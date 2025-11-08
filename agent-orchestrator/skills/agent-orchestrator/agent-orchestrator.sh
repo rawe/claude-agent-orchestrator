@@ -3,10 +3,12 @@
 set -euo pipefail
 
 # Constants
-PROJECT_DIR="$PWD"
-AGENT_SESSIONS_DIR="$PROJECT_DIR/.agent-orchestrator/agent-sessions"
-AGENTS_DIR="$PROJECT_DIR/.agent-orchestrator/agents"
 MAX_NAME_LENGTH=60
+
+# Directory configuration (set by init_directories)
+PROJECT_DIR=""
+AGENT_SESSIONS_DIR=""
+AGENTS_DIR=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -18,15 +20,17 @@ NC='\033[0m' # No Color
 show_help() {
   cat << EOF
 Usage:
-  agent-orchestrator.sh new <session-name> [--agent <agent-name>] [-p <prompt>]
-  agent-orchestrator.sh resume <session-name> [-p <prompt>]
-  agent-orchestrator.sh list
-  agent-orchestrator.sh list-agents
-  agent-orchestrator.sh clean
+  agent-orchestrator.sh [global-options] new <session-name> [--agent <agent-name>] [-p <prompt>]
+  agent-orchestrator.sh [global-options] resume <session-name> [-p <prompt>]
+  agent-orchestrator.sh [global-options] status <session-name>
+  agent-orchestrator.sh [global-options] list
+  agent-orchestrator.sh [global-options] list-agents
+  agent-orchestrator.sh [global-options] clean
 
 Commands:
   new          Create a new session (optionally with an agent)
   resume       Resume an existing session
+  status       Check the status of a session (returns: running, finished, or not_existent)
   list         List all sessions with metadata
   list-agents  List all available agent definitions
   clean        Remove all sessions
@@ -35,9 +39,24 @@ Arguments:
   <session-name>  Name of the session (alphanumeric, dash, underscore only; max 60 chars)
   <agent-name>    Name of the agent definition to use (optional for new command)
 
-Options:
+Global Options (before command):
+  --project-dir <path>   Set project directory (default: current directory)
+  --sessions-dir <path>  Override sessions directory location
+  --agents-dir <path>    Override agents directory location
+
+Command Options:
   -p <prompt>     Session prompt (can be combined with stdin; -p content comes first)
   --agent <name>  Use a specific agent definition (only for new command)
+
+Environment Variables:
+  AGENT_ORCHESTRATOR_PROJECT_DIR   Set default project directory
+  AGENT_ORCHESTRATOR_SESSIONS_DIR  Set default sessions directory
+  AGENT_ORCHESTRATOR_AGENTS_DIR    Set default agents directory
+
+  Precedence order (highest to lowest):
+    1. CLI flags (--project-dir, --sessions-dir, --agents-dir)
+    2. Environment variables
+    3. Current directory (PWD)
 
 Examples:
   # Create new session (generic, no agent)
@@ -58,6 +77,9 @@ Examples:
   # Combine -p and stdin (concatenated)
   cat requirements.md | ./agent-orchestrator.sh new architect -p "Create architecture based on:"
 
+  # Check session status
+  ./agent-orchestrator.sh status architect
+
   # List all sessions
   ./agent-orchestrator.sh list
 
@@ -66,6 +88,20 @@ Examples:
 
   # Remove all sessions
   ./agent-orchestrator.sh clean
+
+  # Use custom project directory
+  ./agent-orchestrator.sh --project-dir /path/to/project new session -p "prompt"
+
+  # Share agents across projects, keep sessions local
+  ./agent-orchestrator.sh --agents-dir ~/shared/agents new session --agent my-agent -p "prompt"
+
+  # Use environment variables
+  export AGENT_ORCHESTRATOR_PROJECT_DIR=/path/to/project
+  ./agent-orchestrator.sh new session -p "prompt"
+
+  # CLI flags override environment variables
+  export AGENT_ORCHESTRATOR_PROJECT_DIR=/tmp/env-project
+  ./agent-orchestrator.sh --project-dir /tmp/cli-project new session -p "prompt"  # Uses /tmp/cli-project
 EOF
 }
 
@@ -73,6 +109,161 @@ EOF
 error() {
   echo -e "${RED}Error: $1${NC}" >&2
   exit 1
+}
+
+# Resolve path to absolute path
+resolve_absolute_path() {
+  local path="$1"
+
+  # If path is empty, return empty
+  if [ -z "$path" ]; then
+    echo ""
+    return
+  fi
+
+  # Try to resolve the path
+  if [ -d "$path" ]; then
+    # Directory exists, get absolute path
+    (cd "$path" 2>/dev/null && pwd) || echo "$path"
+  else
+    # Directory doesn't exist, try to resolve relative to PWD
+    if [[ "$path" = /* ]]; then
+      # Already absolute
+      echo "$path"
+    else
+      # Make it absolute relative to PWD
+      echo "$(pwd)/$path"
+    fi
+  fi
+}
+
+# Find the first existing parent directory
+find_existing_parent() {
+  local dir="$1"
+  local current="$dir"
+
+  while [ "$current" != "/" ] && [ "$current" != "." ]; do
+    if [ -d "$current" ]; then
+      echo "$current"
+      return
+    fi
+    current=$(dirname "$current")
+  done
+
+  echo "/"
+}
+
+# Validate directory configuration
+validate_directories() {
+  # Validate PROJECT_DIR exists and is readable
+  if [ ! -d "$PROJECT_DIR" ]; then
+    error "Project directory does not exist: $PROJECT_DIR"
+  fi
+
+  if [ ! -r "$PROJECT_DIR" ]; then
+    error "Project directory is not readable: $PROJECT_DIR"
+  fi
+
+  # For AGENT_SESSIONS_DIR and AGENTS_DIR, validate that we can create them
+  # Find the first existing parent and check if it's writable
+  if [ ! -d "$AGENT_SESSIONS_DIR" ]; then
+    local sessions_existing_parent
+    sessions_existing_parent=$(find_existing_parent "$AGENT_SESSIONS_DIR")
+    if [ ! -w "$sessions_existing_parent" ]; then
+      error "Cannot create sessions directory (parent not writable): $AGENT_SESSIONS_DIR\nExisting parent: $sessions_existing_parent"
+    fi
+  fi
+
+  if [ ! -d "$AGENTS_DIR" ]; then
+    local agents_existing_parent
+    agents_existing_parent=$(find_existing_parent "$AGENTS_DIR")
+    if [ ! -w "$agents_existing_parent" ]; then
+      error "Cannot create agents directory (parent not writable): $AGENTS_DIR\nExisting parent: $agents_existing_parent"
+    fi
+  fi
+}
+
+# Initialize directory configuration
+# Precedence: 1. CLI flags, 2. Environment variables, 3. PWD default
+# Sets global variables: PROJECT_DIR, AGENT_SESSIONS_DIR, AGENTS_DIR, REMAINING_ARGS
+init_directories() {
+  # Defaults
+  local default_project_dir="$PWD"
+
+  # Environment variables (second priority)
+  local env_project_dir="${AGENT_ORCHESTRATOR_PROJECT_DIR:-}"
+  local env_sessions_dir="${AGENT_ORCHESTRATOR_SESSIONS_DIR:-}"
+  local env_agents_dir="${AGENT_ORCHESTRATOR_AGENTS_DIR:-}"
+
+  # CLI flags (first priority)
+  local cli_project_dir=""
+  local cli_sessions_dir=""
+  local cli_agents_dir=""
+
+  # Parse global flags
+  REMAINING_ARGS=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --project-dir)
+        if [ $# -lt 2 ]; then
+          error "--project-dir flag requires a directory path"
+        fi
+        cli_project_dir="$2"
+        shift 2
+        ;;
+      --sessions-dir)
+        if [ $# -lt 2 ]; then
+          error "--sessions-dir flag requires a directory path"
+        fi
+        cli_sessions_dir="$2"
+        shift 2
+        ;;
+      --agents-dir)
+        if [ $# -lt 2 ]; then
+          error "--agents-dir flag requires a directory path"
+        fi
+        cli_agents_dir="$2"
+        shift 2
+        ;;
+      *)
+        # Not a global flag, save for command processing
+        REMAINING_ARGS+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  # Apply precedence: CLI > ENV > DEFAULT
+  if [ -n "$cli_project_dir" ]; then
+    PROJECT_DIR="$cli_project_dir"
+  elif [ -n "$env_project_dir" ]; then
+    PROJECT_DIR="$env_project_dir"
+  else
+    PROJECT_DIR="$default_project_dir"
+  fi
+
+  # Resolve to absolute path
+  PROJECT_DIR=$(resolve_absolute_path "$PROJECT_DIR")
+
+  # Set derived directories with override support
+  if [ -n "$cli_sessions_dir" ]; then
+    AGENT_SESSIONS_DIR=$(resolve_absolute_path "$cli_sessions_dir")
+  elif [ -n "$env_sessions_dir" ]; then
+    AGENT_SESSIONS_DIR=$(resolve_absolute_path "$env_sessions_dir")
+  else
+    AGENT_SESSIONS_DIR="$PROJECT_DIR/.agent-orchestrator/agent-sessions"
+  fi
+
+  if [ -n "$cli_agents_dir" ]; then
+    AGENTS_DIR=$(resolve_absolute_path "$cli_agents_dir")
+  elif [ -n "$env_agents_dir" ]; then
+    AGENTS_DIR=$(resolve_absolute_path "$env_agents_dir")
+  else
+    AGENTS_DIR="$PROJECT_DIR/.agent-orchestrator/agents"
+  fi
+
+  # Validate directory configuration
+  validate_directories
 }
 
 # Ensure required directories exist
@@ -393,6 +584,52 @@ cmd_resume() {
   extract_result "$session_file"
 }
 
+# Command: status
+cmd_status() {
+  local session_name="$1"
+
+  validate_session_name "$session_name"
+
+  local meta_file="$AGENT_SESSIONS_DIR/${session_name}.meta.json"
+  local session_file="$AGENT_SESSIONS_DIR/${session_name}.jsonl"
+
+  # Check if meta.json exists (primary indicator of session existence)
+  if [ ! -f "$meta_file" ]; then
+    echo "not_existent"
+    return
+  fi
+
+  # Check if session file exists
+  if [ ! -f "$session_file" ]; then
+    # Meta exists but no session file - initializing state
+    echo "running"
+    return
+  fi
+
+  # Check if file is empty (initializing state)
+  if [ ! -s "$session_file" ]; then
+    echo "running"
+    return
+  fi
+
+  # Check last line for type=result
+  local last_line
+  last_line=$(tail -n 1 "$session_file" 2>/dev/null)
+
+  # If we can't read the last line, assume running
+  if [ -z "$last_line" ]; then
+    echo "running"
+    return
+  fi
+
+  # Check if last line has type=result (indicates completion)
+  if echo "$last_line" | jq -e '.type == "result"' > /dev/null 2>&1; then
+    echo "finished"
+  else
+    echo "running"
+  fi
+}
+
 # Command: list
 cmd_list() {
   # Ensure required directories exist
@@ -494,6 +731,20 @@ main() {
     exit 1
   fi
 
+  # Initialize directories from CLI flags, env vars, or defaults
+  # This sets PROJECT_DIR, AGENT_SESSIONS_DIR, AGENTS_DIR, and REMAINING_ARGS
+  init_directories "$@"
+
+  # Check if we have any remaining arguments
+  if [ ${#REMAINING_ARGS[@]} -eq 0 ]; then
+    # No remaining args - show help
+    show_help
+    exit 1
+  fi
+
+  # Set positional parameters to remaining args
+  set -- "${REMAINING_ARGS[@]}"
+
   local command="$1"
   shift
 
@@ -560,6 +811,23 @@ main() {
       done
 
       cmd_resume "$session_name" "$prompt_arg"
+      ;;
+
+    status)
+      # Parse arguments
+      if [ $# -eq 0 ]; then
+        error "Session name required for 'status' command"
+      fi
+
+      local session_name="$1"
+      shift
+
+      # Check for unexpected arguments
+      if [ $# -gt 0 ]; then
+        error "Unknown option: $1"
+      fi
+
+      cmd_status "$session_name"
       ;;
 
     list)
