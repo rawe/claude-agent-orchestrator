@@ -238,9 +238,11 @@ Global options must be specified **before** the command name.
 
 ### `--project-dir <path>`
 
-Set the project directory where `.agent-orchestrator` structure will be created.
+Set the project directory where `.agent-orchestrator` structure will be created **and where the Claude agent will execute**.
 
 **Default:** Current working directory (`$PWD`)
+
+**Important:** This is also the working directory for the `claude` command. The agent will have access to all files in this directory and perform all file operations relative to this location.
 
 **Examples:**
 ```bash
@@ -250,12 +252,14 @@ Set the project directory where `.agent-orchestrator` structure will be created.
 # All subsequent directories derive from this
 # Sessions: /path/to/project/.agent-orchestrator/agent-sessions
 # Agents:   /path/to/project/.agent-orchestrator/agents
+# Claude working directory: /path/to/project
 ```
 
 **Use Cases:**
 - Run orchestrator from any location but target a specific project
 - Manage sessions for multiple projects from a central location
 - CI/CD pipelines with custom workspace directories
+- Point the agent at a specific codebase regardless of your shell's current directory
 
 ---
 
@@ -314,6 +318,47 @@ All three global options can be used together:
   --agents-dir ~/shared/agents \
   new session --agent my-agent -p "prompt"
 ```
+
+---
+
+### Working Directory for Claude
+
+**Important:** The `claude` command is executed from the `PROJECT_DIR`, regardless of where you invoke the agent-orchestrator script.
+
+This means:
+- The Claude agent has access to all files in `PROJECT_DIR`
+- Relative paths in agent prompts are resolved from `PROJECT_DIR`
+- File operations performed by the agent happen in `PROJECT_DIR`
+
+**Examples:**
+
+```bash
+# Example 1: Default behavior
+cd /some/other/path
+./agent-orchestrator.sh new session -p "Analyze the codebase"
+# Claude runs in: /some/other/path (current directory)
+# Sessions stored in: /some/other/path/.agent-orchestrator/agent-sessions
+
+# Example 2: Custom project directory
+cd /anywhere
+./agent-orchestrator.sh --project-dir /path/to/project new session -p "Analyze the codebase"
+# Claude runs in: /path/to/project (specified directory)
+# Sessions stored in: /path/to/project/.agent-orchestrator/agent-sessions
+
+# Example 3: Separate sessions directory
+cd /anywhere
+./agent-orchestrator.sh --project-dir /path/to/project --sessions-dir /tmp/sessions new session -p "Analyze"
+# Claude runs in: /path/to/project (agent works in project)
+# Sessions stored in: /tmp/sessions (separate storage)
+```
+
+**Why this matters:**
+- When you say "analyze the current codebase", Claude looks in `PROJECT_DIR`
+- When Claude creates/modifies files, they go in `PROJECT_DIR`
+- The agent's context is always rooted in `PROJECT_DIR`
+
+**Best practice:**
+Set `--project-dir` to the directory containing the code you want the agent to work on, regardless of where you invoke the script from.
 
 ---
 

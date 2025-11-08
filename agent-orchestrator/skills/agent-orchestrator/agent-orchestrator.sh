@@ -531,8 +531,9 @@ cmd_new() {
   # Save session metadata immediately
   save_session_metadata "$session_name" "$agent_name"
 
-  # Run claude command
-  if ! claude -p "$final_prompt" $mcp_arg --output-format stream-json --permission-mode bypassPermissions >> "$session_file" 2>&1; then
+  # Run claude command from PROJECT_DIR
+  # Note: cd happens in subshell, so we return to original directory after
+  if ! (cd "$PROJECT_DIR" && claude -p "$final_prompt" $mcp_arg --output-format stream-json --permission-mode bypassPermissions) >> "$session_file" 2>&1; then
     error "Claude command failed"
   fi
 
@@ -572,8 +573,9 @@ cmd_resume() {
     mcp_arg=$(build_mcp_arg "$MCP_CONFIG")
   fi
 
-  # Run claude command with resume
-  if ! claude -r "$session_id" -p "$prompt" $mcp_arg --output-format stream-json --permission-mode bypassPermissions >> "$session_file" 2>&1; then
+  # Run claude command with resume from PROJECT_DIR
+  # Note: cd happens in subshell, so we return to original directory after
+  if ! (cd "$PROJECT_DIR" && claude -r "$session_id" -p "$prompt" $mcp_arg --output-format stream-json --permission-mode bypassPermissions) >> "$session_file" 2>&1; then
     error "Claude resume command failed"
   fi
 
