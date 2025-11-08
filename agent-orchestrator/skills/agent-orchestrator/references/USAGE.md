@@ -156,6 +156,51 @@ agent-orchestrator.sh [global-options] status <session-name>
 
 ---
 
+### `show-config`
+
+Display the configuration and execution context for a session.
+
+**Syntax:**
+```bash
+agent-orchestrator.sh [global-options] show-config <session-name>
+```
+
+**Arguments:**
+- `<session-name>` (required): Name of session to inspect
+
+**Examples:**
+```bash
+./agent-orchestrator.sh show-config architect
+# Output:
+# Configuration for session 'architect':
+#   Session file:    /path/.agent-orchestrator/agent-sessions/architect.jsonl
+#   Project dir:     /path/to/project (from meta.json)
+#   Agents dir:      /path/to/agents (from meta.json)
+#   Sessions dir:    /path/.agent-orchestrator/agent-sessions (current)
+#   Agent:           system-architect
+#   Created:         2025-01-08T10:00:00Z
+#   Last resumed:    2025-01-08T12:30:00Z
+#   Schema version:  1.0
+```
+
+**What it shows:**
+- **Session file**: Full path to the JSONL execution log
+- **Project dir**: Where the Claude agent executes (frozen at creation)
+- **Agents dir**: Where agent definitions are located (frozen at creation)
+- **Sessions dir**: Current sessions storage location (can change)
+- **Agent**: Associated agent name (or "none" for generic sessions)
+- **Created**: When the session was first created
+- **Last resumed**: When the session was last resumed
+- **Schema version**: Metadata format version (1.0 or "legacy")
+
+**Use cases:**
+- Verify which directories a session uses
+- Debug session configuration issues
+- Check if session uses legacy or new metadata format
+- Confirm session context before resuming
+
+---
+
 ### `list`
 
 List all agent sessions with metadata.
@@ -562,6 +607,158 @@ Each agent is a directory containing:
 **`agent.mcp.json`** (optional):
 - MCP (Model Context Protocol) configuration
 - Passed to Claude CLI via `--mcp-config` flag
+
+---
+
+## Session Context Preservation
+
+**Critical Concept:** When you resume a session, it uses the **exact same** `PROJECT_DIR` and `AGENTS_DIR` as when it was created, regardless of current settings.
+
+### Why This Matters
+
+Sessions preserve their execution context to ensure consistency:
+- The Claude agent works in the same project directory
+- Agent definitions come from the same location
+- File operations happen in the expected places
+- No surprises from changed environments
+
+### How It Works
+
+**When creating a session (`new`):**
+1. Current `PROJECT_DIR` and `AGENTS_DIR` are captured
+2. Stored in `meta.json` as absolute paths
+3. These become the "frozen" context for this session
+
+**When resuming a session (`resume`):**
+1. Stored `PROJECT_DIR` and `AGENTS_DIR` are loaded from `meta.json`
+2. CLI flags and environment variables are **ignored** for these directories
+3. If stored paths don't exist, you'll get a fallback warning
+4. `SESSIONS_DIR` can still be changed (it's just storage location)
+
+### Metadata Schema (v1.0)
+
+New sessions store context in `meta.json`:
+
+```json
+{
+  "session_name": "architect",
+  "agent": "system-architect",
+  "project_dir": "/Users/ramon/Documents/Projects/my-app",
+  "agents_dir": "/Users/ramon/.agent-orchestrator/agents",
+  "created_at": "2025-01-08T10:00:00Z",
+  "last_resumed_at": "2025-01-08T12:30:00Z",
+  "schema_version": "1.0"
+}
+```
+
+### Legacy Session Migration
+
+Old sessions (without `project_dir`/`agents_dir` fields) are automatically migrated:
+
+```
+NOTICE: Migrating session metadata to new format.
+Capturing current execution context...
+  Project directory: /current/project/dir
+  Agents directory: /current/agents/dir
+
+Future resumes will preserve this context.
+```
+
+The current directories are captured and stored on first resume.
+
+### Context Warnings
+
+**When stored paths are used (ignoring your flags):**
+```
+WARNING: Using stored project directory, ignoring --project-dir flag.
+  Stored: /original/project/dir
+  Your flag: /different/project/dir
+
+Sessions preserve their original context to ensure consistency.
+```
+
+**When stored paths don't exist (fallback):**
+```
+WARNING: Session context has changed.
+
+Stored context (from session creation):
+  Project: /old/path (MISSING)
+  Agents: /old/agents (MISSING)
+
+Current context:
+  Project: /current/path
+  Agents: /current/agents
+
+Continue with fallback context? [y/N]
+```
+
+You must confirm to proceed with changed context.
+
+### Best Practices
+
+**1. Verify Context Before Resuming**
+```bash
+# Check what context a session will use
+./agent-orchestrator.sh show-config my-session
+```
+
+**2. Don't Move Project Directories**
+If you must move a project:
+- The session will fail to find the original path
+- You'll get a fallback warning
+- Consider creating a new session instead
+
+**3. Share Agents Carefully**
+When using `--agents-dir` to share agents:
+- Ensure the path is stable (not temporary)
+- Use absolute paths that won't change
+- Document the shared location
+
+**4. Environment Variables for Consistency**
+```bash
+# Set in your shell profile for consistent defaults
+export AGENT_ORCHESTRATOR_PROJECT_DIR=~/my-projects/main
+export AGENT_ORCHESTRATOR_AGENTS_DIR=~/shared/agents
+
+# All new sessions will use these by default
+./agent-orchestrator.sh new session -p "prompt"
+```
+
+### Troubleshooting
+
+**Problem: "Project directory does not exist" on resume**
+
+The project was moved or deleted.
+
+**Solutions:**
+1. Move the project back to its original location
+2. Accept the fallback to current directory (may cause issues)
+3. Create a new session in the new location
+
+**Problem: "Agent not found" on resume**
+
+The agents directory moved or the agent definition was deleted.
+
+**Solutions:**
+1. Restore the agents directory to its original location
+2. Copy the agent definition to the current agents directory
+3. Accept fallback and ensure agent exists in new location
+
+**Problem: Session created in wrong directory**
+
+You forgot to set `--project-dir` when creating the session.
+
+**Solution:**
+Delete the session and recreate with correct `--project-dir`:
+```bash
+# Wrong - used current directory
+./agent-orchestrator.sh new oops -p "prompt"
+
+# Fix
+./agent-orchestrator.sh clean  # or manually delete oops.*
+cd /correct/project/dir
+./agent-orchestrator.sh new fixed -p "prompt"
+```
 
 ---
 

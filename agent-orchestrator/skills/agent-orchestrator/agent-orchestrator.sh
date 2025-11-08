@@ -23,6 +23,7 @@ Usage:
   agent-orchestrator.sh [global-options] new <session-name> [--agent <agent-name>] [-p <prompt>]
   agent-orchestrator.sh [global-options] resume <session-name> [-p <prompt>]
   agent-orchestrator.sh [global-options] status <session-name>
+  agent-orchestrator.sh [global-options] show-config <session-name>
   agent-orchestrator.sh [global-options] list
   agent-orchestrator.sh [global-options] list-agents
   agent-orchestrator.sh [global-options] clean
@@ -31,6 +32,7 @@ Commands:
   new          Create a new session (optionally with an agent)
   resume       Resume an existing session
   status       Check the status of a session (returns: running, finished, or not_existent)
+  show-config  Display session configuration and context
   list         List all sessions with metadata
   list-agents  List all available agent definitions
   clean        Remove all sessions
@@ -79,6 +81,9 @@ Examples:
 
   # Check session status
   ./agent-orchestrator.sh status architect
+
+  # Show session configuration
+  ./agent-orchestrator.sh show-config architect
 
   # List all sessions
   ./agent-orchestrator.sh list
@@ -425,6 +430,8 @@ load_system_prompt() {
 save_session_metadata() {
   local session_name="$1"
   local agent_name="$2"  # Can be empty for generic sessions
+  local project_dir="$3"
+  local agents_dir="$4"
   local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   local meta_file="$AGENT_SESSIONS_DIR/${session_name}.meta.json"
@@ -433,8 +440,11 @@ save_session_metadata() {
 {
   "session_name": "$session_name",
   "agent": $([ -n "$agent_name" ] && echo "\"$agent_name\"" || echo "null"),
+  "project_dir": "$project_dir",
+  "agents_dir": "$agents_dir",
   "created_at": "$timestamp",
-  "last_resumed_at": "$timestamp"
+  "last_resumed_at": "$timestamp",
+  "schema_version": "1.0"
 }
 EOF
 }
@@ -466,8 +476,125 @@ update_session_metadata() {
     mv "${meta_file}.tmp" "$meta_file"
   else
     # Create meta.json if it doesn't exist (backward compatibility)
-    save_session_metadata "$session_name" "$agent_name"
+    # Use current PROJECT_DIR and AGENTS_DIR
+    save_session_metadata "$session_name" "$agent_name" "$PROJECT_DIR" "$AGENTS_DIR"
   fi
+}
+
+# Load session context and validate/fallback as needed
+# This function enforces that resume uses the same PROJECT_DIR and AGENTS_DIR as creation
+# Sets global vars: PROJECT_DIR, AGENTS_DIR (may override init_directories values)
+# Returns: 0 if OK, 1 if user cancelled due to warnings
+load_and_validate_context() {
+  local session_name="$1"
+  local meta_file="$AGENT_SESSIONS_DIR/${session_name}.meta.json"
+
+  # Save the current values (from init_directories) to detect user overrides
+  local current_project_dir="$PROJECT_DIR"
+  local current_agents_dir="$AGENTS_DIR"
+
+  # Check if meta.json has context fields (schema v1.0+)
+  if ! jq -e '.project_dir' "$meta_file" > /dev/null 2>&1; then
+    # Legacy format - migrate
+    echo -e "${YELLOW}NOTICE: Migrating session metadata to new format.${NC}" >&2
+    echo -e "Capturing current execution context..." >&2
+    echo -e "  Project directory: $PROJECT_DIR" >&2
+    echo -e "  Agents directory: $AGENTS_DIR" >&2
+    echo "" >&2
+
+    # Update meta.json with current context
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local agent=$(jq -r '.agent // empty' "$meta_file")
+    local created=$(jq -r '.created_at' "$meta_file")
+
+    cat > "$meta_file" <<EOF
+{
+  "session_name": "$session_name",
+  "agent": $([ -n "$agent" ] && echo "\"$agent\"" || echo "null"),
+  "project_dir": "$PROJECT_DIR",
+  "agents_dir": "$AGENTS_DIR",
+  "created_at": "$created",
+  "last_resumed_at": "$timestamp",
+  "schema_version": "1.0",
+  "migrated_from": "legacy"
+}
+EOF
+    return 0
+  fi
+
+  # Extract stored context
+  local stored_project_dir=$(jq -r '.project_dir' "$meta_file")
+  local stored_agents_dir=$(jq -r '.agents_dir' "$meta_file")
+
+  # Track if we need to warn about fallback
+  local using_fallback=false
+  local warnings=""
+
+  # Validate PROJECT_DIR
+  if [ ! -d "$stored_project_dir" ] || [ ! -r "$stored_project_dir" ]; then
+    using_fallback=true
+    warnings+="  Project: $stored_project_dir (MISSING)\n"
+    warnings+="  Fallback: $current_project_dir\n\n"
+    # Keep current PROJECT_DIR (fallback)
+  else
+    # Check if user tried to override (and warn)
+    if [ "$stored_project_dir" != "$current_project_dir" ]; then
+      echo -e "${YELLOW}WARNING: Using stored project directory, ignoring --project-dir flag.${NC}" >&2
+      echo -e "  Stored: $stored_project_dir" >&2
+      echo -e "  Your flag: $current_project_dir" >&2
+      echo "" >&2
+    fi
+    PROJECT_DIR="$stored_project_dir"
+  fi
+
+  # Validate AGENTS_DIR
+  if [ ! -d "$stored_agents_dir" ]; then
+    # Check if parent is writable (can create it)
+    local agents_parent=$(find_existing_parent "$stored_agents_dir")
+    if [ ! -w "$agents_parent" ]; then
+      using_fallback=true
+      warnings+="  Agents: $stored_agents_dir (MISSING, cannot create)\n"
+      warnings+="  Fallback: $current_agents_dir\n\n"
+      # Keep current AGENTS_DIR (fallback)
+    else
+      # Can create it, use stored path
+      if [ "$stored_agents_dir" != "$current_agents_dir" ]; then
+        echo -e "${YELLOW}WARNING: Using stored agents directory, ignoring --agents-dir flag.${NC}" >&2
+        echo -e "  Stored: $stored_agents_dir" >&2
+        echo -e "  Your flag: $current_agents_dir" >&2
+        echo "" >&2
+      fi
+      AGENTS_DIR="$stored_agents_dir"
+    fi
+  else
+    # Check if user tried to override (and warn)
+    if [ "$stored_agents_dir" != "$current_agents_dir" ]; then
+      echo -e "${YELLOW}WARNING: Using stored agents directory, ignoring --agents-dir flag.${NC}" >&2
+      echo -e "  Stored: $stored_agents_dir" >&2
+      echo -e "  Your flag: $current_agents_dir" >&2
+      echo "" >&2
+    fi
+    AGENTS_DIR="$stored_agents_dir"
+  fi
+
+  # If using fallback, warn and confirm
+  if [ "$using_fallback" = true ]; then
+    echo -e "${YELLOW}WARNING: Session context has changed.${NC}" >&2
+    echo "" >&2
+    echo -e "Stored context (from session creation):" >&2
+    echo -e "$warnings" >&2
+    echo -e "Current context:" >&2
+    echo -e "  Project: $PROJECT_DIR" >&2
+    echo -e "  Agents: $AGENTS_DIR" >&2
+    echo "" >&2
+    echo -n "Continue with fallback context? [y/N] " >&2
+    read -r response
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+      return 1
+    fi
+  fi
+
+  return 0
 }
 
 # Build MCP config argument for Claude CLI
@@ -528,8 +655,8 @@ cmd_new() {
   # Ensure required directories exist
   ensure_directories
 
-  # Save session metadata immediately
-  save_session_metadata "$session_name" "$agent_name"
+  # Save session metadata immediately with context
+  save_session_metadata "$session_name" "$agent_name" "$PROJECT_DIR" "$AGENTS_DIR"
 
   # Run claude command from PROJECT_DIR
   # Note: cd happens in subshell, so we return to original directory after
@@ -554,6 +681,14 @@ cmd_resume() {
   if [ ! -f "$session_file" ]; then
     error "Session '$session_name' does not exist. Use 'new' command to create it"
   fi
+
+  # Load and validate context (may override PROJECT_DIR/AGENTS_DIR)
+  if ! load_and_validate_context "$session_name"; then
+    error "Session resume cancelled by user"
+  fi
+
+  # Re-validate directories with potentially updated paths
+  validate_directories
 
   # Load session metadata to get agent
   load_session_metadata "$session_name"
@@ -842,6 +977,47 @@ main() {
 
     clean)
       cmd_clean
+      ;;
+
+    show-config)
+      # Parse arguments
+      if [ $# -eq 0 ]; then
+        error "Session name required for 'show-config' command"
+      fi
+
+      local session_name="$1"
+      shift
+
+      # Check for unexpected arguments
+      if [ $# -gt 0 ]; then
+        error "Unknown option: $1"
+      fi
+
+      validate_session_name "$session_name"
+
+      local meta_file="$AGENT_SESSIONS_DIR/${session_name}.meta.json"
+      if [ ! -f "$meta_file" ]; then
+        error "Session '$session_name' does not exist"
+      fi
+
+      # Load and validate context
+      if ! load_and_validate_context "$session_name"; then
+        error "Cannot display configuration"
+      fi
+
+      # Load session metadata
+      load_session_metadata "$session_name"
+
+      # Display configuration
+      echo "Configuration for session '$session_name':"
+      echo "  Session file:    $AGENT_SESSIONS_DIR/${session_name}.jsonl"
+      echo "  Project dir:     $PROJECT_DIR (from meta.json)"
+      echo "  Agents dir:      $AGENTS_DIR (from meta.json)"
+      echo "  Sessions dir:    $AGENT_SESSIONS_DIR (current)"
+      echo "  Agent:           ${SESSION_AGENT:-none}"
+      echo "  Created:         $(jq -r '.created_at' "$meta_file")"
+      echo "  Last resumed:    $(jq -r '.last_resumed_at' "$meta_file")"
+      echo "  Schema version:  $(jq -r '.schema_version // "legacy"' "$meta_file")"
       ;;
 
     -h|--help)
