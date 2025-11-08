@@ -32,6 +32,9 @@ The `agent-orchestrator.sh` script is a command-line tool for managing Claude Co
 # Check session status
 ./agent-orchestrator.sh status my-session
 
+# Get result from completed session
+./agent-orchestrator.sh get-result my-session
+
 # List all sessions
 ./agent-orchestrator.sh list
 ```
@@ -153,6 +156,60 @@ agent-orchestrator.sh [global-options] status <session-name>
 2. If `<session-name>.jsonl` doesn't exist or is empty → `running` (initializing)
 3. If last line of JSONL has `type=result` → `finished`
 4. Otherwise → `running`
+
+---
+
+### `get-result`
+
+Extract the result from a completed agent session.
+
+**Syntax:**
+```bash
+agent-orchestrator.sh [global-options] get-result <session-name>
+```
+
+**Arguments:**
+- `<session-name>` (required): Name of completed session to extract result from
+
+**Returns:**
+- The result string from the completed session (same format as `new` and `resume` commands)
+- Exits with error if session doesn't exist, is still running, or hasn't finished
+
+**Examples:**
+```bash
+# Get result from a finished session
+./agent-orchestrator.sh get-result architect
+# Output: <result text from agent execution>
+
+# Check status first, then get result
+if [ "$(./agent-orchestrator.sh status architect)" = "finished" ]; then
+  ./agent-orchestrator.sh get-result architect
+fi
+```
+
+**Behavior:**
+- Validates session exists and has content
+- Checks if last line of session file has `type=result` (session completed)
+- Extracts and returns the result property using `jq -r '.result // empty'`
+- Returns the same raw result string format as `new` and `resume` commands
+- **Does not** start or resume the session - only retrieves existing result
+
+**Error Conditions:**
+1. `Session '<name>' does not exist` - Session file not found
+2. `Session '<name>' is still initializing` - Session file is empty
+3. `Session '<name>' has not finished yet` - Last line is not type "result"
+4. `Could not extract result from session file` - Result property missing or malformed
+
+**Use Cases:**
+- Retrieve results from completed sessions without resuming
+- Script automation where you only need the final result
+- Polling for session completion and extracting result
+- Extracting results multiple times without affecting the session
+
+**Comparison with `new` and `resume`:**
+- `new` and `resume`: Execute agent and return result
+- `get-result`: Only extracts result from already-completed session
+- All three return the same format: raw result string
 
 ---
 
@@ -988,6 +1045,10 @@ while [ "$(./agent-orchestrator.sh status long-task)" = "running" ]; do
 done
 
 echo "Session completed!"
+
+# Extract and display result
+RESULT=$(./agent-orchestrator.sh get-result long-task)
+echo "Result: $RESULT"
 ```
 
 ---
@@ -1048,9 +1109,13 @@ Extract results from completed sessions:
 
 ```bash
 # Get the result from a completed session
-./agent-orchestrator.sh status my-session | grep -q "finished" && \
-  tail -n 1 ~/.agent-orchestrator/agent-sessions/my-session.jsonl | \
-  jq -r '.result'
+./agent-orchestrator.sh get-result my-session
+
+# Check status first, then get result
+if [ "$(./agent-orchestrator.sh status my-session)" = "finished" ]; then
+  RESULT=$(./agent-orchestrator.sh get-result my-session)
+  echo "Session result: $RESULT"
+fi
 ```
 
 ---

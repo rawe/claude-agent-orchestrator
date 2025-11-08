@@ -23,6 +23,7 @@ Usage:
   agent-orchestrator.sh [global-options] new <session-name> [--agent <agent-name>] [-p <prompt>]
   agent-orchestrator.sh [global-options] resume <session-name> [-p <prompt>]
   agent-orchestrator.sh [global-options] status <session-name>
+  agent-orchestrator.sh [global-options] get-result <session-name>
   agent-orchestrator.sh [global-options] show-config <session-name>
   agent-orchestrator.sh [global-options] list
   agent-orchestrator.sh [global-options] list-agents
@@ -32,6 +33,7 @@ Commands:
   new          Create a new session (optionally with an agent)
   resume       Resume an existing session
   status       Check the status of a session (returns: running, finished, or not_existent)
+  get-result   Extract the result from a completed session
   show-config  Display session configuration and context
   list         List all sessions with metadata
   list-agents  List all available agent definitions
@@ -81,6 +83,9 @@ Examples:
 
   # Check session status
   ./agent-orchestrator.sh status architect
+
+  # Get result from completed session
+  ./agent-orchestrator.sh get-result architect
 
   # Show session configuration
   ./agent-orchestrator.sh show-config architect
@@ -767,6 +772,49 @@ cmd_status() {
   fi
 }
 
+# Command: get-result
+cmd_get_result() {
+  local session_name="$1"
+
+  validate_session_name "$session_name"
+
+  local session_file="$AGENT_SESSIONS_DIR/${session_name}.jsonl"
+
+  # Check if session exists
+  if [ ! -f "$session_file" ]; then
+    error "Session '$session_name' does not exist"
+  fi
+
+  # Check if session file has content
+  if [ ! -s "$session_file" ]; then
+    error "Session '$session_name' is still initializing (no data yet)"
+  fi
+
+  # Read last line
+  local last_line
+  last_line=$(tail -n 1 "$session_file" 2>/dev/null)
+
+  # Check if we can read the last line
+  if [ -z "$last_line" ]; then
+    error "Cannot read session file: $session_file"
+  fi
+
+  # Check if last line is of type "result"
+  if ! echo "$last_line" | jq -e '.type == "result"' > /dev/null 2>&1; then
+    error "Session '$session_name' has not finished yet (last line is not a result)"
+  fi
+
+  # Extract and output result (same as new/resume commands)
+  local result
+  result=$(echo "$last_line" | jq -r '.result // empty' 2>/dev/null)
+
+  if [ -z "$result" ]; then
+    error "Could not extract result from session file"
+  fi
+
+  echo "$result"
+}
+
 # Command: list
 cmd_list() {
   # Ensure required directories exist
@@ -965,6 +1013,23 @@ main() {
       fi
 
       cmd_status "$session_name"
+      ;;
+
+    get-result)
+      # Parse arguments
+      if [ $# -eq 0 ]; then
+        error "Session name required for 'get-result' command"
+      fi
+
+      local session_name="$1"
+      shift
+
+      # Check for unexpected arguments
+      if [ $# -gt 0 ]; then
+        error "Unknown option: $1"
+      fi
+
+      cmd_get_result "$session_name"
       ;;
 
     list)
