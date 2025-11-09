@@ -80,6 +80,16 @@ These environment variables control how the `agent-orchestrator.sh` script opera
   export AGENT_ORCHESTRATOR_AGENTS_DIR="/custom/path/to/agents"
   ```
 
+### MCP Server Configuration
+
+- **`MCP_SERVER_DEBUG`** (optional): Enable debug logging for the MCP server
+  - Set to `"true"` to enable debug logging to `logs/mcp-server.log`
+  - Omit or set to `"false"` to disable logging (default)
+  - Useful for troubleshooting MCP server issues
+  ```bash
+  export MCP_SERVER_DEBUG="true"
+  ```
+
 ## Usage
 
 ### Running the Server
@@ -318,9 +328,34 @@ Make sure to set the required environment variables before testing.
 
 The MCP server includes comprehensive debug logging to help troubleshoot issues.
 
+### Enabling Debug Logging
+
+Debug logging is **disabled by default**. To enable it, set the `MCP_SERVER_DEBUG` environment variable to `"true"`:
+
+```bash
+export MCP_SERVER_DEBUG="true"
+```
+
+Or add it to your MCP configuration:
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "command": "node",
+      "args": ["/path/to/dist/index.js"],
+      "env": {
+        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/path/to/agent-orchestrator.sh",
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
+        "MCP_SERVER_DEBUG": "true"
+      }
+    }
+  }
+}
+```
+
 ### Debug Logs Location
 
-All debug logs are written to:
+When enabled, all debug logs are written to:
 ```
 agent-orchestrator-mcp-server/logs/mcp-server.log
 ```

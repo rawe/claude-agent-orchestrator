@@ -31,9 +31,21 @@ export enum LogLevel {
 }
 
 /**
+ * Check if logging is enabled via environment variable
+ */
+function isLoggingEnabled(): boolean {
+  return process.env.MCP_SERVER_DEBUG === "true";
+}
+
+/**
  * Write a log entry to the log file
  */
 export function log(level: LogLevel, message: string, data?: any) {
+  // Only log if debugging is enabled
+  if (!isLoggingEnabled()) {
+    return;
+  }
+
   try {
     ensureLogDir();
 
@@ -68,6 +80,10 @@ export const logger = {
  * Clear the log file (useful for testing)
  */
 export function clearLog() {
+  if (!isLoggingEnabled()) {
+    return;
+  }
+
   try {
     ensureLogDir();
     fs.writeFileSync(LOG_FILE, "");

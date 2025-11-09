@@ -76,9 +76,10 @@ This will open a web interface where you can:
 }
 ```
 
-**Note**: For more control over session and agent storage locations, you can also set:
+**Note**: Additional optional environment variables:
 - `AGENT_ORCHESTRATOR_SESSIONS_DIR` - Custom path for session storage
 - `AGENT_ORCHESTRATOR_AGENTS_DIR` - Custom path for agent definitions
+- `MCP_SERVER_DEBUG` - Set to `"true"` to enable debug logging (default: disabled)
 
 **Replace the paths** with your actual absolute paths!
 
@@ -126,6 +127,37 @@ Once configured in Claude Desktop, you can use natural language:
 2. Verify the configuration file is valid JSON
 3. Make sure you restarted Claude Desktop after adding the configuration
 4. Check that all paths in the configuration are absolute (not relative)
+
+### Debugging Issues
+
+To troubleshoot MCP server issues, enable debug logging:
+
+1. **Add the `MCP_SERVER_DEBUG` environment variable** to your configuration:
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "env": {
+        "MCP_SERVER_DEBUG": "true",
+        ...other env vars...
+      }
+    }
+  }
+}
+```
+
+2. **Restart Claude Desktop** to apply the changes
+
+3. **Check the log file** at `agent-orchestrator-mcp-server/logs/mcp-server.log`:
+```bash
+# View logs
+cat logs/mcp-server.log | jq '.'
+
+# Follow logs in real-time
+tail -f logs/mcp-server.log | jq '.'
+```
+
+The logs will contain detailed information about server startup, tool calls, script execution, and any errors.
 
 ## Development
 
