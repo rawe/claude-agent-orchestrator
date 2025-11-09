@@ -4,13 +4,31 @@ A Model Context Protocol (MCP) server that provides tools for orchestrating spec
 
 ## Overview
 
-This MCP server enables LLMs to manage and interact with specialized Claude Code agent sessions. It wraps the `agent-orchestrator.sh` bash script to provide a clean, type-safe interface for:
+### What is the Orchestrated Agent Framework (OAF)?
 
-- Discovering available specialized agent definitions
-- Creating new agent sessions (generic or specialized)
-- Resuming existing agent sessions
-- Listing active sessions
-- Cleaning up sessions
+The **Orchestrated Agent Framework (OAF)** is the combination of this MCP server and the `agent-orchestrator.sh` script (from the `agent-orchestrator` Claude Code skill). Together they enable creating and managing specialized Claude Code agent sessions that work autonomously on tasks.
+
+**Key components**:
+- **This MCP server**: Provides MCP tools for orchestrating agents from any MCP-compatible AI system
+- **agent-orchestrator.sh**: The underlying bash script that launches and manages Claude Code sessions
+- **Agent definitions**: Specialized agent configurations (`.agent-orchestrator/agents/`)
+- **Sessions**: Active or completed agent work sessions (`.agent-orchestrator/sessions/`)
+
+### Relationship to Claude Code Plugin
+
+Previously, the agent orchestrator was available only as a Claude Code skill/plugin installed in `.claude/skills/`. This MCP server **provides an abstraction layer** that:
+- Works with any AI agent system supporting MCP (Claude Desktop, Claude Code, etc.)
+- No longer requires installing the skill as a Claude Code plugin
+- Provides a standardized MCP interface for agent orchestration
+
+### What This MCP Server Does
+
+Provides 5 MCP tools for managing orchestrated agent sessions:
+- Discover available specialized agent definitions
+- Create new agent sessions (generic or specialized)
+- Resume existing agent sessions
+- List active sessions
+- Clean up sessions
 
 ## Features
 
@@ -28,123 +46,69 @@ This MCP server enables LLMs to manage and interact with specialized Claude Code
 
 ## Installation
 
-1. **Install dependencies**:
-```bash
-npm install
-```
+See [GETTING_STARTED.md](./GETTING_STARTED.md) for installation instructions.
 
-2. **Build the TypeScript code**:
-```bash
-npm run build
-```
+## Environment Variables Reference
 
-3. **Set required environment variables**:
-```bash
-export AGENT_ORCHESTRATOR_SCRIPT_PATH="/absolute/path/to/agent-orchestrator.sh"
-export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/your/project"  # Recommended: controls where claude runs and where data is stored
-```
+This is the **single source of truth** for all environment variables used by the Agent Orchestrator MCP Server.
 
-## Configuration
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AGENT_ORCHESTRATOR_SCRIPT_PATH` | **Yes** | - | Absolute path to the `agent-orchestrator.sh` script |
+| `AGENT_ORCHESTRATOR_PROJECT_DIR` | **Claude Desktop: Yes**<br>Claude Code: No | Current directory (Claude Code only) | Project directory where orchestrated agents execute. Controls the base for other defaults. |
+| `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/sessions` | Custom location for agent session storage. Use for centralized session management across projects. |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/agents` | Custom location for agent definitions. Use to share agent definitions across projects. |
+| `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | No | `false` | Set to `"true"` to enable logging of orchestrated agent execution. Used for debugging agent sessions. |
+| `MCP_SERVER_DEBUG` | No | `false` | Set to `"true"` to enable debug logging to `logs/mcp-server.log`. Used for troubleshooting MCP server issues. |
+| `PATH` | **Claude Desktop only** | - | Must include path to Node.js binary. Claude Desktop does not inherit shell PATH. Example: `/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin` |
 
-The MCP server requires the following environment variables:
+### Variable Details
 
-### Required
+**`AGENT_ORCHESTRATOR_SCRIPT_PATH`** (Required)
+- Absolute path to the `agent-orchestrator.sh` bash script
+- Example: `/Users/yourname/projects/claude-dev-skills/agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
 
-- **`AGENT_ORCHESTRATOR_SCRIPT_PATH`**: Absolute path to the `agent-orchestrator.sh` script
-  ```bash
-  export AGENT_ORCHESTRATOR_SCRIPT_PATH="/Users/yourname/path/to/agent-orchestrator.sh"
-  ```
+**`AGENT_ORCHESTRATOR_PROJECT_DIR`** (Conditionally Required)
+- Directory where orchestrated agents execute
+- Required for Claude Desktop
+- Optional for Claude Code (defaults to current directory where MCP server is invoked)
+- This is the working directory for all agent sessions
+- Example: `/Users/yourname/my-project`
 
-### Agent Orchestrator Script Configuration
+**`AGENT_ORCHESTRATOR_SESSIONS_DIR`** (Optional)
+- Custom path for storing session data
+- Defaults to `.agent-orchestrator/sessions/` within the project directory
+- Use when you want centralized session management across multiple projects
+- Example: `/Users/yourname/.agent-orchestrator-global/sessions`
 
-These environment variables control how the `agent-orchestrator.sh` script operates:
+**`AGENT_ORCHESTRATOR_AGENTS_DIR`** (Optional)
+- Custom path for agent definition files
+- Defaults to `.agent-orchestrator/agents/` within the project directory
+- Use when you want to share agent definitions across multiple projects
+- Example: `/Users/yourname/.agent-orchestrator-global/agents`
 
-- **`AGENT_ORCHESTRATOR_PROJECT_DIR`** (recommended): Project directory where the `claude` command runs
-  - If not set, defaults to the directory where the script is called from
-  - This is where agents will execute and is the base for other defaults
-  ```bash
-  export AGENT_ORCHESTRATOR_PROJECT_DIR="/Users/yourname/your-project"
-  ```
+**`AGENT_ORCHESTRATOR_ENABLE_LOGGING`** (Optional)
+- Enable logging for orchestrated agent sessions
+- Set to `"true"` for debugging purposes
+- Logs agent execution details
 
-- **`AGENT_ORCHESTRATOR_SESSIONS_DIR`** (optional): Custom location for agent session storage
-  - If not set, defaults to `$AGENT_ORCHESTRATOR_PROJECT_DIR/.agent-orchestrator/sessions`
-  - Use this for centralized session management across multiple projects
-  ```bash
-  export AGENT_ORCHESTRATOR_SESSIONS_DIR="/custom/path/to/sessions"
-  ```
+**`MCP_SERVER_DEBUG`** (Optional)
+- Enable debug logging for the MCP server itself
+- Set to `"true"` to write logs to `logs/mcp-server.log`
+- Logs include server startup, tool calls, script execution, and errors
 
-- **`AGENT_ORCHESTRATOR_AGENTS_DIR`** (optional): Custom location for agent definitions
-  - If not set, defaults to `$AGENT_ORCHESTRATOR_PROJECT_DIR/.agent-orchestrator/agents`
-  - Use this to share agent definitions across multiple projects
-  ```bash
-  export AGENT_ORCHESTRATOR_AGENTS_DIR="/custom/path/to/agents"
-  ```
+**`PATH`** (Claude Desktop Only)
+- Required for Claude Desktop because UI applications do not inherit shell environment PATH
+- Must include the directory containing the `node` binary
+- Common values:
+  - macOS with Homebrew: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
+  - macOS with nvm: `/Users/yourname/.nvm/versions/node/v20.x.x/bin:/usr/local/bin:/usr/bin:/bin`
 
-### MCP Server Configuration
+## Configuration Examples
 
-- **`MCP_SERVER_DEBUG`** (optional): Enable debug logging for the MCP server
-  - Set to `"true"` to enable debug logging to `logs/mcp-server.log`
-  - Omit or set to `"false"` to disable logging (default)
-  - Useful for troubleshooting MCP server issues
-  ```bash
-  export MCP_SERVER_DEBUG="true"
-  ```
-
-## Usage
-
-### Running the Server
-
-**Development mode** (with auto-reload):
-```bash
-npm run dev
-```
-
-**Production mode**:
-```bash
-npm start
-```
-
-### MCP Configuration
-
-Add this server to your MCP settings (e.g., Claude Desktop configuration):
-
-```json
-{
-  "mcpServers": {
-    "agent-orchestrator": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js"
-      ],
-      "env": {
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-For more control over where sessions and agent definitions are stored, you can add:
-
-```json
-{
-  "mcpServers": {
-    "agent-orchestrator": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js"
-      ],
-      "env": {
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/your/project",
-        "AGENT_ORCHESTRATOR_SESSIONS_DIR": "/custom/path/to/sessions",
-        "AGENT_ORCHESTRATOR_AGENTS_DIR": "/custom/path/to/agents"
-      }
-    }
-  }
-}
-```
+For complete setup instructions and configuration examples for different use cases, see:
+- **Quick setup**: [GETTING_STARTED.md](./GETTING_STARTED.md)
+- **Advanced configurations**: [SETUP_GUIDE.md](./SETUP_GUIDE.md)
 
 ## Tools Reference
 

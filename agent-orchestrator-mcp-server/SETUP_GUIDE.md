@@ -1,74 +1,38 @@
-# Agent Orchestrator MCP Server - Usage Guide
+# Setup Guide - Integration Scenarios
 
-This guide provides concise instructions for using the Agent Orchestrator MCP Server with Claude Code and Claude Desktop.
+This guide explains how to configure the Agent Orchestrator MCP Server for different use cases with Claude Code and Claude Desktop.
 
-## What is the Orchestrated Agent Framework (OAF)?
+> 📖 **What is OAF?** See [README.md - Overview](./README.md#overview) for an explanation of the Orchestrated Agent Framework and how this MCP server works.
 
-The **Orchestrated Agent Framework (OAF)** enables you to create and manage specialized Claude Code agent sessions that work autonomously on specific tasks. The MCP server provides tools to orchestrate these agents from Claude Code or Claude Desktop.
-
-**OAF infrastructure consists of**:
-- **Agent definitions**: Specialized agent configurations stored in `.agent-orchestrator/agents/`
-- **Sessions**: Active or completed agent work sessions stored in `.agent-orchestrator/sessions/`
-
-This guide will help you configure where this infrastructure lives - in your current project, a remote project, or a combination of both.
+This guide helps you configure where OAF infrastructure (agent definitions and sessions) lives - in your current project, a remote project, or a combination of both.
 
 ---
 
-## Build and Preparation
+## Prerequisites
 
-### 1. Install Dependencies and Build
+Before configuring, ensure you have installed and built the MCP server:
 
-```bash
-cd agent-orchestrator-mcp-server
-npm install
-npm run build
-```
-
-The build process creates a `dist/` folder containing the compiled MCP server. The main entry point is `dist/index.js` - this is the file that **AGENT_ORCHESTRATOR_SCRIPT_PATH** in your MCP configuration should point to.
-
-### 2. Verify Build Output
-
-Ensure the following file exists:
-```
-agent-orchestrator-mcp-server/dist/index.js
-```
-
-This is the compiled MCP server script that will be invoked by Claude Code or Claude Desktop.
+**See [GETTING_STARTED.md](./GETTING_STARTED.md) for installation instructions.**
 
 ---
 
-## General MCP Configuration
+## Environment Variables Quick Reference
 
-All configurations require the following environment variables:
+> 📖 **For complete environment variable documentation**, see [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
 
-### Required Environment Variables
+This table shows **which variables to use for each use case**:
 
-- **`AGENT_ORCHESTRATOR_SCRIPT_PATH`**: Absolute path to the **agent-orchestrator.sh** script (not the MCP server)
-  - Example: `/Users/yourname/projects/claude-dev-skills/agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
+| Variable | Use Case 1<br>(Local) | Use Case 2<br>(Remote) | Use Case 3<br>(Hybrid) | Claude Desktop |
+|----------|------------|------------|------------|----------------|
+| `AGENT_ORCHESTRATOR_SCRIPT_PATH` | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
+| `AGENT_ORCHESTRATOR_PROJECT_DIR` | ❌ Omit (defaults to current) | ✅ Set to target | ✅ Set to target | ✅ Required |
+| `AGENT_ORCHESTRATOR_SESSIONS_DIR` | ❌ Default | ✅ Set to current | ✅ Set to current | ⚙️ Optional |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | ❌ Default | ✅ Set to current | ❌ Default (use target's) | ⚙️ Optional |
+| `PATH` | ❌ Not needed | ❌ Not needed | ❌ Not needed | ✅ Required |
+| `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | ⚙️ Optional | ⚙️ Optional | ⚙️ Optional | ⚙️ Optional |
+| `MCP_SERVER_DEBUG` | ⚙️ Optional | ⚙️ Optional | ⚙️ Optional | ⚙️ Optional |
 
-### Optional Environment Variables
-
-- **`AGENT_ORCHESTRATOR_PROJECT_DIR`**: Directory where orchestrated agents should be started
-  - If omitted, defaults to the current directory where the MCP server is invoked
-
-- **`AGENT_ORCHESTRATOR_SESSIONS_DIR`**: Custom location for session data storage
-  - If omitted, defaults to `$AGENT_ORCHESTRATOR_PROJECT_DIR/.agent-orchestrator/sessions`
-
-- **`AGENT_ORCHESTRATOR_AGENTS_DIR`**: Custom location for agent definitions
-  - If omitted, defaults to `$AGENT_ORCHESTRATOR_PROJECT_DIR/.agent-orchestrator/agents`
-
-- **`AGENT_ORCHESTRATOR_ENABLE_LOGGING=true`**: Enable logging for debugging purposes (optional)
-
-- **`MCP_SERVER_DEBUG=true`**: Enable debug logging for the MCP server itself (optional)
-
-### Important Note for Claude Desktop
-
-**Claude Desktop does not inherit the PATH environment variable from your shell.** You must explicitly set the `PATH` variable in the Claude Desktop configuration to include the path to your Node.js binary.
-
-Example PATH value for macOS with Homebrew:
-```
-/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin
-```
+**Legend**: ✅ Required | ❌ Omit/Default | ⚙️ Optional for debugging
 
 ---
 
@@ -122,6 +86,8 @@ Create or update `.claude/settings.local.json`:
 - `.mcp.json` contains only placeholders (safe to commit)
 - `.claude/settings.local.json` contains actual paths (do NOT commit)
 
+> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+
 ### Use Case 2: Remote Project (Different Directory)
 
 **When to use**: Keep the target project completely unaware of the orchestrator framework - manage all orchestration from a separate coordination project.
@@ -167,6 +133,8 @@ Create or update `.claude/settings.local.json`:
 - All OAF infrastructure stays in your coordination project
 - Target project has zero knowledge of the orchestrator
 - Useful for managing work across multiple unrelated projects from one coordination hub
+
+> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
 
 ### Use Case 3: Hybrid Approach (Remote Agents, Local Sessions)
 
@@ -214,6 +182,8 @@ Create or update `.claude/settings.local.json`:
 - Session tracking stays in your coordination project for centralized management
 - Hybrid approach: target project is OAF-aware (has agents) but sessions are external
 
+> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+
 ---
 
 ## Claude Desktop Usage
@@ -253,6 +223,8 @@ Create or update `.claude/settings.local.json`:
 - **`PATH`** is **REQUIRED** - Claude Desktop doesn't inherit shell PATH
 - **`AGENT_ORCHESTRATOR_SCRIPT_PATH`** must point to **agent-orchestrator.sh** (not the MCP server dist)
 - **`AGENT_ORCHESTRATOR_PROJECT_DIR`** specifies where orchestrated agents run
+
+> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details, defaults, and PATH examples
 
 ### Optional: Customize Session and Agent Storage
 
@@ -302,29 +274,9 @@ After updating the configuration, restart Claude Desktop for changes to take eff
 
 ## Quick Reference
 
-### Environment Variables Summary
+For complete environment variable documentation including descriptions, defaults, and common PATH values:
 
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `AGENT_ORCHESTRATOR_SCRIPT_PATH` | Yes | Path to agent-orchestrator.sh script | - |
-| `AGENT_ORCHESTRATOR_PROJECT_DIR` | No (Yes for Claude Desktop) | Where agents execute | Current directory (Claude Code only) |
-| `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | Session data storage | `$PROJECT_DIR/.agent-orchestrator/sessions` |
-| `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | Agent definitions location | `$PROJECT_DIR/.agent-orchestrator/agents` |
-| `PATH` | Claude Desktop only | Path to Node.js binary | - |
-| `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | No | Enable agent logging | false |
-| `MCP_SERVER_DEBUG` | No | Enable MCP server debug logs | false |
-
-### Common Paths
-
-**macOS with Homebrew Node.js**:
-```bash
-PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
-```
-
-**macOS with nvm**:
-```bash
-PATH=/Users/yourname/.nvm/versions/node/v20.x.x/bin:/usr/local/bin:/usr/bin:/bin
-```
+> 📖 [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
 
 ---
 
@@ -353,6 +305,12 @@ Add to environment configuration:
 
 View logs at: `agent-orchestrator-mcp-server/logs/mcp-server.log`
 
+For comprehensive debugging instructions, see [README.md - Debugging and Troubleshooting](./README.md#debugging-and-troubleshooting).
+
 ---
 
-For more details, see [README.md](./README.md) and [QUICKSTART.md](./QUICKSTART.md).
+## Additional Resources
+
+- **Quick setup**: [GETTING_STARTED.md](./GETTING_STARTED.md) - Fast path to get running
+- **Complete reference**: [README.md](./README.md) - Full documentation and API reference
+- **Environment variables**: [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
