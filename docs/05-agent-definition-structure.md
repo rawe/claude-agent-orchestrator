@@ -22,12 +22,7 @@ graph TB
     end
 
     subgraph "agent.json Schema"
-        JSONSchema{
-            {
-                "name": "agent-name",
-                "description": "Agent purpose"
-            }
-        }
+        JSONSchema["<b>agent.json</b><br/>{<br/>  'name': 'agent-name',<br/>  'description': 'Agent purpose'<br/>}"]
 
         JSONName["name: string<br/>(must match directory)"]
         JSONDesc["description: string<br/>(human-readable)"]
@@ -53,17 +48,7 @@ graph TB
     end
 
     subgraph "agent.mcp.json Schema"
-        MCPSchema{
-            {
-                "mcpServers": {
-                    "server-name": {
-                        "command": "...",
-                        "args": [...],
-                        "env": {...}
-                    }
-                }
-            }
-        }
+        MCPSchema["<b>agent.mcp.json</b><br/>{<br/>  'mcpServers': {<br/>    'server-name': {<br/>      'command': '...',<br/>      'args': [...],<br/>      'env': {...}<br/>    }<br/>  }<br/>}"]
 
         MCPServers[mcpServers: object<br/>Server definitions]
         MCPCommand[command: string<br/>Executable path]
