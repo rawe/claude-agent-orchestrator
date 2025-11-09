@@ -4,9 +4,9 @@ A Model Context Protocol (MCP) server that provides tools for orchestrating spec
 
 ## Overview
 
-### What is the Orchestrated Agent Framework (OAF)?
+### What is the Agent Orchestrator Framework (AOF)?
 
-The **Orchestrated Agent Framework (OAF)** is the combination of this MCP server and the `agent-orchestrator.sh` script (from the `agent-orchestrator` Claude Code skill). Together they enable creating and managing specialized Claude Code agent sessions that work autonomously on tasks.
+The **Agent Orchestrator Framework (AOF)** is the combination of this MCP server and the `agent-orchestrator.sh` script (from the `agent-orchestrator` Claude Code skill). Together they enable creating and managing specialized Claude Code agent sessions that work autonomously on tasks.
 
 **Key components**:
 - **This MCP server**: Provides MCP tools for orchestrating agents from any MCP-compatible AI system

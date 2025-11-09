@@ -2,9 +2,9 @@
 
 This guide explains how to configure the Agent Orchestrator MCP Server for different use cases with Claude Code and Claude Desktop.
 
-> 📖 **What is OAF?** See [README.md - Overview](./README.md#overview) for an explanation of the Orchestrated Agent Framework and how this MCP server works.
+> 📖 **What is AOF?** See [README.md - Overview](./README.md#overview) for an explanation of the Agent Orchestrator Framework and how this MCP server works.
 
-This guide helps you configure where OAF infrastructure (agent definitions and sessions) lives - in your current project, a remote project, or a combination of both.
+This guide helps you configure where AOF infrastructure (agent definitions and sessions) lives - in your current project, a remote project, or a combination of both.
 
 ---
 
@@ -93,7 +93,7 @@ Create or update `.claude/settings.local.json`:
 **When to use**: Keep the target project completely unaware of the orchestrator framework - manage all orchestration from a separate coordination project.
 
 **What happens**:
-- Current project = all OAF infrastructure (agent definitions, sessions)
+- Current project = all AOF infrastructure (agent definitions, sessions)
 - Target project = just a working directory where agents execute tasks
 - Target project remains clean with no `.agent-orchestrator/` folder
 
@@ -130,7 +130,7 @@ Create or update `.claude/settings.local.json`:
 
 **Key Points**:
 - **Requires manual absolute paths** - Claude Code doesn't support directory variables
-- All OAF infrastructure stays in your coordination project
+- All AOF infrastructure stays in your coordination project
 - Target project has zero knowledge of the orchestrator
 - Useful for managing work across multiple unrelated projects from one coordination hub
 
@@ -143,7 +143,7 @@ Create or update `.claude/settings.local.json`:
 **What happens**:
 - Current project = session data only
 - Target project = agent definitions (`.agent-orchestrator/agents/`)
-- Target project is aware of OAF but doesn't track session history
+- Target project is aware of AOF but doesn't track session history
 - Best for projects with project-specific agents you want to reuse
 
 **Configuration**:
@@ -180,7 +180,7 @@ Create or update `.claude/settings.local.json`:
 - **`AGENT_ORCHESTRATOR_AGENTS_DIR` is omitted** - defaults to `$AGENT_ORCHESTRATOR_PROJECT_DIR/.agent-orchestrator/agents`
 - Target project provides specialized agent definitions for its domain
 - Session tracking stays in your coordination project for centralized management
-- Hybrid approach: target project is OAF-aware (has agents) but sessions are external
+- Hybrid approach: target project is AOF-aware (has agents) but sessions are external
 
 > 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
 
