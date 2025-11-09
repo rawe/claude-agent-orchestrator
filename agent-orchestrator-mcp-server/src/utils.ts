@@ -87,10 +87,14 @@ export async function executeScript(
       resolve(result);
     });
 
-    // Write stdin input if provided
+    // Write stdin input if provided, otherwise close stdin immediately
     if (stdinInput && childProcess.stdin) {
       logger.debug("Writing to script stdin", { length: stdinInput.length });
       childProcess.stdin.write(stdinInput);
+      childProcess.stdin.end();
+    } else if (childProcess.stdin) {
+      // Close stdin immediately if no input to prevent script from waiting
+      logger.debug("Closing stdin (no input provided)");
       childProcess.stdin.end();
     }
   });
