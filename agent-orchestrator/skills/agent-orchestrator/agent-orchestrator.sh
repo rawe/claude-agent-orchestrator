@@ -670,6 +670,33 @@ $prompt
 EOF
 }
 
+# Log result from Claude session
+# Controlled by AGENT_ORCHESTRATOR_ENABLE_LOGGING environment variable
+# Args: $1 - session_name, $2 - result
+log_result() {
+  # Check if logging is enabled
+  if [[ "${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-}" != "1" ]] && \
+     [[ "${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-}" != "true" ]] && \
+     [[ "${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-}" != "yes" ]]; then
+    return 0
+  fi
+
+  local session_name="$1"
+  local result="$2"
+  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  local log_file="$AGENT_SESSIONS_DIR/${session_name}.log"
+
+  cat >> "$log_file" <<EOF
+--------------------------------------------------------------------------------
+Result Timestamp: $timestamp
+
+Result:
+$result
+================================================================================
+
+EOF
+}
+
 # Command: new
 cmd_new() {
   local session_name="$1"
@@ -726,7 +753,14 @@ cmd_new() {
   fi
 
   # Extract and output result
-  extract_result "$session_file"
+  local result
+  result=$(extract_result "$session_file")
+
+  # Log the result if logging is enabled
+  log_result "$session_name" "$result"
+
+  # Output result to stdout
+  echo "$result"
 }
 
 # Command: resume
@@ -785,7 +819,14 @@ cmd_resume() {
   update_session_metadata "$session_name" "$SESSION_AGENT"
 
   # Extract and output result
-  extract_result "$session_file"
+  local result
+  result=$(extract_result "$session_file")
+
+  # Log the result if logging is enabled
+  log_result "$session_name" "$result"
+
+  # Output result to stdout
+  echo "$result"
 }
 
 # Command: status
