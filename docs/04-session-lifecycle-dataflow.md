@@ -27,13 +27,12 @@ stateDiagram-v2
 
     SessionCreation --> Initializing
 
-    state "Initializing" as Initializing {
-        note right of Initializing
-            Session starting up
-            Waiting for Claude CLI
-            to establish connection
-        end note
-    }
+    state "Initializing" as Initializing
+    note right of Initializing
+        Session starting up
+        Waiting for Claude CLI
+        to establish connection
+    end note
 
     Initializing --> Active: Session ID received
 
@@ -57,13 +56,12 @@ stateDiagram-v2
 
     ResultExtraction --> Completed: Task finished
 
-    state "Completed" as Completed {
-        note right of Completed
-            Session in completed state
-            Can be resumed with
-            new prompts or archived
-        end note
-    }
+    state "Completed" as Completed
+    note right of Completed
+        Session in completed state
+        Can be resumed with
+        new prompts or archived
+    end note
 
     Completed --> Resume: User resumes<br/>(resume command)
 
