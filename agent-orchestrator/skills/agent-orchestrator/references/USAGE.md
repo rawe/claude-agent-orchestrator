@@ -562,6 +562,23 @@ export AGENT_ORCHESTRATOR_AGENTS_DIR=~/shared/agents
 
 ---
 
+### `AGENT_ORCHESTRATOR_ENABLE_LOGGING`
+
+Enable command logging for debugging. Logs are written to `<sessions-dir>/<session-name>.log`.
+
+**Accepted values:** `1`, `true`, `yes`
+
+**Default:** Disabled
+
+**Examples:**
+```bash
+# Enable logging
+export AGENT_ORCHESTRATOR_ENABLE_LOGGING=1
+./agent-orchestrator.sh new session -p "prompt"
+```
+
+---
+
 ### Precedence Order
 
 Configuration values are resolved in the following order (highest to lowest priority):

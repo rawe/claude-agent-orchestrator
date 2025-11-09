@@ -53,9 +53,10 @@ Command Options:
   --agent <name>  Use a specific agent definition (only for new command)
 
 Environment Variables:
-  AGENT_ORCHESTRATOR_PROJECT_DIR   Set default project directory
-  AGENT_ORCHESTRATOR_SESSIONS_DIR  Set default sessions directory
-  AGENT_ORCHESTRATOR_AGENTS_DIR    Set default agents directory
+  AGENT_ORCHESTRATOR_PROJECT_DIR    Set default project directory
+  AGENT_ORCHESTRATOR_SESSIONS_DIR   Set default sessions directory
+  AGENT_ORCHESTRATOR_AGENTS_DIR     Set default agents directory
+  AGENT_ORCHESTRATOR_ENABLE_LOGGING Enable command logging (1/true/yes)
 
   Precedence order (highest to lowest):
     1. CLI flags (--project-dir, --sessions-dir, --agents-dir)
@@ -112,6 +113,10 @@ Examples:
   # CLI flags override environment variables
   export AGENT_ORCHESTRATOR_PROJECT_DIR=/tmp/env-project
   ./agent-orchestrator.sh --project-dir /tmp/cli-project new session -p "prompt"  # Uses /tmp/cli-project
+
+  # Enable logging for debugging
+  export AGENT_ORCHESTRATOR_ENABLE_LOGGING=1
+  ./agent-orchestrator.sh new session -p "prompt"
 EOF
 }
 
@@ -620,6 +625,51 @@ build_mcp_arg() {
   echo "--mcp-config $mcp_config"
 }
 
+# Log command execution details to session log file
+# Controlled by AGENT_ORCHESTRATOR_ENABLE_LOGGING environment variable
+# Args: $1 - session_name, $2 - command_type (new/resume), $3 - agent_name, $4 - mcp_config, $5 - full_command, $6 - prompt
+log_command() {
+  # Check if logging is enabled
+  if [[ "${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-}" != "1" ]] && \
+     [[ "${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-}" != "true" ]] && \
+     [[ "${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-}" != "yes" ]]; then
+    return 0
+  fi
+
+  local session_name="$1"
+  local command_type="$2"
+  local agent_name="$3"
+  local mcp_config="$4"
+  local full_command="$5"
+  local prompt="$6"
+  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  local log_file="$AGENT_SESSIONS_DIR/${session_name}.log"
+
+  cat >> "$log_file" <<EOF
+================================================================================
+Timestamp: $timestamp
+Command Type: $command_type
+Working Directory: $PROJECT_DIR
+Agents Directory: $AGENTS_DIR
+Agent Name: ${agent_name:-none}
+MCP Config: ${mcp_config:-none}
+
+Full Command:
+$full_command
+
+Environment:
+AGENT_ORCHESTRATOR_PROJECT_DIR=${AGENT_ORCHESTRATOR_PROJECT_DIR:-not set}
+AGENT_ORCHESTRATOR_AGENTS_DIR=${AGENT_ORCHESTRATOR_AGENTS_DIR:-not set}
+AGENT_ORCHESTRATOR_SESSIONS_DIR=${AGENT_ORCHESTRATOR_SESSIONS_DIR:-not set}
+AGENT_ORCHESTRATOR_ENABLE_LOGGING=${AGENT_ORCHESTRATOR_ENABLE_LOGGING:-not set}
+
+Prompt:
+$prompt
+================================================================================
+
+EOF
+}
+
 # Command: new
 cmd_new() {
   local session_name="$1"
@@ -662,6 +712,12 @@ cmd_new() {
 
   # Save session metadata immediately with context
   save_session_metadata "$session_name" "$agent_name" "$PROJECT_DIR" "$AGENTS_DIR"
+
+  # Build full command string for logging
+  local full_command="cd \"$PROJECT_DIR\" && claude -p \"<prompt>\" $mcp_arg --output-format stream-json --permission-mode bypassPermissions"
+
+  # Log the command execution
+  log_command "$session_name" "new" "$agent_name" "${MCP_CONFIG:-}" "$full_command" "$final_prompt"
 
   # Run claude command from PROJECT_DIR
   # Note: cd happens in subshell, so we return to original directory after
@@ -712,6 +768,12 @@ cmd_resume() {
     load_agent_config "$SESSION_AGENT"
     mcp_arg=$(build_mcp_arg "$MCP_CONFIG")
   fi
+
+  # Build full command string for logging
+  local full_command="cd \"$PROJECT_DIR\" && claude -r \"$session_id\" -p \"<prompt>\" $mcp_arg --output-format stream-json --permission-mode bypassPermissions"
+
+  # Log the command execution
+  log_command "$session_name" "resume" "${SESSION_AGENT:-}" "${MCP_CONFIG:-}" "$full_command" "$prompt"
 
   # Run claude command with resume from PROJECT_DIR
   # Note: cd happens in subshell, so we return to original directory after
