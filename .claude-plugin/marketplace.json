@@ -1,14 +1,26 @@
 {
-  "name": "claude-dev-skills",
+  "name": "agent-orchestrator-framework",
   "owner": {
     "name": "rawe",
     "email": "noreply@example.com"
   },
-    "metadata": {
-    "description": "A marketplace for Claude Code skills and plugins",
-    "version": "0.1.0"
+  "metadata": {
+    "description": "Agent Orchestrator Framework (AOF) - A framework for orchestrating specialized Claude Code agent sessions with multiple usage levels: Claude Code plugins, MCP server abstraction, and low-level script access",
+    "version": "1.0.0"
   },
   "plugins": [
+    {
+      "name": "agent-orchestrator",
+      "source": "./agent-orchestrator"
+    },
+    {
+      "name": "agent-orchestrator-subagents",
+      "source": "./agent-orchestrator-subagents"
+    },
+    {
+      "name": "cli-agent-runner",
+      "source": "./cli-agent-runner"
+    },
     {
       "name": "firstspirit-templating",
       "source": "./firstspirit-templating"
@@ -16,14 +28,6 @@
     {
       "name": "firstspirit-fs-cli",
       "source": "./firstspirit-fs-cli"
-    },
-    {
-      "name": "cli-agent-runner",
-      "source": "./cli-agent-runner"
-    },
-    {
-      "name": "agent-orchestrator",
-      "source": "./agent-orchestrator"
     }
   ]
 }

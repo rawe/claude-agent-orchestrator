@@ -1,6 +1,6 @@
 {
   "name": "agent-orchestrator",
-  "description": "Use this skill when you need to orchestrate another Claude Code session via the agent-orchestrator.sh script to perform specialized, potentially long-running tasks in a simplified way. This wrapper handles session management, result extraction, and can be run in background with polling support.",
+  "description": "Core Agent Orchestrator Framework (AOF) plugin. Provides the agent-orchestrator.sh script and slash commands for orchestrating specialized Claude Code agent sessions. Use this for low-level agent management, session control, and custom agent definitions. For a higher-level subagent-based interface, also install the agent-orchestrator-subagents plugin.",
   "version": "1.0.0",
   "author": {
     "name": "rawe",
@@ -10,6 +10,8 @@
     "agent",
     "orchestration",
     "automation",
-    "session-management"
+    "session-management",
+    "framework",
+    "mcp-configuration"
   ]
 }

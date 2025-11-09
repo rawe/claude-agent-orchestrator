@@ -1,0 +1,19 @@
+{
+  "name": "agent-orchestrator-subagents",
+  "description": "Pre-configured subagent definitions for the Agent Orchestrator Framework. Provides convenient Claude Code subagents for launching and managing orchestrated agents without directly using the low-level agent-orchestrator.sh script. Requires the agent-orchestrator plugin.",
+  "version": "1.0.0",
+  "author": {
+    "name": "rawe",
+    "email": "noreply@example.com"
+  },
+  "keywords": [
+    "agent",
+    "orchestration",
+    "subagents",
+    "automation",
+    "agent-launcher"
+  ],
+  "dependencies": {
+    "agent-orchestrator": "^1.0.0"
+  }
+}

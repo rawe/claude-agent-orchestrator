@@ -66,7 +66,7 @@ This is the **single source of truth** for all environment variables used by the
 
 **`AGENT_ORCHESTRATOR_SCRIPT_PATH`** (Required)
 - Absolute path to the `agent-orchestrator.sh` bash script
-- Example: `/Users/yourname/projects/claude-dev-skills/agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
+- Example: `/Users/yourname/projects/agent-orchestrator-framework/agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
 
 **`AGENT_ORCHESTRATOR_PROJECT_DIR`** (Conditionally Required)
 - Directory where orchestrated agents execute
