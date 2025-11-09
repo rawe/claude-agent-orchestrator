@@ -145,11 +145,6 @@ agent-orchestrator-framework/
 │   ├── GETTING_STARTED.md           # Quick setup guide
 │   └── SETUP_GUIDE.md               # Integration scenarios
 │
-├── cli-agent-runner/                # Earlier/simpler version (kept for compatibility)
-│
-├── firstspirit-templating/          # Additional plugin: FirstSpirit CMS templating
-├── firstspirit-fs-cli/              # Additional plugin: FirstSpirit CLI tools
-│
 └── README.md                        # This file
 ```
 
@@ -202,18 +197,6 @@ Different agents can have different MCP server configurations, enabling speciali
 ### Orchestration Script
 The `agent-orchestrator.sh` bash script is the foundation of all three usage levels. It handles session lifecycle, agent configuration, and result extraction.
 
-## Additional Plugins
-
-This repository also contains these additional plugins (not part of the core AOF):
-
-### FirstSpirit Templating
-Comprehensive knowledge for templating in the FirstSpirit CMS, specifically focused on SiteArchitect development.
-
-### FirstSpirit CLI (fs-cli)
-FirstSpirit CMS template development using fs-cli.
-
-### CLI Agent Runner
-Earlier/simpler version of agent orchestration (kept for compatibility).
 
 ## Documentation
 
@@ -221,12 +204,3 @@ Earlier/simpler version of agent orchestration (kept for compatibility).
 - **[Level 2: Subagents Extension](./agent-orchestrator-subagents/README.md)** - Extension plugin
 - **[Level 3: MCP Server](./agent-orchestrator-mcp-server/README.md)** - MCP implementation
 - **[Technical Architecture](./agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works
-
-## Contributing
-
-To add a new plugin to this marketplace:
-
-1. Add your plugin directory to the repository root
-2. Each plugin can contain multiple skills, commands, and configuration files
-3. Update `.claude-plugin/marketplace.json` with your plugin's metadata
-4. Submit a pull request
