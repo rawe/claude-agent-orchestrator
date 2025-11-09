@@ -16,18 +16,6 @@
     {
       "name": "agent-orchestrator-subagents",
       "source": "./agent-orchestrator-subagents"
-    },
-    {
-      "name": "cli-agent-runner",
-      "source": "./cli-agent-runner"
-    },
-    {
-      "name": "firstspirit-templating",
-      "source": "./firstspirit-templating"
-    },
-    {
-      "name": "firstspirit-fs-cli",
-      "source": "./firstspirit-fs-cli"
     }
   ]
 }
