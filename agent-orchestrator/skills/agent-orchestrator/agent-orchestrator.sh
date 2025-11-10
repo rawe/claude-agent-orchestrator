@@ -944,7 +944,14 @@ cmd_list() {
       session_id="initializing"
     fi
 
-    echo "$session_name (session: $session_id)"
+    # Extract project_dir from metadata
+    local project_dir="unknown"
+    local meta_file="$AGENT_SESSIONS_DIR/${session_name}.meta.json"
+    if [ -f "$meta_file" ]; then
+      project_dir=$(jq -r '.project_dir // "unknown"' "$meta_file" 2>/dev/null || echo "unknown")
+    fi
+
+    echo "$session_name (session: $session_id, project: $project_dir)"
   done
 }
 

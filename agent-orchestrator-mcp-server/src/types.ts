@@ -10,6 +10,7 @@ export interface AgentInfo {
 export interface SessionInfo {
   name: string;
   sessionId: string;
+  projectDir: string;
 }
 
 export interface ServerConfig {

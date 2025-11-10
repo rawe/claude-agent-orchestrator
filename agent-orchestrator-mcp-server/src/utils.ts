@@ -139,7 +139,7 @@ export function parseAgentList(output: string): AgentInfo[] {
 /**
  * Parse session list output from the list command
  * Format:
- * session-name (session: session-id)
+ * session-name (session: session-id, project: project-dir)
  */
 export function parseSessionList(output: string): SessionInfo[] {
   if (output === "No sessions found") {
@@ -150,12 +150,13 @@ export function parseSessionList(output: string): SessionInfo[] {
   const lines = output.split("\n").filter(line => line.trim().length > 0);
 
   for (const line of lines) {
-    // Match pattern: "session-name (session: session-id)"
-    const match = line.match(/^(.+?)\s+\(session:\s+(.+?)\)$/);
+    // Match pattern: "session-name (session: session-id, project: project-dir)"
+    const match = line.match(/^(.+?)\s+\(session:\s+(.+?),\s+project:\s+(.+?)\)$/);
     if (match) {
       sessions.push({
         name: match[1].trim(),
-        sessionId: match[2].trim()
+        sessionId: match[2].trim(),
+        projectDir: match[3].trim()
       });
     }
   }
@@ -212,6 +213,7 @@ export function formatSessionsAsMarkdown(sessions: SessionInfo[]): string {
   for (const session of sessions) {
     lines.push(`## ${session.name}`);
     lines.push(`- **Session ID**: ${session.sessionId}`);
+    lines.push(`- **Project Directory**: ${session.projectDir}`);
     lines.push("");
   }
 
@@ -226,7 +228,8 @@ export function formatSessionsAsJSON(sessions: SessionInfo[]): string {
     total: sessions.length,
     sessions: sessions.map(s => ({
       name: s.name,
-      session_id: s.sessionId
+      session_id: s.sessionId,
+      project_dir: s.projectDir
     }))
   };
 

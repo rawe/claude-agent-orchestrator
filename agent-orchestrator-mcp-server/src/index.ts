@@ -178,9 +178,9 @@ server.registerTool(
   "list_sessions",
   {
     title: "List All Agent Sessions",
-    description: `List all existing agent sessions with their session IDs.
+    description: `List all existing agent sessions with their session IDs and project directories.
 
-This tool shows all agent sessions that have been created, including their names and session IDs. Sessions can be in various states (running, completed, or initializing).
+This tool shows all agent sessions that have been created, including their names, session IDs, and the project directory used for each session. Sessions can be in various states (running, completed, or initializing).
 
 Args:
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
@@ -193,21 +193,26 @@ Returns:
     "sessions": [
       {
         "name": string,           // Session name (e.g., "architect")
-        "session_id": string      // Session ID or status ("initializing", "unknown")
+        "session_id": string,     // Session ID or status ("initializing", "unknown")
+        "project_dir": string     // Project directory path used for this session
       }
     ]
   }
 
-  For Markdown format: Human-readable formatted list with session names and IDs
+  For Markdown format: Human-readable formatted list with session names, IDs, and project directories
 
 Session ID values:
   - UUID string: Normal session ID (e.g., "3db5dca9-6829-4cb7-a645-c64dbd98244d")
   - "initializing": Session file exists but hasn't started yet
   - "unknown": Session ID couldn't be extracted
 
+Project Directory values:
+  - Absolute path: The project directory used when the session was created
+  - "unknown": Project directory couldn't be extracted (legacy sessions)
+
 Examples:
   - Use when: "What sessions exist?" -> See all created sessions
-  - Use when: "Show me my agent sessions" -> List all sessions with their IDs
+  - Use when: "Show me my agent sessions" -> List all sessions with their IDs and project directories
   - Don't use when: You want to see available agent types (use list_agents instead)
 
 Error Handling:
