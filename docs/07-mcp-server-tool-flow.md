@@ -40,13 +40,13 @@ sequenceDiagram
     Script->>FileSystem: Load agent definition<br/>(JSON, prompt, MCP)
     FileSystem-->>Script: Agent config
 
-    Script->>FileSystem: Create session directory<br/>& metadata files
+    Script->>FileSystem: Create session files<br/>(session-name.jsonl, .meta.json)
     FileSystem-->>Script: Created
 
-    Script->>CLI: claude code --mcp-config agent.mcp.json<br/>--system-prompt from agent<br/>+ user prompt
+    Script->>CLI: claude -p "system-prompt + user-prompt"<br/>--mcp-config agent.mcp.json<br/>--output-format stream-json
     CLI-->>Script: Session ID + execution
 
-    CLI->>FileSystem: Write conversation to<br/>session.jsonl
+    CLI->>FileSystem: Write conversation to<br/>session-name.jsonl
     FileSystem-->>CLI: Written
 
     CLI-->>Script: Task complete
@@ -65,7 +65,7 @@ sequenceDiagram
     MCPServer->>Validation: Validate parameters
     Validation-->>MCPServer: Valid
     MCPServer->>Script: ./agent-orchestrator.sh list-sessions
-    Script->>FileSystem: Read .agent-orchestrator/sessions/
+    Script->>FileSystem: Read .agent-orchestrator/agent-sessions/
     FileSystem-->>Script: Session metadata
     Script-->>MCPServer: Session list with IDs
     MCPServer-->>MCPClient: JSON/Markdown response
@@ -89,13 +89,13 @@ sequenceDiagram
     Script->>FileSystem: Load agent config
     FileSystem-->>Script: Agent config
 
-    Script->>FileSystem: Read existing session.jsonl
+    Script->>FileSystem: Read existing session-name.jsonl
     FileSystem-->>Script: Conversation history
 
-    Script->>CLI: claude code --session-id <UUID><br/>--mcp-config agent.mcp.json<br/>+ continuation prompt
+    Script->>CLI: claude -r <session-id><br/>-p "continuation prompt"<br/>--mcp-config agent.mcp.json<br/>--output-format stream-json
     CLI-->>Script: Continued execution
 
-    CLI->>FileSystem: Append to session.jsonl
+    CLI->>FileSystem: Append to session-name.jsonl
     FileSystem-->>CLI: Updated
 
     CLI-->>Script: Task complete
@@ -114,7 +114,7 @@ sequenceDiagram
     MCPServer->>Validation: Validate (no params)
     Validation-->>MCPServer: Valid
     MCPServer->>Script: ./agent-orchestrator.sh clean
-    Script->>FileSystem: Remove .agent-orchestrator/sessions/
+    Script->>FileSystem: Remove .agent-orchestrator/agent-sessions/
     FileSystem-->>Script: Removed
     Script-->>MCPServer: Confirmation message
     MCPServer-->>MCPClient: Success response
@@ -172,9 +172,11 @@ Validate session name (unique, format)
 ↓
 Load agent definition (if specified)
 ↓
-Create session directory structure
+Create session files (session-name.jsonl, .meta.json)
 ↓
-Invoke Claude CLI with agent config
+Prepend system prompt to user prompt
+↓
+Invoke Claude CLI: claude -p "combined-prompt" --mcp-config
 ↓
 Wait for completion
 ↓
@@ -187,9 +189,11 @@ Return to user
 ```
 User → MCP Client → MCP Server → Script → File System
 ↓
-Read sessions/ directory
+Read agent-sessions/ directory
 ↓
-Read each session metadata
+Read session .jsonl and .meta.json files
+↓
+Extract session IDs from JSONL conversation history
 ↓
 Return list with session IDs and status
 ↓
@@ -208,11 +212,13 @@ Load session metadata & associated agent
 ↓
 Load agent configuration
 ↓
-Read existing conversation history
+Read existing conversation history from JSONL
 ↓
-Invoke Claude CLI with session ID
+Extract session ID from conversation
 ↓
-Append new prompt to conversation
+Invoke Claude CLI: claude -r <session-id> -p "prompt" --mcp-config
+↓
+Append new interaction to JSONL
 ↓
 Wait for completion
 ↓
@@ -225,7 +231,7 @@ Return to user
 ```
 User → MCP Client → MCP Server → Script → File System
 ↓
-Remove entire sessions/ directory
+Remove entire agent-sessions/ directory
 ↓
 Return confirmation
 ↓
@@ -280,37 +286,47 @@ The MCP server invokes the bash script with different commands:
 ```
 
 ### 6. **Claude CLI Integration**
-The script manages Claude Code CLI invocations:
+The script manages Claude CLI invocations:
 
 **New Sessions**:
 ```bash
-claude code \
+# System prompt is prepended to user prompt
+combined_prompt="${system_prompt}\n\n---\n\n${user_prompt}"
+
+claude -p "$combined_prompt" \
   --mcp-config path/to/agent.mcp.json \
-  --system-prompt "$(cat agent.system-prompt.md)" \
-  "User prompt here"
+  --output-format stream-json \
+  --permission-mode bypassPermissions
 ```
 
 **Resume Sessions**:
 ```bash
-claude code \
-  --session-id <uuid> \
+# Session ID extracted from existing JSONL file
+claude -r <session-id> \
+  -p "Continuation prompt" \
   --mcp-config path/to/agent.mcp.json \
-  "Continuation prompt"
+  --output-format stream-json \
+  --permission-mode bypassPermissions
 ```
 
 ### 7. **File System Interactions**
 
 #### Read Operations
-- Agent definitions from `agents/` directory
-- Session metadata from `sessions/` directory
-- Conversation history from `.jsonl` files
-- Session UUIDs from `session-id.txt`
+- Agent definitions from `.agent-orchestrator/agents/` directory
+  - `agent.json` (required metadata)
+  - `agent.system-prompt.md` (optional)
+  - `agent.mcp.json` (optional)
+- Session data from `.agent-orchestrator/agent-sessions/` directory
+  - `session-name.jsonl` (conversation history in stream-json format)
+  - `session-name.meta.json` (metadata: agent association, timestamps)
+- Session IDs are extracted from JSONL conversation history
 
 #### Write Operations
-- Create session directories
-- Generate session metadata files
-- Store session UUIDs
-- Claude CLI writes to `.jsonl` (managed by CLI)
+- Create session files in `.agent-orchestrator/agent-sessions/`:
+  - `session-name.jsonl` (created and appended by Claude CLI)
+  - `session-name.meta.json` (created by orchestrator script)
+- No separate session directories - files are flat in agent-sessions/
+- Session IDs are managed by Claude CLI within the JSONL format
 
 ### 8. **Response Format Flexibility**
 All tools support dual output formats:
