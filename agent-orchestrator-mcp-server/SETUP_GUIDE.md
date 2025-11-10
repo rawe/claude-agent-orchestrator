@@ -36,6 +36,28 @@ This table shows **which variables to use for each use case**:
 
 ---
 
+## Per-Tool Project Directory Override
+
+All MCP tools accept an optional `project_dir` parameter that allows you to override the project directory on a per-tool-call basis:
+
+- **When to use**: Override the environment-configured `AGENT_ORCHESTRATOR_PROJECT_DIR` for specific tool calls
+- **Format**: Must be an absolute path (e.g., `/absolute/path/to/project`)
+- **Important**: Only set when explicitly instructed to set a project dir!
+- **Precedence**: Tool parameter > Environment variable > Current directory (PWD)
+
+**Example**:
+```typescript
+{
+  "session_name": "architect",
+  "project_dir": "/absolute/path/to/different/project",
+  "prompt": "Analyze this project's structure"
+}
+```
+
+This feature is useful when you need to temporarily work with a different project without reconfiguring environment variables.
+
+---
+
 ## Claude Code Usage
 
 ### Configuration Files

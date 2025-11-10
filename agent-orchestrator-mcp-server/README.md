@@ -117,11 +117,20 @@ For complete setup instructions and configuration examples for different use cas
 Lists all available specialized agent definitions.
 
 **Parameters**:
+- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
 
 **Example**:
 ```typescript
 {
+  "response_format": "json"
+}
+```
+
+**Example with project_dir override**:
+```typescript
+{
+  "project_dir": "/absolute/path/to/project",
   "response_format": "json"
 }
 ```
@@ -152,11 +161,20 @@ Lists all available specialized agent definitions.
 Lists all existing agent sessions with their session IDs.
 
 **Parameters**:
+- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
 
 **Example**:
 ```typescript
 {
+  "response_format": "json"
+}
+```
+
+**Example with project_dir override**:
+```typescript
+{
+  "project_dir": "/absolute/path/to/project",
   "response_format": "json"
 }
 ```
@@ -185,6 +203,7 @@ Creates a new orchestrated agent session.
 **Parameters**:
 - `session_name` (required): Unique session name (alphanumeric, dash, underscore; max 60 chars)
 - `agent_name` (optional): Name of agent definition to use
+- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `prompt` (required): Initial task description
 
 **Example**:
@@ -192,6 +211,16 @@ Creates a new orchestrated agent session.
 {
   "session_name": "architect",
   "agent_name": "system-architect",
+  "prompt": "Design a microservices architecture for an e-commerce platform"
+}
+```
+
+**Example with project_dir override**:
+```typescript
+{
+  "session_name": "architect",
+  "agent_name": "system-architect",
+  "project_dir": "/absolute/path/to/project",
   "prompt": "Design a microservices architecture for an e-commerce platform"
 }
 ```
@@ -204,6 +233,7 @@ Resumes an existing agent session with a new prompt.
 
 **Parameters**:
 - `session_name` (required): Name of existing session to resume
+- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `prompt` (required): Continuation prompt
 
 **Example**:
@@ -214,17 +244,34 @@ Resumes an existing agent session with a new prompt.
 }
 ```
 
+**Example with project_dir override**:
+```typescript
+{
+  "session_name": "architect",
+  "project_dir": "/absolute/path/to/project",
+  "prompt": "Add security considerations to the architecture design"
+}
+```
+
 **Response**: The agent's result after processing the new prompt.
 
 ### 5. clean_sessions
 
 Removes all agent sessions permanently.
 
-**Parameters**: None
+**Parameters**:
+- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 
 **Example**:
 ```typescript
 {}
+```
+
+**Example with project_dir override**:
+```typescript
+{
+  "project_dir": "/absolute/path/to/project"
+}
 ```
 
 **Response**: Confirmation message (e.g., "All sessions removed" or "No sessions to remove").

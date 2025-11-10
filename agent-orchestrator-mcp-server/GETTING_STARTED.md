@@ -105,6 +105,8 @@ The MCP server provides 5 tools:
 4. **resume_agent** - Resumes an existing agent session
 5. **clean_sessions** - Removes all agent sessions
 
+**Note**: All tools accept an optional `project_dir` parameter (must be absolute path) that allows per-tool override of the project directory. Only set when instructed to set a project dir!
+
 For detailed tool parameters and examples, see [README.md - Tools Reference](./README.md#tools-reference).
 
 ## Example Usage
