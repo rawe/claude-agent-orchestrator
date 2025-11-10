@@ -52,45 +52,24 @@ graph TB
             AgentsDir --> BT_Dir
         end
 
-        subgraph "sessions/<br/>Active & Completed Sessions"
-            SessionsDir[sessions/]
+        subgraph "agent-sessions/<br/>Session Files (Flat Structure)"
+            SessionsDir[agent-sessions/]
 
-            subgraph "Session: architect-review"
-                S1_Dir[architect-review/]
-                S1_JSONL[architect-review.jsonl<br/>Conversation history]
-                S1_Meta[architect-review.meta.json<br/>Session metadata]
-                S1_ID[session-id.txt<br/>Claude session UUID]
+            S1_JSONL[architect-review.jsonl<br/>Conversation history]
+            S1_Meta[architect-review.meta.json<br/>Session metadata]
 
-                S1_Dir --> S1_JSONL
-                S1_Dir --> S1_Meta
-                S1_Dir --> S1_ID
-            end
+            S2_JSONL[code-review-main.jsonl]
+            S2_Meta[code-review-main.meta.json]
 
-            subgraph "Session: code-review-main"
-                S2_Dir[code-review-main/]
-                S2_JSONL[code-review-main.jsonl]
-                S2_Meta[code-review-main.meta.json]
-                S2_ID[session-id.txt]
+            S3_JSONL[browser-test-auth.jsonl]
+            S3_Meta[browser-test-auth.meta.json]
 
-                S2_Dir --> S2_JSONL
-                S2_Dir --> S2_Meta
-                S2_Dir --> S2_ID
-            end
-
-            subgraph "Session: browser-test-auth"
-                S3_Dir[browser-test-auth/]
-                S3_JSONL[browser-test-auth.jsonl]
-                S3_Meta[browser-test-auth.meta.json]
-                S3_ID[session-id.txt]
-
-                S3_Dir --> S3_JSONL
-                S3_Dir --> S3_Meta
-                S3_Dir --> S3_ID
-            end
-
-            SessionsDir --> S1_Dir
-            SessionsDir --> S2_Dir
-            SessionsDir --> S3_Dir
+            SessionsDir --> S1_JSONL
+            SessionsDir --> S1_Meta
+            SessionsDir --> S2_JSONL
+            SessionsDir --> S2_Meta
+            SessionsDir --> S3_JSONL
+            SessionsDir --> S3_Meta
         end
 
         AOF --> AgentsDir
@@ -109,36 +88,32 @@ graph TB
             "]
         end
 
-        subgraph "session.jsonl"
+        subgraph "session-name.jsonl"
             JSONL_Content["
-                Line 1: System message
-                Line 2: User prompt
-                Line 3: Assistant response
-                ... (conversation history)
+                Stream-JSON format
+                Each line: JSON object
+                Contains session ID, messages,
+                and conversation history
             "]
         end
 
-        subgraph "session.meta.json"
+        subgraph "session-name.meta.json"
             Meta_Content["
                 {
                     'sessionName': 'name',
                     'agentName': 'agent',
+                    'projectDir': 'path',
+                    'agentsDir': 'path',
                     'created': 'timestamp',
-                    'lastAccessed': 'timestamp',
-                    'status': 'completed'
+                    'lastAccessed': 'timestamp'
                 }
             "]
-        end
-
-        subgraph "session-id.txt"
-            ID_Content["UUID string<br/>3db5dca9-6829-4cb7-a645-c64dbd98244d"]
         end
     end
 
     SA_JSON -.format.-> AJ_Content
     S1_JSONL -.format.-> JSONL_Content
     S1_Meta -.format.-> Meta_Content
-    S1_ID -.format.-> ID_Content
 
     style Root fill:#F3F4F6
     style AOF fill:#FEF3C7
@@ -147,9 +122,12 @@ graph TB
     style SA_Dir fill:#E0E7FF
     style CR_Dir fill:#E0E7FF
     style BT_Dir fill:#E0E7FF
-    style S1_Dir fill:#D1FAE5
-    style S2_Dir fill:#D1FAE5
-    style S3_Dir fill:#D1FAE5
+    style S1_JSONL fill:#D1FAE5
+    style S1_Meta fill:#D1FAE5
+    style S2_JSONL fill:#D1FAE5
+    style S2_Meta fill:#D1FAE5
+    style S3_JSONL fill:#D1FAE5
+    style S3_Meta fill:#D1FAE5
 ```
 
 ## Architectural Aspects Covered
@@ -161,8 +139,8 @@ All AOF infrastructure lives in `.agent-orchestrator/` within the project direct
 ```
 /path/to/project/
 └── .agent-orchestrator/
-    ├── agents/         # Agent definitions
-    └── sessions/       # Session data
+    ├── agents/            # Agent definitions
+    └── agent-sessions/    # Session data (flat file structure)
 ```
 
 ### 2. **Agent Storage (agents/)**
@@ -186,18 +164,21 @@ agents/
 
 **Directory naming**: Must match the agent name in `agent.json`
 
-### 3. **Session Storage (sessions/)**
-Each session has its own directory containing three files:
+### 3. **Session Storage (agent-sessions/)**
+Sessions are stored as flat files (no subdirectories), with two files per session:
 
 ```
-sessions/
-└── architect-review/
-    ├── architect-review.jsonl        # Conversation history
-    ├── architect-review.meta.json    # Session metadata
-    └── session-id.txt                # Claude session UUID
+agent-sessions/
+├── architect-review.jsonl         # Conversation history (stream-JSON)
+├── architect-review.meta.json     # Session metadata
+├── code-review-main.jsonl
+├── code-review-main.meta.json
+├── browser-test-auth.jsonl
+└── browser-test-auth.meta.json
 ```
 
-**Directory naming**: Matches the session name provided by user
+**File naming**: Uses the session name provided by user
+**No subdirectories**: All session files are flat in the agent-sessions/ directory
 
 ### 4. **File Types and Purposes**
 
@@ -240,37 +221,33 @@ You are a system architecture expert...
 - Passed to Claude CLI
 - Enables specialized tools
 
-#### session.jsonl (Auto-generated)
+#### session-name.jsonl (Auto-generated)
+```json
+{"session_id":"abc123","type":"message","text":"..."}
+{"session_id":"abc123","type":"message","text":"..."}
 ```
-{"type":"system","text":"System prompt..."}
-{"type":"user","text":"User: Design a system"}
-{"type":"assistant","text":"Assistant: Here's the design..."}
-```
-- JSONL format (one JSON object per line)
+- Stream-JSON format (one JSON object per line)
+- Contains session ID within each JSON object
 - Complete conversation history
-- Claude Code session format
+- Written and appended by Claude CLI
+- Session ID extracted by script from this file
 
-#### session.meta.json (Auto-generated)
+#### session-name.meta.json (Auto-generated)
 ```json
 {
   "sessionName": "architect-review",
   "agentName": "system-architect",
+  "projectDir": "/path/to/project",
+  "agentsDir": "/path/to/project/.agent-orchestrator/agents",
   "created": "2025-01-15T10:30:00Z",
-  "lastAccessed": "2025-01-15T11:45:00Z",
-  "status": "completed"
+  "lastAccessed": "2025-01-15T11:45:00Z"
 }
 ```
 - Session metadata and tracking
-- Agent association for resume
-- Timestamps and status
-
-#### session-id.txt (Auto-generated)
-```
-3db5dca9-6829-4cb7-a645-c64dbd98244d
-```
-- Claude Code session UUID
-- Used for internal session management
-- Hidden from user (they use session name)
+- Agent association for resume operations
+- Project and agent directory paths
+- Timestamps for creation and access
+- Created and managed by orchestrator script
 
 ### 5. **File Lifecycle**
 
@@ -286,11 +263,13 @@ You are a system architecture expert...
 - Deleted during `clean` command
 - Not typically version-controlled
 
-### 6. **Directory Isolation**
-Each session and agent is completely isolated:
+### 6. **File Isolation**
+Each session and agent maintains independent state:
+- **Session isolation**: Each session has its own .jsonl and .meta.json files
 - **No cross-contamination**: Sessions don't interfere with each other
 - **Parallel execution**: Multiple sessions can run simultaneously
-- **Independent lifecycle**: Sessions can be created/deleted independently
+- **Independent lifecycle**: Session files can be created/deleted independently
+- **Flat structure**: Simple file management without nested directories
 
 ### 7. **Configuration Flexibility**
 The default structure can be customized via environment variables:
