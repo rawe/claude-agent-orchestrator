@@ -74,6 +74,7 @@ server.registerTool(
 This tool discovers agent definitions configured in the agent orchestrator system. Each agent provides specialized capabilities (e.g., system architecture, code review, documentation writing) and can be used when starting new agent sessions.
 
 Args:
+  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - response_format ('markdown' | 'json'): Output format (default: 'markdown')
 
 Returns:
@@ -107,9 +108,27 @@ Error Handling:
     }
   },
   async (params: ListAgentsInput) => {
+    logger.info("list_agents called", {
+      project_dir: params.project_dir,
+      response_format: params.response_format
+    });
+
     try {
+      // Build command arguments
+      const args = [];
+
+      // Add project_dir if specified (supersedes environment variable)
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
+
+      // Add command
+      args.push("list-agents");
+
+      logger.debug("list_agents: executing script", { args });
+
       // Execute list-agents command
-      const result = await executeScript(config, ["list-agents"]);
+      const result = await executeScript(config, args);
 
       if (result.exitCode !== 0) {
         const errorMsg = handleScriptError(result);
@@ -164,6 +183,7 @@ server.registerTool(
 This tool shows all agent sessions that have been created, including their names and session IDs. Sessions can be in various states (running, completed, or initializing).
 
 Args:
+  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - response_format ('markdown' | 'json'): Output format (default: 'markdown')
 
 Returns:
@@ -202,9 +222,27 @@ Error Handling:
     }
   },
   async (params: ListSessionsInput) => {
+    logger.info("list_sessions called", {
+      project_dir: params.project_dir,
+      response_format: params.response_format
+    });
+
     try {
+      // Build command arguments
+      const args = [];
+
+      // Add project_dir if specified (supersedes environment variable)
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
+
+      // Add command
+      args.push("list");
+
+      logger.debug("list_sessions: executing script", { args });
+
       // Execute list command
-      const result = await executeScript(config, ["list"]);
+      const result = await executeScript(config, args);
 
       if (result.exitCode !== 0) {
         const errorMsg = handleScriptError(result);
@@ -263,6 +301,7 @@ IMPORTANT: This operation may take significant time to complete as it runs a ful
 Args:
   - session_name (string): Unique identifier for the session (alphanumeric, dash, underscore; max 60 chars)
   - agent_name (string, optional): Name of agent definition to use (e.g., "system-architect", "code-reviewer")
+  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - prompt (string): Initial task description or prompt for the agent
 
 Session naming rules:
@@ -298,12 +337,18 @@ Error Handling:
     logger.info("start_agent called", {
       session_name: params.session_name,
       agent_name: params.agent_name,
+      project_dir: params.project_dir,
       prompt_length: params.prompt?.length || 0
     });
 
     try {
       // Build command arguments
       const args = ["new", params.session_name];
+
+      // Add project_dir if specified (supersedes environment variable)
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
 
       // Add agent if specified
       if (params.agent_name) {
@@ -386,6 +431,7 @@ IMPORTANT: This operation may take significant time to complete as it runs a ful
 
 Args:
   - session_name (string): Name of the existing session to resume
+  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - prompt (string): Continuation prompt or new task description
 
 Returns:
@@ -413,9 +459,25 @@ Note: The agent definition used during session creation is automatically remembe
     }
   },
   async (params: ResumeAgentInput) => {
+    logger.info("resume_agent called", {
+      session_name: params.session_name,
+      project_dir: params.project_dir,
+      prompt_length: params.prompt?.length || 0
+    });
+
     try {
       // Build command arguments
-      const args = ["resume", params.session_name, "-p", params.prompt];
+      const args = ["resume", params.session_name];
+
+      // Add project_dir if specified (supersedes environment variable)
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
+
+      // Add prompt
+      args.push("-p", params.prompt);
+
+      logger.debug("resume_agent: executing script", { args });
 
       // Execute resume command
       const result = await executeScript(config, args);
@@ -464,7 +526,7 @@ This tool permanently deletes all agent sessions, including their conversation h
 WARNING: This is a destructive operation. All session data will be permanently lost.
 
 Args:
-  None
+  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 
 Returns:
   Confirmation message indicating sessions were removed or that no sessions existed.
@@ -490,9 +552,26 @@ Note: This operation is idempotent - running it multiple times has the same effe
     }
   },
   async (params: CleanSessionsInput) => {
+    logger.info("clean_sessions called", {
+      project_dir: params.project_dir
+    });
+
     try {
+      // Build command arguments
+      const args = [];
+
+      // Add project_dir if specified (supersedes environment variable)
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
+
+      // Add command
+      args.push("clean");
+
+      logger.debug("clean_sessions: executing script", { args });
+
       // Execute clean command
-      const result = await executeScript(config, ["clean"]);
+      const result = await executeScript(config, args);
 
       if (result.exitCode !== 0) {
         const errorMsg = handleScriptError(result);
