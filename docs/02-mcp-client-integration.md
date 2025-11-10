@@ -35,7 +35,7 @@ graph TB
 
     subgraph "Core Orchestration"
         Script[agent-orchestrator.sh<br/>Bash Script]
-        Sessions[.agent-orchestrator/<br/>sessions/]
+        Sessions[.agent-orchestrator/<br/>agent-sessions/]
         Agents[.agent-orchestrator/<br/>agents/]
     end
 
@@ -116,7 +116,7 @@ Regardless of client, all get access to the same 5 tools:
 ### 5. **Shared Core Foundation**
 All clients, regardless of type, ultimately invoke the same:
 - `agent-orchestrator.sh` bash script for orchestration logic
-- `.agent-orchestrator/sessions/` for session persistence
+- `.agent-orchestrator/agent-sessions/` for session persistence
 - `.agent-orchestrator/agents/` for agent definitions
 
 This architecture enables the Agent Orchestrator Framework to work with any MCP-compatible AI system while maintaining a single, consistent implementation.

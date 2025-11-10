@@ -44,7 +44,7 @@ graph TB
     end
 
     subgraph "Data Layer"
-        Sessions[Session Storage<br/>.agent-orchestrator/sessions/]
+        Sessions[Session Storage<br/>.agent-orchestrator/agent-sessions/]
         Agents[Agent Definitions<br/>.agent-orchestrator/agents/]
 
         subgraph "Session Files"
