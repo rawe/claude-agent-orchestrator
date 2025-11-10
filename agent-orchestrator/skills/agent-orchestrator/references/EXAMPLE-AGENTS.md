@@ -79,3 +79,9 @@ The following example agents are available in the `../example/agents/` directory
 **Description**: Conducts iterative Confluence research using CQL queries to answer questions
 **Features**: Includes mcp-atlassian MCP server integration, generates documented JSON sources and markdown research results
 **Setup**: See README.md for required environment variables configuration
+
+### jira-researcher
+**Location**: `../example/agents/jira-researcher/`
+**Description**: Conducts iterative Jira research using JQL queries to answer questions
+**Features**: Includes mcp-atlassian MCP server integration, analyzes issues and linked items, generates documented JSON sources and markdown research results
+**Setup**: See README.md for required environment variables configuration
