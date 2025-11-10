@@ -1,0 +1,4 @@
+{
+  "name": "jira-researcher",
+  "description": "Conducts iterative Jira research to answer questions using JQL queries, generates concise answers with documented JSON sources. Input: working_folder (path for sources file), question (research query)"
+}
