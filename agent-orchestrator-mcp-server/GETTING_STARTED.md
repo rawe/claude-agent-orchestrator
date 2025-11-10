@@ -100,7 +100,7 @@ This opens a web interface where you can:
 The MCP server provides 5 tools:
 
 1. **list_agents** - Lists all available specialized agent definitions
-2. **list_sessions** - Lists all active agent sessions
+2. **list_sessions** - Lists all active agent sessions with their IDs and project directories
 3. **start_agent** - Starts a new orchestrated agent session
 4. **resume_agent** - Resumes an existing agent session
 5. **clean_sessions** - Removes all agent sessions

@@ -34,7 +34,7 @@ Provides 5 MCP tools for managing orchestrated agent sessions:
 
 - **5 MCP Tools**:
   - `list_agents` - Discover available specialized agent definitions
-  - `list_sessions` - View all agent sessions and their IDs
+  - `list_sessions` - View all agent sessions with their IDs and project directories
   - `start_agent` - Create new agent sessions with optional specialization
   - `resume_agent` - Continue work in existing sessions
   - `clean_sessions` - Remove all sessions
@@ -158,7 +158,7 @@ Lists all available specialized agent definitions.
 
 ### 2. list_sessions
 
-Lists all existing agent sessions with their session IDs.
+Lists all existing agent sessions with their session IDs and project directories.
 
 **Parameters**:
 - `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
@@ -186,11 +186,13 @@ Lists all existing agent sessions with their session IDs.
   "sessions": [
     {
       "name": "architect",
-      "session_id": "3db5dca9-6829-4cb7-a645-c64dbd98244d"
+      "session_id": "3db5dca9-6829-4cb7-a645-c64dbd98244d",
+      "project_dir": "/Users/ramon/my-project"
     },
     {
       "name": "reviewer",
-      "session_id": "initializing"
+      "session_id": "initializing",
+      "project_dir": "/Users/ramon/another-project"
     }
   ]
 }
