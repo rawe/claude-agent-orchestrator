@@ -119,34 +119,37 @@ When testing or running scripts during development:
 **File to implement**: `commands/lib/session.py`
 
 **Reference documentation**:
+- `ARCHITECTURE_PLAN.md` - Section 4.2 (lib/session.py), **Section 7.1-7.2 (IMPORTANT: New simplified file format for SDK usage)**
 - `PROJECT_CONTEXT.md` - File Format Compatibility section
-- `ARCHITECTURE_PLAN.md` - Section 4.2 (lib/session.py), Section 7 (File Format Compatibility)
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 342-450 (session functions)
 
+**IMPORTANT NOTE**: The file format has been updated for SDK usage. Session ID is now stored in `.meta.json` (not `.jsonl`), and the `.jsonl` file uses our own simplified message serialization. See Section 7.1-7.2 in ARCHITECTURE_PLAN.md for details.
+
 **Implementation requirements**:
-- [ ] Create `SessionMetadata` dataclass
+- [ ] Create `SessionMetadata` dataclass (UPDATED: now includes `session_id` field)
 - [ ] Create `SessionState` type alias: `Literal["running", "finished", "not_existent"]`
 - [ ] Implement `validate_session_name()` - MUST match bash validation rules
   - Max 60 characters
   - Only alphanumeric, dash, underscore: `^[a-zA-Z0-9_-]+$`
-- [ ] Implement `get_session_status()` - MUST match bash algorithm exactly
+- [ ] Implement `get_session_status()` - detect session state
   - Check `.meta.json` exists → else "not_existent"
   - Check `.jsonl` exists → else "running"
   - Check `.jsonl` size > 0 → else "running"
   - Read last line, check for `type: "result"` → "finished" or "running"
-- [ ] Implement `save_session_metadata()` - create `.meta.json`
-- [ ] Implement `load_session_metadata()` - read `.meta.json`
+- [ ] Implement `save_session_metadata()` - create `.meta.json` (UPDATED: now includes session_id parameter)
+- [ ] Implement `load_session_metadata()` - read `.meta.json` (UPDATED: now returns session_id)
 - [ ] Implement `update_session_metadata()` - update `last_resumed_at` timestamp
-- [ ] Implement `extract_session_id()` - read first line of `.jsonl`
-- [ ] Implement `extract_result()` - read last line of `.jsonl`
+- [ ] Implement `extract_session_id()` - UPDATED: read from `.meta.json` (not `.jsonl`)
+- [ ] Implement `extract_result()` - read last line of `.jsonl` (in our simplified format)
 - [ ] Implement `list_all_sessions()` - return list of (name, session_id, project_dir)
 - [ ] Add full type hints throughout
 
 **Success criteria**:
-- State detection matches bash script exactly
-- Can read `.meta.json` files created by bash script
-- Can parse `.jsonl` files created by bash script
-- Session validation rules match bash
+- State detection algorithm works correctly for new format
+- Can save and load `.meta.json` files with session_id
+- Can parse `.jsonl` files in our simplified format
+- Session validation rules match bash (60 chars, alphanumeric + dash/underscore)
+- **NOTE**: This implementation uses a NEW file format (not bash-compatible) since we're using the SDK directly
 
 ---
 

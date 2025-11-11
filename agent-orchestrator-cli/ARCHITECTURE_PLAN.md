@@ -315,6 +315,7 @@ SessionState = Literal["running", "finished", "not_existent"]
 class SessionMetadata:
     """Metadata stored in {session_name}.meta.json"""
     session_name: str
+    session_id: str  # Claude session ID from SDK
     agent: Optional[str]
     project_dir: Path
     agents_dir: Path
@@ -390,6 +391,7 @@ def get_session_status(session_name: str, sessions_dir: Path) -> SessionState:
 
 def save_session_metadata(
     session_name: str,
+    session_id: str,
     agent: Optional[str],
     project_dir: Path,
     agents_dir: Path,
@@ -402,6 +404,7 @@ def save_session_metadata(
     1. Create metadata dict:
        {
          "session_name": session_name,
+         "session_id": session_id,  # NEW: Claude session ID from SDK
          "agent": agent (or null if None),
          "project_dir": str(project_dir.resolve()),
          "agents_dir": str(agents_dir.resolve()),
@@ -428,6 +431,7 @@ def load_session_metadata(session_name: str, sessions_dir: Path) -> SessionMetad
        - last_resumed_at = datetime.fromisoformat(data['last_resumed_at'].rstrip('Z'))
     5. Return SessionMetadata(
          session_name=data['session_name'],
+         session_id=data['session_id'],  # NEW: Required field
          agent=data.get('agent'),  # Can be null
          project_dir=Path(data['project_dir']),
          agents_dir=Path(data['agents_dir']),
@@ -439,7 +443,7 @@ def load_session_metadata(session_name: str, sessions_dir: Path) -> SessionMetad
     Raises:
         FileNotFoundError: If meta.json doesn't exist
         json.JSONDecodeError: If invalid JSON
-        KeyError: If required fields missing
+        KeyError: If required fields missing (including session_id)
     """
 
 
@@ -457,22 +461,21 @@ def update_session_metadata(session_name: str, sessions_dir: Path) -> None:
     """
 
 
-def extract_session_id(session_file: Path) -> str:
+def extract_session_id(session_name: str, sessions_dir: Path) -> str:
     """
-    Extract Claude session_id from first line of .jsonl file.
+    Extract Claude session_id from .meta.json file.
 
-    Implementation (from bash extract_session_id):
-    1. Open session_file
-    2. Read first line
-    3. Parse JSON: first_line = json.loads(line)
-    4. Extract: session_id = first_line.get('session_id')
-    5. If missing or empty: raise ValueError("No session_id in first line")
-    6. Return session_id
+    NOTE: Since we're using the SDK (not CLI), session_id is now stored
+    in .meta.json, not in the first line of .jsonl file.
+
+    Implementation:
+    1. Load session metadata using load_session_metadata()
+    2. Return metadata.session_id
 
     Raises:
-        FileNotFoundError: If session file doesn't exist
-        json.JSONDecodeError: If first line isn't valid JSON
-        ValueError: If session_id field missing
+        FileNotFoundError: If meta.json doesn't exist
+        json.JSONDecodeError: If invalid JSON
+        KeyError: If session_id field missing
     """
 
 
@@ -480,7 +483,9 @@ def extract_result(session_file: Path) -> str:
     """
     Extract result from last line of .jsonl file.
 
-    Implementation (from bash extract_result):
+    NOTE: Our simplified JSONL format stores result in last line with type="result".
+
+    Implementation:
     1. Read last line (same efficient method as get_session_status)
     2. Parse JSON: last_msg = json.loads(last_line)
     3. Extract: result = last_msg.get('result')
@@ -498,18 +503,19 @@ def list_all_sessions(sessions_dir: Path) -> list[tuple[str, str, str]]:
     """
     List all sessions with basic info.
 
-    Implementation (from bash cmd_list):
+    NOTE: Session ID now comes from .meta.json, not .jsonl file.
+
+    Implementation:
     1. Ensure sessions_dir exists: if not, return []
-    2. Find all .jsonl files: sessions_dir.glob("*.jsonl")
-    3. For each session_file:
-       a. Extract session_name: session_file.stem
-       b. Try to get session_id:
-          - If file has content: read first line, parse session_id
-          - If empty or error: session_id = "initializing"
-       c. Try to get project_dir:
-          - Load meta.json, get project_dir field
-          - If error: project_dir = "unknown"
-       d. Append tuple: (session_name, session_id, project_dir)
+    2. Find all .meta.json files: sessions_dir.glob("*.meta.json")
+    3. For each meta_file:
+       a. Extract session_name: meta_file.stem.replace('.meta', '')
+       b. Try to load metadata:
+          - Load meta.json
+          - session_id = metadata.session_id
+          - project_dir = str(metadata.project_dir)
+          - If error: session_id = "unknown", project_dir = "unknown"
+       c. Append tuple: (session_name, session_id, project_dir)
     4. Return list of tuples
 
     Returns:
@@ -703,6 +709,7 @@ async def run_claude_session(
     3. Stream session to file:
        async for message in query(prompt=prompt, options=options):
            # Write each message to JSONL file (append mode)
+           # NOTE: Using our simplified format - just serialize SDK messages as-is
            with open(session_file, 'a') as f:
                json.dump(message.model_dump(), f)
                f.write('\n')
@@ -723,6 +730,10 @@ async def run_claude_session(
 
     5. Return tuple:
        return (session_id, result)
+
+    NOTE: The .jsonl file will contain our own serialization of SDK messages.
+    This provides external feedback that the agent is working, and allows
+    result extraction. We don't need to match Claude Code's internal format.
 
     Raises:
         ValueError: If session_id or result not found in messages
@@ -1004,15 +1015,37 @@ For each configuration value:
 
 ### 7.1 Session File Format (`.jsonl`)
 
-- **Format**: JSON Lines (stream-json from Claude CLI/SDK)
-- **First line**: Contains `session_id` field
-- **Last line**: Contains `type: "result"` and `result` field
+**IMPORTANT: Simplified Format for SDK Usage**
+
+Since we're using the Claude Agent Python SDK (not the CLI), we no longer need to mimic Claude Code's internal session format. Instead, we use our own simplified JSONL format:
+
+- **Format**: JSON Lines - one JSON object per line
+- **Purpose**: External feedback that the agent is working + result retrieval
+- **Each line**: Simple serialization of messages received from the SDK
+- **Structure**: Our own JSON format (not Claude Code's internal format)
+
+**Example `.jsonl` content:**
+```jsonl
+{"type": "message", "role": "assistant", "content": "I'll help you with that...", "timestamp": "2025-01-15T10:30:01Z"}
+{"type": "tool_use", "tool": "read_file", "args": {"path": "README.md"}, "timestamp": "2025-01-15T10:30:02Z"}
+{"type": "message", "role": "assistant", "content": "Based on the README...", "timestamp": "2025-01-15T10:30:05Z"}
+{"type": "result", "result": "Final answer here", "timestamp": "2025-01-15T10:30:10Z"}
+```
+
+**Key Points:**
+- Each line = `json.dumps(message)` from SDK stream
+- Last line with `"type": "result"` indicates completion
+- Result extraction: parse last line, extract `result` field
+- Session ID is NOT stored in `.jsonl` (stored in `.meta.json` instead)
 
 ### 7.2 Metadata File Format (`.meta.json`)
+
+**Updated to include `session_id` field:**
 
 ```json
 {
   "session_name": "architect",
+  "session_id": "claude-session-abc123def456",
   "agent": "system-architect",
   "project_dir": "/absolute/path/to/project",
   "agents_dir": "/absolute/path/to/agents",
@@ -1021,6 +1054,16 @@ For each configuration value:
   "schema_version": "1.0"
 }
 ```
+
+**Field Descriptions:**
+- `session_name`: User-provided session name
+- `session_id`: Claude session ID from SDK (for resumption)
+- `agent`: Agent name or `null` for generic sessions
+- `project_dir`: Absolute path to project working directory
+- `agents_dir`: Absolute path to agents directory
+- `created_at`: UTC timestamp when session was created
+- `last_resumed_at`: UTC timestamp of last resume operation
+- `schema_version`: Metadata schema version (currently "1.0")
 
 ### 7.3 Agent Structure
 
