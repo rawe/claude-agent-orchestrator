@@ -21,79 +21,83 @@ Rewrite `agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` as 
 
 **Progressive Disclosure**: Each command is a standalone script that loads details only when called, reducing LLM context window usage by ~70%.
 
-**Shared Logic**: Common functionality in `lib/` modules:
+**Self-Contained Design**: The `commands/` directory contains both executables AND their shared `lib/` as a subdirectory. This enables:
+- Skills deployment (copy entire `commands/` to `.claude/skills/`)
+- Simple imports (`Path(__file__).parent / "lib"`)
+- Portability (no external dependencies)
+
+**Shared Logic**: Common functionality in `commands/lib/` modules:
 - `config.py` - Configuration loading (CLI > ENV > Default precedence)
 - `session.py` - Session operations (validation, state detection, metadata)
 - `agent.py` - Agent loading (agent.json, system prompts, MCP config)
-- `claude_client.py` - Claude API integration
+- `claude_client.py` - Claude SDK wrapper (using Python SDK directly)
 - `utils.py` - Common utilities (error handling, I/O)
 
 ## Current Status
 
-✅ Project structure created
-✅ All command stubs written with TODO comments
+✅ Project structure created with `commands/` containing `lib/` subdirectory
+✅ All command stubs written with uv script headers
 ✅ All lib module stubs written with function signatures
-✅ Complete documentation (architecture, development guide, LLM prompts)
+✅ Complete documentation (architecture, SDK investigation, development guide)
+✅ **Decision Made: Use Claude Agent Python SDK (Option B)**
 ⏳ Implementation pending
 
-## Major Decision Required: Claude Integration Strategy
+## Claude Integration Decision: Python SDK ✅
 
-### Option A: Direct CLI Invocation (Bash Script Approach)
-**Current bash script does**: Shell out to `claude` CLI binary
+**Decision**: Use Claude Agent Python SDK directly (Option B)
 
-**Pros**:
-- Easy 1:1 port from bash
-- Minimal changes to existing logic
-- CLI handles all session management
+**Investigation Results** (see `CLAUDE_SDK_INVESTIGATION.md`):
+- ✅ Session persistence/resumption - `ClaudeAgentOptions(resume=session_id)`
+- ✅ Working directory context - `ClaudeAgentOptions(cwd=project_dir)`
+- ✅ MCP tool integration - `ClaudeAgentOptions(mcp_servers={...})`
+- ✅ Response streaming - Async iterator over messages
+- ✅ 100% file format compatibility - Can write same `.jsonl` format
 
-**Cons**:
-- Less flexible
-- Harder to customize
-- Depends on CLI installation
-- Shell subprocess overhead
-
-### Option B: Claude Agent Python SDK
-**Alternative approach**: Use official Python SDK directly
-
-**Pros**:
-- More flexible and powerful
+**Benefits**:
+- Native Python integration (no subprocess overhead)
+- Better error handling (exceptions vs exit codes)
 - Programmatic control over all aspects
-- Better error handling
-- Native Python integration
+- Type safety with full type hints
 - Long-term maintainability
 
-**Cons**:
-- Requires understanding SDK session management
-- Need to replicate some CLI behavior
-- More complex implementation
-- May require architecture adjustments
+**Implementation**: See `ARCHITECTURE_PLAN.md` for detailed guidance on `lib/claude_client.py` using SDK's `query()` function and `ClaudeAgentOptions`.
 
-### Decision Impact
+## Next Steps (Implementation Roadmap)
 
-Affects `lib/claude_client.py` implementation primarily. Rest of architecture remains unchanged.
+### Phase 1: Core Infrastructure (Read-Only)
+1. Implement `commands/lib/config.py` - Configuration loading
+2. Implement `commands/lib/utils.py` - Common utilities
+3. Implement `commands/lib/session.py` - Session metadata and state detection
+4. Implement `commands/ao-status` - Test with bash-created sessions
+5. Implement `commands/ao-list-sessions` - Test listing
+6. Implement `commands/ao-show-config` - Test config display
 
-**Recommendation**: Investigate SDK session management capabilities before deciding. If SDK supports:
-- Session persistence/resumption
-- Working directory context
-- MCP tool integration
-- Response streaming to files
+### Phase 2: Agent Loading
+1. Implement `commands/lib/agent.py` - Agent configuration loading
+2. Implement `commands/ao-list-agents` - Test agent listing
 
-Then Option B (SDK) is superior long-term.
+### Phase 3: Claude SDK Integration
+1. Implement `commands/lib/claude_client.py` - SDK wrapper
+2. Test basic session creation (no agent)
+3. Validate `.jsonl` output format matches bash
 
-## Next Steps
+### Phase 4: Write Operations
+1. Implement `commands/ao-new` - Create new sessions
+2. Implement `commands/ao-resume` - Resume sessions
+3. Implement `commands/ao-get-result` - Extract results
+4. Implement `commands/ao-clean` - Remove sessions
 
-1. **Decide**: CLI vs SDK for Claude integration
-2. **Implement**: Core infrastructure (config, utils, session validation)
-3. **Test**: Simple read-only commands (ao-status, ao-list-sessions)
-4. **Integrate**: Claude API wrapper
-5. **Complete**: Full command implementations
+### Phase 5: Testing & Validation
+1. Test bash/Python interoperability
+2. Verify 100% file format compatibility
+3. Update user documentation
 
 ## Key Files
 
-- **Reference**: `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
-- **Architecture**: `docs/architecture.md`
-- **Implementation Guide**: `docs/development.md`
-- **LLM Prompts**: `docs/llm-prompts.md`
+- **Bash Reference**: `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
+- **Architecture Plan**: `ARCHITECTURE_PLAN.md` (comprehensive implementation guidance)
+- **SDK Investigation**: `CLAUDE_SDK_INVESTIGATION.md` (SDK capabilities analysis)
+- **Legacy Docs**: `docs/architecture.md`, `docs/development.md`, `docs/llm-prompts.md`
 
 ## File Format Compatibility
 
@@ -109,4 +113,8 @@ Progressive disclosure enables token-efficient LLM workflows. Instead of loading
 
 ---
 
-**Resume from here**: Decide on Claude integration approach, then start with `lib/config.py` implementation.
+**Current Status**: Architecture planning complete. Ready to begin Phase 1 implementation starting with `commands/lib/config.py`.
+
+**Key Documents**:
+- `ARCHITECTURE_PLAN.md` - Complete implementation guidance with detailed hints
+- `CLAUDE_SDK_INVESTIGATION.md` - SDK capabilities and usage patterns

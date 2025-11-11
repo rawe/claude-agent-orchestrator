@@ -57,6 +57,19 @@ lib/session.py
 
 ## 2. File Structure & Module Organization
 
+### 2.0 Structure Rationale
+
+**Self-contained distribution**: The `commands/` folder contains everything needed - scripts AND their shared library (`lib/` as subdirectory). This design is essential for:
+
+1. **Skills deployment**: Can copy entire `commands/` folder to `.claude/skills/agent-orchestrator/` for Claude Code integration
+2. **uv compatibility**: Scripts import from co-located `lib/` using simple relative path: `Path(__file__).parent / "lib"`
+3. **Portability**: No external dependencies on sibling directories - commands/ is fully self-contained
+4. **PATH simplicity**: `export PATH="$PATH:.../commands"` - single directory to add
+
+**Trade-off accepted**: `lib/` is not at project root, but this enables the self-contained model which is critical for the skills use case.
+
+### 2.1 Directory Layout
+
 ```
 agent-orchestrator-cli/
 ├── pyproject.toml              # uv project config
@@ -65,30 +78,30 @@ agent-orchestrator-cli/
 │   ├── architecture.md         # This document
 │   ├── development.md
 │   └── llm-prompts.md
-├── commands/                        # Standalone command scripts
-│   ├── ao-new                  # Create new session
-│   ├── ao-resume               # Resume existing session
-│   ├── ao-status               # Check session state
-│   ├── ao-get-result           # Extract result
-│   ├── ao-list-sessions        # List all sessions
-│   ├── ao-list-agents          # List available agents
-│   ├── ao-show-config          # Display session config
-│   └── ao-clean                # Remove all sessions
-└── lib/                        # Shared library modules
-    ├── __init__.py
-    ├── config.py               # Configuration management
-    ├── session.py              # Session operations
-    ├── agent.py                # Agent loading
-    ├── claude_client.py        # Claude SDK wrapper
-    └── utils.py                # Common utilities
+└── commands/                   # Self-contained commands directory
+    ├── ao-new                  # Create new session
+    ├── ao-resume               # Resume existing session
+    ├── ao-status               # Check session state
+    ├── ao-get-result           # Extract result
+    ├── ao-list-sessions        # List all sessions
+    ├── ao-list-agents          # List available agents
+    ├── ao-show-config          # Display session config
+    ├── ao-clean                # Remove all sessions
+    └── lib/                    # Shared library modules (co-located)
+        ├── __init__.py
+        ├── config.py           # Configuration management
+        ├── session.py          # Session operations
+        ├── agent.py            # Agent loading
+        ├── claude_client.py    # Claude SDK wrapper
+        └── utils.py            # Common utilities
 ```
 
-### 2.1 Command Scripts Structure
+### 2.2 Command Scripts Structure
 
 Each script in `commands/` follows this pattern:
 
 ```python
-#!/usr/commands/env python3
+#!/usr/bin/env python3
 """
 ao-<command> - Brief description
 
@@ -99,8 +112,8 @@ Usage:
 import sys
 from pathlib import Path
 
-# Add lib to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+# Add lib to path for imports (lib/ is inside commands/)
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 from config import load_config
 from session import validate_session_name
