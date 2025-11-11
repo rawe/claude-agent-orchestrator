@@ -1,0 +1,46 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+# ]
+# ///
+"""
+List all available agent definitions.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer()
+
+
+@app.command()
+def main(
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
+):
+    """
+    List all available agent definitions.
+
+    Displays: agent name, description, capabilities
+
+    Examples:
+        ao-list-agents
+    """
+    # TODO: Implement command logic
+    # 1. Load configuration
+    # 2. Find all agent directories
+    # 3. Load agent.json for each agent
+    # 4. Extract metadata (name, description)
+    # 5. Format and display list
+    print("TODO: List all agents")
+
+
+if __name__ == "__main__":
+    app()

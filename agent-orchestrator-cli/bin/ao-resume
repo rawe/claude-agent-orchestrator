@@ -1,0 +1,54 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "anthropic",
+#     "typer",
+# ]
+# ///
+"""
+Resume an existing agent orchestrator session.
+
+This command continues a previous session with a new prompt.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer()
+
+
+@app.command()
+def main(
+    session_name: str = typer.Argument(..., help="Name of the session"),
+    prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="Continuation prompt"),
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
+):
+    """
+    Resume an existing agent orchestrator session.
+
+    Examples:
+        ao-resume mysession -p "Add error handling"
+        cat additional-requirements.md | ao-resume mysession
+    """
+    # TODO: Implement command logic
+    # 1. Load configuration
+    # 2. Validate session exists
+    # 3. Load session context (agent, previous config)
+    # 4. Extract session ID from session file
+    # 5. Read prompt (from -p flag and/or stdin)
+    # 6. Call Claude API with session ID
+    # 7. Append response to session file
+    # 8. Update metadata timestamp
+    # 9. Extract and return result
+    print(f"TODO: Resume session '{session_name}'")
+
+
+if __name__ == "__main__":
+    app()

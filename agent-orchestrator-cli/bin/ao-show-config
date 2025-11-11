@@ -1,0 +1,46 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+# ]
+# ///
+"""
+Display session configuration and context.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer()
+
+
+@app.command()
+def main(
+    session_name: str = typer.Argument(..., help="Name of the session"),
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+):
+    """
+    Display session configuration and context.
+
+    Shows: agent used, directories, session metadata
+
+    Examples:
+        ao-show-config mysession
+    """
+    # TODO: Implement command logic
+    # 1. Load configuration
+    # 2. Validate session exists
+    # 3. Load session metadata
+    # 4. Display all configuration values
+    # 5. Show agent info if applicable
+    print(f"TODO: Show config for session '{session_name}'")
+
+
+if __name__ == "__main__":
+    app()

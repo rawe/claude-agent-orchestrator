@@ -49,7 +49,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -77,3 +76,6 @@ $RECYCLE.BIN/
 
 # Agent Orchestrator
 .agent-orchestrator/
+
+# work in progress
+agent-orchestrator-launcher/

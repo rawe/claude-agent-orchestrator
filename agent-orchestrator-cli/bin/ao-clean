@@ -1,0 +1,45 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+# ]
+# ///
+"""
+Remove all agent orchestrator sessions.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer()
+
+
+@app.command()
+def main(
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+):
+    """
+    Remove all sessions (with confirmation).
+
+    Examples:
+        ao-clean
+        ao-clean --force
+    """
+    # TODO: Implement command logic
+    # 1. Load configuration
+    # 2. Prompt for confirmation (unless --force)
+    # 3. Remove sessions directory
+    # 4. Report success
+    print("TODO: Clean all sessions")
+
+
+if __name__ == "__main__":
+    app()

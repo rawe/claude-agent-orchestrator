@@ -1,0 +1,58 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "anthropic",
+#     "typer",
+# ]
+# ///
+"""
+Create a new agent orchestrator session.
+
+This command creates a new Claude AI session, optionally with an agent configuration.
+"""
+
+import sys
+from pathlib import Path
+
+# Add lib to path for shared modules
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer()
+
+
+@app.command()
+def main(
+    session_name: str = typer.Argument(..., help="Name of the session"),
+    prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="Session prompt"),
+    agent: Optional[str] = typer.Option(None, "--agent", help="Agent to use"),
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
+    agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
+):
+    """
+    Create a new agent orchestrator session.
+
+    Examples:
+        ao-new mysession -p "Write hello world"
+        ao-new research --agent web-researcher -p "Research AI"
+        cat prompt.md | ao-new mysession
+    """
+    # TODO: Implement command logic
+    # 1. Load configuration (from env, CLI flags, defaults)
+    # 2. Validate session name
+    # 3. Check session doesn't already exist
+    # 4. Read prompt (from -p flag and/or stdin)
+    # 5. Load agent if specified
+    # 6. Create session directory and metadata
+    # 7. Call Claude API
+    # 8. Stream response to session file
+    # 9. Extract and return result
+    print(f"TODO: Create session '{session_name}'")
+
+
+if __name__ == "__main__":
+    app()

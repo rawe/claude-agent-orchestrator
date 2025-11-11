@@ -1,0 +1,45 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+# ]
+# ///
+"""
+List all agent orchestrator sessions with metadata.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer()
+
+
+@app.command()
+def main(
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
+):
+    """
+    List all sessions with metadata.
+
+    Displays: session name, agent (if any), creation time, last modified
+
+    Examples:
+        ao-list
+    """
+    # TODO: Implement command logic
+    # 1. Load configuration
+    # 2. Find all session directories
+    # 3. Load metadata for each session
+    # 4. Format and display list
+    print("TODO: List all sessions")
+
+
+if __name__ == "__main__":
+    app()
