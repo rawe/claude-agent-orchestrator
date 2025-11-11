@@ -36,13 +36,32 @@ def main(
     Examples:
         ao-status mysession
     """
-    # TODO: Implement command logic
-    # 1. Load configuration
-    # 2. Check if session directory exists
-    # 3. If not: return "not_existent"
-    # 4. Check session file for completion markers
-    # 5. Return "running" or "finished"
-    print(f"TODO: Check status of session '{session_name}'")
+    from config import load_config
+    from session import validate_session_name, get_session_status
+
+    try:
+        # Validate session name
+        validate_session_name(session_name)
+
+        # Load configuration with CLI overrides
+        config = load_config(
+            cli_project_dir=str(project_dir) if project_dir else None,
+            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
+            cli_agents_dir=None,
+        )
+
+        # Get and print session status
+        status = get_session_status(session_name, config.sessions_dir)
+        print(status)
+
+    except ValueError as e:
+        # Session validation errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except Exception as e:
+        # Unexpected errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

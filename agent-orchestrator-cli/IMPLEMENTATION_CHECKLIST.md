@@ -163,26 +163,26 @@ When testing or running scripts during development:
 - Current stub: `commands/ao-status`
 
 **Implementation requirements**:
-- [ ] Keep uv script header
-- [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
-- [ ] Import: `load_config`, `validate_session_name`, `get_session_status`
-- [ ] Parse CLI args: `<session-name>`, `--sessions-dir`
-- [ ] Load configuration
-- [ ] Validate session name
-- [ ] Call `get_session_status()`
-- [ ] Print result: "running", "finished", or "not_existent"
-- [ ] Handle errors gracefully
+- [x] Keep uv script header
+- [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
+- [x] Import: `load_config`, `validate_session_name`, `get_session_status`
+- [x] Parse CLI args: `<session-name>`, `--sessions-dir`
+- [x] Load configuration
+- [x] Validate session name
+- [x] Call `get_session_status()`
+- [x] Print result: "running", "finished", or "not_existent"
+- [x] Handle errors gracefully
 
 **Test plan**:
-- [ ] Create test session with bash script
-- [ ] Run `ao-status <session-name>` - should return correct status
-- [ ] Test with non-existent session - should return "not_existent"
-- [ ] Test with running session - should return "running"
-- [ ] Test with finished session - should return "finished"
+- [x] Create test session with bash script
+- [x] Run `ao-status <session-name>` - should return correct status
+- [x] Test with non-existent session - should return "not_existent"
+- [x] Test with running session - should return "running"
+- [x] Test with finished session - should return "finished"
 
 **Success criteria**:
-- Works with bash-created sessions
-- Status matches bash script output exactly
+- ✅ Works with bash-created sessions
+- ✅ Status matches bash script output exactly
 
 ---
 
