@@ -73,7 +73,7 @@ Phase 3: EXECUTE (Focused Action)
 ### Implementation: One Command = One Script
 
 ```
-bin/
+commands/
 ├── ao-new              # Create session (standalone)
 ├── ao-resume           # Resume session (standalone)
 ├── ao-status           # Check status (standalone)
@@ -180,7 +180,7 @@ lib/
 ### Import Pattern
 
 ```python
-#!/usr/bin/env -S uv run --script
+#!/usr/commands/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["anthropic", "typer"]
@@ -213,7 +213,7 @@ def main():
 - Common validators (session name, paths)
 - Error formatting utilities
 
-**In `bin/` (Command-specific)**:
+**In `commands/` (Command-specific)**:
 - Argument parsing (via argparse/typer)
 - Command-specific validation
 - Output formatting for this command
@@ -236,7 +236,7 @@ def validate_session_name(name: str) -> tuple[bool, str]:
     return True, ""
 ```
 
-**bin/ao-new** (uses shared logic):
+**commands/ao-new** (uses shared logic):
 ```python
 from utils import validate_session_name, error
 
@@ -257,7 +257,7 @@ LLM has been told about `ao-*` commands:
 # In system prompt or tools description:
 """
 Agent Orchestrator commands are available as ao-* executables.
-Run `ls bin/ao-*` to see available commands.
+Run `ls commands/ao-*` to see available commands.
 Run `<command> --help` for usage details.
 """
 ```
@@ -312,7 +312,7 @@ Workflow:
 
 ### Adding a New Command
 
-1. **Create script**: `bin/ao-mycommand`
+1. **Create script**: `commands/ao-mycommand`
 2. **Add uv shebang** (see template)
 3. **Import from lib**: `from config import load_config`
 4. **Implement logic**
@@ -327,7 +327,7 @@ Workflow:
 ### Example: Adding `ao-archive`
 
 ```python
-#!/usr/bin/env -S uv run --script
+#!/usr/commands/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["typer"]
@@ -335,7 +335,7 @@ Workflow:
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 from config import load_config
 from session import archive_session
@@ -454,7 +454,7 @@ def test_precedence_env_over_default():
 Test commands as black boxes:
 ```bash
 # tests/test_ao_new.sh
-./bin/ao-new test-session -p "Hello"
+./commands/ao-new test-session -p "Hello"
 assert_session_created "test-session"
 ```
 
@@ -464,7 +464,7 @@ Simulate LLM workflow:
 ```python
 def test_progressive_discovery():
     # Step 1: Discover
-    commands = run("ls bin/ao-*")
+    commands = run("ls commands/ao-*")
     assert "ao-new" in commands
 
     # Step 2: Detail

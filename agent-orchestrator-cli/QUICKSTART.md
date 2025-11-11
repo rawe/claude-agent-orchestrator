@@ -4,7 +4,7 @@
 
 A complete **stub/template** implementation of the Agent Orchestrator CLI with:
 
-✅ **8 command scripts** (`bin/ao-*`) - Executable, self-documenting stubs
+✅ **8 command scripts** (`commands/ao-*`) - Executable, self-documenting stubs
 ✅ **5 shared modules** (`lib/*.py`) - Function stubs with TODOs
 ✅ **Progressive disclosure architecture** - Optimized for LLM workflows
 ✅ **Complete documentation** - Architecture and development guides
@@ -17,7 +17,7 @@ A complete **stub/template** implementation of the Agent Orchestrator CLI with:
 cd agent-orchestrator-cli
 
 # Verify commands are executable
-./bin/ao-new --help
+./commands/ao-new --help
 
 # Should show: Help text from typer (once uv downloads dependencies)
 ```
@@ -50,22 +50,22 @@ cd agent-orchestrator-cli
 
 Then test:
 ```bash
-python -c "import sys; sys.path.insert(0, 'lib'); from config import load_config; print('OK')"
+python -c "import sys; sys.path.insert(0, 'commands/lib'); from config import load_config; print('OK')"
 ```
 
 ### 4. Implement Simple Commands First
 
 ```bash
 # Start with read-only commands:
-1. bin/ao-status
-2. bin/ao-list-sessions
-3. bin/ao-list-agents
+1. commands/ao-status
+2. commands/ao-list-sessions
+3. commands/ao-list-agents
 ```
 
 Test each:
 ```bash
-./bin/ao-status --help
-./bin/ao-status testsession  # Should handle gracefully
+./commands/ao-status --help
+./commands/ao-status testsession  # Should handle gracefully
 ```
 
 ### 5. Add Claude Integration
@@ -73,8 +73,8 @@ Test each:
 ```bash
 # Complex commands:
 1. lib/claude_client.py
-2. bin/ao-new
-3. bin/ao-resume
+2. commands/ao-new
+3. commands/ao-resume
 ```
 
 ## How Progressive Disclosure Works
@@ -135,8 +135,8 @@ Only loads what's needed, when it's needed!
 mkdir -p /tmp/test-ao-project
 cd /tmp/test-ao-project
 
-# Add bin to PATH
-export PATH="/path/to/agent-orchestrator-cli/bin:$PATH"
+# Add commands to PATH
+export PATH="/path/to/agent-orchestrator-cli/commands:$PATH"
 
 # Test full workflow
 ao-new testsession -p "Write hello world in Python"
@@ -179,7 +179,7 @@ Expose discovery tool:
 
 ```bash
 # Add to PATH permanently
-echo 'export PATH="$PATH:/path/to/agent-orchestrator-cli/bin"' >> ~/.bashrc
+echo 'export PATH="$PATH:/path/to/agent-orchestrator-cli/commands"' >> ~/.bashrc
 
 # Use anywhere
 ao-new mysession --agent researcher -p "Research topic"

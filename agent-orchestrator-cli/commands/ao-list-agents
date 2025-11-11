@@ -12,7 +12,7 @@ List all available agent definitions.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from typing import Optional

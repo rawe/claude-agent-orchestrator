@@ -6,13 +6,13 @@
 # ]
 # ///
 """
-Remove all agent orchestrator sessions.
+Extract the result from a completed agent orchestrator session.
 """
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from typing import Optional
@@ -22,23 +22,23 @@ app = typer.Typer()
 
 @app.command()
 def main(
+    session_name: str = typer.Argument(..., help="Name of the session"),
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
-    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ):
     """
-    Remove all sessions (with confirmation).
+    Extract the result from a completed session.
 
     Examples:
-        ao-clean
-        ao-clean --force
+        ao-get-result mysession
     """
     # TODO: Implement command logic
     # 1. Load configuration
-    # 2. Prompt for confirmation (unless --force)
-    # 3. Remove sessions directory
-    # 4. Report success
-    print("TODO: Clean all sessions")
+    # 2. Validate session exists
+    # 3. Check session is finished (not running)
+    # 4. Extract result from session file (typically last assistant message)
+    # 5. Output result
+    print(f"TODO: Get result from session '{session_name}'")
 
 
 if __name__ == "__main__":

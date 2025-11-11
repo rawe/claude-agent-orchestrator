@@ -75,7 +75,7 @@ Constraints:
 Please implement the module.
 ```
 
-## Implementing bin/ao-status
+## Implementing commands/ao-status
 
 ```markdown
 I need to implement the `ao-status` command that checks session status.
@@ -96,7 +96,7 @@ Implementation plan:
 5. Print state to stdout
 6. Exit with code 0
 
-Task: Replace the TODO in `bin/ao-status` with working implementation.
+Task: Replace the TODO in `commands/ao-status` with working implementation.
 
 Constraints:
 - Use existing shared modules (config, session, utils)
@@ -148,7 +148,7 @@ Constraints:
 Please implement the module.
 ```
 
-## Implementing bin/ao-new
+## Implementing commands/ao-new
 
 ```markdown
 I need to implement the `ao-new` command that creates new agent sessions.
@@ -179,7 +179,7 @@ Implementation flow:
 9. Extract and output result
 10. Log if logging enabled
 
-Task: Replace TODO in `bin/ao-new` with working implementation.
+Task: Replace TODO in `commands/ao-new` with working implementation.
 
 Constraints:
 - Use all relevant shared modules

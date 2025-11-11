@@ -12,7 +12,7 @@
 
 ```
 agent-orchestrator-cli/
-├── bin/              # Executable command scripts
+├── commands/              # Executable command scripts
 │   ├── ao-new
 │   ├── ao-resume
 │   ├── ao-status
@@ -66,13 +66,13 @@ Suggested order for implementing functionality:
 
 ```bash
 # Test directly
-./bin/ao-new --help
+./commands/ao-new --help
 
 # Test with uv explicitly
-uv run --script bin/ao-new --help
+uv run --script commands/ao-new --help
 
 # Add to PATH for easier testing
-export PATH="$PWD/bin:$PATH"
+export PATH="$PWD/commands:$PATH"
 ao-new --help
 ```
 
@@ -80,12 +80,12 @@ ao-new --help
 
 1. Copy template:
 ```bash
-cp bin/ao-new bin/ao-mycommand
+cp commands/ao-new commands/ao-mycommand
 ```
 
 2. Update the script:
 ```python
-#!/usr/bin/env -S uv run --script
+#!/usr/commands/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["anthropic", "typer"]
@@ -93,14 +93,14 @@ cp bin/ao-new bin/ao-mycommand
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 # Your implementation here
 ```
 
 3. Make executable:
 ```bash
-chmod +x bin/ao-mycommand
+chmod +x commands/ao-mycommand
 ```
 
 ### Adding Shared Functionality
@@ -144,7 +144,7 @@ def test_config_precedence():
 
 ```bash
 # tests/integration/test_session_lifecycle.sh
-#!/bin/bash
+#!/commands/bash
 # Test full session lifecycle
 ```
 
@@ -252,21 +252,21 @@ Structure:
 
 ```bash
 # Add to any command for debugging
-python -u bin/ao-new --help
+python -u commands/ao-new --help
 ```
 
 ### Check uv Dependencies
 
 ```bash
 # See what uv would install
-uv pip compile bin/ao-new
+uv pip compile commands/ao-new
 ```
 
 ### Test Imports
 
 ```bash
 # Check if shared modules load
-python -c "import sys; sys.path.insert(0, 'lib'); from config import Config; print('OK')"
+python -c "import sys; sys.path.insert(0, 'commands/lib'); from config import Config; print('OK')"
 ```
 
 ## Migration from Bash
@@ -284,7 +284,7 @@ All commands should behave identically to bash script:
 ```bash
 # Test both versions produce same output
 bash ../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh status test
-./bin/ao-status test
+./commands/ao-status test
 
 # Compare results
 ```
@@ -310,7 +310,7 @@ Preserve:
 
 Prompt template:
 ```
-Implement bin/ao-new based on:
+Implement commands/ao-new based on:
 1. The TODO comments in the file
 2. The bash script 'new' command implementation
 3. Using shared modules from lib/

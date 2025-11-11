@@ -38,7 +38,7 @@ This is a **pull-based** model (load on demand) vs MCP's **push-based** model (e
 
 ```
 agent-orchestrator-cli/
-├── bin/                    # Individual command scripts (executable)
+├── commands/               # Command scripts with shared library
 │   ├── ao-new              # Create new session
 │   ├── ao-resume           # Resume existing session
 │   ├── ao-status           # Check session status
@@ -46,19 +46,18 @@ agent-orchestrator-cli/
 │   ├── ao-list-sessions    # List all sessions
 │   ├── ao-list-agents      # List available agents
 │   ├── ao-show-config      # Show session configuration
-│   └── ao-clean            # Clean all sessions
-├── lib/                    # Shared Python modules
-│   ├── __init__.py
-│   ├── config.py           # Configuration management
-│   ├── session.py          # Session operations
-│   ├── agent.py            # Agent loading
-│   ├── claude_client.py    # Claude SDK integration
-│   └── utils.py            # Common utilities
+│   ├── ao-clean            # Clean all sessions
+│   └── lib/                # Shared Python modules
+│       ├── __init__.py
+│       ├── config.py       # Configuration management
+│       ├── session.py      # Session operations
+│       ├── agent.py        # Agent loading
+│       ├── claude_client.py # Claude SDK integration
+│       └── utils.py        # Common utilities
 ├── docs/                   # Documentation
-│   ├── architecture.md     # This progressive disclosure pattern
-│   ├── commands.md         # Command reference
+│   ├── architecture.md     # Progressive disclosure pattern
 │   └── development.md      # Development guide
-└── README.md              # This file
+└── README.md               # This file
 ```
 
 ## Commands
@@ -83,8 +82,8 @@ Each command is a self-contained Python script using `uv` for dependency managem
 Each command is a standalone `uv` script - no installation needed! Just make them executable:
 
 ```bash
-chmod +x bin/ao-*
-export PATH="$PATH:/path/to/agent-orchestrator-cli/bin"
+chmod +x commands/ao-*
+export PATH="$PATH:/path/to/agent-orchestrator-cli/commands"
 ```
 
 ### Dependencies
@@ -98,7 +97,7 @@ export PATH="$PATH:/path/to/agent-orchestrator-cli/bin"
 
 1. **List available commands**:
    ```bash
-   ls bin/ao-*
+   ls commands/ao-*
    ```
 
 2. **Get command help** (load parameters on demand):
@@ -117,7 +116,7 @@ export PATH="$PATH:/path/to/agent-orchestrator-cli/bin"
 User: "Create a new agent session to design an API"
 
 LLM thinks: I need to create a session. Let me check what command to use.
-LLM runs: ls bin/ao-*
+LLM runs: ls commands/ao-*
 LLM sees: ao-new, ao-resume, ao-status, ao-list-sessions, ao-list-agents...
 LLM thinks: I need ao-new. Let me check its parameters.
 LLM runs: ao-new --help
@@ -152,12 +151,12 @@ All commands use shared configuration logic from `lib/config.py` to ensure consi
 
 1. **Copy template** (or create from scratch):
    ```bash
-   cp bin/ao-new bin/ao-mycommand
+   cp commands/ao-new commands/ao-mycommand
    ```
 
 2. **Add uv shebang**:
    ```python
-   #!/usr/bin/env -S uv run --script
+   #!/usr/commands/env -S uv run --script
    # /// script
    # requires-python = ">=3.11"
    # dependencies = [
@@ -171,7 +170,7 @@ All commands use shared configuration logic from `lib/config.py` to ensure consi
    ```python
    import sys
    from pathlib import Path
-   sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+   sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
    from config import load_config
    from utils import validate_session_name
@@ -181,7 +180,7 @@ All commands use shared configuration logic from `lib/config.py` to ensure consi
 
 5. **Make executable**:
    ```bash
-   chmod +x bin/ao-mycommand
+   chmod +x commands/ao-mycommand
    ```
 
 ### Code Reuse Strategy
@@ -193,7 +192,7 @@ All commands use shared configuration logic from `lib/config.py` to ensure consi
 - Claude API integration
 - Common utilities
 
-**Command-specific logic stays in `bin/`**:
+**Command-specific logic stays in `commands/`**:
 - Argument parsing
 - Command-specific validation
 - Output formatting

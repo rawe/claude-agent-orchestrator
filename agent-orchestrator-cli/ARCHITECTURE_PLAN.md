@@ -36,7 +36,7 @@ Key SDK features NOT used by bash (available for future):
 ### 1.3 Module Dependency Graph
 
 ```
-Command Scripts (bin/)
+Command Scripts (commands/)
     ├─> lib/config.py (Environment + CLI args)
     ├─> lib/session.py (State detection, metadata)
     ├─> lib/agent.py (Agent loading)
@@ -65,7 +65,7 @@ agent-orchestrator-cli/
 │   ├── architecture.md         # This document
 │   ├── development.md
 │   └── llm-prompts.md
-├── bin/                        # Standalone command scripts
+├── commands/                        # Standalone command scripts
 │   ├── ao-new                  # Create new session
 │   ├── ao-resume               # Resume existing session
 │   ├── ao-status               # Check session state
@@ -85,10 +85,10 @@ agent-orchestrator-cli/
 
 ### 2.1 Command Scripts Structure
 
-Each script in `bin/` follows this pattern:
+Each script in `commands/` follows this pattern:
 
 ```python
-#!/usr/bin/env python3
+#!/usr/commands/env python3
 """
 ao-<command> - Brief description
 
@@ -881,7 +881,7 @@ def log_result(
 
 ---
 
-## 5. Command Scripts (bin/)
+## 5. Command Scripts (commands/)
 
 ### Command Script Pattern
 
@@ -894,35 +894,35 @@ All command scripts follow this structure:
 5. **Handle errors** - Graceful error messages, proper exit codes
 6. **Output results** - Print to stdout (errors to stderr)
 
-### 5.1 bin/ao-new
+### 5.1 commands/ao-new
 
 See ARCHITECTURE_PLAN.md section 5.1 for complete implementation guidance.
 
-### 5.2 bin/ao-resume
+### 5.2 commands/ao-resume
 
 See ARCHITECTURE_PLAN.md section 5.2 for complete implementation guidance.
 
-### 5.3 bin/ao-status
+### 5.3 commands/ao-status
 
 See ARCHITECTURE_PLAN.md section 5.3 for complete implementation guidance.
 
-### 5.4 bin/ao-get-result
+### 5.4 commands/ao-get-result
 
 See ARCHITECTURE_PLAN.md section 5.4 for complete implementation guidance.
 
-### 5.5 bin/ao-list-sessions
+### 5.5 commands/ao-list-sessions
 
 See ARCHITECTURE_PLAN.md section 5.5 for complete implementation guidance.
 
-### 5.6 bin/ao-list-agents
+### 5.6 commands/ao-list-agents
 
 See ARCHITECTURE_PLAN.md section 5.6 for complete implementation guidance.
 
-### 5.7 bin/ao-show-config
+### 5.7 commands/ao-show-config
 
 See ARCHITECTURE_PLAN.md section 5.7 for complete implementation guidance.
 
-### 5.8 bin/ao-clean
+### 5.8 commands/ao-clean
 
 See ARCHITECTURE_PLAN.md section 5.8 for complete implementation guidance.
 
@@ -1027,23 +1027,23 @@ agents/
 1. Implement `lib/config.py`
 2. Implement `lib/utils.py`
 3. Implement `lib/session.py`
-4. Implement `bin/ao-status`
-5. Implement `bin/ao-list-sessions`
-6. Implement `bin/ao-show-config`
+4. Implement `commands/ao-status`
+5. Implement `commands/ao-list-sessions`
+6. Implement `commands/ao-show-config`
 
 ### Phase 2: Agent Loading
 1. Implement `lib/agent.py`
-2. Implement `bin/ao-list-agents`
+2. Implement `commands/ao-list-agents`
 
 ### Phase 3: Claude SDK Integration
 1. Implement `lib/claude_client.py`
 2. Test basic session creation
 
 ### Phase 4: Write Operations
-1. Implement `bin/ao-new`
-2. Implement `bin/ao-resume`
-3. Implement `bin/ao-get-result`
-4. Implement `bin/ao-clean`
+1. Implement `commands/ao-new`
+2. Implement `commands/ao-resume`
+3. Implement `commands/ao-get-result`
+4. Implement `commands/ao-clean`
 
 ### Phase 5: Testing & Documentation
 1. Create comprehensive test suite

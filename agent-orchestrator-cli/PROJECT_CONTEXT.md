@@ -8,14 +8,14 @@ Rewrite `agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` as 
 
 | Bash Script Command | Python Script | Purpose |
 |---------------------|---------------|---------|
-| `new` | `bin/ao-new` | Create new session |
-| `resume` | `bin/ao-resume` | Resume existing session |
-| `status` | `bin/ao-status` | Check session state (running/finished/not_existent) |
-| `get-result` | `bin/ao-get-result` | Extract result from completed session |
-| `list` | `bin/ao-list-sessions` | List all sessions with metadata |
-| `list-agents` | `bin/ao-list-agents` | List available agent definitions |
-| `show-config` | `bin/ao-show-config` | Display session configuration |
-| `clean` | `bin/ao-clean` | Remove all sessions |
+| `new` | `commands/ao-new` | Create new session |
+| `resume` | `commands/ao-resume` | Resume existing session |
+| `status` | `commands/ao-status` | Check session state (running/finished/not_existent) |
+| `get-result` | `commands/ao-get-result` | Extract result from completed session |
+| `list` | `commands/ao-list-sessions` | List all sessions with metadata |
+| `list-agents` | `commands/ao-list-agents` | List available agent definitions |
+| `show-config` | `commands/ao-show-config` | Display session configuration |
+| `clean` | `commands/ao-clean` | Remove all sessions |
 
 ## Architecture
 
