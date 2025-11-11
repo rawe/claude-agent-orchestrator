@@ -38,6 +38,23 @@ This checklist breaks implementation into **5 phases**, each designed for a sepa
 
 ---
 
+## Important: Python/uv Invocation Rules
+
+When testing or running scripts during development:
+
+- **For running scripts**: Use `uv run <script.py>`
+  - Example: `uv run test_utils.py`
+  - Example: `uv run commands/ao-status`
+  
+- **For inline Python commands**: Use `python` (NOT `python3`)
+  - Example: `echo 'test' | python -c "import sys; print(sys.stdin.read())"`
+  - NEVER combine with `uv run`: NO `uv run python -c ...`
+  
+- **Never use `python3`**: This may invoke an older system Python version
+- **Never combine**: NO `uv run python` - choose `uv run <script>` OR `python -c`
+
+---
+
 ## Phase 1: Core Infrastructure (Read-Only Commands)
 
 **Goal**: Implement configuration and session management without Claude SDK integration.
@@ -83,17 +100,17 @@ This checklist breaks implementation into **5 phases**, each designed for a sepa
 - `ARCHITECTURE_PLAN.md` - Section 4.5 (lib/utils.py)
 
 **Implementation requirements**:
-- [ ] Implement `get_prompt_from_args_and_stdin()` - handles `-p` flag and stdin
-- [ ] Implement `error_exit()` - print to stderr and exit
-- [ ] Implement `ensure_directory_exists()` - create directory if needed
-- [ ] Implement `log_command()` - log to `.log` file (if logging enabled)
-- [ ] Implement `log_result()` - log result to `.log` file
-- [ ] Add full type hints throughout
+- [x] Implement `get_prompt_from_args_and_stdin()` - handles `-p` flag and stdin
+- [x] Implement `error_exit()` - print to stderr and exit
+- [x] Implement `ensure_directory_exists()` - create directory if needed
+- [x] Implement `log_command()` - log to `.log` file (if logging enabled)
+- [x] Implement `log_result()` - log result to `.log` file
+- [x] Add full type hints throughout
 
 **Success criteria**:
-- Can read prompt from stdin
-- Can combine prompt from `-p` flag and stdin
-- Logging functions create proper `.log` file format
+- ✅ Can read prompt from stdin
+- ✅ Can combine prompt from `-p` flag and stdin
+- ✅ Logging functions create proper `.log` file format
 
 ---
 
