@@ -5,9 +5,17 @@ Handles configuration loading with precedence:
 CLI Flags > Environment Variables > Defaults (PWD)
 """
 
+import os
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
+
+
+# Environment variable names (MUST match bash script exactly)
+ENV_PROJECT_DIR = "AGENT_ORCHESTRATOR_PROJECT_DIR"
+ENV_SESSIONS_DIR = "AGENT_ORCHESTRATOR_SESSIONS_DIR"
+ENV_AGENTS_DIR = "AGENT_ORCHESTRATOR_AGENTS_DIR"
+ENV_ENABLE_LOGGING = "AGENT_ORCHESTRATOR_ENABLE_LOGGING"
 
 
 @dataclass
@@ -20,72 +28,145 @@ class Config:
     enable_logging: bool
 
 
-def load_config(
-    project_dir: Optional[Path] = None,
-    sessions_dir: Optional[Path] = None,
-    agents_dir: Optional[Path] = None,
-) -> Config:
+def resolve_absolute_path(path_str: str) -> Path:
     """
-    Load configuration with precedence handling.
+    Convert path string to absolute Path object.
 
     Args:
-        project_dir: CLI override for project directory
-        sessions_dir: CLI override for sessions directory
-        agents_dir: CLI override for agents directory
+        path_str: Path string (can be relative or absolute)
 
     Returns:
-        Config object with resolved paths
-
-    TODO: Implement precedence logic:
-    1. Use CLI arguments if provided
-    2. Fall back to environment variables
-    3. Fall back to PWD defaults
-    4. Validate all paths
-    5. Create directories if needed
+        Absolute Path object with normalized path
     """
-    # TODO: Implement
-    raise NotImplementedError("Config loading not yet implemented")
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    return path.resolve()
 
 
-def get_project_dir() -> Path:
+def find_existing_parent(path: Path) -> Path:
     """
-    Get project directory from environment or default to PWD.
+    Find the first existing parent directory by walking up the tree.
 
-    TODO: Check AGENT_ORCHESTRATOR_PROJECT_DIR env var
+    Args:
+        path: Directory path to check
+
+    Returns:
+        First existing parent directory (or root if none found)
     """
-    # TODO: Implement
-    raise NotImplementedError()
+    current = path
+    while current != current.parent:  # Not at root
+        if current.exists() and current.is_dir():
+            return current
+        current = current.parent
+    return Path("/")
 
 
-def get_sessions_dir(project_dir: Path) -> Path:
+def validate_can_create(path: Path, dir_name: str) -> None:
     """
-    Get sessions directory.
+    Validate that a directory can be created (parent exists and is writable).
 
-    Default: {project_dir}/.agent-orchestrator/sessions
+    Args:
+        path: The directory to validate
+        dir_name: Human-readable name for error messages ("sessions", "agents")
 
-    TODO: Check AGENT_ORCHESTRATOR_SESSIONS_DIR env var
+    Raises:
+        ValueError: If directory cannot be created (parent not writable)
     """
-    # TODO: Implement
-    raise NotImplementedError()
+    # If directory already exists, it's valid
+    if path.exists() and path.is_dir():
+        return
+
+    # Find first existing parent
+    parent = find_existing_parent(path.parent)
+
+    # Check if parent is writable
+    if not os.access(parent, os.W_OK):
+        raise ValueError(
+            f"Cannot create {dir_name} directory (parent not writable): {path}\n"
+            f"Existing parent: {parent}"
+        )
 
 
-def get_agents_dir(project_dir: Path) -> Path:
+def load_config(
+    cli_project_dir: Optional[str] = None,
+    cli_sessions_dir: Optional[str] = None,
+    cli_agents_dir: Optional[str] = None,
+) -> Config:
     """
-    Get agents directory.
+    Load configuration with CLI > ENV > DEFAULT precedence.
 
-    Default: {project_dir}/.agent-orchestrator/agents
+    Args:
+        cli_project_dir: Optional CLI override for project directory
+        cli_sessions_dir: Optional CLI override for sessions directory
+        cli_agents_dir: Optional CLI override for agents directory
 
-    TODO: Check AGENT_ORCHESTRATOR_AGENTS_DIR env var
+    Returns:
+        Config object with all paths resolved to absolute paths
+
+    Raises:
+        ValueError: If project_dir doesn't exist or directories can't be created
     """
-    # TODO: Implement
-    raise NotImplementedError()
+    # Part A: Read environment variables
+    env_project_dir = os.environ.get(ENV_PROJECT_DIR)
+    env_sessions_dir = os.environ.get(ENV_SESSIONS_DIR)
+    env_agents_dir = os.environ.get(ENV_AGENTS_DIR)
+    env_logging = os.environ.get(ENV_ENABLE_LOGGING, "").lower()
 
+    # Part B: Apply precedence for PROJECT_DIR
+    # CLI > ENV > DEFAULT
+    if cli_project_dir:
+        project_dir_str = cli_project_dir
+    elif env_project_dir:
+        project_dir_str = env_project_dir
+    else:
+        project_dir_str = str(Path.cwd())
 
-def is_logging_enabled() -> bool:
-    """
-    Check if logging is enabled.
+    # Resolve to absolute path
+    project_dir = resolve_absolute_path(project_dir_str)
 
-    TODO: Check AGENT_ORCHESTRATOR_ENABLE_LOGGING env var
-    """
-    # TODO: Implement
-    raise NotImplementedError()
+    # Part C: Validate PROJECT_DIR
+    # Must exist and be readable
+    if not project_dir.exists():
+        raise ValueError(f"Project directory does not exist: {project_dir}")
+    if not project_dir.is_dir():
+        raise ValueError(f"Project directory is not a directory: {project_dir}")
+    if not os.access(project_dir, os.R_OK):
+        raise ValueError(f"Project directory is not readable: {project_dir}")
+
+    # Part D: Apply precedence for SESSIONS_DIR
+    # CLI > ENV > DEFAULT
+    if cli_sessions_dir:
+        sessions_dir = resolve_absolute_path(cli_sessions_dir)
+    elif env_sessions_dir:
+        sessions_dir = resolve_absolute_path(env_sessions_dir)
+    else:
+        # Default: {project_dir}/.agent-orchestrator/agent-sessions
+        sessions_dir = project_dir / ".agent-orchestrator" / "agent-sessions"
+
+    # Part E: Apply precedence for AGENTS_DIR
+    # CLI > ENV > DEFAULT
+    if cli_agents_dir:
+        agents_dir = resolve_absolute_path(cli_agents_dir)
+    elif env_agents_dir:
+        agents_dir = resolve_absolute_path(env_agents_dir)
+    else:
+        # Default: {project_dir}/.agent-orchestrator/agents
+        agents_dir = project_dir / ".agent-orchestrator" / "agents"
+
+    # Part F: Validate creation permissions
+    # Validate we can create these directories
+    validate_can_create(sessions_dir, "sessions")
+    validate_can_create(agents_dir, "agents")
+
+    # Part G: Parse logging flag
+    # Enable if value is "1", "true", or "yes"
+    enable_logging = env_logging in ("1", "true", "yes")
+
+    # Part H: Return Config object
+    return Config(
+        project_dir=project_dir,
+        sessions_dir=sessions_dir,
+        agents_dir=agents_dir,
+        enable_logging=enable_logging,
+    )
