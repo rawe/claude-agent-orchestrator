@@ -126,29 +126,30 @@ When testing or running scripts during development:
 **IMPORTANT NOTE**: The file format has been updated for SDK usage. Session ID is now stored in `.meta.json` (not `.jsonl`), and the `.jsonl` file uses our own simplified message serialization. See Section 7.1-7.2 in ARCHITECTURE_PLAN.md for details.
 
 **Implementation requirements**:
-- [ ] Create `SessionMetadata` dataclass (UPDATED: now includes `session_id` field)
-- [ ] Create `SessionState` type alias: `Literal["running", "finished", "not_existent"]`
-- [ ] Implement `validate_session_name()` - MUST match bash validation rules
+- [x] Create `SessionMetadata` dataclass (UPDATED: now includes `session_id` field)
+- [x] Create `SessionState` type alias: `Literal["running", "finished", "not_existent"]`
+- [x] Implement `validate_session_name()` - MUST match bash validation rules
   - Max 60 characters
   - Only alphanumeric, dash, underscore: `^[a-zA-Z0-9_-]+$`
-- [ ] Implement `get_session_status()` - detect session state
+- [x] Implement `get_session_status()` - detect session state
   - Check `.meta.json` exists → else "not_existent"
   - Check `.jsonl` exists → else "running"
   - Check `.jsonl` size > 0 → else "running"
   - Read last line, check for `type: "result"` → "finished" or "running"
-- [ ] Implement `save_session_metadata()` - create `.meta.json` (UPDATED: now includes session_id parameter)
-- [ ] Implement `load_session_metadata()` - read `.meta.json` (UPDATED: now returns session_id)
-- [ ] Implement `update_session_metadata()` - update `last_resumed_at` timestamp
-- [ ] Implement `extract_session_id()` - UPDATED: read from `.meta.json` (not `.jsonl`)
-- [ ] Implement `extract_result()` - read last line of `.jsonl` (in our simplified format)
-- [ ] Implement `list_all_sessions()` - return list of (name, session_id, project_dir)
-- [ ] Add full type hints throughout
+- [x] Implement `save_session_metadata()` - create `.meta.json` (UPDATED: now includes session_id parameter)
+- [x] Implement `load_session_metadata()` - read `.meta.json` (UPDATED: now returns session_id)
+- [x] Implement `update_session_metadata()` - update `last_resumed_at` timestamp
+- [x] Implement `extract_session_id()` - UPDATED: read from `.meta.json` (not `.jsonl`)
+- [x] Implement `extract_result()` - read last line of `.jsonl` (in our simplified format)
+- [x] Implement `list_all_sessions()` - return list of (name, session_id, project_dir)
+- [x] Add full type hints throughout
 
 **Success criteria**:
-- State detection algorithm works correctly for new format
-- Can save and load `.meta.json` files with session_id
-- Can parse `.jsonl` files in our simplified format
-- Session validation rules match bash (60 chars, alphanumeric + dash/underscore)
+- ✅ State detection algorithm works correctly for new format
+- ✅ Can save and load `.meta.json` files with session_id
+- ✅ Can parse `.jsonl` files in our simplified format
+- ✅ Session validation rules match bash (60 chars, alphanumeric + dash/underscore)
+- ✅ All tests pass (7/7 tests passed)
 - **NOTE**: This implementation uses a NEW file format (not bash-compatible) since we're using the SDK directly
 
 ---
