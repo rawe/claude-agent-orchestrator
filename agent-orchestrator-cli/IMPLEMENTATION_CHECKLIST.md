@@ -1,6 +1,40 @@
 # Agent Orchestrator CLI - Implementation Checklist
 
-This document provides a step-by-step implementation plan for the Python agent orchestrator. Each phase is designed to be completed in a separate session.
+## Project Context
+
+**What we're building**: A Python rewrite of the bash-based agent orchestrator (`agent-orchestrator.sh`) using the Claude Agent SDK.
+
+**Why**: Progressive disclosure architecture optimized for LLM workflows - each command is a standalone script that loads only what it needs, reducing context window usage by ~70%.
+
+**Key Architectural Decisions**:
+- **Self-contained design**: `commands/` directory contains both executables AND their shared `lib/` subdirectory, enabling easy skills deployment
+- **SDK integration**: Using Claude Agent Python SDK directly (not CLI subprocess) for better error handling, type safety, and maintainability
+- **100% compatibility**: Must maintain complete interoperability with existing bash script - sessions created by either tool can be used by the other
+
+**File Structure**:
+```
+commands/
+├── ao-new, ao-resume, ao-status, etc.  # Standalone command scripts
+└── lib/                                 # Shared modules (co-located)
+    ├── config.py                        # CLI > ENV > DEFAULT precedence
+    ├── session.py                       # State detection, metadata
+    ├── agent.py                         # Agent loading
+    ├── claude_client.py                 # SDK wrapper
+    └── utils.py                         # Common utilities
+```
+
+**Essential Reading Before Starting**:
+- `PROJECT_CONTEXT.md` - Overall project goals, architecture rationale, current status
+- `ARCHITECTURE_PLAN.md` - Detailed implementation guidance with function signatures
+- `CLAUDE_SDK_INVESTIGATION.md` - SDK capabilities and usage patterns
+
+---
+
+## Implementation Approach
+
+This checklist breaks implementation into **5 phases**, each designed for a separate coding session. Each phase builds on the previous, starting with read-only operations and progressing to full session creation.
+
+**Start here**: Phase 1, Step 1.1
 
 ---
 
@@ -13,8 +47,9 @@ This document provides a step-by-step implementation plan for the Python agent o
 **File to implement**: `commands/lib/config.py`
 
 **Reference documentation**:
-- `ARCHITECTURE_PLAN.md` - Section 4.1 (lib/config.py)
-- `PROJECT_CONTEXT.md` - Environment variables section
+- `PROJECT_CONTEXT.md` - Architecture section (self-contained design rationale)
+- `ARCHITECTURE_PLAN.md` - Section 3 (Configuration Management), Section 4.1 (lib/config.py)
+- `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 1-100 (environment variables, directory setup)
 
 **Implementation requirements**:
 - [ ] Create `Config` dataclass with fields: `project_dir`, `sessions_dir`, `agents_dir`, `enable_logging`
@@ -67,7 +102,8 @@ This document provides a step-by-step implementation plan for the Python agent o
 **File to implement**: `commands/lib/session.py`
 
 **Reference documentation**:
-- `ARCHITECTURE_PLAN.md` - Section 4.2 (lib/session.py)
+- `PROJECT_CONTEXT.md` - File Format Compatibility section
+- `ARCHITECTURE_PLAN.md` - Section 4.2 (lib/session.py), Section 7 (File Format Compatibility)
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 342-450 (session functions)
 
 **Implementation requirements**:
@@ -243,7 +279,8 @@ This document provides a step-by-step implementation plan for the Python agent o
 **File to implement**: `commands/lib/agent.py`
 
 **Reference documentation**:
-- `ARCHITECTURE_PLAN.md` - Section 4.3 (lib/agent.py)
+- `PROJECT_CONTEXT.md` - File Format Compatibility section (agent structure)
+- `ARCHITECTURE_PLAN.md` - Section 4.3 (lib/agent.py), Section 7.3 (Agent Structure)
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 380-438 (agent functions)
 - Example agent: `../agent-orchestrator/example/agents/confluence-researcher/`
 
@@ -318,8 +355,9 @@ This document provides a step-by-step implementation plan for the Python agent o
 **File to implement**: `commands/lib/claude_client.py`
 
 **Reference documentation**:
+- `PROJECT_CONTEXT.md` - Claude Integration Decision section (SDK choice rationale)
+- `CLAUDE_SDK_INVESTIGATION.md` - Complete SDK usage guide (requirements analysis, implementation patterns)
 - `ARCHITECTURE_PLAN.md` - Section 4.4 (lib/claude_client.py)
-- `CLAUDE_SDK_INVESTIGATION.md` - Complete SDK usage guide
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 740-763 (Claude invocation)
 
 **Implementation requirements**:
@@ -363,6 +401,7 @@ This document provides a step-by-step implementation plan for the Python agent o
 **File to implement**: `commands/ao-new`
 
 **Reference documentation**:
+- `PROJECT_CONTEXT.md` - Command Mapping table (bash → Python), Architecture section
 - `ARCHITECTURE_PLAN.md` - Section 5.1 (bin/ao-new) - has complete implementation template
 - Current stub: `commands/ao-new`
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 682-764 (cmd_new)
@@ -554,31 +593,43 @@ This document provides a step-by-step implementation plan for the Python agent o
 
 ## Quick Reference
 
+### Essential Documents
+
+**Always Read First**:
+- `PROJECT_CONTEXT.md` - Project goals, architecture decisions, current status
+- `ARCHITECTURE_PLAN.md` - Detailed implementation guidance
+- `CLAUDE_SDK_INVESTIGATION.md` - SDK capabilities and patterns
+
 ### Key Files for Each Phase
 
 **Phase 1 (Core Infrastructure)**:
-- Read: `ARCHITECTURE_PLAN.md` sections 4.1, 4.2, 4.5, 5.3-5.5, 5.7
-- Read: `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` (lines 342-450)
+- Read: `PROJECT_CONTEXT.md` (Architecture, File Format Compatibility)
+- Read: `ARCHITECTURE_PLAN.md` sections 3, 4.1, 4.2, 4.5, 5.3-5.5, 5.7, 7
+- Read: `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` (lines 1-100, 342-450)
 - Implement: `commands/lib/config.py`, `commands/lib/utils.py`, `commands/lib/session.py`
 - Implement: `commands/ao-status`, `commands/ao-list-sessions`, `commands/ao-show-config`, `commands/ao-get-result`
 
 **Phase 2 (Agent Loading)**:
-- Read: `ARCHITECTURE_PLAN.md` sections 4.3, 5.6
+- Read: `PROJECT_CONTEXT.md` (File Format Compatibility - agent structure)
+- Read: `ARCHITECTURE_PLAN.md` sections 4.3, 5.6, 7.3
 - Read: `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` (lines 380-438)
 - Implement: `commands/lib/agent.py`
 - Implement: `commands/ao-list-agents`
 
 **Phase 3 (Claude SDK)**:
+- Read: `PROJECT_CONTEXT.md` (Claude Integration Decision section)
+- Read: `CLAUDE_SDK_INVESTIGATION.md` (entire document - SDK decision rationale)
 - Read: `ARCHITECTURE_PLAN.md` section 4.4
-- Read: `CLAUDE_SDK_INVESTIGATION.md` (entire document)
 - Implement: `commands/lib/claude_client.py`
 
 **Phase 4 (Write Operations)**:
+- Read: `PROJECT_CONTEXT.md` (Command Mapping table)
 - Read: `ARCHITECTURE_PLAN.md` sections 5.1, 5.2, 5.8
 - Read: `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` (lines 682-830)
 - Implement: `commands/ao-new`, `commands/ao-resume`, `commands/ao-clean`
 
 **Phase 5 (Testing)**:
+- Read: `PROJECT_CONTEXT.md` (Why This Matters section)
 - Read: `ARCHITECTURE_PLAN.md` sections 7, 8
 - Run: All interoperability tests
 - Update: Documentation files
@@ -592,14 +643,39 @@ When starting a new implementation session, use this prompt:
 ```
 I'm implementing the Agent Orchestrator CLI Python rewrite.
 
+Context: We're rewriting agent-orchestrator.sh as Python scripts using Claude Agent SDK.
+Goal: Progressive disclosure architecture with 100% bash compatibility.
+
 Current phase: [PHASE NUMBER AND NAME]
 Current step: [STEP NUMBER]
 
 Please read:
+- PROJECT_CONTEXT.md - [relevant section from step]
 - IMPLEMENTATION_CHECKLIST.md - Step [X.Y]
-- [Any reference files listed in that step]
+- [Any other reference files listed in that step]
 
 Then implement [FILE/FEATURE NAME] according to the requirements in the checklist.
+Make sure to maintain compatibility with the bash script.
+```
+
+**Example for Step 1.1**:
+```
+I'm implementing the Agent Orchestrator CLI Python rewrite.
+
+Context: We're rewriting agent-orchestrator.sh as Python scripts using Claude Agent SDK.
+Goal: Progressive disclosure architecture with 100% bash compatibility.
+
+Current phase: Phase 1 - Core Infrastructure
+Current step: Step 1.1 - Configuration Module
+
+Please read:
+- PROJECT_CONTEXT.md - Architecture section (self-contained design)
+- IMPLEMENTATION_CHECKLIST.md - Step 1.1
+- ARCHITECTURE_PLAN.md - Sections 3 and 4.1
+- ../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh - Lines 1-100
+
+Then implement commands/lib/config.py according to the requirements.
+Environment variable names MUST match the bash script exactly.
 ```
 
 ---
