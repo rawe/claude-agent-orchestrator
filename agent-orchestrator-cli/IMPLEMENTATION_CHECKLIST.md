@@ -195,25 +195,25 @@ When testing or running scripts during development:
 - Current stub: `commands/ao-list-sessions`
 
 **Implementation requirements**:
-- [ ] Keep uv script header
-- [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
-- [ ] Import: `load_config`, `list_all_sessions`, `ensure_directory_exists`
-- [ ] Parse CLI args: `--sessions-dir`
-- [ ] Load configuration
-- [ ] Ensure sessions directory exists
-- [ ] Call `list_all_sessions()`
-- [ ] Output format: `{session_name} (session: {session_id}, project: {project_dir})`
-- [ ] If no sessions: print "No sessions found"
+- [x] Keep uv script header
+- [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
+- [x] Import: `load_config`, `list_all_sessions`, `ensure_directory_exists`
+- [x] Parse CLI args: `--sessions-dir`
+- [x] Load configuration
+- [x] Ensure sessions directory exists
+- [x] Call `list_all_sessions()`
+- [x] Output format: `{session_name} (session: {session_id}, project: {project_dir})`
+- [x] If no sessions: print "No sessions found"
 
 **Test plan**:
-- [ ] Create multiple test sessions with bash script
-- [ ] Run `ao-list-sessions` - should show all sessions
-- [ ] Output format should match bash script
-- [ ] Test with empty sessions directory - should print "No sessions found"
+- [x] Create multiple test sessions with bash script
+- [x] Run `ao-list-sessions` - should show all sessions
+- [x] Output format should match bash script
+- [x] Test with empty sessions directory - should print "No sessions found"
 
 **Success criteria**:
-- Lists all bash-created sessions correctly
-- Output format matches bash script
+- ✅ Lists all bash-created sessions correctly
+- ✅ Output format matches bash script
 
 ---
 
