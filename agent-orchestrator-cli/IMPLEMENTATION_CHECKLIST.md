@@ -226,15 +226,15 @@ When testing or running scripts during development:
 - Current stub: `commands/ao-show-config`
 
 **Implementation requirements**:
-- [ ] Keep uv script header
-- [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
-- [ ] Import: `load_config`, `validate_session_name`, `load_session_metadata`
-- [ ] Parse CLI args: `<session-name>`, `--sessions-dir`
-- [ ] Load configuration
-- [ ] Validate session name
-- [ ] Check session exists (`.meta.json` file)
-- [ ] Load session metadata
-- [ ] Display configuration matching bash format:
+- [x] Keep uv script header
+- [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
+- [x] Import: `load_config`, `validate_session_name`, `load_session_metadata`
+- [x] Parse CLI args: `<session-name>`, `--sessions-dir`
+- [x] Load configuration
+- [x] Validate session name
+- [x] Check session exists (`.meta.json` file)
+- [x] Load session metadata
+- [x] Display configuration matching bash format:
   ```
   Configuration for session '{session_name}':
     Session file:    {sessions_dir}/{session_name}.jsonl
@@ -248,14 +248,14 @@ When testing or running scripts during development:
   ```
 
 **Test plan**:
-- [ ] Create test session with bash script
-- [ ] Run `ao-show-config <session-name>` - should display config
-- [ ] Output format should match bash script
-- [ ] Test with non-existent session - should error gracefully
+- [x] Create test session with bash script
+- [x] Run `ao-show-config <session-name>` - should display config
+- [x] Output format should match bash script
+- [x] Test with non-existent session - should error gracefully
 
 **Success criteria**:
-- Displays configuration for bash-created sessions
-- Output format matches bash script
+- ✅ Displays configuration for bash-created sessions
+- ✅ Output format matches bash script
 
 ---
 

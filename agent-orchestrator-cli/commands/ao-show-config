@@ -10,6 +10,7 @@ Display session configuration and context.
 """
 
 import sys
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
@@ -23,7 +24,7 @@ app = typer.Typer()
 @app.command()
 def main(
     session_name: str = typer.Argument(..., help="Name of the session"),
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
 ):
     """
     Display session configuration and context.
@@ -33,13 +34,56 @@ def main(
     Examples:
         ao-show-config mysession
     """
-    # TODO: Implement command logic
-    # 1. Load configuration
-    # 2. Validate session exists
-    # 3. Load session metadata
-    # 4. Display all configuration values
-    # 5. Show agent info if applicable
-    print(f"TODO: Show config for session '{session_name}'")
+    from config import load_config
+    from session import validate_session_name, load_session_metadata
+
+    try:
+        # Validate session name
+        validate_session_name(session_name)
+
+        # Load configuration with CLI overrides
+        config = load_config(
+            cli_project_dir=None,
+            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
+            cli_agents_dir=None,
+        )
+
+        # Check if session exists
+        meta_file = config.sessions_dir / f"{session_name}.meta.json"
+        if not meta_file.exists():
+            print(f"Error: Session '{session_name}' does not exist", file=sys.stderr)
+            raise typer.Exit(1)
+
+        # Load session metadata
+        metadata = load_session_metadata(session_name, config.sessions_dir)
+
+        # Display configuration matching bash format
+        print(f"Configuration for session '{session_name}':")
+        print(f"  Session file:    {config.sessions_dir}/{session_name}.jsonl")
+        print(f"  Project dir:     {metadata.project_dir} (from meta.json)")
+        print(f"  Agents dir:      {metadata.agents_dir} (from meta.json)")
+        print(f"  Sessions dir:    {config.sessions_dir} (current)")
+        print(f"  Agent:           {metadata.agent if metadata.agent else 'none'}")
+        print(f"  Created:         {metadata.created_at.isoformat()}Z")
+        print(f"  Last resumed:    {metadata.last_resumed_at.isoformat()}Z")
+        print(f"  Schema version:  {metadata.schema_version}")
+
+    except ValueError as e:
+        # Session validation errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except FileNotFoundError as e:
+        # Session metadata not found
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        # JSON parsing errors
+        print(f"Error: Invalid session metadata: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except Exception as e:
+        # Unexpected errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
