@@ -10,6 +10,7 @@ from typing import Optional
 import json
 import asyncio
 import dataclasses
+from datetime import datetime
 
 
 async def run_claude_session(
@@ -85,6 +86,17 @@ async def run_claude_session(
 
     # Ensure parent directory exists
     session_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write user message to .jsonl first (before SDK streaming)
+    # This creates a complete conversation history in one file
+    user_message = {
+        "type": "user_message",
+        "content": prompt,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+    with open(session_file, 'a') as f:
+        json.dump(user_message, f)
+        f.write('\n')
 
     # Stream session and write to file
     try:

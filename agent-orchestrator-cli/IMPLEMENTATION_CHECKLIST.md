@@ -496,6 +496,10 @@ Command description here.
 - Module structure follows existing patterns from config.py and session.py
 - Error messages provide clear guidance for troubleshooting
 - **BUG FIX (Phase 4)**: Changed `message.model_dump()` to `dataclasses.asdict(message)` - SDK uses standard dataclasses, not Pydantic models
+- **ENHANCEMENT (Phase 4)**: Added user message logging to `.jsonl` file - creates complete conversation history in one file
+  - Format: `{"type": "user_message", "content": "prompt text", "timestamp": "ISO8601Z"}`
+  - Written before SDK streaming begins (first line per interaction)
+  - Works for both `ao-new` and `ao-resume` commands
 - Full integration testing completed successfully in Phase 4 Steps 4.1 and 4.2
 
 ---
