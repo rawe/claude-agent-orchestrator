@@ -20,7 +20,7 @@ from config import load_config
 from agent import list_all_agents
 from utils import ensure_directory_exists
 
-app = typer.Typer()
+app = typer.Typer(add_completion=False)
 
 
 @app.command()
