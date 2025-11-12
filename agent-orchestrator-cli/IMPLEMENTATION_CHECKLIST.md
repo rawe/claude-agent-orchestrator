@@ -268,26 +268,28 @@ When testing or running scripts during development:
 - Current stub: `commands/ao-get-result`
 
 **Implementation requirements**:
-- [ ] Keep uv script header
-- [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
-- [ ] Import: `load_config`, `validate_session_name`, `get_session_status`, `extract_result`
-- [ ] Parse CLI args: `<session-name>`, `--sessions-dir`
-- [ ] Load configuration
-- [ ] Validate session name
-- [ ] Check session exists
-- [ ] Check session status is "finished" (error if not)
-- [ ] Extract result from `.jsonl` file
-- [ ] Print result to stdout
+- [x] Keep uv script header
+- [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
+- [x] Import: `load_config`, `validate_session_name`, `get_session_status`, `extract_result`
+- [x] Parse CLI args: `<session-name>`, `--sessions-dir`
+- [x] Load configuration
+- [x] Validate session name
+- [x] Check session exists
+- [x] Check session status is "finished" (error if not)
+- [x] Extract result from `.jsonl` file
+- [x] Print result to stdout
 
 **Test plan**:
-- [ ] Create finished session with bash script
-- [ ] Run `ao-get-result <session-name>` - should print result
-- [ ] Test with running session - should error
-- [ ] Test with non-existent session - should error
+- [x] Create finished session with bash script
+- [x] Run `ao-get-result <session-name>` - should print result
+- [x] Test with running session - should error
+- [x] Test with non-existent session - should error
 
 **Success criteria**:
-- Extracts result from bash-created sessions
-- Only works with finished sessions
+- ✅ Extracts result from bash-created sessions
+- ✅ Only works with finished sessions
+- ✅ Clear error messages for all failure cases
+- ✅ Correct exit codes (0 for success, 1 for errors)
 
 ---
 

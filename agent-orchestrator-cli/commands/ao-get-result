@@ -32,13 +32,48 @@ def main(
     Examples:
         ao-get-result mysession
     """
-    # TODO: Implement command logic
-    # 1. Load configuration
-    # 2. Validate session exists
-    # 3. Check session is finished (not running)
-    # 4. Extract result from session file (typically last assistant message)
-    # 5. Output result
-    print(f"TODO: Get result from session '{session_name}'")
+    from config import load_config
+    from session import validate_session_name, get_session_status, extract_result
+
+    try:
+        # Validate session name
+        validate_session_name(session_name)
+
+        # Load configuration with CLI overrides
+        config = load_config(
+            cli_project_dir=str(project_dir) if project_dir else None,
+            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
+            cli_agents_dir=None,
+        )
+
+        # Check session status
+        status = get_session_status(session_name, config.sessions_dir)
+
+        if status == "not_existent":
+            print(f"Error: Session '{session_name}' does not exist", file=sys.stderr)
+            raise typer.Exit(1)
+
+        if status == "running":
+            print(f"Error: Session '{session_name}' is still running. Wait for completion or check status with ao-status.", file=sys.stderr)
+            raise typer.Exit(1)
+
+        # Extract and print result
+        session_file = config.sessions_dir / f"{session_name}.jsonl"
+        result = extract_result(session_file)
+        print(result)
+
+    except ValueError as e:
+        # Session validation errors or result extraction errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except FileNotFoundError as e:
+        # Session file not found
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except Exception as e:
+        # Unexpected errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
