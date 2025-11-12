@@ -56,14 +56,14 @@ def validate_session_name(name: str) -> None:
 
 def get_session_status(session_name: str, sessions_dir: Path) -> SessionState:
     """
-    Detect session state (MUST MATCH BASH EXACTLY).
+    Detect session state.
 
-    Algorithm (from bash cmd_status):
+    Algorithm:
     1. Check if .meta.json exists → if not: return "not_existent"
     2. Check if .jsonl exists → if not: return "running" (initializing)
     3. Check if .jsonl is empty (size == 0) → if empty: return "running"
     4. Read last line of .jsonl:
-       - If has "type": "result" field: return "finished"
+       - If has "subtype": "success" and "result" field: return "finished"
        - Else: return "running"
     5. On any error (JSON parse, file read): return "running"
 
@@ -99,7 +99,8 @@ def get_session_status(session_name: str, sessions_dir: Path) -> SessionState:
             last_line = f.readline().decode("utf-8")
 
         last_msg = json.loads(last_line)
-        if last_msg.get("type") == "result":
+        # SDK result message has "subtype": "success" and a "result" field
+        if last_msg.get("subtype") == "success" and "result" in last_msg:
             return "finished"
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         # On any error, assume running
