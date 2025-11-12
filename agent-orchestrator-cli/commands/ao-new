@@ -122,10 +122,13 @@ def main(
                 session_name=session_name,
                 command_type="new",
                 agent_name=agent_name,
-                mcp_config=str(agent_config.mcp_config) if agent and agent_config.mcp_config else None,
+                mcp_config_path=str(agent_config.mcp_config) if agent and agent_config.mcp_config else None,
                 full_command=full_command,
                 prompt=final_prompt,
                 sessions_dir=config.sessions_dir,
+                project_dir=config.project_dir,
+                agents_dir=config.agents_dir,
+                enable_logging=config.enable_logging,
             )
 
         # 9. Run Claude session
@@ -143,7 +146,7 @@ def main(
 
         # 10. Log result (if logging enabled)
         if config.enable_logging:
-            log_result(session_name, result, config.sessions_dir)
+            log_result(session_name, result, config.sessions_dir, config.enable_logging)
 
         # 11. Print result to stdout
         print(result)
