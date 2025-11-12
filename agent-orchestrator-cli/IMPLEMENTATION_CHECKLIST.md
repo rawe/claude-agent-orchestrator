@@ -764,14 +764,15 @@ Command description here.
 ### ✅ Step 5.3: Documentation Updates
 
 **Files to update**:
-- [ ] `README.md` - Update with Python usage instructions
-- [ ] `docs/architecture.md` - Mark as legacy if needed
-- [ ] `docs/development.md` - Update development instructions
-- [ ] Add usage examples to main README
+- [x] `README.md` - Updated with concise Python usage instructions
+- [x] `docs/architecture.md` - No changes needed (Python progressive disclosure architecture, not bash-specific)
+- [x] `docs/development.md` - Updated with Python development workflow, removed bash references
+- [x] Add usage examples to main README - Added with `uv run` command invocations
 
 **Success criteria**:
-- Documentation complete and accurate
-- Usage examples work as documented
+- ✅ Documentation complete and accurate
+- ✅ Usage examples reference AI_ASSISTANT_GUIDE.md for details
+- ✅ All cross-references verified
 
 ---
 

@@ -4,96 +4,73 @@
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.10+
 - `uv` installed: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Claude API key in environment: `export ANTHROPIC_API_KEY=your-key`
+- Claude API key: `export ANTHROPIC_API_KEY=your-key`
 
 ### Project Structure
 
 ```
 agent-orchestrator-cli/
-├── commands/              # Executable command scripts
-│   ├── ao-new
-│   ├── ao-resume
-│   ├── ao-status
-│   ├── ao-get-result
-│   ├── ao-list
-│   ├── ao-list-agents
-│   ├── ao-show-config
-│   └── ao-clean
-├── lib/              # Shared Python modules
-│   ├── config.py       # Configuration management
-│   ├── session.py      # Session operations
-│   ├── agent.py        # Agent loading
-│   ├── claude_client.py # Claude API wrapper
-│   └── utils.py        # Common utilities
-└── docs/             # Documentation
+├── commands/                   # Executable command scripts
+│   ├── ao-new                  # Create new session
+│   ├── ao-resume               # Resume existing session
+│   ├── ao-status               # Check session status
+│   ├── ao-get-result           # Get session result
+│   ├── ao-list-sessions        # List all sessions
+│   ├── ao-list-agents          # List available agents
+│   ├── ao-show-config          # Show configuration
+│   ├── ao-clean                # Clean all sessions
+│   └── lib/                    # Shared Python modules (co-located)
+│       ├── __init__.py
+│       ├── config.py           # Configuration management
+│       ├── session.py          # Session operations
+│       ├── agent.py            # Agent loading
+│       ├── claude_client.py    # Claude SDK wrapper
+│       └── utils.py            # Common utilities
+└── docs/                       # Documentation
 ```
-
-## Implementation Order
-
-Suggested order for implementing functionality:
-
-### Phase 1: Core Infrastructure
-1. **lib/config.py** - Configuration loading
-2. **lib/utils.py** - Basic utilities (error, read/write)
-3. **lib/session.py** - Session name validation
-
-### Phase 2: Session Management
-4. **ao-status** - Simplest command (read-only)
-5. **ao-list-sessions** - Session discovery
-6. **lib/session.py** - State detection algorithm
-
-### Phase 3: Agent System
-7. **lib/agent.py** - Agent loading
-8. **ao-list-agents** - Agent discovery
-9. **ao-show-config** - Display configuration
-
-### Phase 4: Claude Integration
-10. **lib/claude_client.py** - Claude SDK wrapper
-11. **ao-new** - Session creation
-12. **ao-resume** - Session continuation
-13. **ao-get-result** - Result extraction
-
-### Phase 5: Polish
-14. **ao-clean** - Cleanup operations
-15. Error handling and user feedback
-16. Testing and validation
 
 ## Development Workflow
 
 ### Testing a Command
 
+All commands must be run with `uv run`:
+
 ```bash
-# Test directly
-./commands/ao-new --help
+# Test help output
+uv run commands/ao-new --help
 
-# Test with uv explicitly
-uv run --script commands/ao-new --help
+# Test command execution
+uv run commands/ao-status test-session
 
-# Add to PATH for easier testing
-export PATH="$PWD/commands:$PATH"
-ao-new --help
+# Test with stdin
+echo "Hello" | uv run commands/ao-new test-session
 ```
 
 ### Adding a New Command
 
-1. Copy template:
+1. Copy an existing command as template:
 ```bash
-cp commands/ao-new commands/ao-mycommand
+cp commands/ao-status commands/ao-mycommand
 ```
 
-2. Update the script:
+2. Update the script header and logic:
 ```python
-#!/usr/commands/env -S uv run --script
+#!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.11"
-# dependencies = ["anthropic", "typer"]
+# requires-python = ">=3.10"
+# dependencies = [
+#     "claude-agent-sdk",  # If using Claude SDK
+# ]
 # ///
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+from config import load_config
+# Import other shared modules as needed
 
 # Your implementation here
 ```
@@ -101,6 +78,11 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 3. Make executable:
 ```bash
 chmod +x commands/ao-mycommand
+```
+
+4. Test with `uv run`:
+```bash
+uv run commands/ao-mycommand --help
 ```
 
 ### Adding Shared Functionality
@@ -121,12 +103,12 @@ If functionality is used by 2+ commands:
 mkdir -p /tmp/test-ao
 cd /tmp/test-ao
 
-# Test commands
-ao-new testsession -p "Hello world"
-ao-status testsession
-ao-get-result testsession
-ao-list
-ao-clean
+# Test commands (all require 'uv run')
+uv run /path/to/commands/ao-new testsession -p "Hello world"
+uv run /path/to/commands/ao-status testsession
+uv run /path/to/commands/ao-get-result testsession
+uv run /path/to/commands/ao-list-sessions
+uv run /path/to/commands/ao-clean
 ```
 
 ### Unit Testing (TODO)
@@ -140,12 +122,17 @@ def test_config_precedence():
     pass
 ```
 
-### Integration Testing (TODO)
+### Integration Testing
 
 ```bash
 # tests/integration/test_session_lifecycle.sh
-#!/commands/bash
+#!/bin/bash
 # Test full session lifecycle
+uv run commands/ao-new test-session -p "Hello"
+uv run commands/ao-status test-session
+uv run commands/ao-resume test-session -p "Continue"
+uv run commands/ao-get-result test-session
+uv run commands/ao-clean
 ```
 
 ## Common Patterns
@@ -195,35 +182,32 @@ state = get_session_state(name, config.sessions_dir)
 
 ### File Formats
 
-Match the bash script exactly:
-
-**Session Metadata** (`.metadata.json`):
+**Session Metadata** (`.meta.json`):
 ```json
 {
   "session_name": "mysession",
+  "session_id": "session_abc123",
   "agent": "researcher",
   "created_at": "2024-01-01T12:00:00Z",
-  "updated_at": "2024-01-01T12:00:00Z",
+  "last_resumed_at": "2024-01-01T12:00:00Z",
   "project_dir": "/path/to/project",
-  "sessions_dir": "/path/to/sessions",
-  "agents_dir": "/path/to/agents"
+  "agents_dir": "/path/to/agents",
+  "schema_version": "1.0"
 }
 ```
 
-**Session File** (`session.txt`):
-- Stream of Claude API responses
-- First line may contain session ID
-- Last assistant message is the result
+**Session Messages** (`.jsonl`):
+- JSONL format with one message per line
+- Contains SDK-native dataclass serialization
+- User messages and agent responses
+- Last message contains the result
 
 ### State Detection Algorithm
 
-Ported from bash script:
-
-1. If session dir doesn't exist: `not_existent`
-2. If session file doesn't exist: `not_existent`
-3. Check last line for completion marker
-4. If no marker: `running`
-5. If has marker: `finished`
+1. Check if `.meta.json` exists → if not: `not_existent`
+2. Check if `.jsonl` exists → if not: `running`
+3. Check if `.jsonl` size > 0 → if empty: `running`
+4. Read last line of `.jsonl` and check for `type: "result"` → if found: `finished`, else: `running`
 
 ### Configuration Precedence
 
@@ -248,45 +232,29 @@ Structure:
 
 ## Debugging
 
-### Enable Verbose Output
+### Check Command Help
 
 ```bash
-# Add to any command for debugging
-python -u commands/ao-new --help
+# Verify command loads correctly
+uv run commands/ao-new --help
 ```
 
-### Check uv Dependencies
-
-```bash
-# See what uv would install
-uv pip compile commands/ao-new
-```
-
-### Test Imports
+### Test Shared Module Imports
 
 ```bash
 # Check if shared modules load
 python -c "import sys; sys.path.insert(0, 'commands/lib'); from config import Config; print('OK')"
 ```
 
-## Migration from Bash
-
-### Behavior Compatibility
-
-All commands should behave identically to bash script:
-- Same input/output formats
-- Same error messages
-- Same file structures
-- Same state detection
-
-### Testing Compatibility
+### Enable Logging
 
 ```bash
-# Test both versions produce same output
-bash ../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh status test
-./commands/ao-status test
+# Enable session logging
+export AGENT_ORCHESTRATOR_ENABLE_LOGGING=true
+uv run commands/ao-new test -p "Hello"
 
-# Compare results
+# Check log file
+cat .agent-orchestrator/agent-sessions/test.log
 ```
 
 ## Tips for LLM-Assisted Development
@@ -297,13 +265,14 @@ Prompt template:
 ```
 Implement lib/config.py based on:
 1. The function stubs already present
-2. The bash script at: ../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh
+2. The requirements in ARCHITECTURE_PLAN.md
 3. The precedence rules in docs/architecture.md
 
 Preserve:
 - Function signatures
 - Error handling patterns
 - Documentation style
+- Type hints
 ```
 
 ### Implementing a Command
@@ -311,21 +280,24 @@ Preserve:
 Prompt template:
 ```
 Implement commands/ao-new based on:
-1. The TODO comments in the file
-2. The bash script 'new' command implementation
-3. Using shared modules from lib/
+1. The requirements in IMPLEMENTATION_CHECKLIST.md
+2. Using shared modules from lib/
+3. Following patterns in existing commands
 
-Follow the patterns in other commands.
+Ensure:
+- Proper error handling
+- Type hints throughout
+- Clear user-facing messages
 ```
 
-## Next Steps
+## Reference Documentation
 
-1. Pick a module from Phase 1
-2. Implement based on bash script behavior
-3. Test manually
-4. Move to next module
-5. Iterate until all phases complete
+For implementation details, see:
+- `ARCHITECTURE_PLAN.md` - Detailed implementation guidance
+- `IMPLEMENTATION_CHECKLIST.md` - Step-by-step implementation plan
+- `PROJECT_CONTEXT.md` - Project goals and architecture decisions
+- `CLAUDE_SDK_INVESTIGATION.md` - SDK usage patterns
 
 ---
 
-**Remember**: Each command is independent. You can implement them in any order, as long as shared dependencies in `lib/` are ready first.
+**Remember**: Each command is independent and uses shared modules from `lib/` for common functionality.

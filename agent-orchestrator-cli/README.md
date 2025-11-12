@@ -77,54 +77,46 @@ Each command is a self-contained Python script using `uv` for dependency managem
 
 ## Installation
 
-### Using uv (Recommended)
+### Prerequisites
 
-Each command is a standalone `uv` script - no installation needed! Just make them executable:
+- Python 3.10+
+- **`uv`** (required): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Claude API key: `export ANTHROPIC_API_KEY=your-key`
+
+### Usage
+
+Commands must be run with `uv run`:
 
 ```bash
-chmod +x commands/ao-*
-export PATH="$PATH:/path/to/agent-orchestrator-cli/commands"
+uv run commands/ao-new my-session -p "Write a REST API"
+uv run commands/ao-status my-session
 ```
 
-### Dependencies
+`uv` automatically resolves and installs dependencies defined in each command's inline script metadata.
 
-- Python 3.11+
-- `uv` (for running scripts): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+## Usage for AI Assistants
 
-## Usage for LLMs
+**Complete reference**: See [docs/AI_ASSISTANT_GUIDE.md](docs/AI_ASSISTANT_GUIDE.md) for all commands, parameters, workflows, and usage patterns.
 
-### Discovery Pattern
+### Progressive Discovery Pattern
 
-1. **List available commands**:
-   ```bash
-   ls commands/ao-*
-   ```
+1. **Discover**: List available commands
+2. **Detail**: Load parameters with `--help`
+3. **Execute**: Run with `uv run commands/<command>`
 
-2. **Get command help** (load parameters on demand):
-   ```bash
-   ao-new --help
-   ```
+### Quick Example
 
-3. **Execute command**:
-   ```bash
-   ao-new mysession -p "Create a REST API"
-   ```
+```bash
+# Create session with prompt from stdin
+echo "Write a REST API" | uv run commands/ao-new my-session
 
-### Example: LLM Workflow
+# Resume with CLI prompt
+uv run commands/ao-resume my-session -p "Add tests"
 
+# Check status and get result
+uv run commands/ao-status my-session
+uv run commands/ao-get-result my-session
 ```
-User: "Create a new agent session to design an API"
-
-LLM thinks: I need to create a session. Let me check what command to use.
-LLM runs: ls commands/ao-*
-LLM sees: ao-new, ao-resume, ao-status, ao-list-sessions, ao-list-agents...
-LLM thinks: I need ao-new. Let me check its parameters.
-LLM runs: ao-new --help
-LLM sees: Full parameter details for ao-new
-LLM executes: ao-new api-design --agent system-architect -p "Design REST API"
-```
-
-Only 3 tool calls, minimal context loaded at each step!
 
 ## Configuration
 
@@ -147,58 +139,7 @@ All commands use shared configuration logic from `lib/config.py` to ensure consi
 
 ## Development
 
-### Creating a New Command
-
-1. **Copy template** (or create from scratch):
-   ```bash
-   cp commands/ao-new commands/ao-mycommand
-   ```
-
-2. **Add uv shebang**:
-   ```python
-   #!/usr/commands/env -S uv run --script
-   # /// script
-   # requires-python = ">=3.11"
-   # dependencies = [
-   #     "anthropic",
-   #     "typer",
-   # ]
-   # ///
-   ```
-
-3. **Import shared modules**:
-   ```python
-   import sys
-   from pathlib import Path
-   sys.path.insert(0, str(Path(__file__).parent / "lib"))
-
-   from config import load_config
-   from utils import validate_session_name
-   ```
-
-4. **Implement command logic**
-
-5. **Make executable**:
-   ```bash
-   chmod +x commands/ao-mycommand
-   ```
-
-### Code Reuse Strategy
-
-**Shared logic goes in `lib/`**:
-- Configuration loading
-- Session validation and operations
-- Agent loading and validation
-- Claude API integration
-- Common utilities
-
-**Command-specific logic stays in `commands/`**:
-- Argument parsing
-- Command-specific validation
-- Output formatting
-- Error handling
-
-This balances code reuse with maintainability of individual commands.
+See [docs/development.md](docs/development.md) for development workflow, implementation patterns, and testing strategies.
 
 ## Benefits of This Approach
 
@@ -220,16 +161,6 @@ This balances code reuse with maintainability of individual commands.
 - **Composable**: Can pipe and chain commands
 - **Fast**: No framework overhead, direct execution
 
-## Migration from Bash
-
-This replaces `/agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` with:
-- Python instead of Bash (better error handling, type safety)
-- Split commands instead of monolithic script (progressive disclosure)
-- `uv` for dependencies instead of system requirements (self-contained)
-
-### Compatibility
-
-File formats and behavior remain identical to the bash version for seamless migration.
 
 ## Integration Patterns
 
@@ -261,20 +192,8 @@ Use MCP for high-frequency operations, CLI for specialized/rare operations:
 - MCP: Core session management (new, resume, status)
 - CLI: Advanced operations (show-config, clean, list-agents)
 
-## Status
-
-**In Active Development**
-
-- [x] Architecture design
-- [x] Documentation
-- [ ] Shared library modules
-- [ ] Individual command scripts
-- [ ] Testing framework
-- [ ] Migration guide
-
 ## Related Projects
 
-- [Agent Orchestrator Bash](../agent-orchestrator/skills/agent-orchestrator/) - Original implementation
 - [Agent Orchestrator MCP Server](../agent-orchestrator-mcp-server/) - MCP-based interface
 - [Agent Orchestrator Launcher](../agent-orchestrator-launcher/) - TypeScript docs/spec
 
@@ -286,4 +205,4 @@ This CLI embodies that philosophy for LLM-tool interaction.
 
 ---
 
-**Next Steps**: See [docs/development.md](docs/development.md) for implementation guide.
+**Documentation**: See [docs/development.md](docs/development.md) for development guide and [docs/AI_ASSISTANT_GUIDE.md](docs/AI_ASSISTANT_GUIDE.md) for complete usage reference.
