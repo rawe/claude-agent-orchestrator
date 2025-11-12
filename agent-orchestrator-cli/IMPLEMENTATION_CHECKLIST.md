@@ -664,25 +664,25 @@ Command description here.
 - Current stub: `commands/ao-clean`
 
 **Implementation requirements**:
-- [ ] Keep uv script header
-- [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
-- [ ] Import: `load_config`, `shutil`
-- [ ] Parse CLI args: `--sessions-dir`
-- [ ] Load configuration
-- [ ] If sessions directory exists:
+- [x] Keep uv script header
+- [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
+- [x] Import: `load_config`, `shutil`
+- [x] Parse CLI args: `--sessions-dir`
+- [x] Load configuration
+- [x] If sessions directory exists:
   - Remove entire directory: `shutil.rmtree(config.sessions_dir)`
   - Print "All sessions removed"
-- [ ] Else: print "No sessions to remove"
+- [x] Else: print "No sessions to remove"
 
 **Test plan**:
-- [ ] Create test sessions
-- [ ] Run `ao-clean`
-- [ ] Verify all sessions removed
-- [ ] Run `ao-clean` again - should say "No sessions to remove"
+- [x] Create test sessions
+- [x] Run `ao-clean`
+- [x] Verify all sessions removed
+- [x] Run `ao-clean` again - should say "No sessions to remove"
 
 **Success criteria**:
-- Removes all sessions cleanly
-- Safe to run multiple times
+- ✅ Removes all sessions cleanly
+- ✅ Safe to run multiple times
 
 ---
 

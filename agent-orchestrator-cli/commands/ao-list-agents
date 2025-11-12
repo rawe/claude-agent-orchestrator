@@ -18,7 +18,6 @@ import typer
 from typing import Optional
 from config import load_config
 from agent import list_all_agents
-from utils import ensure_directory_exists
 
 app = typer.Typer(add_completion=False)
 
@@ -39,18 +38,15 @@ def main(
     # 1. Load configuration
     config = load_config(cli_agents_dir=str(agents_dir) if agents_dir else None)
 
-    # 2. Ensure agents directory exists
-    ensure_directory_exists(config.agents_dir)
-
-    # 3. Get list of agents
+    # 2. Get list of agents (list_all_agents handles missing directory gracefully)
     agents = list_all_agents(config.agents_dir)
 
-    # 4. Handle empty case
+    # 3. Handle empty case
     if not agents:
         print("No agent definitions found")
         return
 
-    # 5. Display agents with bash-compatible formatting
+    # 4. Display agents with bash-compatible formatting
     first = True
     for name, description in agents:
         if first:

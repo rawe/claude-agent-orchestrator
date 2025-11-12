@@ -24,21 +24,36 @@ app = typer.Typer(add_completion=False)
 def main(
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
-    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ):
     """
-    Remove all sessions (with confirmation).
+    Remove all sessions.
 
     Examples:
         ao-clean
-        ao-clean --force
+        ao-clean --sessions-dir /custom/path
     """
-    # TODO: Implement command logic
-    # 1. Load configuration
-    # 2. Prompt for confirmation (unless --force)
-    # 3. Remove sessions directory
-    # 4. Report success
-    print("TODO: Clean all sessions")
+    from config import load_config
+    import shutil
+
+    try:
+        # Load configuration with CLI overrides
+        config = load_config(
+            cli_project_dir=str(project_dir) if project_dir else None,
+            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
+            cli_agents_dir=None,
+        )
+
+        # Check if sessions directory exists
+        if config.sessions_dir.exists():
+            # Remove entire directory
+            shutil.rmtree(config.sessions_dir)
+            print("All sessions removed")
+        else:
+            print("No sessions to remove")
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

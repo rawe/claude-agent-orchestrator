@@ -36,7 +36,6 @@ def main(
     """
     from config import load_config
     from session import list_all_sessions
-    from utils import ensure_directory_exists
 
     try:
         # Load configuration with CLI overrides
@@ -46,10 +45,7 @@ def main(
             cli_agents_dir=None,
         )
 
-        # Ensure sessions directory exists
-        ensure_directory_exists(config.sessions_dir)
-
-        # Get all sessions
+        # Get all sessions (list_all_sessions handles missing directory gracefully)
         sessions = list_all_sessions(config.sessions_dir)
 
         # Display results
