@@ -184,6 +184,7 @@ Command description here.
 - [x] Implement `save_session_metadata()` - create `.meta.json` (UPDATED: now includes session_id parameter)
 - [x] Implement `load_session_metadata()` - read `.meta.json` (UPDATED: now returns session_id)
 - [x] Implement `update_session_metadata()` - update `last_resumed_at` timestamp
+- [ ] **NEW**: Implement `update_session_id()` - update `.meta.json` with session_id during streaming (Phase 4)
 - [x] Implement `extract_session_id()` - UPDATED: read from `.meta.json` (not `.jsonl`)
 - [x] Implement `extract_result()` - read last line of `.jsonl` (in our simplified format)
 - [x] Implement `list_all_sessions()` - return list of (name, session_id, project_dir)
@@ -438,6 +439,14 @@ Command description here.
 - **Import pattern**: `from claude_agent_sdk import query, ClaudeAgentOptions`
 - **NOTE**: The SDK uses `query()` function (NOT `ClaudeSDKClient` class) - See ARCHITECTURE_PLAN.md Section 4.4
 
+**CRITICAL: MCP Configuration Format**:
+- The SDK's `mcp_servers` parameter expects a **parsed dictionary**, NOT a file path
+- Agent's `agent.mcp.json` structure: `{"mcpServers": {"server-name": {"command": "...", "args": [...]}}}`
+- The `build_mcp_servers_dict()` function extracts the `mcpServers` dict from the parsed JSON
+- SDK receives: `{"server-name": {"command": "...", "args": [...]}}`
+- **No file paths are passed** - we parse JSON and pass the dictionary structure
+- See example agents in `agent-orchestrator/skills/agent-orchestrator/example/agents/*/agent.mcp.json`
+
 **Implementation requirements**:
 - [x] Create `commands/lib/claude_client.py` module
 - [x] Add uv script header to ANY command that imports this module (e.g., `ao-new`, `ao-resume`)
@@ -449,13 +458,15 @@ Command description here.
     - `cwd=str(project_dir.resolve())`
     - `permission_mode="bypassPermissions"`
     - `resume=session_id` (if resuming)
-    - `mcp_servers=mcp_servers` (if provided)
+    - `mcp_servers=mcp_servers` (if provided - dict extracted from agent.mcp.json)
   - Stream session using: `async for message in query(prompt=prompt, options=options):`
   - Write each message to `.jsonl` file: `json.dump(message.model_dump(), f); f.write('\n')`
   - Extract `session_id` from messages: `if hasattr(message, 'session_id'):`
+  - **STAGE 2 HOOK**: Call `update_session_id()` immediately when session_id received (Phase 4 requirement)
   - Extract `result` from messages: `if hasattr(message, 'result'):`
   - Return tuple: `(session_id, result)`
 - [x] Implement `run_session_sync()` - synchronous wrapper using `asyncio.run()`
+- [ ] **Phase 4**: Add session_name and sessions_dir parameters to enable Stage 2 metadata update
 - [x] Add full type hints throughout
 - [x] Handle SDK exceptions gracefully
 
@@ -492,6 +503,47 @@ Command description here.
 
 **Goal**: Implement commands that create and modify sessions.
 
+---
+
+### CRITICAL: Metadata Lifecycle for ao-new
+
+**The ao-new command must update metadata in THREE stages:**
+
+#### Stage 1: Initial Creation (BEFORE Claude runs)
+- Create `.meta.json` with all available fields
+- **Included fields**: `session_name`, `agent`, `project_dir`, `agents_dir`, `created_at`, `schema_version`
+- **MISSING field**: `session_id` (not available until Claude SDK starts streaming)
+- **Purpose**: Users can see the session was started (metadata file exists)
+- **Timing**: Immediately after validating inputs, before calling `run_session_sync()`
+
+#### Stage 2: Session ID Update (DURING Claude execution)
+- When first message with `session_id` arrives from Claude SDK
+- **UPDATE** `.meta.json` to add the `session_id` field
+- **Implementation**: In `claude_client.py` lines 90-92, call `update_session_id()` immediately when session_id is received
+- **Purpose**: Makes session resumable while still running
+- **Timing**: During the message streaming loop in `run_claude_session()`
+
+#### Stage 3: Post-Completion Update (OPTIONAL, for future features)
+- After result received and session completes
+- Can update `last_resumed_at` or other tracking fields if needed
+- **Purpose**: Future-proofing for additional metadata tracking
+- **Note**: Not currently implemented, but architecture supports it
+
+#### Why This Three-Stage Approach?
+
+1. **Visibility**: Users see the session started immediately (metadata exists)
+2. **SDK Limitation**: Session ID comes from Claude SDK during execution (not available upfront)
+3. **Resumability**: `ao-resume` command needs `session_id` from metadata to resume sessions
+4. **Robustness**: If Claude fails mid-execution, we still have partial metadata for debugging
+
+#### Key Distinction: ao-new vs ao-resume
+
+- **ao-new**: Extracts `session_id` from SDK messages during execution (Stage 2 above)
+- **ao-resume**: Reads existing `session_id` from `.meta.json` and passes to SDK's `resume` parameter
+- **Important**: Session ID extraction ONLY happens in ao-new (creates new session_id)
+
+---
+
 ### ✅ Step 4.1: Implement ao-new Command
 
 **File to implement**: `commands/ao-new`
@@ -502,8 +554,10 @@ Command description here.
 - Current stub: `commands/ao-new`
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 682-764 (cmd_new)
 
+**CRITICAL: Read the "Metadata Lifecycle" section above before implementing**
+
 **Implementation requirements**:
-- [ ] Keep uv script header
+- [ ] Keep uv script header (update dependencies: `["claude-agent-sdk", "typer"]`)
 - [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
 - [ ] Import all required modules
 - [ ] Parse CLI args: `<session-name>`, `--agent`, `-p`, `--project-dir`, `--sessions-dir`, `--agents-dir`
@@ -513,12 +567,12 @@ Command description here.
 - [ ] Get prompt (from `-p` and/or stdin)
 - [ ] If agent specified:
   - Load agent configuration
-  - Prepend system prompt to user prompt
-  - Build MCP servers dict
+  - Prepend system prompt to user prompt with separator: `{system_prompt}\n\n---\n\n{user_prompt}`
+  - Build MCP servers dict (extracts `mcpServers` from agent.mcp.json)
 - [ ] Ensure directories exist
-- [ ] Save session metadata
+- [ ] **STAGE 1**: Save initial session metadata WITHOUT session_id (before Claude runs)
 - [ ] Log command (if logging enabled)
-- [ ] Run Claude session via `run_session_sync()`
+- [ ] Run Claude session via `run_session_sync()` - this handles STAGE 2 (session_id update during streaming)
 - [ ] Log result (if logging enabled)
 - [ ] Print result to stdout
 
@@ -546,24 +600,30 @@ Command description here.
 - Current stub: `commands/ao-resume`
 - `../agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` - Lines 766-830 (cmd_resume)
 
+**IMPORTANT: Session ID Handling**:
+- ao-resume reads `session_id` from existing `.meta.json` file (created by ao-new)
+- NO session_id extraction from messages during streaming (that only happens in ao-new)
+- The SDK's `resume` parameter uses the session_id from metadata to continue the conversation
+- Session ID does NOT change when resuming - it stays the same as when created
+
 **Implementation requirements**:
-- [ ] Keep uv script header
+- [ ] Keep uv script header (update dependencies: `["claude-agent-sdk", "typer"]`)
 - [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
 - [ ] Import all required modules
 - [ ] Parse CLI args: `<session-name>`, `-p`, `--project-dir`, `--sessions-dir`, `--agents-dir`
 - [ ] Validate session name
 - [ ] Load configuration
 - [ ] Check session exists
-- [ ] Load session metadata
+- [ ] Load session metadata (includes session_id)
 - [ ] Validate context consistency (warn if CLI overrides differ from metadata)
-- [ ] Extract session_id from `.jsonl` file
+- [ ] Extract session_id from metadata using `extract_session_id()` or from `load_session_metadata().session_id`
 - [ ] Get prompt (from `-p` and/or stdin)
 - [ ] If session has agent:
   - Load agent configuration
   - Build MCP servers dict
 - [ ] Log command (if logging enabled)
 - [ ] Run Claude session with resume via `run_session_sync(resume_session_id=session_id)`
-- [ ] Update session metadata timestamp
+- [ ] Update session metadata timestamp with `update_session_metadata()`
 - [ ] Log result (if logging enabled)
 - [ ] Print result to stdout
 
