@@ -308,24 +308,26 @@ When testing or running scripts during development:
 - Example agent: `../agent-orchestrator/example/agents/confluence-researcher/`
 
 **Implementation requirements**:
-- [ ] Create `AgentConfig` dataclass with fields: `name`, `description`, `system_prompt`, `mcp_config`
-- [ ] Implement `load_agent_config()` - load from agent directory
+- [x] Create `AgentConfig` dataclass with fields: `name`, `description`, `system_prompt`, `mcp_config`
+- [x] Implement `load_agent_config()` - load from agent directory
   - Check `agent_dir` exists
   - Parse `agent.json` (required)
   - Load `agent.system-prompt.md` (optional)
   - Load `agent.mcp.json` (optional)
   - Validate name matches directory name
-- [ ] Implement `list_all_agents()` - scan agents directory
+- [x] Implement `list_all_agents()` - scan agents directory
   - Return list of (name, description) tuples
   - Skip invalid directories
   - Sort by name
-- [ ] Implement `build_mcp_servers_dict()` - extract `mcpServers` dict
-- [ ] Add full type hints throughout
+- [x] Implement `build_mcp_servers_dict()` - extract `mcpServers` dict
+- [x] Add full type hints throughout
 
 **Success criteria**:
-- Can load agent configurations created for bash script
-- Can list all available agents
-- Handles optional files correctly
+- ✅ Can load agent configurations created for bash script
+- ✅ Can list all available agents (tested with 4 example agents)
+- ✅ Handles optional files correctly (system prompt & MCP config)
+- ✅ Error handling works (FileNotFoundError for missing agents, etc.)
+- ✅ All tests pass (7/7 test cases)
 
 ---
 
