@@ -340,14 +340,14 @@ When testing or running scripts during development:
 - Current stub: `commands/ao-list-agents`
 
 **Implementation requirements**:
-- [ ] Keep uv script header
-- [ ] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
-- [ ] Import: `load_config`, `list_all_agents`, `ensure_directory_exists`
-- [ ] Parse CLI args: `--agents-dir`
-- [ ] Load configuration
-- [ ] Ensure agents directory exists
-- [ ] Call `list_all_agents()`
-- [ ] Output format (bash-compatible):
+- [x] Keep uv script header
+- [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
+- [x] Import: `load_config`, `list_all_agents`, `ensure_directory_exists`
+- [x] Parse CLI args: `--agents-dir`
+- [x] Load configuration
+- [x] Ensure agents directory exists
+- [x] Call `list_all_agents()`
+- [x] Output format (bash-compatible):
   ```
   {name}:
   {description}
@@ -357,17 +357,18 @@ When testing or running scripts during development:
   {next_name}:
   {next_description}
   ```
-- [ ] If no agents: print "No agent definitions found"
+- [x] If no agents: print "No agent definitions found"
 
 **Test plan**:
-- [ ] Use existing agent definitions from bash script
-- [ ] Run `ao-list-agents` - should show all agents
-- [ ] Output format should match bash script
-- [ ] Test with empty agents directory - should print "No agent definitions found"
+- [x] Use existing agent definitions from bash script
+- [x] Run `ao-list-agents` - should show all agents
+- [x] Output format should match bash script
+- [x] Test with empty agents directory - should print "No agent definitions found"
 
 **Success criteria**:
-- Lists all bash-compatible agents
-- Output format matches bash script
+- ✅ Lists all bash-compatible agents (tested with 4 example agents)
+- ✅ Output format matches bash script exactly
+- ✅ Handles empty agents directory gracefully
 
 ---
 

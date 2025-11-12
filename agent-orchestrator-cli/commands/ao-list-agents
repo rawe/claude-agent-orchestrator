@@ -16,30 +16,53 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from typing import Optional
+from config import load_config
+from agent import list_all_agents
+from utils import ensure_directory_exists
 
 app = typer.Typer()
 
 
 @app.command()
 def main(
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
 ):
     """
     List all available agent definitions.
 
-    Displays: agent name, description, capabilities
+    Displays: agent name, description
 
     Examples:
         ao-list-agents
+        ao-list-agents --agents-dir /path/to/agents
     """
-    # TODO: Implement command logic
     # 1. Load configuration
-    # 2. Find all agent directories
-    # 3. Load agent.json for each agent
-    # 4. Extract metadata (name, description)
-    # 5. Format and display list
-    print("TODO: List all agents")
+    config = load_config(cli_agents_dir=str(agents_dir) if agents_dir else None)
+
+    # 2. Ensure agents directory exists
+    ensure_directory_exists(config.agents_dir)
+
+    # 3. Get list of agents
+    agents = list_all_agents(config.agents_dir)
+
+    # 4. Handle empty case
+    if not agents:
+        print("No agent definitions found")
+        return
+
+    # 5. Display agents with bash-compatible formatting
+    first = True
+    for name, description in agents:
+        if first:
+            first = False
+        else:
+            # Add separator before subsequent agents
+            print("---")
+            print()
+
+        print(f"{name}:")
+        print(description)
+        print()
 
 
 if __name__ == "__main__":
