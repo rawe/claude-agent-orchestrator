@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 import json
 import asyncio
+import dataclasses
 
 
 async def run_claude_session(
@@ -89,8 +90,9 @@ async def run_claude_session(
     try:
         async for message in query(prompt=prompt, options=options):
             # Write each message to JSONL file (append mode)
+            # Note: SDK messages are dataclasses, not Pydantic models
             with open(session_file, 'a') as f:
-                json.dump(message.model_dump(), f)
+                json.dump(dataclasses.asdict(message), f)
                 f.write('\n')
 
             # Capture session_id from first message that has it
