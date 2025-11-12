@@ -110,14 +110,25 @@ def get_session_status(session_name: str, sessions_dir: Path) -> SessionState:
 
 def save_session_metadata(
     session_name: str,
-    session_id: str,
     agent: Optional[str],
     project_dir: Path,
     agents_dir: Path,
     sessions_dir: Path,
+    session_id: Optional[str] = None,
 ) -> None:
     """
     Create .meta.json file for new session.
+
+    STAGE 1 (ao-new): Called without session_id before Claude runs.
+    STAGE 2 (ao-new): session_id added later via update_session_id().
+
+    Args:
+        session_name: Name of the session
+        agent: Agent name (optional)
+        project_dir: Project directory path
+        agents_dir: Agents directory path
+        sessions_dir: Sessions directory path
+        session_id: Claude session ID (optional, added in Stage 2)
 
     Implementation:
     1. Create metadata dict with all required fields
@@ -131,7 +142,6 @@ def save_session_metadata(
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     metadata = {
         "session_name": session_name,
-        "session_id": session_id,
         "agent": agent,  # Can be null
         "project_dir": str(project_dir.resolve()),
         "agents_dir": str(agents_dir.resolve()),
@@ -140,11 +150,54 @@ def save_session_metadata(
         "schema_version": "1.0",
     }
 
+    # Add session_id only if provided (Stage 2)
+    if session_id is not None:
+        metadata["session_id"] = session_id
+
     # Write to file
     meta_file = sessions_dir / f"{session_name}.meta.json"
     with open(meta_file, "w") as f:
         json.dump(metadata, f, indent=2)
         f.write("\n")  # Add trailing newline for consistency
+
+
+def update_session_id(
+    session_name: str, session_id: str, sessions_dir: Path
+) -> None:
+    """
+    Update metadata file with session_id (STAGE 2).
+
+    Called during Claude session streaming when session_id is first received.
+    This allows the session to be resumable even while still running.
+
+    Args:
+        session_name: Name of the session
+        session_id: Claude session ID from SDK
+        sessions_dir: Sessions directory path
+
+    Raises:
+        FileNotFoundError: If metadata file doesn't exist
+        json.JSONDecodeError: If invalid JSON in metadata file
+    """
+    meta_file = sessions_dir / f"{session_name}.meta.json"
+
+    # Read existing metadata
+    if not meta_file.exists():
+        raise FileNotFoundError(
+            f"Metadata file not found for session '{session_name}'. "
+            "Stage 1 metadata should be created before calling update_session_id()."
+        )
+
+    with open(meta_file, "r") as f:
+        metadata = json.load(f)
+
+    # Update session_id field
+    metadata["session_id"] = session_id
+
+    # Write back to file
+    with open(meta_file, "w") as f:
+        json.dump(metadata, f, indent=2)
+        f.write("\n")
 
 
 def load_session_metadata(session_name: str, sessions_dir: Path) -> SessionMetadata:

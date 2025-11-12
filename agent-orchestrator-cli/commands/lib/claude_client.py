@@ -15,6 +15,8 @@ async def run_claude_session(
     prompt: str,
     session_file: Path,
     project_dir: Path,
+    session_name: Optional[str] = None,
+    sessions_dir: Optional[Path] = None,
     mcp_servers: Optional[dict] = None,
     resume_session_id: Optional[str] = None,
 ) -> tuple[str, str]:
@@ -28,6 +30,8 @@ async def run_claude_session(
         prompt: User prompt (may include prepended system prompt from agent)
         session_file: Path to .jsonl file to append messages
         project_dir: Working directory for Claude (sets cwd)
+        session_name: Session name (required for Stage 2 metadata update)
+        sessions_dir: Sessions directory (required for Stage 2 metadata update)
         mcp_servers: MCP server configuration dict (from agent.mcp.json)
         resume_session_id: If provided, resume existing session
 
@@ -45,7 +49,9 @@ async def run_claude_session(
         >>> session_id, result = await run_claude_session(
         ...     prompt="What is 2+2?",
         ...     session_file=session_file,
-        ...     project_dir=project_dir
+        ...     project_dir=project_dir,
+        ...     session_name="test",
+        ...     sessions_dir=Path("/tmp/sessions")
         ... )
     """
     # Import SDK here to give better error message if not installed
@@ -91,6 +97,21 @@ async def run_claude_session(
             if session_id is None and hasattr(message, 'session_id'):
                 session_id = message.session_id
 
+                # STAGE 2: Update metadata with session_id immediately
+                # This makes the session resumable even while still running
+                if session_name and sessions_dir:
+                    try:
+                        from session import update_session_id as _update_session_id
+                        _update_session_id(session_name, session_id, sessions_dir)
+                    except Exception as e:
+                        # Don't fail the session if metadata update fails
+                        # Just log to stderr for debugging
+                        import sys
+                        print(
+                            f"Warning: Failed to update session_id in metadata: {e}",
+                            file=sys.stderr
+                        )
+
             # Capture result from last message that has it (overwrite each time)
             if hasattr(message, 'result'):
                 result = message.result
@@ -119,6 +140,8 @@ def run_session_sync(
     prompt: str,
     session_file: Path,
     project_dir: Path,
+    session_name: Optional[str] = None,
+    sessions_dir: Optional[Path] = None,
     mcp_servers: Optional[dict] = None,
     resume_session_id: Optional[str] = None,
 ) -> tuple[str, str]:
@@ -132,6 +155,8 @@ def run_session_sync(
         prompt: User prompt (may include prepended system prompt from agent)
         session_file: Path to .jsonl file to append messages
         project_dir: Working directory for Claude (sets cwd)
+        session_name: Session name (required for Stage 2 metadata update)
+        sessions_dir: Sessions directory (required for Stage 2 metadata update)
         mcp_servers: MCP server configuration dict (from agent.mcp.json)
         resume_session_id: If provided, resume existing session
 
@@ -149,7 +174,9 @@ def run_session_sync(
         >>> session_id, result = run_session_sync(
         ...     prompt="What is 2+2?",
         ...     session_file=session_file,
-        ...     project_dir=project_dir
+        ...     project_dir=project_dir,
+        ...     session_name="test",
+        ...     sessions_dir=Path("/tmp/sessions")
         ... )
     """
     return asyncio.run(
@@ -157,6 +184,8 @@ def run_session_sync(
             prompt=prompt,
             session_file=session_file,
             project_dir=project_dir,
+            session_name=session_name,
+            sessions_dir=sessions_dir,
             mcp_servers=mcp_servers,
             resume_session_id=resume_session_id,
         )
