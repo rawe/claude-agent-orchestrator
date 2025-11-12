@@ -2,44 +2,61 @@
 
 ## Executive Summary
 
-**Recommendation: Use Option B (Python SDK)** - The Claude Agent SDK for Python supports all critical requirements and offers superior long-term maintainability.
+**Recommendation: Use ClaudeSDKClient from the Python SDK** - The Claude Agent SDK for Python with `ClaudeSDKClient` supports all critical requirements and offers superior long-term maintainability.
+
+**Key Decision**: Use `ClaudeSDKClient` (not the simpler `query()` function) because it provides:
+- Proper session management with `resume` parameter
+- Multi-turn conversation support
+- Explicit lifecycle control (connect/disconnect)
+- Interrupt capability for long-running tasks
+- Hook system for deterministic processing
+- Better suited for our orchestrator's session persistence needs
 
 ## Requirements Analysis
 
 ### ✅ Requirement 1: Session Persistence & Resumption
 
-**SUPPORTED** - The SDK provides full session management:
+**SUPPORTED** - The SDK provides full session management via `ClaudeSDKClient`:
 
 ```python
-from claude_agent_sdk import ClaudeAgentOptions, query
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, ResultMessage
 
-# Create new session (captures session_id from response)
-async for message in query(
-    prompt="Design user auth system",
-    options=ClaudeAgentOptions(
-        cwd="/path/to/project",
-        permission_mode="bypassPermissions"
-    )
-):
-    # First message contains session_id
-    if hasattr(message, 'session_id'):
-        session_id = message.session_id
+# Create new session (captures session_id from ResultMessage)
+options = ClaudeAgentOptions(
+    cwd="/path/to/project",
+    permission_mode="bypassPermissions"
+)
+
+async with ClaudeSDKClient(options=options) as client:
+    await client.query("Design user auth system")
+
+    async for message in client.receive_response():
+        if isinstance(message, ResultMessage):
+            session_id = message.session_id
+            result = message.result
+            print(f"Session ID: {session_id}")
 
 # Resume existing session
-async for message in query(
-    prompt="Continue with API design",
-    options=ClaudeAgentOptions(
-        resume=session_id,  # Resume by session ID
-        cwd="/path/to/project"
-    )
-):
-    process_message(message)
+resume_options = ClaudeAgentOptions(
+    resume=session_id,  # Resume by session ID
+    cwd="/path/to/project",
+    permission_mode="bypassPermissions"
+)
+
+async with ClaudeSDKClient(options=resume_options) as client:
+    await client.query("Continue with API design")
+
+    async for message in client.receive_response():
+        if isinstance(message, ResultMessage):
+            print(f"Resumed session: {message.session_id}")
 ```
 
 **Key Parameters:**
 - `resume: str` - Resume specific session by ID
-- `continue_conversation: bool` - Resume most recent conversation
 - `fork_session: bool` - Create branching session from resume point
+
+**Key Message Types:**
+- `ResultMessage` - Contains `session_id`, `result`, `total_cost_usd`, `duration_ms`, `num_turns`
 
 ### ✅ Requirement 2: Working Directory Context
 
@@ -100,27 +117,37 @@ options = ClaudeAgentOptions(
 
 ### ✅ Requirement 4: Response Streaming to Files
 
-**SUPPORTED** - Async streaming with JSON output:
+**SUPPORTED** - Async streaming with JSON output using `ClaudeSDKClient`:
 
 ```python
 import json
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage
 
 session_file = "/path/to/session.jsonl"
+options = ClaudeAgentOptions(
+    cwd="/path/to/project",
+    permission_mode="bypassPermissions"
+)
 
-async for message in query(prompt="...", options=options):
-    # Each message is streamed progressively
-    with open(session_file, 'a') as f:
-        # Messages come in stream-json format
-        json.dump(message.model_dump(), f)
-        f.write('\n')
+session_id = None
+result = None
 
-    # Extract session_id from first message
-    if hasattr(message, 'session_id'):
-        session_id = message.session_id
+async with ClaudeSDKClient(options=options) as client:
+    await client.query("Your prompt here")
 
-    # Extract final result from last message
-    if hasattr(message, 'result'):
-        result = message.result
+    async for message in client.receive_response():
+        # Write each message to JSONL file
+        with open(session_file, 'a') as f:
+            json.dump(message.model_dump(), f)
+            f.write('\n')
+
+        # Extract session_id and result from ResultMessage
+        if isinstance(message, ResultMessage):
+            session_id = message.session_id
+            result = message.result
+
+print(f"Session ID: {session_id}")
+print(f"Result: {result}")
 ```
 
 ## Bash Script Analysis
@@ -172,28 +199,32 @@ claude -r "$session_id" \
 
 | Bash Behavior | Python SDK Equivalent |
 |---------------|----------------------|
-| `claude -p "$prompt"` | `query(prompt=..., options=...)` |
-| `claude -r "$session_id"` | `query(options=ClaudeAgentOptions(resume=session_id))` |
+| `claude -p "$prompt"` | `async with ClaudeSDKClient(options) as client: await client.query(prompt)` |
+| `claude -r "$session_id"` | `ClaudeAgentOptions(resume=session_id)` |
 | `--mcp-config "$path"` | Load JSON, pass to `mcp_servers` param |
-| `--output-format stream-json` | Built-in: `query()` returns async iterator |
+| `--output-format stream-json` | Built-in: `client.receive_response()` returns async iterator |
 | `--permission-mode bypassPermissions` | `permission_mode="bypassPermissions"` |
 | `cd "$PROJECT_DIR" &&` | `cwd="/path/to/project"` |
 | `>> "$session_file"` | Manually write streamed messages to file |
 
 ### Key Differences from CLI Approach
 
-**Advantages of SDK:**
+**Advantages of ClaudeSDKClient:**
 1. **Native Python integration** - No subprocess overhead
-2. **Better error handling** - Exceptions vs exit codes
-3. **Programmatic control** - Full access to message objects
-4. **Type safety** - Type hints for configuration
-5. **Flexibility** - Easy to customize behavior
-6. **Future-proof** - SDK evolves with new features
+2. **Better error handling** - Typed exceptions (ClaudeSDKError, CLIConnectionError, etc.)
+3. **Programmatic control** - Full access to typed message objects
+4. **Type safety** - Type hints for all configuration and messages
+5. **Multi-turn conversations** - Maintain context across multiple queries in same session
+6. **Interrupt support** - Can stop Claude mid-execution with `await client.interrupt()`
+7. **Hook system** - Deterministic processing and automated feedback
+8. **Custom tools** - In-process MCP servers via `@tool()` decorator
+9. **Lifecycle management** - Explicit connect/disconnect control
+10. **Future-proof** - SDK evolves with new features
 
 **Considerations:**
 1. **Session file management** - Must manually write to `.jsonl` files
-2. **Session ID extraction** - Must parse from message stream
-3. **Result extraction** - Must track last message result
+2. **Session ID extraction** - Must check for `ResultMessage` type
+3. **Result extraction** - Extract from `ResultMessage.result` property
 
 ### Recommended Implementation Pattern
 
@@ -202,8 +233,8 @@ claude -r "$session_id" \
 
 import json
 from pathlib import Path
-from claude_agent_sdk import query, ClaudeAgentOptions
-from typing import AsyncIterator, Optional
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage
+from typing import Optional
 
 async def run_claude_session(
     prompt: str,
@@ -213,14 +244,21 @@ async def run_claude_session(
     resume_session_id: Optional[str] = None
 ) -> tuple[str, str]:
     """
-    Run Claude session and stream to file.
+    Run Claude session and stream to file using ClaudeSDKClient.
+
+    Args:
+        prompt: The prompt to send to Claude
+        session_file: Path to .jsonl file for storing messages
+        project_dir: Working directory for Claude
+        mcp_config: Optional MCP configuration dict
+        resume_session_id: Optional session ID to resume
 
     Returns: (session_id, result)
     """
 
     # Build options
     options = ClaudeAgentOptions(
-        cwd=str(project_dir),
+        cwd=str(project_dir.resolve()),
         permission_mode="bypassPermissions",
     )
 
@@ -232,24 +270,28 @@ async def run_claude_session(
         # Extract allowed tools from MCP config if needed
         # options.allowed_tools = [...]
 
-    # Stream session to file
+    # Initialize tracking variables
     session_id = None
     result = None
 
-    async for message in query(prompt=prompt, options=options):
-        # Write each message to JSONL file
-        with open(session_file, 'a') as f:
-            json.dump(message.model_dump(), f)
-            f.write('\n')
+    # Use ClaudeSDKClient context manager for proper lifecycle
+    async with ClaudeSDKClient(options=options) as client:
+        # Send the prompt
+        await client.query(prompt)
 
-        # Capture session_id from first message
-        if session_id is None and hasattr(message, 'session_id'):
-            session_id = message.session_id
+        # Stream messages and write to file
+        async for message in client.receive_response():
+            # Write each message to JSONL file
+            with open(session_file, 'a') as f:
+                json.dump(message.model_dump(), f)
+                f.write('\n')
 
-        # Capture result from last message
-        if hasattr(message, 'result'):
-            result = message.result
+            # Extract session_id and result from ResultMessage
+            if isinstance(message, ResultMessage):
+                session_id = message.session_id
+                result = message.result
 
+    # Validate we received required data
     if not session_id:
         raise ValueError("No session_id received from Claude")
 
@@ -310,36 +352,57 @@ def get_session_status(session_name: str) -> str:
 
 ## Additional SDK Features
 
-Beyond the bash script's capabilities, the SDK offers:
+Beyond the bash script's capabilities, the ClaudeSDKClient offers:
 
-1. **Custom tool callbacks** - `can_use_tool` parameter
-2. **Partial message streaming** - `include_partial_messages`
-3. **System prompt customization** - `system_prompt` parameter
-4. **Model selection** - `model` parameter
-5. **Settings file support** - `settings` parameter
-6. **Stderr callbacks** - `stderr` parameter
+### ClaudeSDKClient-Specific Features
+1. **Multi-turn conversations** - Maintain context across multiple `client.query()` calls in same session
+2. **Interrupt capability** - Stop Claude mid-execution: `await client.interrupt()`
+3. **Hook system** - Deterministic processing and automated feedback via hooks
+4. **Custom tools** - In-process MCP servers using `@tool()` decorator and `create_sdk_mcp_server()`
+5. **Lifecycle management** - Explicit control via `connect()` and `disconnect()` methods
+6. **Bidirectional communication** - Interactive conversations with context preservation
+
+### ClaudeAgentOptions Parameters
+7. **Custom tool callbacks** - `can_use_tool` parameter for permission control
+8. **Partial message streaming** - `include_partial_messages` for real-time progress
+9. **System prompt customization** - `system_prompt` parameter to shape behavior
+10. **Model selection** - `model` parameter for choosing Claude model
+11. **Settings file support** - `settings` parameter for configuration
+12. **Stderr callbacks** - `stderr` parameter for debugging output
+
+### Message Types Available
+- **UserMessage** - User input messages
+- **AssistantMessage** - Claude's responses (with TextBlock, ThinkingBlock, ToolUseBlock)
+- **SystemMessage** - System-level notifications
+- **ResultMessage** - Final result with session_id, cost, duration, num_turns
 
 ## Conclusion
 
-**The Claude Agent SDK for Python fully supports all requirements** and offers a superior implementation path:
+**The Claude Agent SDK for Python with ClaudeSDKClient fully supports all requirements** and offers a superior implementation path:
 
-✅ Session persistence & resumption
-✅ Working directory context
-✅ MCP tool integration
-✅ Response streaming to files
-✅ 100% file format compatibility
-✅ Better error handling
-✅ Native Python integration
+✅ Session persistence & resumption via `resume` parameter
+✅ Working directory context with `cwd` option
+✅ MCP tool integration (external, programmatic, and in-process)
+✅ Response streaming to files with typed message objects
+✅ Session ID extraction from `ResultMessage.session_id`
+✅ Result extraction from `ResultMessage.result`
+✅ Better error handling with typed exceptions
+✅ Native Python integration with async/await
+✅ Multi-turn conversation support
+✅ Interrupt capability for long-running tasks
+✅ Hook system for deterministic processing
 ✅ Long-term maintainability
 
 ## Next Steps
 
-1. **Implement `lib/claude_client.py`** using the SDK pattern above
-2. **Test with simple session** - Verify JSONL output matches bash format
-3. **Implement session ID extraction** - Parse from first message
-4. **Implement result extraction** - Parse from last message
-5. **Test MCP integration** - Load agent MCP configs
-6. **Validate compatibility** - Ensure bash and Python sessions are interoperable
+1. **Implement `lib/claude_client.py`** using the ClaudeSDKClient pattern above
+2. **Add proper imports** - `ClaudeSDKClient`, `ClaudeAgentOptions`, `ResultMessage`
+3. **Test with simple session** - Verify JSONL output and session_id extraction
+4. **Test session resumption** - Verify `resume` parameter works correctly
+5. **Test MCP integration** - Load agent MCP configs programmatically
+6. **Validate message types** - Ensure `isinstance(message, ResultMessage)` works
+7. **Test interrupt capability** - Verify `await client.interrupt()` functionality
+8. **Validate compatibility** - Ensure session files are properly structured
 
 ## References
 

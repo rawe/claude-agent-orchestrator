@@ -385,33 +385,35 @@ When testing or running scripts during development:
 
 **Implementation requirements**:
 - [ ] Add dependency: `claude_agent_sdk` (check if available or use correct package name)
-- [ ] Import: `from claude_agent_sdk import query, ClaudeAgentOptions`
+- [ ] Import: `from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage`
 - [ ] Implement `async run_claude_session()`:
   - Build `ClaudeAgentOptions` with:
     - `cwd=str(project_dir.resolve())`
     - `permission_mode="bypassPermissions"`
     - `resume=session_id` (if resuming)
     - `mcp_servers=mcp_servers` (if provided)
-  - Stream messages via `async for message in query(prompt=prompt, options=options)`
+  - Use ClaudeSDKClient context manager: `async with ClaudeSDKClient(options=options) as client:`
+  - Send prompt via `await client.query(prompt)`
+  - Stream messages via `async for message in client.receive_response()`
   - Write each message to `.jsonl` file: `json.dump(message.model_dump(), f); f.write('\n')`
-  - Capture `session_id` from first message with `session_id` attribute
-  - Capture `result` from last message with `result` attribute
+  - Extract `session_id` and `result` from `ResultMessage`: `if isinstance(message, ResultMessage):`
   - Return tuple: `(session_id, result)`
 - [ ] Implement `run_session_sync()` - synchronous wrapper using `asyncio.run()`
 - [ ] Add full type hints throughout
 
 **Test plan**:
 - [ ] Create simple test session without agent
-- [ ] Verify `.jsonl` file format matches bash output
-- [ ] Check first line contains `session_id`
-- [ ] Check last line contains `result`
+- [ ] Verify `.jsonl` file format is properly structured
+- [ ] Check `ResultMessage` in stream contains `session_id` property
+- [ ] Check `ResultMessage` contains `result` property
 - [ ] Test with MCP configuration
-- [ ] Test session resumption
+- [ ] Test session resumption with `resume` parameter
 
 **Success criteria**:
-- Creates `.jsonl` files compatible with bash script
-- Session ID extraction works
-- Result extraction works
+- Creates `.jsonl` files with proper message stream format
+- Session ID extraction from `ResultMessage` works correctly
+- Result extraction from `ResultMessage` works correctly
+- Session resumption via `resume` parameter functions properly
 
 ---
 
