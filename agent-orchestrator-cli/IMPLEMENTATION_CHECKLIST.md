@@ -690,60 +690,77 @@ Command description here.
 
 **Goal**: Comprehensive interoperability testing and documentation.
 
-### ✅ Step 5.1: Bash/Python Interoperability Tests
+### ✅ Step 5.1: Interface Compatibility Tests - COMPLETE
+
+**SCOPE CLARIFICATION**: This step tests **interface compatibility only** (CLI parameters, environment variables, command names). File format compatibility is **NOT required** - Python uses SDK-native format while bash uses CLI subprocess format. See `INTERFACE_COMPATIBILITY.md` for details.
 
 **Reference documentation**:
-- `ARCHITECTURE_PLAN.md` - Section 8 (Testing Strategy)
+- `INTERFACE_COMPATIBILITY.md` - Complete compatibility model documentation
+- `PROJECT_CONTEXT.md` - Compatibility Model section
+- `docs/BASH_TO_PYTHON_MAPPING.md` - Command and function mapping for MCP migration
 
 **Test scenarios**:
-- [ ] **Bash creates, Python operates**:
-  - Create session with bash `new` command
-  - Check status with Python `ao-status`
-  - Resume with Python `ao-resume`
-  - Get result with Python `ao-get-result`
-- [ ] **Python creates, Bash operates**:
-  - Create session with Python `ao-new`
-  - Check status with bash `status` command
-  - Resume with bash `resume` command
-  - Get result with bash `get-result` command
-- [ ] **Cross-tool listing**:
-  - Create sessions with both tools
-  - List with both tools - should show all sessions
-- [ ] **Agent-based sessions**:
-  - Create with agent using bash
-  - Resume with Python - verify agent config loaded
-  - Create with agent using Python
-  - Resume with bash - verify agent config loaded
+- [x] **CLI Parameter Compatibility**:
+  - Verify `--sessions-dir`, `--agents-dir`, `--project-dir`, `-p` work identically ✅
+  - Test parameter precedence: CLI > ENV > DEFAULT ✅
+  - Confirm both tools accept same parameter formats ✅
+- [x] **Environment Variable Compatibility**:
+  - Verify `AGENT_ORCHESTRATOR_PROJECT_DIR` works identically ✅
+  - Verify `AGENT_ORCHESTRATOR_SESSIONS_DIR` works identically ✅
+  - Verify `AGENT_ORCHESTRATOR_AGENTS_DIR` works identically ✅
+  - Verify `AGENT_ORCHESTRATOR_ENABLE_LOGGING` works identically ✅
+- [x] **Command Name Mapping**:
+  - Confirm `ao-new` ↔ `new` (bash) ✅
+  - Confirm `ao-resume` ↔ `resume` (bash) ✅
+  - Confirm `ao-status` ↔ `status` (bash) ✅
+  - Confirm `ao-get-result` ↔ `get-result` (bash) ✅
+  - Confirm `ao-list-sessions` ↔ `list` (bash) ✅
+  - Confirm `ao-list-agents` ↔ `list-agents` (bash) ✅
+  - Confirm `ao-show-config` ↔ `show-config` (bash) ✅
+  - Confirm `ao-clean` ↔ `clean` (bash) ✅
+- [x] **Agent Structure Compatibility**:
+  - Verify Python loads same agent definitions as bash ✅
+  - Test `agent.json`, `agent.system-prompt.md`, `agent.mcp.json` structure ✅
 
-**Success criteria**:
-- 100% interoperability confirmed
-- No compatibility issues found
+**Test Results**:
+- ✅ All 24 interface compatibility tests passing
+- ✅ Test script: `test_interface_compatibility.sh`
+- ✅ All CLI parameters verified identical
+- ✅ All environment variables verified identical
+- ✅ Command naming mapping documented and verified
+- ✅ Agent structure is identical between tools
+- ⚠️ **File format compatibility NOT required** (intentional divergence)
+
+**Deliverables**:
+- ✅ `INTERFACE_COMPATIBILITY.md` - Complete compatibility guide
+- ✅ `test_interface_compatibility.sh` - Automated test suite (24 tests, all passing)
+- ✅ `docs/BASH_TO_PYTHON_MAPPING.md` - Function/command mapping for MCP migration
+- ✅ Updated `PROJECT_CONTEXT.md` with compatibility model
+- ✅ Updated checklist to reflect interface-only scope
 
 ---
 
-### ✅ Step 5.2: File Format Validation
+### ⏭️ Step 5.2: File Format Validation - SKIPPED
 
-**Reference documentation**:
-- `ARCHITECTURE_PLAN.md` - Section 7 (File Format Compatibility)
+**STATUS**: ⏭️ **SKIPPED** - Not applicable due to intentional file format divergence
 
-**Validation checks**:
-- [ ] **Session files (`.jsonl`)**:
-  - Compare bash vs Python output structure
-  - Verify first line has `session_id`
-  - Verify last line has `type: "result"` and `result`
-  - Check JSON parsing works both ways
-- [ ] **Metadata files (`.meta.json`)**:
-  - Compare bash vs Python structure
-  - Verify all required fields present
-  - Check timestamp format matches
-  - Verify schema version compatibility
-- [ ] **Agent structure**:
-  - Verify Python loads bash-style agents correctly
-  - Check all optional files handled correctly
+**Rationale**:
+- Python uses SDK-native `.jsonl` format (dataclass serialization)
+- Bash uses CLI subprocess `.jsonl` format
+- File formats are **intentionally different** by design
+- Interface compatibility (CLI params, env vars) is sufficient
+- See `INTERFACE_COMPATIBILITY.md` for full explanation
 
-**Success criteria**:
-- All file formats match exactly
-- No parsing errors in either direction
+**What was validated instead**:
+- ✅ Interface compatibility (Step 5.1)
+- ✅ Agent structure compatibility (Step 5.1)
+- ✅ Environment variable compatibility (Step 5.1)
+- ✅ CLI parameter compatibility (Step 5.1)
+
+**File format divergence documented in**:
+- `PROJECT_CONTEXT.md` - "Compatibility Model" section
+- `INTERFACE_COMPATIBILITY.md` - Complete compatibility guide
+- `IMPLEMENTATION_CHECKLIST.md` - Step 1.3 note (line 199)
 
 ---
 

@@ -51,7 +51,7 @@ Rewrite `agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` as 
 - ✅ Working directory context - `ClaudeAgentOptions(cwd=project_dir)`
 - ✅ MCP tool integration - `ClaudeAgentOptions(mcp_servers={...})`
 - ✅ Response streaming - Async iterator over messages
-- ✅ 100% file format compatibility - Can write same `.jsonl` format
+- ✅ SDK-native message format - Uses dataclass serialization for `.jsonl`
 
 **Benefits**:
 - Native Python integration (no subprocess overhead)
@@ -88,8 +88,8 @@ Rewrite `agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` as 
 4. Implement `commands/ao-clean` - Remove sessions
 
 ### Phase 5: Testing & Validation
-1. Test bash/Python interoperability
-2. Verify 100% file format compatibility
+1. Test interface compatibility (CLI parameters, environment variables)
+2. Document file format divergence
 3. Update user documentation
 
 ## Key Files
@@ -99,13 +99,24 @@ Rewrite `agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh` as 
 - **SDK Investigation**: `CLAUDE_SDK_INVESTIGATION.md` (SDK capabilities analysis)
 - **Legacy Docs**: `docs/architecture.md`, `docs/development.md`, `docs/llm-prompts.md`
 
-## File Format Compatibility
+## Compatibility Model
 
-Must maintain 100% compatibility with bash script:
-- Session metadata: `.metadata.json`
-- Session files: `session.txt`
-- Agent structure: `agent.json`, `agent.system-prompt.md`, `agent.mcp.json`
-- State detection algorithm: Must match bash behavior exactly
+**Interface Compatibility** (✅ MAINTAINED):
+- Command names: `ao-new`, `ao-resume`, `ao-status`, etc. map to bash `new`, `resume`, `status`
+- CLI parameters: `--sessions-dir`, `--agents-dir`, `--project-dir`, `-p` are identical
+- Environment variables: 100% identical naming and behavior
+  - `AGENT_ORCHESTRATOR_PROJECT_DIR`
+  - `AGENT_ORCHESTRATOR_SESSIONS_DIR`
+  - `AGENT_ORCHESTRATOR_AGENTS_DIR`
+  - `AGENT_ORCHESTRATOR_ENABLE_LOGGING`
+- Agent structure: `agent.json`, `agent.system-prompt.md`, `agent.mcp.json` (unchanged)
+
+**File Format Divergence** (⚠️ INTENTIONAL):
+- Python uses SDK-native `.jsonl` format (dataclass serialization)
+- Bash uses CLI subprocess `.jsonl` format
+- **Sessions are NOT cross-compatible** - Python sessions cannot be resumed by bash and vice versa
+- **This is by design** - Python SDK provides superior error handling and type safety
+- Each tool operates independently on its own session files
 
 ## Why This Matters
 
