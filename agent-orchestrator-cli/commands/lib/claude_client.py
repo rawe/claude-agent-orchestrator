@@ -58,7 +58,7 @@ async def run_claude_session(
     """
     # Import SDK here to give better error message if not installed
     try:
-        from claude_agent_sdk import query, ClaudeAgentOptions
+        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage
     except ImportError as e:
         raise ImportError(
             "claude-agent-sdk is not installed. "
@@ -98,37 +98,43 @@ async def run_claude_session(
         json.dump(user_message, f)
         f.write('\n')
 
-    # Stream session and write to file
+    # Stream session and write to file using ClaudeSDKClient
     try:
-        async for message in query(prompt=prompt, options=options):
-            # Write each message to JSONL file (append mode)
-            # Note: SDK messages are dataclasses, not Pydantic models
-            with open(session_file, 'a') as f:
-                json.dump(dataclasses.asdict(message), f)
-                f.write('\n')
+        async with ClaudeSDKClient(options=options) as client:
+            # Send the query
+            await client.query(prompt)
 
-            # Capture session_id from first message that has it
-            if session_id is None and hasattr(message, 'session_id'):
-                session_id = message.session_id
+            # Stream messages from client
+            async for message in client.receive_response():
+                # Write each message to JSONL file (append mode)
+                # Note: SDK messages are dataclasses
+                with open(session_file, 'a') as f:
+                    json.dump(dataclasses.asdict(message), f)
+                    f.write('\n')
 
-                # STAGE 2: Update metadata with session_id immediately
-                # This makes the session resumable even while still running
-                if session_name and sessions_dir:
-                    try:
-                        from session import update_session_id as _update_session_id
-                        _update_session_id(session_name, session_id, sessions_dir)
-                    except Exception as e:
-                        # Don't fail the session if metadata update fails
-                        # Just log to stderr for debugging
-                        import sys
-                        print(
-                            f"Warning: Failed to update session_id in metadata: {e}",
-                            file=sys.stderr
-                        )
+                # Extract session_id and result from ResultMessage
+                if isinstance(message, ResultMessage):
+                    # Capture session_id from first ResultMessage
+                    if session_id is None:
+                        session_id = message.session_id
 
-            # Capture result from last message that has it (overwrite each time)
-            if hasattr(message, 'result'):
-                result = message.result
+                        # STAGE 2: Update metadata with session_id immediately
+                        # This makes the session resumable even while still running
+                        if session_name and sessions_dir:
+                            try:
+                                from session import update_session_id as _update_session_id
+                                _update_session_id(session_name, session_id, sessions_dir)
+                            except Exception as e:
+                                # Don't fail the session if metadata update fails
+                                # Just log to stderr for debugging
+                                import sys
+                                print(
+                                    f"Warning: Failed to update session_id in metadata: {e}",
+                                    file=sys.stderr
+                                )
+
+                    # Capture result (overwrite each time to get final result)
+                    result = message.result
 
     except Exception as e:
         # Propagate SDK errors with context
