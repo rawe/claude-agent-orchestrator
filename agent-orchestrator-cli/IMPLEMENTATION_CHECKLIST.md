@@ -248,7 +248,7 @@ Command description here.
 - [x] Load configuration
 - [x] Ensure sessions directory exists
 - [x] Call `list_all_sessions()`
-- [x] Output format: `{session_name} (session: {session_id}, project: {project_dir})`
+- [x] Output format: `{session_name} (session-id: {session_id}, project-dir: {project_dir})`
 - [x] If no sessions: print "No sessions found"
 
 **Test plan**:
@@ -275,11 +275,12 @@ Command description here.
 - [x] Keep uv script header
 - [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
 - [x] Import: `load_config`, `validate_session_name`, `load_session_metadata`
-- [x] Parse CLI args: `<session-name>`, `--sessions-dir`
+- [x] Parse CLI args: `<session-name>`, `--project-dir`, `--sessions-dir`
 - [x] Load configuration
 - [x] Validate session name
 - [x] Check session exists (`.meta.json` file)
 - [x] Load session metadata
+- [x] **ENHANCEMENT**: Added `--project-dir` parameter for consistency with other commands
 - [x] Display configuration matching bash format:
   ```
   Configuration for session '{session_name}':
@@ -389,10 +390,11 @@ Command description here.
 - [x] Keep uv script header
 - [x] Add import: `sys.path.insert(0, str(Path(__file__).parent / "lib"))`
 - [x] Import: `load_config`, `list_all_agents`, `ensure_directory_exists`
-- [x] Parse CLI args: `--agents-dir`
+- [x] Parse CLI args: `--project-dir`, `--agents-dir`
 - [x] Load configuration
 - [x] Ensure agents directory exists
 - [x] Call `list_all_agents()`
+- [x] **ENHANCEMENT**: Added `--project-dir` parameter for consistency with other commands
 - [x] Output format (bash-compatible):
   ```
   {name}:
@@ -692,10 +694,9 @@ Command description here.
 
 ### ✅ Step 5.1: Interface Compatibility Tests - COMPLETE
 
-**SCOPE CLARIFICATION**: This step tests **interface compatibility only** (CLI parameters, environment variables, command names). File format compatibility is **NOT required** - Python uses SDK-native format while bash uses CLI subprocess format. See `INTERFACE_COMPATIBILITY.md` for details.
+**SCOPE CLARIFICATION**: This step tests **interface compatibility only** (CLI parameters, environment variables, command names). File format compatibility is **NOT required** - Python uses SDK-native format while bash uses CLI subprocess format.
 
 **Reference documentation**:
-- `INTERFACE_COMPATIBILITY.md` - Complete compatibility model documentation
 - `PROJECT_CONTEXT.md` - Compatibility Model section
 - `docs/BASH_TO_PYTHON_MAPPING.md` - Command and function mapping for MCP migration
 
@@ -724,7 +725,6 @@ Command description here.
 
 **Test Results**:
 - ✅ All 24 interface compatibility tests passing
-- ✅ Test script: `test_interface_compatibility.sh`
 - ✅ All CLI parameters verified identical
 - ✅ All environment variables verified identical
 - ✅ Command naming mapping documented and verified
@@ -732,9 +732,8 @@ Command description here.
 - ⚠️ **File format compatibility NOT required** (intentional divergence)
 
 **Deliverables**:
-- ✅ `INTERFACE_COMPATIBILITY.md` - Complete compatibility guide
-- ✅ `test_interface_compatibility.sh` - Automated test suite (24 tests, all passing)
-- ✅ `docs/BASH_TO_PYTHON_MAPPING.md` - Function/command mapping for MCP migration
+- ✅ `docs/BASH_TO_PYTHON_MAPPING.md` - Migration guide for developers
+- ✅ `docs/AI_ASSISTANT_GUIDE.md` - Compact usage guide for AI assistants
 - ✅ Updated `PROJECT_CONTEXT.md` with compatibility model
 - ✅ Updated checklist to reflect interface-only scope
 
@@ -749,7 +748,6 @@ Command description here.
 - Bash uses CLI subprocess `.jsonl` format
 - File formats are **intentionally different** by design
 - Interface compatibility (CLI params, env vars) is sufficient
-- See `INTERFACE_COMPATIBILITY.md` for full explanation
 
 **What was validated instead**:
 - ✅ Interface compatibility (Step 5.1)
@@ -759,7 +757,6 @@ Command description here.
 
 **File format divergence documented in**:
 - `PROJECT_CONTEXT.md` - "Compatibility Model" section
-- `INTERFACE_COMPATIBILITY.md` - Complete compatibility guide
 - `IMPLEMENTATION_CHECKLIST.md` - Step 1.3 note (line 199)
 
 ---

@@ -66,9 +66,12 @@ uv run commands/ao-clean
 ### Common Options
 - `-p "prompt text"` or `--prompt "prompt text"` - Provide prompt via CLI instead of stdin
 - `--agent <agent-name>` - Use specialized agent definition (only for `ao-new`)
-- `--sessions-dir <path>` - Override default session storage location
-- `--agents-dir <path>` - Override default agent definitions location
-- `--project-dir <path>` - Override working directory for Claude
+- `--project-dir <path>` - Override project directory (determines default paths for sessions-dir and agents-dir)
+  - **Available in ALL commands**
+- `--sessions-dir <path>` - Override session storage location
+  - **Available**: All commands that work with sessions (except `ao-list-agents`)
+- `--agents-dir <path>` - Override agent definitions location
+  - **Available**: `ao-new`, `ao-resume`, `ao-list-agents`
 
 ### Environment Variables (Alternative to CLI flags)
 ```bash
@@ -79,6 +82,11 @@ export AGENT_ORCHESTRATOR_ENABLE_LOGGING=true
 ```
 
 **Precedence**: CLI flags > Environment variables > Defaults
+
+**Why `--project-dir` on read-only commands?**
+- Default paths for `sessions-dir` and `agents-dir` are relative to `project-dir`
+- Example: `project-dir=/my/project` → default `sessions-dir=/my/project/.agent-orchestrator/agent-sessions`
+- Commands need to know project-dir to resolve default paths correctly
 
 ---
 
@@ -110,12 +118,17 @@ uv run commands/ao-new research-task --agent researcher -p "Research topic X"
 
 ### Custom Directories
 ```bash
-# Using CLI flags
-uv run commands/ao-new task --sessions-dir /tmp/sessions --project-dir /my/project
+# List agents from custom location
+uv run commands/ao-list-agents --agents-dir /custom/agents
 
-# Using environment variables
+# Create session with custom paths
+uv run commands/ao-new task --sessions-dir /tmp/sessions --agents-dir /custom/agents --project-dir /my/project
+
+# Using environment variables (applies to all commands)
 export AGENT_ORCHESTRATOR_SESSIONS_DIR=/tmp/sessions
+export AGENT_ORCHESTRATOR_AGENTS_DIR=/custom/agents
 uv run commands/ao-new task
+uv run commands/ao-list-agents  # Uses env var
 ```
 
 ---

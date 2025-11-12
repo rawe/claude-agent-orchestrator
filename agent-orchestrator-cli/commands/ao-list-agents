@@ -24,6 +24,7 @@ app = typer.Typer(add_completion=False)
 
 @app.command()
 def main(
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
 ):
     """
@@ -34,9 +35,13 @@ def main(
     Examples:
         ao-list-agents
         ao-list-agents --agents-dir /path/to/agents
+        ao-list-agents --project-dir /my/project
     """
     # 1. Load configuration
-    config = load_config(cli_agents_dir=str(agents_dir) if agents_dir else None)
+    config = load_config(
+        cli_project_dir=str(project_dir) if project_dir else None,
+        cli_agents_dir=str(agents_dir) if agents_dir else None,
+    )
 
     # 2. Get list of agents (list_all_agents handles missing directory gracefully)
     agents = list_all_agents(config.agents_dir)
