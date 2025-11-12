@@ -28,7 +28,7 @@ def main(
     """
     List all sessions with metadata.
 
-    Displays: session name (session: session_id, project: project_dir)
+    Displays: session name (session-id: session_id, project-dir: project_dir)
 
     Examples:
         ao-list-sessions
@@ -53,7 +53,7 @@ def main(
             print("No sessions found")
         else:
             for session_name, session_id, project_dir_path in sessions:
-                print(f"{session_name} (session: {session_id}, project: {project_dir_path})")
+                print(f"{session_name} (session-id: {session_id}, project-dir: {project_dir_path})")
 
     except Exception as e:
         # Handle errors
