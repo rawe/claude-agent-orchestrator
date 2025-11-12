@@ -38,20 +38,23 @@ import {
   formatToolResponse
 } from "./utils.js";
 import { ServerConfig, ResponseFormat } from "./types.js";
-import { ENV_SCRIPT_PATH } from "./constants.js";
+import { ENV_COMMAND_PATH } from "./constants.js";
 import { logger } from "./logger.js";
 
 // Get configuration from environment variables
 function getServerConfig(): ServerConfig {
-  const scriptPath = process.env[ENV_SCRIPT_PATH];
-  if (!scriptPath) {
-    console.error(`ERROR: ${ENV_SCRIPT_PATH} environment variable is required`);
-    console.error(`Please set it to the absolute path of agent-orchestrator.sh`);
+  const commandPath = process.env[ENV_COMMAND_PATH];
+  if (!commandPath) {
+    console.error(`ERROR: ${ENV_COMMAND_PATH} environment variable is required`);
+    console.error(`Please set it to the absolute path of the commands directory`);
     process.exit(1);
   }
 
+  // Normalize path: remove trailing slash if present
+  const normalizedPath = commandPath.replace(/\/$/, '');
+
   return {
-    scriptPath: path.resolve(scriptPath)
+    commandPath: path.resolve(normalizedPath)
   };
 }
 
@@ -610,18 +613,18 @@ Note: This operation is idempotent - running it multiple times has the same effe
 // Main function
 async function main() {
   logger.info("Agent Orchestrator MCP Server starting", {
-    scriptPath: config.scriptPath,
+    commandPath: config.commandPath,
     cwd: process.cwd(),
     nodeVersion: process.version,
     env: {
-      AGENT_ORCHESTRATOR_SCRIPT_PATH: process.env.AGENT_ORCHESTRATOR_SCRIPT_PATH,
+      AGENT_ORCHESTRATOR_COMMAND_PATH: process.env.AGENT_ORCHESTRATOR_COMMAND_PATH,
       AGENT_ORCHESTRATOR_PROJECT_DIR: process.env.AGENT_ORCHESTRATOR_PROJECT_DIR,
       PATH: process.env.PATH
     }
   });
 
   console.error("Agent Orchestrator MCP Server");
-  console.error(`Script path: ${config.scriptPath}`);
+  console.error(`Commands path: ${config.commandPath}`);
   console.error("");
 
   // Create transport

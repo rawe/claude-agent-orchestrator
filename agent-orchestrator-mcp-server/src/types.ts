@@ -14,7 +14,7 @@ export interface SessionInfo {
 }
 
 export interface ServerConfig {
-  scriptPath: string;
+  commandPath: string;
 }
 
 export enum ResponseFormat {

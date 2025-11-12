@@ -14,7 +14,18 @@ import { CHARACTER_LIMIT } from "./constants.js";
 import { logger } from "./logger.js";
 
 /**
- * Execute the agent-orchestrator.sh script with given arguments
+ * Command name mapping from bash subcommands to Python commands
+ */
+const COMMAND_NAME_MAP: Record<string, string> = {
+  'new': 'ao-new',
+  'resume': 'ao-resume',
+  'list': 'ao-list-sessions',
+  'list-agents': 'ao-list-agents',
+  'clean': 'ao-clean'
+};
+
+/**
+ * Execute Python agent orchestrator commands via uv
  */
 export async function executeScript(
   config: ServerConfig,
@@ -23,22 +34,45 @@ export async function executeScript(
 ): Promise<ScriptExecutionResult> {
   const startTime = Date.now();
 
-  logger.debug("Executing script", {
-    scriptPath: config.scriptPath,
-    args,
+  // Extract command name (first argument) and remaining args
+  const [commandName, ...commandArgs] = args;
+
+  if (!commandName) {
+    throw new Error("No command specified");
+  }
+
+  // Map bash subcommand to Python command name
+  const pythonCommand = COMMAND_NAME_MAP[commandName];
+
+  if (!pythonCommand) {
+    throw new Error(`Unknown command: ${commandName}`);
+  }
+
+  // Build full command path (commandPath already has trailing slash removed in config)
+  const fullCommandPath = `${config.commandPath}/${pythonCommand}`;
+
+  // Build uv run arguments: uv run <command-path> <args...>
+  const uvArgs = ['run', fullCommandPath, ...commandArgs];
+
+  logger.debug("Executing Python command via uv", {
+    commandPath: config.commandPath,
+    pythonCommand,
+    fullCommandPath,
+    uvArgs,
     hasStdin: !!stdinInput,
     stdinLength: stdinInput?.length || 0,
     env: {
       PATH: process.env.PATH,
       HOME: process.env.HOME,
       PWD: process.env.PWD,
-      AGENT_ORCHESTRATOR_SCRIPT_PATH: process.env.AGENT_ORCHESTRATOR_SCRIPT_PATH,
+      AGENT_ORCHESTRATOR_COMMAND_PATH: process.env.AGENT_ORCHESTRATOR_COMMAND_PATH,
       AGENT_ORCHESTRATOR_PROJECT_DIR: process.env.AGENT_ORCHESTRATOR_PROJECT_DIR,
     }
   });
 
   return new Promise((resolve, reject) => {
-    const childProcess = spawn(config.scriptPath, args, {
+    // Execute via uv run
+    const childProcess = spawn('uv', uvArgs, {
       env: { ...process.env },
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -49,22 +83,22 @@ export async function executeScript(
     childProcess.stdout?.on("data", (data: Buffer) => {
       const chunk = data.toString();
       stdout += chunk;
-      logger.debug("Script stdout chunk", { length: chunk.length });
+      logger.debug("Command stdout chunk", { length: chunk.length });
     });
 
     childProcess.stderr?.on("data", (data: Buffer) => {
       const chunk = data.toString();
       stderr += chunk;
-      logger.debug("Script stderr chunk", { length: chunk.length, content: chunk.substring(0, 200) });
+      logger.debug("Command stderr chunk", { length: chunk.length, content: chunk.substring(0, 200) });
     });
 
     childProcess.on("error", (error: Error) => {
-      logger.error("Script execution error", {
+      logger.error("Command execution error", {
         error: error.message,
         stack: error.stack,
         duration: Date.now() - startTime
       });
-      reject(new Error(`Failed to execute script: ${error.message}`));
+      reject(new Error(`Failed to execute command: ${error.message}`));
     });
 
     childProcess.on("close", (code: number | null) => {
@@ -75,7 +109,7 @@ export async function executeScript(
         exitCode: code ?? 1
       };
 
-      logger.debug("Script execution completed", {
+      logger.debug("Command execution completed", {
         exitCode: code,
         stdoutLength: result.stdout.length,
         stderrLength: result.stderr.length,
@@ -89,11 +123,11 @@ export async function executeScript(
 
     // Write stdin input if provided, otherwise close stdin immediately
     if (stdinInput && childProcess.stdin) {
-      logger.debug("Writing to script stdin", { length: stdinInput.length });
+      logger.debug("Writing to command stdin", { length: stdinInput.length });
       childProcess.stdin.write(stdinInput);
       childProcess.stdin.end();
     } else if (childProcess.stdin) {
-      // Close stdin immediately if no input to prevent script from waiting
+      // Close stdin immediately if no input to prevent command from waiting
       logger.debug("Closing stdin (no input provided)");
       childProcess.stdin.end();
     }

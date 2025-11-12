@@ -5,8 +5,9 @@ Get the Agent Orchestrator MCP Server up and running quickly with this guide.
 ## Prerequisites
 
 1. Node.js >= 18
-2. The `agent-orchestrator.sh` script installed and accessible
-3. A project directory where you want to run orchestrated agents
+2. `uv` (Python package manager) installed and in PATH
+3. The agent orchestrator Python commands installed and accessible
+4. A project directory where you want to run orchestrated agents
 
 ## Installation
 
@@ -53,7 +54,7 @@ Add this configuration to your Claude Desktop config file:
       ],
       "env": {
         "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/agent-orchestrator-cli/commands",
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/your/project"
       }
     }
@@ -83,7 +84,7 @@ Test the server locally before integrating with Claude Desktop:
 
 ```bash
 # Set environment variables
-export AGENT_ORCHESTRATOR_SCRIPT_PATH="/absolute/path/to/agent-orchestrator.sh"
+export AGENT_ORCHESTRATOR_COMMAND_PATH="/absolute/path/to/agent-orchestrator-cli/commands"
 export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/your/project"
 
 # Run MCP Inspector
@@ -130,7 +131,8 @@ Once configured, you can use natural language in Claude Desktop:
 ### Environment Variable Errors
 
 If you see errors about missing environment variables:
-- `AGENT_ORCHESTRATOR_SCRIPT_PATH` must point to the **agent-orchestrator.sh** bash script
+- `AGENT_ORCHESTRATOR_COMMAND_PATH` must point to the **commands directory** containing Python scripts
+- Verify `uv` is installed and accessible: `which uv`
 - For PATH issues on macOS, try: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
 
 For detailed environment variable documentation, see [README.md - Environment Variables Reference](./README.md#environment-variables-reference).
