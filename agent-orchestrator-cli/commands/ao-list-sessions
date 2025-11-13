@@ -36,6 +36,15 @@ def main(
     """
     from config import load_config
     from session import list_all_sessions
+    from utils import debug_log
+
+    # DEBUG LOGGING - Command entry
+    debug_log("COMMAND - ao-list-sessions", {
+        "cwd": str(Path.cwd()),
+        "argv": sys.argv,
+        "project_dir": str(project_dir) if project_dir else "None",
+        "sessions_dir": str(sessions_dir) if sessions_dir else "None",
+    })
 
     try:
         # Load configuration with CLI overrides

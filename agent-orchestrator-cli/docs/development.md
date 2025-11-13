@@ -257,6 +257,40 @@ uv run commands/ao-new test -p "Hello"
 cat .agent-orchestrator/agent-sessions/test.log
 ```
 
+### Debug Path Resolution Issues
+
+For diagnosing session directory path resolution problems, a temporary debug logging feature is available:
+
+**Configuration**: Edit `commands/lib/utils.py` (lines 21-27)
+
+```python
+# Set to True to enable, False to disable
+ENABLE_DEBUG_LOGGING = True
+
+# Configure log file path (absolute path recommended)
+DEBUG_LOG_PATH = _PROJECT_ROOT / "debug-session-path.log"
+```
+
+**What it logs**:
+- Command invocations, current working directory, arguments
+- Environment variables (SESSIONS_DIR, PROJECT_DIR, etc.)
+- Path resolution steps (relative vs absolute, cwd used)
+- Final resolved paths for all directories
+- Session list results
+
+**Usage**:
+```bash
+# Enable in utils.py, then run commands
+uv run commands/ao-list-sessions
+
+# View log (default location: project root)
+cat debug-session-path.log
+
+# Disable by setting ENABLE_DEBUG_LOGGING = False
+```
+
+**Note**: This is temporary debugging infrastructure. Remove after resolving path issues.
+
 ## Tips for LLM-Assisted Development
 
 ### Implementing a Module

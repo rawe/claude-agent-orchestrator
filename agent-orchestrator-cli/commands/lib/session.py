@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import json
 import os
 import re
+from utils import debug_log
 
 
 SessionState = Literal["running", "finished", "not_existent"]
@@ -347,14 +348,32 @@ def list_all_sessions(sessions_dir: Path) -> list[tuple[str, str, str]]:
     Returns:
         List of (session_name, session_id, project_dir) tuples
     """
+    # DEBUG LOGGING - Entry
+    debug_log("list_all_sessions - ENTRY", {
+        "sessions_dir": str(sessions_dir),
+        "sessions_dir_exists": sessions_dir.exists(),
+    })
+
     # Ensure sessions_dir exists
     if not sessions_dir.exists():
+        debug_log("list_all_sessions - RESULT", {
+            "reason": "sessions_dir does not exist",
+            "sessions_found": 0,
+        })
         return []
 
     sessions = []
 
     # Find all .meta.json files
-    for meta_file in sessions_dir.glob("*.meta.json"):
+    meta_files = list(sessions_dir.glob("*.meta.json"))
+
+    # DEBUG LOGGING - Files found
+    debug_log("list_all_sessions - FILES", {
+        "meta_files_found": len(meta_files),
+        "file_list": [f.name for f in meta_files],
+    })
+
+    for meta_file in meta_files:
         # Extract session name (remove .meta.json suffix)
         session_name = meta_file.stem.replace(".meta", "")
 
@@ -369,5 +388,11 @@ def list_all_sessions(sessions_dir: Path) -> list[tuple[str, str, str]]:
             project_dir = "unknown"
 
         sessions.append((session_name, session_id, project_dir))
+
+    # DEBUG LOGGING - Result
+    debug_log("list_all_sessions - RESULT", {
+        "sessions_found": len(sessions),
+        "session_names": [s[0] for s in sessions],
+    })
 
     return sessions
