@@ -24,7 +24,7 @@ AOF provides three distinct usage levels, allowing you to choose the integration
 **Best for:** Direct, low-level control of agent orchestration within Claude Code
 
 Install the `agent-orchestrator` plugin to get:
-- The `agent-orchestrator.sh` script (1,203 lines of orchestration logic)
+- Python-based `ao-*` commands for agent orchestration
 - 4 slash commands for agent management
 - Skills for creating and managing agents
 - Complete control over agent lifecycle
@@ -82,7 +82,7 @@ Use the standalone MCP server implementation to get:
 - Works with Claude Desktop, Claude Code, or any MCP-compatible system
 - 5 MCP tools for agent orchestration
 - TypeScript implementation with full type safety
-- Works with the same `agent-orchestrator.sh` script
+- Works with the same Python commands as Level 1
 
 **Quick Start:**
 ```bash
@@ -125,7 +125,7 @@ agent-orchestrator-framework/
 ├── agent-orchestrator/              # Level 1: Core framework plugin
 │   ├── skills/
 │   │   └── agent-orchestrator/
-│   │       ├── agent-orchestrator.sh    # Core orchestration script (1,203 lines)
+│   │       ├── commands/                # Python ao-* commands
 │   │       ├── SKILL.md                 # Skill definition
 │   │       ├── references/              # Technical documentation
 │   │       └── example/                 # Example agent definitions
@@ -194,8 +194,8 @@ Isolated Claude Code sessions for individual agents. Each session has a unique I
 ### MCP Configuration
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
 
-### Orchestration Script
-The `agent-orchestrator.sh` bash script is the foundation of all three usage levels. It handles session lifecycle, agent configuration, and result extraction.
+### Orchestration Commands
+The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of all three usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
 ## Documentation

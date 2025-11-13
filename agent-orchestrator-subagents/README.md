@@ -4,14 +4,14 @@ Pre-configured Claude Code subagents for the Agent Orchestrator Framework (AOF).
 
 ## Overview
 
-This plugin provides convenient Claude Code subagents that allow you to launch and manage orchestrated agents without directly interacting with the low-level `agent-orchestrator.sh` script. It extends the core Agent Orchestrator Framework with a higher-level, more user-friendly interface.
+This plugin provides convenient Claude Code subagents that allow you to launch and manage orchestrated agents without directly using the low-level Python `ao-*` commands. It extends the core Agent Orchestrator Framework with a higher-level, more user-friendly interface.
 
 ## Requirements
 
 **This plugin requires the `agent-orchestrator` plugin to be installed.**
 
 The subagents in this plugin depend on the core `agent-orchestrator` plugin, which provides:
-- The `agent-orchestrator.sh` script
+- Python `ao-*` orchestration commands
 - Core orchestration functionality
 - Session management
 - Agent definition handling
@@ -23,7 +23,7 @@ This plugin provides two specialized subagents:
 ### 1. Orchestrated Agent Launcher
 **Location**: `agents/orchestrated-agent-launcher.md`
 
-A Claude Code subagent that simplifies launching new orchestrated agent sessions. Instead of manually invoking the `agent-orchestrator.sh` script, you can use this subagent to:
+A Claude Code subagent that simplifies launching new orchestrated agent sessions. Instead of manually using the `ao-*` commands, you can use this subagent to:
 - Create new agent sessions with natural language
 - Launch specialized agents by name
 - Start generic agents for custom tasks
