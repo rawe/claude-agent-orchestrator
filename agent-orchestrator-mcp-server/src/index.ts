@@ -19,14 +19,19 @@ import {
   StartAgentInputSchema,
   ResumeAgentInputSchema,
   CleanSessionsInputSchema,
+  GetAgentStatusInputSchema,
+  GetAgentResultInputSchema,
   type ListAgentsInput,
   type ListSessionsInput,
   type StartAgentInput,
   type ResumeAgentInput,
-  type CleanSessionsInput
+  type CleanSessionsInput,
+  type GetAgentStatusInput,
+  type GetAgentResultInput
 } from "./schemas.js";
 import {
   executeScript,
+  executeScriptAsync,
   parseAgentList,
   parseSessionList,
   formatAgentsAsMarkdown,
@@ -346,7 +351,8 @@ Error Handling:
       session_name: params.session_name,
       agent_name: params.agent_name,
       project_dir: params.project_dir,
-      prompt_length: params.prompt?.length || 0
+      prompt_length: params.prompt?.length || 0,
+      async: params.async
     });
 
     try {
@@ -366,9 +372,33 @@ Error Handling:
       // Add prompt
       args.push("-p", params.prompt);
 
-      logger.debug("start_agent: executing script", { args });
+      logger.debug("start_agent: executing script", { args, async: params.async });
 
-      // Execute new command
+      // Check if async mode requested
+      if (params.async === true) {
+        logger.info("start_agent: using async execution (fire-and-forget mode)");
+
+        // Execute in background (detached mode)
+        const asyncResult = await executeScriptAsync(config, args);
+
+        logger.info("start_agent: async process spawned", {
+          session_name: asyncResult.session_name
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              session_name: asyncResult.session_name,
+              status: asyncResult.status,
+              message: asyncResult.message
+            }, null, 2)
+          }]
+        };
+      }
+
+      // Original blocking behavior (async=false or undefined)
+      logger.info("start_agent: using synchronous execution (blocking mode)");
       const result = await executeScript(config, args);
 
       if (result.exitCode !== 0) {
@@ -470,7 +500,8 @@ Note: The agent definition used during session creation is automatically remembe
     logger.info("resume_agent called", {
       session_name: params.session_name,
       project_dir: params.project_dir,
-      prompt_length: params.prompt?.length || 0
+      prompt_length: params.prompt?.length || 0,
+      async: params.async
     });
 
     try {
@@ -485,9 +516,33 @@ Note: The agent definition used during session creation is automatically remembe
       // Add prompt
       args.push("-p", params.prompt);
 
-      logger.debug("resume_agent: executing script", { args });
+      logger.debug("resume_agent: executing script", { args, async: params.async });
 
-      // Execute resume command
+      // Check if async mode requested
+      if (params.async === true) {
+        logger.info("resume_agent: using async execution (fire-and-forget mode)");
+
+        // Execute in background (detached mode)
+        const asyncResult = await executeScriptAsync(config, args);
+
+        logger.info("resume_agent: async process spawned", {
+          session_name: asyncResult.session_name
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              session_name: asyncResult.session_name,
+              status: asyncResult.status,
+              message: asyncResult.message
+            }, null, 2)
+          }]
+        };
+      }
+
+      // Original blocking behavior (async=false or undefined)
+      logger.info("resume_agent: using synchronous execution (blocking mode)");
       const result = await executeScript(config, args);
 
       if (result.exitCode !== 0) {
@@ -599,6 +654,221 @@ Note: This operation is idempotent - running it multiple times has the same effe
         }]
       };
     } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: ${error instanceof Error ? error.message : String(error)}`
+        }],
+        isError: true
+      };
+    }
+  }
+);
+
+// Register get_agent_status tool
+server.registerTool(
+  "get_agent_status",
+  {
+    title: "Get Agent Session Status",
+    description: `Check the current status of an agent session.
+
+Returns one of three statuses:
+- "running": Session is currently executing or initializing
+- "finished": Session completed successfully with a result
+- "not_existent": Session does not exist
+
+Use this tool to poll for completion when using async mode with start_agent or resume_agent.
+
+Args:
+  - session_name (string): Name of the session to check
+  - project_dir (string, optional): Project directory path
+  - wait_seconds (number, optional): Seconds to wait before checking status (default: 0, max: 300)
+
+Returns:
+  JSON object with status field: {"status": "running"|"finished"|"not_existent"}
+
+Examples:
+  - Poll until finished: Keep calling until status="finished"
+  - Poll with interval: Use wait_seconds=10 to wait 10 seconds before checking (reduces token usage)
+  - Check before resume: Verify session exists before resuming
+  - Monitor background execution: Track progress of async agents
+
+Polling Strategy:
+  - Short tasks: Poll every 2-5 seconds (wait_seconds=2-5)
+  - Long tasks: Poll every 10-30 seconds (wait_seconds=10-30)
+  - Very long tasks: Poll every 60+ seconds (wait_seconds=60+)
+  - Using wait_seconds reduces token usage by spacing out status checks`,
+    inputSchema: GetAgentStatusInputSchema.shape,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    }
+  },
+  async (params: GetAgentStatusInput) => {
+    logger.info("get_agent_status called", {
+      session_name: params.session_name,
+      wait_seconds: params.wait_seconds
+    });
+
+    try {
+      // Wait if wait_seconds is specified and > 0
+      if (params.wait_seconds && params.wait_seconds > 0) {
+        logger.debug("get_agent_status: waiting before status check", {
+          wait_seconds: params.wait_seconds
+        });
+        await new Promise(resolve => setTimeout(resolve, params.wait_seconds * 1000));
+        logger.debug("get_agent_status: wait completed, checking status now");
+      }
+
+      const args = ["status", params.session_name];
+
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
+
+      const result = await executeScript(config, args);
+
+      if (result.exitCode !== 0) {
+        // Handle error - likely means session not found or other issue
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ status: "not_existent" }, null, 2)
+          }]
+        };
+      }
+
+      // Parse status from stdout (should be one of: running, finished, not_existent)
+      const status = result.stdout.trim();
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ status }, null, 2)
+        }]
+      };
+    } catch (error) {
+      // Handle exceptions
+      logger.error("get_agent_status: exception", { error });
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ status: "not_existent" }, null, 2)
+        }]
+      };
+    }
+  }
+);
+
+// Register get_agent_result tool
+server.registerTool(
+  "get_agent_result",
+  {
+    title: "Get Agent Session Result",
+    description: `Retrieve the final result from a completed agent session.
+
+This tool extracts the result from a session that has finished executing. It will fail with an error if the session is still running or does not exist.
+
+Workflow:
+  1. Start agent with async=true
+  2. Poll with get_agent_status until status="finished"
+  3. Call get_agent_result to retrieve the final output
+
+Args:
+  - session_name (string): Name of the completed session
+  - project_dir (string, optional): Project directory path
+
+Returns:
+  The agent's final response/result as text
+
+Error Handling:
+  - "Session still running" -> Poll get_agent_status until finished
+  - "Session not found" -> Verify session name is correct
+  - "No result found" -> Session may have failed, check status`,
+    inputSchema: GetAgentResultInputSchema.shape,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    }
+  },
+  async (params: GetAgentResultInput) => {
+    logger.info("get_agent_result called", { session_name: params.session_name });
+
+    try {
+      // First check status to provide helpful error messages
+      const statusArgs = ["status", params.session_name];
+      if (params.project_dir) {
+        statusArgs.push("--project-dir", params.project_dir);
+      }
+
+      const statusResult = await executeScript(config, statusArgs);
+      const status = statusResult.stdout.trim();
+
+      if (status === "not_existent") {
+        return {
+          content: [{
+            type: "text",
+            text: `Error: Session '${params.session_name}' does not exist. Please check the session name.`
+          }],
+          isError: true
+        };
+      }
+
+      if (status === "running") {
+        return {
+          content: [{
+            type: "text",
+            text: `Error: Session '${params.session_name}' is still running. Use get_agent_status to poll until status is 'finished'.`
+          }],
+          isError: true
+        };
+      }
+
+      // Session is finished, retrieve result
+      const args = ["get-result", params.session_name];
+      if (params.project_dir) {
+        args.push("--project-dir", params.project_dir);
+      }
+
+      const result = await executeScript(config, args);
+
+      if (result.exitCode !== 0) {
+        logger.error("get_agent_result: script failed", {
+          exitCode: result.exitCode,
+          stderr: result.stderr
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: `Error retrieving result: ${result.stderr || 'Unknown error'}`
+          }],
+          isError: true
+        };
+      }
+
+      // Check character limit
+      const { text, truncated } = truncateResponse(result.stdout);
+
+      if (truncated) {
+        logger.warn("get_agent_result: response truncated", {
+          originalLength: result.stdout.length,
+          truncatedLength: text.length
+        });
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: text
+        }]
+      };
+    } catch (error) {
+      logger.error("get_agent_result: exception", { error });
       return {
         content: [{
           type: "text",

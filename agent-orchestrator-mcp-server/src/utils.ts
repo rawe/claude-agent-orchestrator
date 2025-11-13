@@ -8,6 +8,7 @@ import {
   SessionInfo,
   ServerConfig,
   ScriptExecutionResult,
+  AsyncExecutionResult,
   ResponseFormat
 } from "./types.js";
 import { CHARACTER_LIMIT } from "./constants.js";
@@ -21,7 +22,9 @@ const COMMAND_NAME_MAP: Record<string, string> = {
   'resume': 'ao-resume',
   'list': 'ao-list-sessions',
   'list-agents': 'ao-list-agents',
-  'clean': 'ao-clean'
+  'clean': 'ao-clean',
+  'status': 'ao-status',
+  'get-result': 'ao-get-result'
 };
 
 /**
@@ -131,6 +134,97 @@ export async function executeScript(
       logger.debug("Closing stdin (no input provided)");
       childProcess.stdin.end();
     }
+  });
+}
+
+/**
+ * Execute a script command asynchronously (fire-and-forget mode)
+ * Spawns a detached process that continues running after this function returns
+ *
+ * @param config Server configuration
+ * @param args Command arguments (first element is command name)
+ * @param stdinInput Optional stdin input to pass to the process
+ * @returns Promise resolving immediately with session metadata
+ */
+export async function executeScriptAsync(
+  config: ServerConfig,
+  args: string[],
+  stdinInput?: string
+): Promise<AsyncExecutionResult> {
+  const startTime = Date.now();
+
+  // Extract command name and map to Python command
+  const [commandName, ...commandArgs] = args;
+
+  if (!commandName) {
+    throw new Error("No command specified");
+  }
+
+  const pythonCommand = COMMAND_NAME_MAP[commandName];
+
+  if (!pythonCommand) {
+    throw new Error(`Unknown command: ${commandName}`);
+  }
+
+  // Build full command path
+  const fullCommandPath = `${config.commandPath}/${pythonCommand}`;
+  const uvArgs = ['run', fullCommandPath, ...commandArgs];
+
+  logger.debug("Executing Python command asynchronously (detached mode)", {
+    commandPath: config.commandPath,
+    pythonCommand,
+    fullCommandPath,
+    uvArgs,
+    hasStdin: !!stdinInput,
+    stdinLength: stdinInput?.length || 0
+  });
+
+  return new Promise((resolve, reject) => {
+    // Spawn detached process
+    const childProcess = spawn('uv', uvArgs, {
+      env: { ...process.env },
+      stdio: ["pipe", "pipe", "pipe"],
+      detached: true  // KEY: Process runs independently of parent
+    });
+
+    // Immediately unref to allow parent to exit without waiting
+    childProcess.unref();
+
+    logger.info("Detached process spawned", {
+      pid: childProcess.pid,
+      command: pythonCommand,
+      args: commandArgs
+    });
+
+    // Handle spawn errors (happens synchronously if spawn fails)
+    childProcess.on("error", (error: Error) => {
+      logger.error("Async command spawn error", {
+        error: error.message,
+        stack: error.stack,
+        duration: Date.now() - startTime
+      });
+      reject(new Error(`Failed to spawn async command: ${error.message}`));
+    });
+
+    // Write stdin if provided, then close immediately
+    if (stdinInput && childProcess.stdin) {
+      logger.debug("Writing to async command stdin", { length: stdinInput.length });
+      childProcess.stdin.write(stdinInput);
+      childProcess.stdin.end();
+    } else if (childProcess.stdin) {
+      logger.debug("Closing async command stdin (no input provided)");
+      childProcess.stdin.end();
+    }
+
+    // Extract session_name from command args (first arg after command name)
+    const session_name = commandArgs[0] || "unknown";
+
+    // Resolve immediately with metadata
+    resolve({
+      session_name,
+      status: "running",
+      message: "Agent started in background. Use get_agent_status to poll for completion and get_agent_result to retrieve the final result."
+    });
   });
 }
 

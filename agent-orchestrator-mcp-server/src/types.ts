@@ -27,3 +27,9 @@ export interface ScriptExecutionResult {
   stderr: string;
   exitCode: number;
 }
+
+export interface AsyncExecutionResult {
+  session_name: string;
+  status: "running";
+  message: string;
+}

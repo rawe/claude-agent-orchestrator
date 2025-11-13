@@ -45,7 +45,11 @@ export const StartAgentInputSchema = z.object({
   project_dir: ProjectDirSchema,
   prompt: z.string()
     .min(1, "Prompt cannot be empty")
-    .describe("Initial prompt or task description for the agent session")
+    .describe("Initial prompt or task description for the agent session"),
+  async: z.boolean()
+    .optional()
+    .default(false)
+    .describe("Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_status to poll for completion.")
 }).strict();
 
 export type StartAgentInput = z.infer<typeof StartAgentInputSchema>;
@@ -60,7 +64,11 @@ export const ResumeAgentInputSchema = z.object({
   project_dir: ProjectDirSchema,
   prompt: z.string()
     .min(1, "Prompt cannot be empty")
-    .describe("Continuation prompt or task description for the resumed session")
+    .describe("Continuation prompt or task description for the resumed session"),
+  async: z.boolean()
+    .optional()
+    .default(false)
+    .describe("Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_status to poll for completion.")
 }).strict();
 
 export type ResumeAgentInput = z.infer<typeof ResumeAgentInputSchema>;
@@ -71,3 +79,33 @@ export const CleanSessionsInputSchema = z.object({
 }).strict();
 
 export type CleanSessionsInput = z.infer<typeof CleanSessionsInputSchema>;
+
+// Schema for get_agent_status tool
+export const GetAgentStatusInputSchema = z.object({
+  session_name: z.string()
+    .min(1, "Session name cannot be empty")
+    .max(MAX_SESSION_NAME_LENGTH, `Session name must not exceed ${MAX_SESSION_NAME_LENGTH} characters`)
+    .regex(SESSION_NAME_PATTERN, "Session name can only contain alphanumeric characters, dashes, and underscores")
+    .describe("Name of the session to check status for"),
+  project_dir: ProjectDirSchema,
+  wait_seconds: z.number()
+    .min(0, "Wait time must be non-negative")
+    .max(300, "Wait time cannot exceed 300 seconds (5 minutes)")
+    .optional()
+    .default(0)
+    .describe("Number of seconds to wait before checking status (default: 0). Useful for polling long-running agents with longer intervals to reduce token usage.")
+}).strict();
+
+export type GetAgentStatusInput = z.infer<typeof GetAgentStatusInputSchema>;
+
+// Schema for get_agent_result tool
+export const GetAgentResultInputSchema = z.object({
+  session_name: z.string()
+    .min(1, "Session name cannot be empty")
+    .max(MAX_SESSION_NAME_LENGTH, `Session name must not exceed ${MAX_SESSION_NAME_LENGTH} characters`)
+    .regex(SESSION_NAME_PATTERN, "Session name can only contain alphanumeric characters, dashes, and underscores")
+    .describe("Name of the session to retrieve result from"),
+  project_dir: ProjectDirSchema
+}).strict();
+
+export type GetAgentResultInput = z.infer<typeof GetAgentResultInputSchema>;
