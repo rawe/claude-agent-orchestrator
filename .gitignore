@@ -79,4 +79,5 @@ $RECYCLE.BIN/
 
 # work in progress
 agent-orchestrator-launcher/
+agent-orchestrator-cli/
 tickets/
