@@ -122,16 +122,13 @@ Error Handling:
     });
 
     try {
-      // Build command arguments
-      const args = [];
+      // Build command arguments - command name must be first
+      const args = ["list-agents"];
 
       // Add project_dir if specified (supersedes environment variable)
       if (params.project_dir) {
         args.push("--project-dir", params.project_dir);
       }
-
-      // Add command
-      args.push("list-agents");
 
       logger.debug("list_agents: executing script", { args });
 
@@ -241,16 +238,13 @@ Error Handling:
     });
 
     try {
-      // Build command arguments
-      const args = [];
+      // Build command arguments - command name must be first
+      const args = ["list"];
 
       // Add project_dir if specified (supersedes environment variable)
       if (params.project_dir) {
         args.push("--project-dir", params.project_dir);
       }
-
-      // Add command
-      args.push("list");
 
       logger.debug("list_sessions: executing script", { args });
 
@@ -620,16 +614,13 @@ Note: This operation is idempotent - running it multiple times has the same effe
     });
 
     try {
-      // Build command arguments
-      const args = [];
+      // Build command arguments - command name must be first
+      const args = ["clean"];
 
       // Add project_dir if specified (supersedes environment variable)
       if (params.project_dir) {
         args.push("--project-dir", params.project_dir);
       }
-
-      // Add command
-      args.push("clean");
 
       logger.debug("clean_sessions: executing script", { args });
 
