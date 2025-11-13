@@ -63,11 +63,32 @@ When creating a session with an agent:
 ### Session Management
 
 The tool abstracts away Claude Code's internal session ID management. You interact with sessions using memorable names rather than UUIDs, while the tool handles:
-- Session file storage and organization
+- Session file storage and organization (`.jsonl` + `.meta.json` files)
 - Session ID extraction and tracking
 - Agent association and configuration
 - Result retrieval and formatting
-- State management (initializing, active, completed)
+- State management
+
+#### Session States
+
+Sessions can be in one of three states (returned by `ao-status`):
+- **`not_existent`** - Session doesn't exist yet (never created or was cleaned up)
+- **`running`** - Session created but hasn't returned a result yet (actively processing or ready for resume)
+- **`finished`** - Session completed with result available (use `ao-get-result` to retrieve)
+
+#### Session Storage
+
+Each session is stored as:
+- `{session-name}.jsonl` - Complete conversation history in JSONL format
+- `{session-name}.meta.json` - Session metadata (agent association, project directory, timestamps, session ID)
+
+Location: `{sessions-dir}/` (default: `.agent-orchestrator/agent-sessions/`)
+
+#### Working Directory Context
+
+- Sessions operate in a `project-dir` (default: current working directory when command is invoked)
+- All file operations within the session are relative to this directory
+- The project directory is stored in session metadata and preserved across resumes
 
 ## Use Cases
 
@@ -76,16 +97,16 @@ The tool abstracts away Claude Code's internal session ID management. You intera
 Coordinate multiple specialized sessions working on different aspects of a project:
 ```bash
 # First, discover available agent definitions
-./agent-orchestrator.sh list-agents
+uv run commands/ao-list-agents
 
 # Architecture session using system-architect agent
-./agent-orchestrator.sh new architect --agent system-architect -p "Design microservices architecture for e-commerce"
+uv run commands/ao-new architect --agent system-architect -p "Design microservices architecture for e-commerce"
 
 # Development session implements based on architecture
-cat architecture.md | ./agent-orchestrator.sh new developer --agent senior-developer -p "Implement based on this design:"
+cat architecture.md | uv run commands/ao-new developer --agent senior-developer -p "Implement based on this design:"
 
 # Reviewer session provides feedback
-./agent-orchestrator.sh new reviewer --agent security-reviewer -p "Review the implementation for best practices"
+uv run commands/ao-new reviewer --agent security-reviewer -p "Review the implementation for best practices"
 ```
 
 ### Long-Running Background Tasks
@@ -101,13 +122,13 @@ Delegate time-consuming tasks to background sessions while you continue working:
 Resume sessions to continue and refine their previous work:
 ```bash
 # Initial work
-./agent-orchestrator.sh new technical-writer --agent documentation-expert -p "Create API documentation"
+uv run commands/ao-new technical-writer --agent documentation-expert -p "Create API documentation"
 
 # Later refinement
-./agent-orchestrator.sh resume technical-writer -p "Add authentication examples"
+uv run commands/ao-resume technical-writer -p "Add authentication examples"
 
 # Further enhancement
-./agent-orchestrator.sh resume technical-writer -p "Include error handling section"
+uv run commands/ao-resume technical-writer -p "Include error handling section"
 ```
 
 ### Stateful Conversations
@@ -176,13 +197,13 @@ The tool now supports **agent definitions** - reusable configurations that defin
 **Agent-Based Sessions**
 ```bash
 # Create session with agent
-./agent-orchestrator.sh new architect --agent system-architect -p "Design e-commerce system"
+uv run commands/ao-new architect --agent system-architect -p "Design e-commerce system"
 
 # Create generic session (no agent)
-./agent-orchestrator.sh new quick-task -p "Simple task"
+uv run commands/ao-new quick-task -p "Simple task"
 
 # Resume remembers agent association
-./agent-orchestrator.sh resume architect -p "Add security layer"
+uv run commands/ao-resume architect -p "Add security layer"
 ```
 
 **Separation of Concerns**
@@ -220,8 +241,16 @@ The tool now supports **agent definitions** - reusable configurations that defin
 
 ### Components
 
-**`agent-orchestrator.sh`**
-Core bash script providing the command-line interface and orchestration logic. Handles session management, Claude Code CLI invocation, and result extraction.
+**`ao-*` Commands**
+Collection of Python-based CLI commands providing the command-line interface and orchestration logic. Handles session management, Claude Code SDK invocation, and result extraction. Commands include:
+- `ao-new` - Create new sessions
+- `ao-resume` - Resume existing sessions
+- `ao-status` - Check session state
+- `ao-get-result` - Extract results
+- `ao-list-sessions` - List all sessions
+- `ao-list-agents` - List available agents
+- `ao-show-config` - Display session configuration
+- `ao-clean` - Remove all sessions
 
 ### Directory Structure
 
@@ -278,5 +307,7 @@ The core functionality is stable and tested. Agent type system and advanced feat
 
 ## Related Documentation
 
-- **Script Help**: Run `./agent-orchestrator.sh --help` for command syntax and examples
-- **Claude Code CLI**: Refer to Claude Code CLI documentation for underlying command options and usage: https://docs.claude.com/en/docs/claude-code/cli-reference 
+- **Command Help**: Run `uv run commands/ao-<command> --help` for command-specific syntax and options (e.g., `uv run commands/ao-new --help`)
+- **Skill Documentation**: See the main `SKILL.md` file for comprehensive usage guide and examples
+- **Example Agents**: See `EXAMPLE-AGENTS.md` for detailed agent definition examples
+- **Claude Code SDK**: The commands use the Claude Code SDK for agent orchestration 

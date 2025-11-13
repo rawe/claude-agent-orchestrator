@@ -38,14 +38,14 @@ browser-tester/
 cp -r path/to/agent-orchestrator/example/agents/browser-tester .agent-orchestrator/agents/
 ```
 
-Once copied to your project, the agent can be used with the CLI Agent Runner script:
+Once copied to your project, the agent can be used with the Agent Orchestrator commands:
 
 ```bash
 # List available agents
-./agent-orchestrator.sh list-agents
+uv run commands/ao-list-agents
 
 # Create session with the browser-tester agent
-./agent-orchestrator.sh new my-test --agent browser-tester -p "Test login flow"
+uv run commands/ao-new my-test --agent browser-tester -p "Test login flow"
 ```
 
 ## Customizing Agents
