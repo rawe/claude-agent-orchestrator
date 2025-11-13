@@ -70,6 +70,7 @@ async def run_claude_session(
     options = ClaudeAgentOptions(
         cwd=str(project_dir.resolve()),
         permission_mode="bypassPermissions",
+        setting_sources=["user", "project", "local"],
     )
 
     # Add resume session ID if provided

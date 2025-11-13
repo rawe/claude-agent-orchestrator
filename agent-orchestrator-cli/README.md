@@ -137,6 +137,21 @@ CLI Flags > Environment Variables > Defaults (PWD)
 
 All commands use shared configuration logic from `lib/config.py` to ensure consistency.
 
+### Claude Code Settings Integration
+
+The CLI automatically loads Claude Code settings to provide the same experience as running Claude Code directly:
+
+**Settings Sources Loaded:**
+- **User settings**: `~/.claude/settings.json`
+- **Project settings**: `.claude/settings.json` (in project directory)
+- **Local settings**: `.claude/settings.local.json` (in project directory)
+- **Project instructions**: `CLAUDE.md` files
+
+**MCP Server Precedence:**
+Agent-specific MCP configurations (from `agent.mcp.json`) always take precedence over user settings. This ensures agent isolation and specialized capabilities per agent type.
+
+**Note:** Settings are loaded using the Claude Agent SDK's `setting_sources` parameter, which mirrors Claude Code's standard behavior.
+
 ## Development
 
 See [docs/development.md](docs/development.md) for development workflow, implementation patterns, and testing strategies.
