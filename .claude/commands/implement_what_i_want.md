@@ -29,7 +29,7 @@ Extract out of the input the following variables:
 ### Recap
 Use a subagent to recap the given implmenation task and try to understand the intent and the actual requirement behind it.
 
--> Write this task recap in the file: <doc_working_directory>/task_recap.md
+-> Write this task recap in the file: <doc_working_directory>/01_task_recap.md
 
 
 ### Exploration
@@ -39,19 +39,19 @@ Goal of exploration is to find relevant files, modules, components and their loc
 
 * Input for the explore agent:
   - A highlevel instruction of the goal of the exploration.
-  - The file ref for task recap from <doc_working_directory>/task_recap.md
+  - The file ref for task recap from <doc_working_directory>/01_task_recap.md
   - The path to the output directory where the exploration result should be written to.
 * Output from the explore agent:
   - Writes the exploration result to the given output directory.
   - summary of the exploration result.
 
--> Ensure this exploration result is written to the file: <doc_working_directory>/exploration_result.md - Do not read it.
+-> Ensure this exploration result is written to the file: <doc_working_directory>/02_exploration_result.md - Do not read it.
 
 ### Planning
 Use the plan subagent to create a concrete plan for implementing the given task. the plan agent should get 
 * Input for the plan agent:
-  - The file ref to the task recap from <doc_working_directory>/task_recap.md
-  - The file ref to the exploration result from <doc_working_directory>/exploration_result.md
+  - The file ref to the task recap from <doc_working_directory>/01_task_recap.md
+  - The file ref to the exploration result from <doc_working_directory>/02_exploration_result.md
   - The path to the output directory where the plan should be written to.
 * Output from the plan agent:
   - A step by step plan for implementing the given task as a markdown file including checklist of steps to be done.
@@ -61,9 +61,9 @@ Use the plan subagent to create a concrete plan for implementing the given task.
 *Hints for the plan agent*
 * Focus on creating a concrete plan to handover to the main agent. - create one concise plan file.
 
--> Ensure this plan file is written to the file: <doc_working_directory>/implementation_plan.md - Do not read it.
+-> Ensure this plan file is written to the file: <doc_working_directory>/03_implementation_plan.md - Do not read it.
 
 
 ### Implementation
 * Ask the user potential questions from the plan summary before starting the implementation.
-* After answering and user approval start the implementation of the given task using the implementation plan from <doc_working_directory>/implementation_plan.md
+* After answering and user approval start the implementation of the given task using the implementation plan from <doc_working_directory>/03_implementation_plan.md
