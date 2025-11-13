@@ -1,0 +1,68 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+# ]
+# ///
+"""
+Check the status of an agent orchestrator session.
+
+Returns: running, finished, or not_existent
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    session_name: str = typer.Argument(..., help="Name of the session"),
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
+):
+    """
+    Check the status of a session.
+
+    Outputs one of: running, finished, not_existent
+
+    Examples:
+        ao-status mysession
+    """
+    from config import load_config
+    from session import validate_session_name, get_session_status
+
+    try:
+        # Validate session name
+        validate_session_name(session_name)
+
+        # Load configuration with CLI overrides
+        config = load_config(
+            cli_project_dir=str(project_dir) if project_dir else None,
+            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
+            cli_agents_dir=None,
+        )
+
+        # Get and print session status
+        status = get_session_status(session_name, config.sessions_dir)
+        print(status)
+
+    except ValueError as e:
+        # Session validation errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+    except Exception as e:
+        # Unexpected errors
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()

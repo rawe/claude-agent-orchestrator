@@ -14,7 +14,7 @@ export interface SessionInfo {
 }
 
 export interface ServerConfig {
-  scriptPath: string;
+  commandPath: string;
 }
 
 export enum ResponseFormat {
@@ -26,4 +26,10 @@ export interface ScriptExecutionResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+}
+
+export interface AsyncExecutionResult {
+  session_name: string;
+  status: "running";
+  message: string;
 }

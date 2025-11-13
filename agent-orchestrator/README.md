@@ -1,6 +1,6 @@
 # Agent Orchestrator - Core Framework
 
-The core Agent Orchestrator Framework (AOF) plugin for Claude Code. Provides the foundational `agent-orchestrator.sh` script, slash commands, and skills for orchestrating specialized Claude Code agent sessions.
+The core Agent Orchestrator Framework (AOF) plugin for Claude Code. Provides Python-based orchestration commands, slash commands, and skills for orchestrating specialized Claude Code agent sessions.
 
 ## Overview
 
@@ -15,15 +15,15 @@ This is the **core framework** that provides the low-level orchestration functio
 
 ## What's Included
 
-### 1. Core Script
-**Location**: `skills/agent-orchestrator/agent-orchestrator.sh`
+### 1. Core Commands
+**Location**: `skills/agent-orchestrator/commands/`
 
-The foundational bash script (1,203 lines) that handles:
-- Agent session lifecycle management
-- Agent definition loading
+Python-based `ao-*` commands that handle:
+- Agent session lifecycle management (`ao-new`, `ao-resume`, `ao-status`)
+- Agent definition loading (`ao-list-agents`)
 - MCP server configuration injection
 - Session state persistence
-- Result extraction and formatting
+- Result extraction and formatting (`ao-get-result`)
 
 ### 2. Slash Commands
 
@@ -53,6 +53,11 @@ Detailed technical documentation of the framework architecture, including:
 **Location**: `skills/agent-orchestrator/example/`
 
 Example agent definitions and usage scenarios to help you get started.
+
+## Requirements
+
+- **Python**: Required for running the `ao-*` commands
+- **uv**: Python package and project manager (see [uv documentation](https://docs.astral.sh/uv/))
 
 ## Installation
 
@@ -89,7 +94,7 @@ Agent definitions are markdown files in `.agent-orchestrator/agents/` that defin
 - Capability restrictions
 
 **Sessions**:
-Sessions are stored in `.agent-orchestrator/sessions/` and contain:
+Sessions are stored in `.agent-orchestrator/agent-sessions/` and contain:
 - Unique session ID
 - Agent configuration
 - Execution state
@@ -118,45 +123,62 @@ See the [main repository README](../README.md) for details on all three usage le
 
 ```
 .agent-orchestrator/
-├── agents/                    # Agent definition files (.md)
-│   └── my-agent.md           # Custom agent configurations
-└── sessions/                  # Session data
-    └── session-name/         # Individual session directory
-        ├── session-id.txt    # Unique session identifier
-        ├── config.json       # Session configuration
-        └── result.md         # Agent execution results
+├── agents/                    # Agent definition directories
+│   └── my-agent/             # Agent folder
+│       ├── agent.json        # Agent configuration
+│       ├── agent.system-prompt.md  # Optional: system prompt
+│       └── agent.mcp.json    # Optional: MCP config
+└── agent-sessions/           # Session data
+    ├── session-name.jsonl    # Session conversation history
+    └── session-name.meta.json # Session metadata
 ```
 
 ### Agent Definition Format
 
-Agent definitions are markdown files with frontmatter:
+Agents are organized in directories with multiple files:
 
-```markdown
----
-name: code-reviewer
-description: Reviews code for best practices and improvements
----
-
-# System Prompt
-
-You are a code review expert...
-
-# Instructions
-
-1. Review the code
-2. Identify issues
-3. Suggest improvements
+**agent.json** (Required):
+```json
+{
+  "name": "code-reviewer",
+  "description": "Reviews code for best practices and improvements"
+}
 ```
 
-### Script API
+**agent.system-prompt.md** (Optional):
+```markdown
+You are a code review expert...
 
-The `agent-orchestrator.sh` script provides several commands:
+Review code for:
+1. Best practices
+2. Security issues
+3. Performance improvements
+```
 
-- `start`: Create a new agent session
-- `resume`: Continue an existing session
-- `list-agents`: Show available agent definitions
-- `list-sessions`: Show active sessions
-- `clean`: Remove all sessions
+**agent.mcp.json** (Optional):
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
+    }
+  }
+}
+```
+
+### Command API
+
+The `ao-*` Python commands provide orchestration functionality:
+
+- `ao-new`: Create a new agent session
+- `ao-resume`: Continue an existing session
+- `ao-status`: Check session state (running/finished/not_existent)
+- `ao-get-result`: Extract result from finished session
+- `ao-list-agents`: Show available agent definitions
+- `ao-list-sessions`: Show active sessions
+- `ao-show-config`: Display session configuration
+- `ao-clean`: Remove all sessions
 
 ## Related Components
 

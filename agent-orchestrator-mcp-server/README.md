@@ -1,16 +1,16 @@
 # Agent Orchestrator MCP Server
 
-A Model Context Protocol (MCP) server that provides tools for orchestrating specialized Claude Code agents through the agent-orchestrator.sh script.
+A Model Context Protocol (MCP) server that provides tools for orchestrating specialized Claude Code agents through the agent orchestrator Python commands.
 
 ## Overview
 
 ### What is the Agent Orchestrator Framework (AOF)?
 
-The **Agent Orchestrator Framework (AOF)** is the combination of this MCP server and the `agent-orchestrator.sh` script (from the `agent-orchestrator` Claude Code skill). Together they enable creating and managing specialized Claude Code agent sessions that work autonomously on tasks.
+The **Agent Orchestrator Framework (AOF)** is the combination of this MCP server and the agent orchestrator Python commands (from the `agent-orchestrator-cli` package). Together they enable creating and managing specialized Claude Code agent sessions that work autonomously on tasks.
 
 **Key components**:
 - **This MCP server**: Provides MCP tools for orchestrating agents from any MCP-compatible AI system
-- **agent-orchestrator.sh**: The underlying bash script that launches and manages Claude Code sessions
+- **Python commands**: The underlying Python commands (`ao-new`, `ao-resume`, etc.) that launch and manage Claude Code sessions via `uv`
 - **Agent definitions**: Specialized agent configurations (`.agent-orchestrator/agents/`)
 - **Sessions**: Active or completed agent work sessions (`.agent-orchestrator/sessions/`)
 
@@ -54,7 +54,7 @@ This is the **single source of truth** for all environment variables used by the
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_SCRIPT_PATH` | **Yes** | - | Absolute path to the `agent-orchestrator.sh` script |
+| `AGENT_ORCHESTRATOR_COMMAND_PATH` | **Yes** | - | Absolute path to the commands directory containing Python scripts (e.g., `/path/to/agent-orchestrator-cli/commands`) |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | **Claude Desktop: Yes**<br>Claude Code: No | Current directory (Claude Code only) | Project directory where orchestrated agents execute. Controls the base for other defaults. |
 | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/sessions` | Custom location for agent session storage. Use for centralized session management across projects. |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/agents` | Custom location for agent definitions. Use to share agent definitions across projects. |
@@ -64,9 +64,11 @@ This is the **single source of truth** for all environment variables used by the
 
 ### Variable Details
 
-**`AGENT_ORCHESTRATOR_SCRIPT_PATH`** (Required)
-- Absolute path to the `agent-orchestrator.sh` bash script
-- Example: `/Users/yourname/projects/agent-orchestrator-framework/agent-orchestrator/skills/agent-orchestrator/agent-orchestrator.sh`
+**`AGENT_ORCHESTRATOR_COMMAND_PATH`** (Required)
+- Absolute path to the commands directory containing Python scripts
+- Example (local development): `/Users/yourname/projects/agent-orchestrator-cli/commands`
+- Example (production): `/usr/local/lib/agent-orchestrator/commands`
+- The directory should contain: `ao-new`, `ao-resume`, `ao-list-sessions`, `ao-list-agents`, `ao-clean`
 
 **`AGENT_ORCHESTRATOR_PROJECT_DIR`** (Conditionally Required)
 - Directory where orchestrated agents execute
@@ -357,7 +359,7 @@ Or add it to your MCP configuration:
       "command": "node",
       "args": ["/path/to/dist/index.js"],
       "env": {
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/path/to/agent-orchestrator.sh",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/path/to/agent-orchestrator-cli/commands",
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
         "MCP_SERVER_DEBUG": "true"
       }
@@ -421,10 +423,10 @@ cat agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.message | co
    - Review script execution logs for the exact error
    - Verify `AGENT_ORCHESTRATOR_PROJECT_DIR` is set correctly (or omit it to use current directory)
 
-2. **Script execution errors**:
-   - Look for "Script execution error" or "Script execution completed" log entries
+2. **Command execution errors**:
+   - Look for "Command execution error" or "Command execution completed" log entries
    - Check the `exitCode`, `stdout`, and `stderr` fields in the logs
-   - Verify the script path in `AGENT_ORCHESTRATOR_SCRIPT_PATH` is correct and executable
+   - Verify the command path in `AGENT_ORCHESTRATOR_COMMAND_PATH` is correct
 
 3. **Environment issues**:
    - Check the "Agent Orchestrator MCP Server starting" log entry
@@ -434,6 +436,7 @@ cat agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.message | co
 ## Requirements
 
 - **Node.js**: >= 18
+- **uv**: Python package manager (must be in PATH)
 - **TypeScript**: ^5.7.2
 - **MCP SDK**: ^1.6.1
 - **Zod**: ^3.23.8
@@ -446,4 +449,4 @@ MIT
 
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- Agent Orchestrator Script (referenced by this server)
+- Agent Orchestrator CLI (Python commands referenced by this server)

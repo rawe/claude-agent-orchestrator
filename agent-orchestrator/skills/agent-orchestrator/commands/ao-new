@@ -1,0 +1,182 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "claude-agent-sdk",
+#     "typer",
+# ]
+# ///
+"""
+Create a new agent orchestrator session.
+
+This command creates a new Claude AI session, optionally with an agent configuration.
+"""
+
+import sys
+from pathlib import Path
+
+# Add lib to path for shared modules
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    session_name: str = typer.Argument(..., help="Name of the session"),
+    prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="Session prompt"),
+    agent: Optional[str] = typer.Option(None, "--agent", help="Agent to use"),
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
+    agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
+):
+    """
+    Create a new agent orchestrator session.
+
+    Examples:
+        ao-new mysession -p "Write hello world"
+        ao-new research --agent web-researcher -p "Research AI"
+        cat prompt.md | ao-new mysession
+    """
+    from config import load_config
+    from session import (
+        validate_session_name,
+        get_session_status,
+        save_session_metadata,
+    )
+    from agent import load_agent_config, build_mcp_servers_dict
+    from claude_client import run_session_sync
+    from utils import (
+        get_prompt_from_args_and_stdin,
+        ensure_directory_exists,
+        log_command,
+        log_result,
+        error_exit,
+        debug_log,
+    )
+
+    # DEBUG LOGGING - Command entry
+    debug_log("COMMAND - ao-new", {
+        "cwd": str(Path.cwd()),
+        "argv": sys.argv,
+        "session_name": session_name,
+        "prompt": prompt or "None (will read from stdin)",
+        "agent": agent or "None",
+        "project_dir": str(project_dir) if project_dir else "None",
+        "sessions_dir": str(sessions_dir) if sessions_dir else "None",
+        "agents_dir": str(agents_dir) if agents_dir else "None",
+    })
+
+    try:
+        # 1. Validate session name
+        validate_session_name(session_name)
+
+        # 2. Load configuration
+        config = load_config(
+            cli_project_dir=str(project_dir) if project_dir else None,
+            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
+            cli_agents_dir=str(agents_dir) if agents_dir else None,
+        )
+
+        # 3. Check session doesn't already exist
+        status = get_session_status(session_name, config.sessions_dir)
+        if status != "not_existent":
+            error_exit(
+                f"Session '{session_name}' already exists. "
+                "Use 'ao-resume' command to continue or choose a different name"
+            )
+
+        # 4. Get prompt (from -p and/or stdin)
+        user_prompt = get_prompt_from_args_and_stdin(prompt)
+
+        # 5. Load agent if specified
+        final_prompt = user_prompt
+        mcp_servers = None
+        agent_name = None
+
+        if agent:
+            agent_config = load_agent_config(agent, config.agents_dir)
+            agent_name = agent_config.name
+
+            # Prepend system prompt if available
+            if agent_config.system_prompt:
+                final_prompt = f"{agent_config.system_prompt}\n\n---\n\n{user_prompt}"
+
+            # Build MCP servers dict
+            mcp_servers = build_mcp_servers_dict(agent_config.mcp_config)
+
+        # 6. Ensure directories exist
+        ensure_directory_exists(config.sessions_dir)
+
+        # 7. STAGE 1: Save initial session metadata WITHOUT session_id
+        # This allows users to see the session was started
+        save_session_metadata(
+            session_name=session_name,
+            agent=agent_name,
+            project_dir=config.project_dir,
+            agents_dir=config.agents_dir,
+            sessions_dir=config.sessions_dir,
+            session_id=None,  # Will be added in Stage 2 during streaming
+        )
+
+        # 8. Log command (if logging enabled)
+        if config.enable_logging:
+            # Build command string for logging (similar to bash)
+            mcp_info = f"with MCP servers: {list(mcp_servers.keys())}" if mcp_servers else "no MCP"
+            full_command = (
+                f"cd {config.project_dir} && "
+                f"query(prompt=<prompt>, cwd={config.project_dir}, "
+                f"permission_mode=bypassPermissions, {mcp_info})"
+            )
+            log_command(
+                session_name=session_name,
+                command_type="new",
+                agent_name=agent_name,
+                mcp_config_path=str(agent_config.mcp_config) if agent and agent_config.mcp_config else None,
+                full_command=full_command,
+                prompt=final_prompt,
+                sessions_dir=config.sessions_dir,
+                project_dir=config.project_dir,
+                agents_dir=config.agents_dir,
+                enable_logging=config.enable_logging,
+            )
+
+        # 9. Run Claude session
+        # STAGE 2 happens automatically during streaming when session_id is received
+        session_file = config.sessions_dir / f"{session_name}.jsonl"
+
+        session_id, result = run_session_sync(
+            prompt=final_prompt,
+            session_file=session_file,
+            project_dir=config.project_dir,
+            session_name=session_name,  # For Stage 2 metadata update
+            sessions_dir=config.sessions_dir,  # For Stage 2 metadata update
+            mcp_servers=mcp_servers,
+        )
+
+        # 10. Log result (if logging enabled)
+        if config.enable_logging:
+            log_result(session_name, result, config.sessions_dir, config.enable_logging)
+
+        # 11. Print result to stdout
+        print(result)
+
+    except ValueError as e:
+        # Session validation errors, prompt errors, etc.
+        error_exit(str(e))
+    except FileNotFoundError as e:
+        # Agent not found, config file issues, etc.
+        error_exit(str(e))
+    except ImportError as e:
+        # SDK not installed
+        error_exit(str(e))
+    except Exception as e:
+        # Unexpected errors (SDK errors, etc.)
+        error_exit(f"Unexpected error: {e}")
+
+
+if __name__ == "__main__":
+    app()

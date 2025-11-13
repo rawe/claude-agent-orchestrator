@@ -3,7 +3,7 @@
  */
 
 // Environment variable names
-export const ENV_SCRIPT_PATH = "AGENT_ORCHESTRATOR_SCRIPT_PATH";
+export const ENV_COMMAND_PATH = "AGENT_ORCHESTRATOR_COMMAND_PATH";
 
 // Session name constraints (from agent-orchestrator.sh)
 export const MAX_SESSION_NAME_LENGTH = 60;
