@@ -184,8 +184,8 @@ export function parseSessionList(output: string): SessionInfo[] {
   const lines = output.split("\n").filter(line => line.trim().length > 0);
 
   for (const line of lines) {
-    // Match pattern: "session-name (session: session-id, project: project-dir)"
-    const match = line.match(/^(.+?)\s+\(session:\s+(.+?),\s+project:\s+(.+?)\)$/);
+    // Match pattern: "session-name (session-id: session-id, project-dir: project-dir)"
+    const match = line.match(/^(.+?)\s+\(session-id:\s+(.+?),\s+project-dir:\s+(.+?)\)$/);
     if (match) {
       sessions.push({
         name: match[1].trim(),
