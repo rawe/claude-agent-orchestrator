@@ -106,6 +106,9 @@ Create a new agent session called "code-review" using the code-reviewer agent
 
 **Documentation:** [agent-orchestrator-mcp-server/README.md](./agent-orchestrator-mcp-server/README.md)
 
+**Important Limitation:**
+Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 3 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1/2 integration approaches which operate within a single Claude Code session.
+
 ---
 
 ## Which Level Should You Use?
