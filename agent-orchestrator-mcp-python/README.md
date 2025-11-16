@@ -90,13 +90,13 @@ The server provides 7 MCP tools for managing orchestrated agent sessions:
 
 | Tool | Description |
 |------|-------------|
-| `list_agents` | Discover available specialized agent definitions |
-| `list_sessions` | View all agent sessions with their IDs and project directories |
-| `start_agent` | Create new agent sessions (supports async execution) |
-| `resume_agent` | Continue work in existing sessions (supports async execution) |
-| `clean_sessions` | Remove all sessions |
-| `get_agent_status` | Check status of running or completed sessions |
-| `get_agent_result` | Retrieve result from completed sessions |
+| `list_agent_definitions` | Discover available agent definition blueprints |
+| `list_agent_sessions` | View all agent session instances with their IDs and project directories |
+| `start_agent_session` | Create new agent session instances (supports async execution) |
+| `resume_agent_session` | Continue work in existing session instances (supports async execution) |
+| `delete_all_agent_sessions` | Permanently delete all session instances |
+| `get_agent_session_status` | Check status of running or completed session instances |
+| `get_agent_session_result` | Retrieve result from completed session instances |
 
 All tools support optional `project_dir` parameter for managing multiple projects.
 
@@ -132,10 +132,10 @@ Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `
 
 ## Common Errors
 
-- **Session already exists**: Use `resume_agent` or different name
-- **Session does not exist**: Use `start_agent` first
+- **Session already exists**: Use `resume_agent_session` or different name
+- **Session does not exist**: Use `start_agent_session` first
 - **Invalid session name**: Check naming rules
-- **Agent not found**: Use `list_agents` to see available agents
+- **Agent not found**: Use `list_agent_definitions` to see available agent definitions
 - **Command path error**: Verify `AGENT_ORCHESTRATOR_COMMAND_PATH` is correct
 
 ## Testing

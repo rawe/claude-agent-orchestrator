@@ -28,29 +28,30 @@ class ProjectDirField(BaseModel):
     )
 
 
-# Schema for list_agents tool
-class ListAgentsInput(ResponseFormatField, ProjectDirField):
-    """Input schema for list_agents tool"""
+# Schema for list_agent_definitions tool
+class ListAgentDefinitionsInput(ResponseFormatField, ProjectDirField):
+    """Input schema for list_agent_definitions tool"""
     pass
 
 
-# Schema for list_sessions tool
-class ListSessionsInput(ResponseFormatField, ProjectDirField):
-    """Input schema for list_sessions tool"""
+# Schema for list_agent_sessions tool
+class ListAgentSessionsInput(ResponseFormatField, ProjectDirField):
+    """Input schema for list_agent_sessions tool"""
     pass
 
 
-# Schema for start_agent tool
-class StartAgentInput(ProjectDirField):
-    """Input schema for start_agent tool"""
+# Schema for start_agent_session tool
+class StartAgentSessionInput(ProjectDirField):
+    """Input schema for start_agent_session tool"""
     session_name: str = Field(
         min_length=1,
         max_length=MAX_SESSION_NAME_LENGTH,
         description="Unique name for the agent session (alphanumeric, dash, underscore only)"
     )
-    agent_name: Optional[str] = Field(
+    agent_definition_name: Optional[str] = Field(
         default=None,
-        description="Optional agent definition to use (e.g., 'system-architect', 'code-reviewer')"
+        alias="agent_name",
+        description="Name of agent definition (blueprint) to use for this session (optional for generic sessions)"
     )
     prompt: str = Field(
         min_length=1,
@@ -59,7 +60,7 @@ class StartAgentInput(ProjectDirField):
     async_: bool = Field(
         default=False,
         alias="async",
-        description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_status to poll for completion."
+        description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_session_status to poll for completion."
     )
 
     @field_validator("session_name")
@@ -75,9 +76,9 @@ class StartAgentInput(ProjectDirField):
         populate_by_name = True
 
 
-# Schema for resume_agent tool
-class ResumeAgentInput(ProjectDirField):
-    """Input schema for resume_agent tool"""
+# Schema for resume_agent_session tool
+class ResumeAgentSessionInput(ProjectDirField):
+    """Input schema for resume_agent_session tool"""
     session_name: str = Field(
         min_length=1,
         max_length=MAX_SESSION_NAME_LENGTH,
@@ -90,7 +91,7 @@ class ResumeAgentInput(ProjectDirField):
     async_: bool = Field(
         default=False,
         alias="async",
-        description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_status to poll for completion."
+        description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_session_status to poll for completion."
     )
 
     @field_validator("session_name")
@@ -106,15 +107,15 @@ class ResumeAgentInput(ProjectDirField):
         populate_by_name = True
 
 
-# Schema for clean_sessions tool
-class CleanSessionsInput(ProjectDirField):
-    """Input schema for clean_sessions tool"""
+# Schema for delete_all_agent_sessions tool
+class DeleteAllAgentSessionsInput(ProjectDirField):
+    """Input schema for delete_all_agent_sessions tool"""
     pass
 
 
-# Schema for get_agent_status tool
-class GetAgentStatusInput(ProjectDirField):
-    """Input schema for get_agent_status tool"""
+# Schema for get_agent_session_status tool
+class GetAgentSessionStatusInput(ProjectDirField):
+    """Input schema for get_agent_session_status tool"""
     session_name: str = Field(
         min_length=1,
         max_length=MAX_SESSION_NAME_LENGTH,
@@ -137,9 +138,9 @@ class GetAgentStatusInput(ProjectDirField):
         return v
 
 
-# Schema for get_agent_result tool
-class GetAgentResultInput(ProjectDirField):
-    """Input schema for get_agent_result tool"""
+# Schema for get_agent_session_result tool
+class GetAgentSessionResultInput(ProjectDirField):
+    """Input schema for get_agent_session_result tool"""
     session_name: str = Field(
         min_length=1,
         max_length=MAX_SESSION_NAME_LENGTH,

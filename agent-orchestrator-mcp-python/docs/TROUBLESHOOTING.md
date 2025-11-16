@@ -75,9 +75,9 @@ cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.level == "ER
 
 ### Search for specific operations
 
-**Find all start_agent calls:**
+**Find all start_agent_session calls:**
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.message | contains("start_agent"))'
+cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.message | contains("start_agent_session"))'
 ```
 
 **Find all tool invocations:**
@@ -105,11 +105,11 @@ This opens a web interface where you can:
 
 ## Common Issues
 
-### 1. start_agent fails but list_agents works
+### 1. start_agent_session fails but list_agent_definitions works
 
 **Symptoms:**
-- `list_agents` returns results successfully
-- `start_agent` fails with execution errors
+- `list_agent_definitions` returns results successfully
+- `start_agent_session` fails with execution errors
 
 **Solutions:**
 - Check that the `claude` CLI is installed and in PATH
@@ -172,23 +172,23 @@ This opens a web interface where you can:
 ### 6. Session already exists
 
 **Symptoms:**
-- `start_agent` fails with "Session already exists" error
+- `start_agent_session` fails with "Session already exists" error
 
 **Solutions:**
-- Use `list_sessions` to see all existing sessions
-- Use `resume_agent` instead of `start_agent` to continue an existing session
+- Use `list_agent_sessions` to see all existing sessions
+- Use `resume_agent_session` instead of `start_agent_session` to continue an existing session
 - Use a different session name
-- Use `clean_sessions` to remove all sessions (warning: permanent deletion)
+- Use `delete_all_agent_sessions` to remove all sessions (warning: permanent deletion)
 
 ### 7. Agent not found
 
 **Symptoms:**
-- `start_agent` fails with "Agent not found" error
+- `start_agent_session` fails with "Agent not found" error
 
 **Solutions:**
-- Use `list_agents` to see all available agent definitions
+- Use `list_agent_definitions` to see all available agent definitions
 - Check that the agent definition exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
-- Verify the agent name spelling matches exactly
+- Verify the agent definition name spelling matches exactly
 - Ensure agent definition files have `.md` extension
 
 ### 8. PATH issues (Claude Desktop)
@@ -215,13 +215,13 @@ This opens a web interface where you can:
 
 **Symptoms:**
 - Async sessions don't complete
-- `get_agent_status` always returns "running"
+- `get_agent_session_status` always returns "running"
 
 **Solutions:**
 - Check that the underlying agent process is actually running
 - Review logs for script execution errors
 - Verify the session name is correct
-- Use `get_agent_status` with `wait_seconds` to poll with delay
+- Use `get_agent_session_status` with `wait_seconds` to poll with delay
 - Check system resources (CPU, memory) for long-running tasks
 
 ### 10. Permission denied errors

@@ -9,7 +9,16 @@ import re
 import subprocess
 from typing import Callable, List, Optional, TypeVar
 
-from constants import CHARACTER_LIMIT
+from constants import (
+    CHARACTER_LIMIT,
+    CMD_DELETE_ALL_SESSIONS,
+    CMD_GET_RESULT,
+    CMD_GET_STATUS,
+    CMD_LIST_DEFINITIONS,
+    CMD_LIST_SESSIONS,
+    CMD_RESUME_SESSION,
+    CMD_START_SESSION,
+)
 from logger import logger
 from types_models import (
     AgentInfo,
@@ -22,15 +31,15 @@ from types_models import (
 
 T = TypeVar("T")
 
-# Command name mapping from bash subcommands to Python commands
+# Command name mapping from internal command names to Python CLI command files
 COMMAND_NAME_MAP = {
-    "new": "ao-new",
-    "resume": "ao-resume",
-    "list": "ao-list-sessions",
-    "list-agents": "ao-list-agents",
-    "clean": "ao-clean",
-    "status": "ao-status",
-    "get-result": "ao-get-result",
+    CMD_START_SESSION: "ao-new",
+    CMD_RESUME_SESSION: "ao-resume",
+    CMD_LIST_SESSIONS: "ao-list-sessions",
+    CMD_LIST_DEFINITIONS: "ao-list-agents",
+    CMD_DELETE_ALL_SESSIONS: "ao-clean",
+    CMD_GET_STATUS: "ao-status",
+    CMD_GET_RESULT: "ao-get-result",
 }
 
 
@@ -220,7 +229,7 @@ async def execute_script_async(
         return AsyncExecutionResult(
             session_name=session_name,
             status="running",
-            message="Agent started in background. Use get_agent_status to poll for completion and get_agent_result to retrieve the final result.",
+            message="Agent started in background. Use get_agent_session_status to poll for completion and get_agent_session_result to retrieve the final result.",
         )
 
     except Exception as error:

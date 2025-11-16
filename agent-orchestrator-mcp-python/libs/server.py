@@ -21,16 +21,25 @@ from mcp.server.lowlevel import Server
 from mcp.server.models import InitializationOptions
 from pydantic import ValidationError
 
-from constants import ENV_COMMAND_PATH
+from constants import (
+    CMD_DELETE_ALL_SESSIONS,
+    CMD_GET_RESULT,
+    CMD_GET_STATUS,
+    CMD_LIST_DEFINITIONS,
+    CMD_LIST_SESSIONS,
+    CMD_RESUME_SESSION,
+    CMD_START_SESSION,
+    ENV_COMMAND_PATH,
+)
 from logger import logger
 from schemas import (
-    CleanSessionsInput,
-    GetAgentResultInput,
-    GetAgentStatusInput,
-    ListAgentsInput,
-    ListSessionsInput,
-    ResumeAgentInput,
-    StartAgentInput,
+    DeleteAllAgentSessionsInput,
+    GetAgentSessionResultInput,
+    GetAgentSessionStatusInput,
+    ListAgentDefinitionsInput,
+    ListAgentSessionsInput,
+    ResumeAgentSessionInput,
+    StartAgentSessionInput,
 )
 from types_models import ResponseFormat, ServerConfig
 from utils import (
@@ -69,16 +78,15 @@ server = Server("agent-orchestrator-mcp-server")
 config = get_server_config()
 
 
-# Register list_agents tool
 @server.list_tools()
 async def list_tools() -> list[types.Tool]:
     """List available tools"""
     return [
         types.Tool(
-            name="list_agents",
-            description="""List all available specialized agent definitions that can be used with start_agent.
+            name="list_agent_definitions",
+            description="""List all available agent definitions (blueprints) that can be used to create agent sessions.
 
-This tool discovers agent definitions configured in the agent orchestrator system. Each agent provides specialized capabilities (e.g., system architecture, code review, documentation writing) and can be used when starting new agent sessions.
+This tool discovers agent definitions configured in the agent orchestrator system. Agent definitions are blueprints (not running instances) that provide specialized capabilities (e.g., system architecture, code review, documentation writing).
 
 Args:
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
@@ -99,9 +107,9 @@ Returns:
   For Markdown format: Human-readable formatted list with agent names and descriptions
 
 Examples:
-  - Use when: "What agents are available?" -> Check available specialized agents
-  - Use when: "Show me the agent definitions" -> List all agent capabilities
-  - Don't use when: You want to see running sessions (use list_sessions instead)
+  - Use when: "What agents are available?" -> Check available agent blueprints
+  - Use when: "Show me the agent definitions" -> List all agent definition capabilities
+  - Don't use when: You want to see running sessions (use list_agent_sessions instead)
 
 Error Handling:
   - Returns "No agent definitions found" if no agents are configured
@@ -123,10 +131,10 @@ Error Handling:
             },
         ),
         types.Tool(
-            name="list_sessions",
-            description="""List all existing agent sessions with their session IDs and project directories.
+            name="list_agent_sessions",
+            description="""List all agent session instances (running, completed, or initializing).
 
-This tool shows all agent sessions that have been created, including their names, session IDs, and the project directory used for each session. Sessions can be in various states (running, completed, or initializing).
+This tool shows all agent session instances that have been created, including their names, session IDs, and the project directory used for each session. These are running or completed instances, not blueprints.
 
 Args:
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
@@ -157,9 +165,9 @@ Project Directory values:
   - "unknown": Project directory couldn't be extracted (legacy sessions)
 
 Examples:
-  - Use when: "What sessions exist?" -> See all created sessions
-  - Use when: "Show me my agent sessions" -> List all sessions with their IDs and project directories
-  - Don't use when: You want to see available agent types (use list_agents instead)
+  - Use when: "What sessions exist?" -> See all created session instances
+  - Use when: "Show me my agent sessions" -> List all session instances with their IDs and project directories
+  - Don't use when: You want to see available agent blueprints (use list_agent_definitions instead)
 
 Error Handling:
   - Returns "No sessions found" if no sessions exist
@@ -181,18 +189,18 @@ Error Handling:
             },
         ),
         types.Tool(
-            name="start_agent",
-            description="""Start a new orchestrated agent session with an optional specialized agent definition.
+            name="start_agent_session",
+            description="""Start a new agent session instance that immediately begins execution.
 
-This tool creates a new agent session that runs in a separate Claude Code context. Sessions can be generic (no agent) or specialized (with an agent definition). The agent will execute the provided prompt and return the result.
+This tool creates a new agent session instance that runs in a separate Claude Code context. Sessions can be generic (no agent definition) or specialized (with an agent definition blueprint). The agent session will execute the provided prompt and return the result.
 
 IMPORTANT: This operation may take significant time to complete as it runs a full Claude Code session. The agent will process the prompt and may use multiple tool calls to complete the task.
 
 Args:
-  - session_name (string): Unique identifier for the session (alphanumeric, dash, underscore; max 60 chars)
-  - agent_name (string, optional): Name of agent definition to use (e.g., "system-architect", "code-reviewer")
+  - session_name (string): Unique identifier for the agent session instance (alphanumeric, dash, underscore; max 60 chars)
+  - agent_definition_name (string, optional): Name of agent definition (blueprint) to use for this session (optional for generic sessions)
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-  - prompt (string): Initial task description or prompt for the agent
+  - prompt (string): Initial task description or prompt for the agent session
   - async (boolean, optional): Run in background mode (default: false)
 
 Session naming rules:
@@ -205,27 +213,27 @@ Returns:
   The result/output from the completed agent session. This is the agent's final response after processing the prompt and completing all necessary tasks.
 
 Examples:
-  - Use when: "Create an architecture design" -> Start session with system-architect agent
-  - Use when: "Analyze this codebase" -> Start generic session or use code-reviewer agent
-  - Don't use when: Session already exists (use resume_agent instead)
-  - Don't use when: You just want to list available agents (use list_agents instead)
+  - Use when: "Create an architecture design" -> Start session with system-architect agent definition
+  - Use when: "Analyze this codebase" -> Start generic session or use code-reviewer agent definition
+  - Don't use when: Session already exists (use resume_agent_session instead)
+  - Don't use when: You just want to list available agent definitions (use list_agent_definitions instead)
 
 Error Handling:
-  - "Session already exists" -> Use resume_agent or choose different name
+  - "Session already exists" -> Use resume_agent_session or choose different name
   - "Session name too long" -> Use shorter name (max 60 characters)
   - "Invalid characters" -> Only use alphanumeric, dash, underscore
-  - "Agent not found" -> Check available agents with list_agents
+  - "Agent not found" -> Check available agent definitions with list_agent_definitions
   - "No prompt provided" -> Provide a prompt argument""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "session_name": {
                         "type": "string",
-                        "description": "Unique name for the agent session (alphanumeric, dash, underscore only)",
+                        "description": "Unique identifier for this agent session instance",
                     },
-                    "agent_name": {
+                    "agent_definition_name": {
                         "type": "string",
-                        "description": "Optional agent definition to use (e.g., 'system-architect', 'code-reviewer')",
+                        "description": "Name of agent definition (blueprint) to use for this session (optional for generic sessions)",
                     },
                     "project_dir": {
                         "type": "string",
@@ -245,31 +253,31 @@ Error Handling:
             },
         ),
         types.Tool(
-            name="resume_agent",
-            description="""Resume an existing agent session with a new prompt to continue the work.
+            name="resume_agent_session",
+            description="""Resume an existing agent session instance with a new prompt to continue work.
 
-This tool continues an existing agent session, allowing you to build upon previous work. The agent remembers all context from previous interactions in this session. Any agent association from session creation is automatically maintained.
+This tool continues an existing agent session instance, allowing you to build upon previous work. The agent session remembers all context from previous interactions. Any agent definition from session creation is automatically maintained.
 
 IMPORTANT: This operation may take significant time to complete as it runs a full Claude Code session. The agent will process the new prompt in the context of all previous interactions.
 
 Args:
-  - session_name (string): Name of the existing session to resume
+  - session_name (string): Name of the existing agent session instance to resume
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-  - prompt (string): Continuation prompt or new task description
+  - prompt (string): Continuation prompt building on previous session context
   - async (boolean, optional): Run in background mode (default: false)
 
 Returns:
   The result/output from the resumed agent session. This is the agent's response after processing the new prompt in context of previous interactions.
 
 Examples:
-  - Use when: "Continue the architecture work" -> Resume existing architect session
+  - Use when: "Continue the architecture work" -> Resume existing architect session instance
   - Use when: "Add security considerations" -> Resume session to build on previous work
   - Use when: "Review the changes made" -> Resume to get status or make adjustments
-  - Don't use when: Session doesn't exist (use start_agent to create it)
-  - Don't use when: Starting fresh work (use start_agent for new sessions)
+  - Don't use when: Session doesn't exist (use start_agent_session to create it)
+  - Don't use when: Starting fresh work (use start_agent_session for new sessions)
 
 Error Handling:
-  - "Session does not exist" -> Use start_agent to create a new session
+  - "Session does not exist" -> Use start_agent_session to create a new session
   - "Session name invalid" -> Check session name format
   - "No prompt provided" -> Provide a prompt argument
 
@@ -279,7 +287,7 @@ Note: The agent definition used during session creation is automatically remembe
                 "properties": {
                     "session_name": {
                         "type": "string",
-                        "description": "Name of the existing session to resume",
+                        "description": "Name of the existing agent session instance to resume",
                     },
                     "project_dir": {
                         "type": "string",
@@ -287,7 +295,7 @@ Note: The agent definition used during session creation is automatically remembe
                     },
                     "prompt": {
                         "type": "string",
-                        "description": "Continuation prompt or task description for the resumed session",
+                        "description": "Continuation prompt building on previous session context",
                     },
                     "async": {
                         "type": "boolean",
@@ -299,10 +307,10 @@ Note: The agent definition used during session creation is automatically remembe
             },
         ),
         types.Tool(
-            name="clean_sessions",
-            description="""Remove all agent sessions and their associated data.
+            name="delete_all_agent_sessions",
+            description="""Permanently delete all agent session instances and their associated data.
 
-This tool permanently deletes all agent sessions, including their conversation history and metadata. This operation cannot be undone.
+This tool permanently deletes all agent session instances, including their conversation history and metadata. This operation cannot be undone.
 
 WARNING: This is a destructive operation. All session data will be permanently lost.
 
@@ -335,18 +343,18 @@ Note: This operation is idempotent - running it multiple times has the same effe
             },
         ),
         types.Tool(
-            name="get_agent_status",
-            description="""Check the current status of an agent session.
+            name="get_agent_session_status",
+            description="""Check the current status of an agent session instance (running, finished, or not_existent).
 
 Returns one of three statuses:
-- "running": Session is currently executing or initializing
-- "finished": Session completed successfully with a result
-- "not_existent": Session does not exist
+- "running": Session instance is currently executing or initializing
+- "finished": Session instance completed successfully with a result
+- "not_existent": Session instance does not exist
 
-Use this tool to poll for completion when using async mode with start_agent or resume_agent.
+Use this tool to poll for completion when using async mode with start_agent_session or resume_agent_session.
 
 Args:
-  - session_name (string): Name of the session to check
+  - session_name (string): Name of the agent session instance to check
   - project_dir (string, optional): Project directory path
   - wait_seconds (number, optional): Seconds to wait before checking status (default: 0, max: 300)
 
@@ -369,7 +377,7 @@ Polling Strategy:
                 "properties": {
                     "session_name": {
                         "type": "string",
-                        "description": "Name of the session to check status for",
+                        "description": "Name of the agent session instance to check",
                     },
                     "project_dir": {
                         "type": "string",
@@ -387,25 +395,25 @@ Polling Strategy:
             },
         ),
         types.Tool(
-            name="get_agent_result",
-            description="""Retrieve the final result from a completed agent session.
+            name="get_agent_session_result",
+            description="""Retrieve the final output/result from a completed agent session instance.
 
-This tool extracts the result from a session that has finished executing. It will fail with an error if the session is still running or does not exist.
+This tool extracts the result from a session instance that has finished executing. It will fail with an error if the session is still running or does not exist.
 
 Workflow:
-  1. Start agent with async=true
-  2. Poll with get_agent_status until status="finished"
-  3. Call get_agent_result to retrieve the final output
+  1. Start agent session with async=true
+  2. Poll with get_agent_session_status until status="finished"
+  3. Call get_agent_session_result to retrieve the final output
 
 Args:
-  - session_name (string): Name of the completed session
+  - session_name (string): Name of the completed agent session instance
   - project_dir (string, optional): Project directory path
 
 Returns:
   The agent's final response/result as text
 
 Error Handling:
-  - "Session still running" -> Poll get_agent_status until finished
+  - "Session still running" -> Poll get_agent_session_status until finished
   - "Session not found" -> Verify session name is correct
   - "No result found" -> Session may have failed, check status""",
             inputSchema={
@@ -413,7 +421,7 @@ Error Handling:
                 "properties": {
                     "session_name": {
                         "type": "string",
-                        "description": "Name of the session to retrieve result from",
+                        "description": "Name of the completed agent session instance",
                     },
                     "project_dir": {
                         "type": "string",
@@ -433,20 +441,20 @@ async def call_tool(
     """Handle tool calls"""
 
     try:
-        if name == "list_agents":
-            return await handle_list_agents(arguments)
-        elif name == "list_sessions":
-            return await handle_list_sessions(arguments)
-        elif name == "start_agent":
-            return await handle_start_agent(arguments)
-        elif name == "resume_agent":
-            return await handle_resume_agent(arguments)
-        elif name == "clean_sessions":
-            return await handle_clean_sessions(arguments)
-        elif name == "get_agent_status":
-            return await handle_get_agent_status(arguments)
-        elif name == "get_agent_result":
-            return await handle_get_agent_result(arguments)
+        if name == "list_agent_definitions":
+            return await handle_list_agent_definitions(arguments)
+        elif name == "list_agent_sessions":
+            return await handle_list_agent_sessions(arguments)
+        elif name == "start_agent_session":
+            return await handle_start_agent_session(arguments)
+        elif name == "resume_agent_session":
+            return await handle_resume_agent_session(arguments)
+        elif name == "delete_all_agent_sessions":
+            return await handle_delete_all_agent_sessions(arguments)
+        elif name == "get_agent_session_status":
+            return await handle_get_agent_session_status(arguments)
+        elif name == "get_agent_session_result":
+            return await handle_get_agent_session_result(arguments)
         else:
             return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -460,12 +468,12 @@ async def call_tool(
         return [types.TextContent(type="text", text=error_msg)]
 
 
-async def handle_list_agents(arguments: dict) -> list[types.TextContent]:
-    """Handle list_agents tool call"""
-    params = ListAgentsInput(**arguments)
+async def handle_list_agent_definitions(arguments: dict) -> list[types.TextContent]:
+    """Handle list_agent_definitions tool call"""
+    params = ListAgentDefinitionsInput(**arguments)
 
     logger.info(
-        "list_agents called",
+        "list_agent_definitions called",
         {
             "project_dir": params.project_dir,
             "response_format": params.response_format,
@@ -474,13 +482,13 @@ async def handle_list_agents(arguments: dict) -> list[types.TextContent]:
 
     try:
         # Build command arguments - command name must be first
-        args = ["list-agents"]
+        args = [CMD_LIST_DEFINITIONS]
 
         # Add project_dir if specified (supersedes environment variable)
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
 
-        logger.debug("list_agents: executing script", {"args": args})
+        logger.debug("list_agent_definitions: executing script", {"args": args})
 
         # Execute list-agents command
         result = await execute_script(config, args)
@@ -509,12 +517,12 @@ async def handle_list_agents(arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"Error: {str(error)}")]
 
 
-async def handle_list_sessions(arguments: dict) -> list[types.TextContent]:
-    """Handle list_sessions tool call"""
-    params = ListSessionsInput(**arguments)
+async def handle_list_agent_sessions(arguments: dict) -> list[types.TextContent]:
+    """Handle list_agent_sessions tool call"""
+    params = ListAgentSessionsInput(**arguments)
 
     logger.info(
-        "list_sessions called",
+        "list_agent_sessions called",
         {
             "project_dir": params.project_dir,
             "response_format": params.response_format,
@@ -523,13 +531,13 @@ async def handle_list_sessions(arguments: dict) -> list[types.TextContent]:
 
     try:
         # Build command arguments - command name must be first
-        args = ["list"]
+        args = [CMD_LIST_SESSIONS]
 
         # Add project_dir if specified (supersedes environment variable)
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
 
-        logger.debug("list_sessions: executing script", {"args": args})
+        logger.debug("list_agent_sessions: executing script", {"args": args})
 
         # Execute list command
         result = await execute_script(config, args)
@@ -558,15 +566,15 @@ async def handle_list_sessions(arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"Error: {str(error)}")]
 
 
-async def handle_start_agent(arguments: dict) -> list[types.TextContent]:
-    """Handle start_agent tool call"""
-    params = StartAgentInput(**arguments)
+async def handle_start_agent_session(arguments: dict) -> list[types.TextContent]:
+    """Handle start_agent_session tool call"""
+    params = StartAgentSessionInput(**arguments)
 
     logger.info(
-        "start_agent called",
+        "start_agent_session called",
         {
             "session_name": params.session_name,
-            "agent_name": params.agent_name,
+            "agent_definition_name": params.agent_definition_name,
             "project_dir": params.project_dir,
             "prompt_length": len(params.prompt),
             "async": params.async_,
@@ -575,30 +583,30 @@ async def handle_start_agent(arguments: dict) -> list[types.TextContent]:
 
     try:
         # Build command arguments
-        args = ["new", params.session_name]
+        args = [CMD_START_SESSION, params.session_name]
 
         # Add project_dir if specified (supersedes environment variable)
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
 
         # Add agent if specified
-        if params.agent_name:
-            args.extend(["--agent", params.agent_name])
+        if params.agent_definition_name:
+            args.extend(["--agent", params.agent_definition_name])
 
         # Add prompt
         args.extend(["-p", params.prompt])
 
-        logger.debug("start_agent: executing script", {"args": args, "async": params.async_})
+        logger.debug("start_agent_session: executing script", {"args": args, "async": params.async_})
 
         # Check if async mode requested
         if params.async_:
-            logger.info("start_agent: using async execution (fire-and-forget mode)")
+            logger.info("start_agent_session: using async execution (fire-and-forget mode)")
 
             # Execute in background (detached mode)
             async_result = await execute_script_async(config, args)
 
             logger.info(
-                "start_agent: async process spawned",
+                "start_agent_session: async process spawned",
                 {"session_name": async_result.session_name},
             )
 
@@ -617,12 +625,12 @@ async def handle_start_agent(arguments: dict) -> list[types.TextContent]:
             ]
 
         # Original blocking behavior (async=false or undefined)
-        logger.info("start_agent: using synchronous execution (blocking mode)")
+        logger.info("start_agent_session: using synchronous execution (blocking mode)")
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
             logger.error(
-                "start_agent: script failed",
+                "start_agent_session: script failed",
                 {
                     "exitCode": result.exitCode,
                     "stdout": result.stdout,
@@ -634,7 +642,7 @@ async def handle_start_agent(arguments: dict) -> list[types.TextContent]:
             return [types.TextContent(type="text", text=error_msg)]
 
         logger.info(
-            "start_agent: script succeeded",
+            "start_agent_session: script succeeded",
             {
                 "stdoutLength": len(result.stdout),
                 "stderrLength": len(result.stderr),
@@ -646,7 +654,7 @@ async def handle_start_agent(arguments: dict) -> list[types.TextContent]:
 
         if truncated:
             logger.warn(
-                "start_agent: response truncated",
+                "start_agent_session: response truncated",
                 {
                     "originalLength": len(result.stdout),
                     "truncatedLength": len(text),
@@ -657,18 +665,18 @@ async def handle_start_agent(arguments: dict) -> list[types.TextContent]:
 
     except Exception as error:
         logger.error(
-            "start_agent: exception",
+            "start_agent_session: exception",
             {"error": str(error)},
         )
         return [types.TextContent(type="text", text=f"Error: {str(error)}")]
 
 
-async def handle_resume_agent(arguments: dict) -> list[types.TextContent]:
-    """Handle resume_agent tool call"""
-    params = ResumeAgentInput(**arguments)
+async def handle_resume_agent_session(arguments: dict) -> list[types.TextContent]:
+    """Handle resume_agent_session tool call"""
+    params = ResumeAgentSessionInput(**arguments)
 
     logger.info(
-        "resume_agent called",
+        "resume_agent_session called",
         {
             "session_name": params.session_name,
             "project_dir": params.project_dir,
@@ -679,7 +687,7 @@ async def handle_resume_agent(arguments: dict) -> list[types.TextContent]:
 
     try:
         # Build command arguments
-        args = ["resume", params.session_name]
+        args = [CMD_RESUME_SESSION, params.session_name]
 
         # Add project_dir if specified (supersedes environment variable)
         if params.project_dir:
@@ -688,17 +696,17 @@ async def handle_resume_agent(arguments: dict) -> list[types.TextContent]:
         # Add prompt
         args.extend(["-p", params.prompt])
 
-        logger.debug("resume_agent: executing script", {"args": args, "async": params.async_})
+        logger.debug("resume_agent_session: executing script", {"args": args, "async": params.async_})
 
         # Check if async mode requested
         if params.async_:
-            logger.info("resume_agent: using async execution (fire-and-forget mode)")
+            logger.info("resume_agent_session: using async execution (fire-and-forget mode)")
 
             # Execute in background (detached mode)
             async_result = await execute_script_async(config, args)
 
             logger.info(
-                "resume_agent: async process spawned",
+                "resume_agent_session: async process spawned",
                 {"session_name": async_result.session_name},
             )
 
@@ -717,7 +725,7 @@ async def handle_resume_agent(arguments: dict) -> list[types.TextContent]:
             ]
 
         # Original blocking behavior (async=false or undefined)
-        logger.info("resume_agent: using synchronous execution (blocking mode)")
+        logger.info("resume_agent_session: using synchronous execution (blocking mode)")
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
@@ -733,21 +741,21 @@ async def handle_resume_agent(arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"Error: {str(error)}")]
 
 
-async def handle_clean_sessions(arguments: dict) -> list[types.TextContent]:
-    """Handle clean_sessions tool call"""
-    params = CleanSessionsInput(**arguments)
+async def handle_delete_all_agent_sessions(arguments: dict) -> list[types.TextContent]:
+    """Handle delete_all_agent_sessions tool call"""
+    params = DeleteAllAgentSessionsInput(**arguments)
 
-    logger.info("clean_sessions called", {"project_dir": params.project_dir})
+    logger.info("delete_all_agent_sessions called", {"project_dir": params.project_dir})
 
     try:
         # Build command arguments - command name must be first
-        args = ["clean"]
+        args = [CMD_DELETE_ALL_SESSIONS]
 
         # Add project_dir if specified (supersedes environment variable)
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
 
-        logger.debug("clean_sessions: executing script", {"args": args})
+        logger.debug("delete_all_agent_sessions: executing script", {"args": args})
 
         # Execute clean command
         result = await execute_script(config, args)
@@ -762,12 +770,12 @@ async def handle_clean_sessions(arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"Error: {str(error)}")]
 
 
-async def handle_get_agent_status(arguments: dict) -> list[types.TextContent]:
-    """Handle get_agent_status tool call"""
-    params = GetAgentStatusInput(**arguments)
+async def handle_get_agent_session_status(arguments: dict) -> list[types.TextContent]:
+    """Handle get_agent_session_status tool call"""
+    params = GetAgentSessionStatusInput(**arguments)
 
     logger.info(
-        "get_agent_status called",
+        "get_agent_session_status called",
         {
             "session_name": params.session_name,
             "wait_seconds": params.wait_seconds,
@@ -778,13 +786,13 @@ async def handle_get_agent_status(arguments: dict) -> list[types.TextContent]:
         # Wait if wait_seconds is specified and > 0
         if params.wait_seconds and params.wait_seconds > 0:
             logger.debug(
-                "get_agent_status: waiting before status check",
+                "get_agent_session_status: waiting before status check",
                 {"wait_seconds": params.wait_seconds},
             )
             await asyncio.sleep(params.wait_seconds)
-            logger.debug("get_agent_status: wait completed, checking status now")
+            logger.debug("get_agent_session_status: wait completed, checking status now")
 
-        args = ["status", params.session_name]
+        args = [CMD_GET_STATUS, params.session_name]
 
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
@@ -807,7 +815,7 @@ async def handle_get_agent_status(arguments: dict) -> list[types.TextContent]:
 
     except Exception as error:
         # Handle exceptions
-        logger.error("get_agent_status: exception", {"error": str(error)})
+        logger.error("get_agent_session_status: exception", {"error": str(error)})
         return [
             types.TextContent(
                 type="text",
@@ -816,15 +824,15 @@ async def handle_get_agent_status(arguments: dict) -> list[types.TextContent]:
         ]
 
 
-async def handle_get_agent_result(arguments: dict) -> list[types.TextContent]:
-    """Handle get_agent_result tool call"""
-    params = GetAgentResultInput(**arguments)
+async def handle_get_agent_session_result(arguments: dict) -> list[types.TextContent]:
+    """Handle get_agent_session_result tool call"""
+    params = GetAgentSessionResultInput(**arguments)
 
-    logger.info("get_agent_result called", {"session_name": params.session_name})
+    logger.info("get_agent_session_result called", {"session_name": params.session_name})
 
     try:
         # First check status to provide helpful error messages
-        status_args = ["status", params.session_name]
+        status_args = [CMD_GET_STATUS, params.session_name]
         if params.project_dir:
             status_args.extend(["--project-dir", params.project_dir])
 
@@ -843,12 +851,12 @@ async def handle_get_agent_result(arguments: dict) -> list[types.TextContent]:
             return [
                 types.TextContent(
                     type="text",
-                    text=f"Error: Session '{params.session_name}' is still running. Use get_agent_status to poll until status is 'finished'.",
+                    text=f"Error: Session '{params.session_name}' is still running. Use get_agent_session_status to poll until status is 'finished'.",
                 )
             ]
 
         # Session is finished, retrieve result
-        args = ["get-result", params.session_name]
+        args = [CMD_GET_RESULT, params.session_name]
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
 
@@ -856,7 +864,7 @@ async def handle_get_agent_result(arguments: dict) -> list[types.TextContent]:
 
         if result.exitCode != 0:
             logger.error(
-                "get_agent_result: script failed",
+                "get_agent_session_result: script failed",
                 {
                     "exitCode": result.exitCode,
                     "stderr": result.stderr,
@@ -875,7 +883,7 @@ async def handle_get_agent_result(arguments: dict) -> list[types.TextContent]:
 
         if truncated:
             logger.warn(
-                "get_agent_result: response truncated",
+                "get_agent_session_result: response truncated",
                 {
                     "originalLength": len(result.stdout),
                     "truncatedLength": len(text),
@@ -885,7 +893,7 @@ async def handle_get_agent_result(arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=text)]
 
     except Exception as error:
-        logger.error("get_agent_result: exception", {"error": str(error)})
+        logger.error("get_agent_session_result: exception", {"error": str(error)})
         return [types.TextContent(type="text", text=f"Error: {str(error)}")]
 
 

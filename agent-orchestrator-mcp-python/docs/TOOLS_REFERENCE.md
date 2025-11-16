@@ -6,21 +6,21 @@ Detailed API documentation for all MCP tools provided by the Agent Orchestrator 
 
 The Agent Orchestrator MCP Server provides 7 tools for managing orchestrated agent sessions:
 
-1. **list_agents** - Discover available specialized agent definitions
-2. **list_sessions** - View all agent sessions with their IDs and project directories
-3. **start_agent** - Create new agent sessions with optional specialization (supports async execution)
-4. **resume_agent** - Continue work in existing sessions (supports async execution)
-5. **clean_sessions** - Remove all sessions
-6. **get_agent_status** - Check the status of a running or completed session
-7. **get_agent_result** - Retrieve the result from a completed session
+1. **list_agent_definitions** - Discover available agent definition blueprints
+2. **list_agent_sessions** - View all agent session instances with their IDs and project directories
+3. **start_agent_session** - Create new agent session instances with optional specialization (supports async execution)
+4. **resume_agent_session** - Continue work in existing session instances (supports async execution)
+5. **delete_all_agent_sessions** - Permanently delete all session instances
+6. **get_agent_session_status** - Check the status of a running or completed session instance
+7. **get_agent_session_result** - Retrieve the result from a completed session instance
 
 All tools support optional `project_dir` override for managing multiple projects.
 
 ---
 
-## 1. list_agents
+## 1. list_agent_definitions
 
-Lists all available specialized agent definitions.
+Lists all available agent definitions (blueprints) that can be used to create agent sessions.
 
 ### Parameters
 
@@ -68,9 +68,9 @@ Lists all available specialized agent definitions.
 
 ---
 
-## 2. list_sessions
+## 2. list_agent_sessions
 
-Lists all existing agent sessions with their session IDs and project directories.
+Lists all agent session instances (running, completed, or initializing).
 
 ### Parameters
 
@@ -116,24 +116,24 @@ Lists all existing agent sessions with their session IDs and project directories
 
 ---
 
-## 3. start_agent
+## 3. start_agent_session
 
-Creates a new orchestrated agent session.
+Start a new agent session instance that immediately begins execution.
 
 ### Parameters
 
-- `session_name` (required): Unique session name (alphanumeric, dash, underscore; max 60 chars)
-- `agent_name` (optional): Name of agent definition to use
+- `session_name` (required): Unique identifier for this agent session instance (alphanumeric, dash, underscore; max 60 chars)
+- `agent_definition_name` (optional): Name of agent definition (blueprint) to use for this session (optional for generic sessions)
 - `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-- `prompt` (required): Initial task description
-- `async` (optional): Run in background (default: `false`). When `true`, returns immediately and use `get_agent_status` / `get_agent_result` to check progress
+- `prompt` (required): Initial task description or prompt for the agent session
+- `async` (optional): Run in background (default: `false`). When `true`, returns immediately and use `get_agent_session_status` / `get_agent_session_result` to check progress
 
 ### Example (synchronous)
 
 ```python
 {
   "session_name": "architect",
-  "agent_name": "system-architect",
+  "agent_definition_name": "system-architect",
   "prompt": "Design a microservices architecture for an e-commerce platform"
 }
 ```
@@ -143,7 +143,7 @@ Creates a new orchestrated agent session.
 ```python
 {
   "session_name": "architect",
-  "agent_name": "system-architect",
+  "agent_definition_name": "system-architect",
   "prompt": "Design a microservices architecture for an e-commerce platform",
   "async": true
 }
@@ -154,7 +154,7 @@ Creates a new orchestrated agent session.
 ```python
 {
   "session_name": "architect",
-  "agent_name": "system-architect",
+  "agent_definition_name": "system-architect",
   "project_dir": "/absolute/path/to/project",
   "prompt": "Design a microservices architecture for an e-commerce platform"
 }
@@ -164,20 +164,20 @@ Creates a new orchestrated agent session.
 
 **Synchronous mode (`async: false` or omitted)**: The agent's result after completing the task.
 
-**Asynchronous mode (`async: true`)**: Immediate confirmation that the session started. Use `get_agent_status` to check progress and `get_agent_result` to retrieve the final result.
+**Asynchronous mode (`async: true`)**: Immediate confirmation that the session started. Use `get_agent_session_status` to check progress and `get_agent_session_result` to retrieve the final result.
 
 ---
 
-## 4. resume_agent
+## 4. resume_agent_session
 
-Resumes an existing agent session with a new prompt.
+Resume an existing agent session instance with a new prompt to continue work.
 
 ### Parameters
 
-- `session_name` (required): Name of existing session to resume
+- `session_name` (required): Name of the existing agent session instance to resume
 - `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-- `prompt` (required): Continuation prompt
-- `async` (optional): Run in background (default: `false`). When `true`, returns immediately and use `get_agent_status` / `get_agent_result` to check progress
+- `prompt` (required): Continuation prompt building on previous session context
+- `async` (optional): Run in background (default: `false`). When `true`, returns immediately and use `get_agent_session_status` / `get_agent_session_result` to check progress
 
 ### Example (synchronous)
 
@@ -212,13 +212,13 @@ Resumes an existing agent session with a new prompt.
 
 **Synchronous mode (`async: false` or omitted)**: The agent's result after processing the new prompt.
 
-**Asynchronous mode (`async: true`)**: Immediate confirmation that the session resumed. Use `get_agent_status` to check progress and `get_agent_result` to retrieve the final result.
+**Asynchronous mode (`async: true`)**: Immediate confirmation that the session resumed. Use `get_agent_session_status` to check progress and `get_agent_session_result` to retrieve the final result.
 
 ---
 
-## 5. clean_sessions
+## 5. delete_all_agent_sessions
 
-Removes all agent sessions permanently.
+Permanently delete all agent session instances and their associated data.
 
 ### Parameters
 
@@ -244,13 +244,13 @@ Confirmation message (e.g., "All sessions removed" or "No sessions to remove").
 
 ---
 
-## 6. get_agent_status
+## 6. get_agent_session_status
 
-Check the status of a running or completed agent session. Used with asynchronous execution to monitor progress.
+Check the current status of an agent session instance (running, finished, or not_existent). Used with asynchronous execution to monitor progress.
 
 ### Parameters
 
-- `session_name` (required): Name of session to check
+- `session_name` (required): Name of the agent session instance to check
 - `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `wait_seconds` (optional): Wait before checking status (0-300 seconds). Useful for polling with a delay.
 
@@ -305,19 +305,19 @@ or
 ```
 
 **Status values:**
-- `"running"` - Agent is still executing
-- `"finished"` - Agent has completed, use `get_agent_result` to retrieve output
-- `"not_existent"` - Session does not exist
+- `"running"` - Agent session instance is still executing
+- `"finished"` - Agent session instance has completed, use `get_agent_session_result` to retrieve output
+- `"not_existent"` - Session instance does not exist
 
 ---
 
-## 7. get_agent_result
+## 7. get_agent_session_result
 
-Retrieve the result from a completed agent session. Used with asynchronous execution to get the final output.
+Retrieve the final output/result from a completed agent session instance. Used with asynchronous execution to get the final output.
 
 ### Parameters
 
-- `session_name` (required): Name of completed session
+- `session_name` (required): Name of the completed agent session instance
 - `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 
 ### Example
@@ -341,7 +341,7 @@ Retrieve the result from a completed agent session. Used with asynchronous execu
 
 The agent's final result/output from the completed session.
 
-**Note**: If the session is still running or does not exist, an appropriate error will be returned. Use `get_agent_status` first to check if the session has finished.
+**Note**: If the session is still running or does not exist, an appropriate error will be returned. Use `get_agent_session_status` first to check if the session has finished.
 
 ---
 
@@ -357,8 +357,8 @@ Session names must follow these constraints:
 
 The server provides clear, actionable error messages:
 
-- **Session already exists**: Use `resume_agent` or choose a different name
-- **Session does not exist**: Use `start_agent` to create it first
+- **Session already exists**: Use `resume_agent_session` or choose a different name
+- **Session does not exist**: Use `start_agent_session` to create it first
 - **Invalid session name**: Check naming rules (alphanumeric, dash, underscore; max 60 chars)
-- **Agent not found**: Use `list_agents` to see available agents
+- **Agent not found**: Use `list_agent_definitions` to see available agent definitions
 - **Script execution failed**: Check that the script path and environment variables are configured correctly
