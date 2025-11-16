@@ -82,7 +82,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
 - `AGENT_ORCHESTRATOR_AGENTS_DIR` - Custom agent definitions location
 - `MCP_SERVER_DEBUG` - Enable debug logging
 
-**For complete reference, defaults, and examples, see [ENV_VARS.md](./ENV_VARS.md)**
+**For complete reference, defaults, and examples, see [ENV_VARS.md](./docs/ENV_VARS.md)**
 
 ## MCP Tools
 
@@ -100,7 +100,7 @@ The server provides 7 MCP tools for managing orchestrated agent sessions:
 
 All tools support optional `project_dir` parameter for managing multiple projects.
 
-**For detailed API documentation, parameters, and examples, see [TOOLS_REFERENCE.md](./TOOLS_REFERENCE.md)**
+**For detailed API documentation, parameters, and examples, see [TOOLS_REFERENCE.md](./docs/TOOLS_REFERENCE.md)**
 
 ## Project Structure
 
@@ -122,7 +122,7 @@ agent-orchestrator-mcp-python/
 
 Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `logs/mcp-server.log`.
 
-**For comprehensive debugging guide, log filtering, and troubleshooting common issues, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**
+**For comprehensive debugging guide, log filtering, and troubleshooting common issues, see [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)**
 
 ## Session Naming Rules
 

@@ -315,7 +315,7 @@ For comprehensive debugging instructions, see [TROUBLESHOOTING.md](./TROUBLESHOO
 
 ## Additional Resources
 
-- **Complete reference**: [README.md](./README.md) - Overview and quick reference
+- **Complete reference**: [README.md](../README.md) - Overview and quick reference
 - **Tools API**: [TOOLS_REFERENCE.md](./TOOLS_REFERENCE.md) - Detailed tool documentation
 - **Debugging**: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Comprehensive troubleshooting guide
 - **Environment variables**: [ENV_VARS.md](./ENV_VARS.md)
