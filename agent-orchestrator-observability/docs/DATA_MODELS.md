@@ -103,7 +103,24 @@ Common data structures used across the observability system.
 }
 ```
 
-### Message Event
+### Message Event (User)
+```json
+{
+  "event_type": "message",
+  "session_id": "abc-123-def",
+  "session_name": "my-agent",
+  "timestamp": "2025-11-16T10:34:50.000000Z",
+  "role": "user",
+  "content": [
+    {
+      "type": "text",
+      "text": "calculate 1+1"
+    }
+  ]
+}
+```
+
+### Message Event (Assistant)
 ```json
 {
   "event_type": "message",

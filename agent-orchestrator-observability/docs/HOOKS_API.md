@@ -30,6 +30,16 @@ Interface between hook scripts and the observability backend.
 - `tool_output` - Result returned by the tool
 - `error` - Error message if execution failed (null otherwise)
 
+### UserPromptSubmit Hook
+**File:** `hooks/user_prompt_submit_hook.py`
+**Trigger:** When the user submits a prompt to Claude
+**Data Captured:**
+- `session_id` - Session identifier
+- `prompt` - The user's input text
+
+**Event Sent:**
+Sends a `message` event with `role: "user"` and the prompt as text content.
+
 ### Stop Hook
 **File:** `hooks/stop_hook.py`
 **Trigger:** When a Claude Code agent session stops
@@ -39,19 +49,21 @@ Interface between hook scripts and the observability backend.
 - `reason` - Reason for stopping (e.g., "completed")
 
 **Additional Processing:**
-This hook also reads the session transcript file and extracts the last message to send as a separate `message` event (see Message Events below).
+This hook also reads the session transcript file and extracts the last message to send as a separate `message` event with `role: "assistant"` (see Message Events below).
 
 ---
 
 ## Message Events
 
-**Note:** Message events are **not triggered by a hook directly**. They are extracted from the session transcript by the Stop hook.
+Message events capture the conversation between the user and the assistant.
 
-**Source:** Session transcript JSONL file (last line)
-**Sent by:** `hooks/stop_hook.py` (after sending `session_stop` event)
-**Data Captured:**
+**Sources:**
+1. **User messages** - Sent directly by `hooks/user_prompt_submit_hook.py` when user submits a prompt
+2. **Assistant messages** - Extracted from session transcript by `hooks/stop_hook.py` when session ends
+
+**Data Structure:**
 - `session_id` - Session identifier
-- `role` - Message author (`assistant` or `user`)
+- `role` - Message author (`user` or `assistant`)
 - `content` - Array of content blocks (see [Message Content Block](DATA_MODELS.md#message-content-block))
 
 **Event Structure:**

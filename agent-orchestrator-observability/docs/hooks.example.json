@@ -45,6 +45,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ${AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH}/hooks/user_prompt_submit_hook.py",
+            "timeout": 2000
+          }
+        ]
+      }
     ]
   }
 }
