@@ -1,452 +1,171 @@
 # Agent Orchestrator MCP Server
 
-A Model Context Protocol (MCP) server that provides tools for orchestrating specialized Claude Code agents through the agent orchestrator Python commands.
+Model Context Protocol (MCP) server for orchestrating specialized Claude Code agents. Provides tools to create, manage, and execute agent sessions programmatically.
 
-## Overview
+## Quick Start
 
-### What is the Agent Orchestrator Framework (AOF)?
+**Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
-The **Agent Orchestrator Framework (AOF)** is the combination of this MCP server and the agent orchestrator Python commands (from the `agent-orchestrator-cli` package). Together they enable creating and managing specialized Claude Code agent sessions that work autonomously on tasks.
-
-**Key components**:
-- **This MCP server**: Provides MCP tools for orchestrating agents from any MCP-compatible AI system
-- **Python commands**: The underlying Python commands (`ao-new`, `ao-resume`, etc.) that launch and manage Claude Code sessions via `uv`
-- **Agent definitions**: Specialized agent configurations (`.agent-orchestrator/agents/`)
-- **Sessions**: Active or completed agent work sessions (`.agent-orchestrator/sessions/`)
-
-### Relationship to Claude Code Plugin
-
-Previously, the agent orchestrator was available only as a Claude Code skill/plugin installed in `.claude/skills/`. This MCP server **provides an abstraction layer** that:
-- Works with any AI agent system supporting MCP (Claude Desktop, Claude Code, etc.)
-- No longer requires installing the skill as a Claude Code plugin
-- Provides a standardized MCP interface for agent orchestration
-
-### What This MCP Server Does
-
-Provides 5 MCP tools for managing orchestrated agent sessions:
-- Discover available specialized agent definitions
-- Create new agent sessions (generic or specialized)
-- Resume existing agent sessions
-- List active sessions
-- Clean up sessions
-
-## Features
-
-- **5 MCP Tools**:
-  - `list_agents` - Discover available specialized agent definitions
-  - `list_sessions` - View all agent sessions with their IDs and project directories
-  - `start_agent` - Create new agent sessions with optional specialization
-  - `resume_agent` - Continue work in existing sessions
-  - `clean_sessions` - Remove all sessions
-
-- **Type-Safe**: Full TypeScript implementation with Zod validation
-- **Flexible Output**: Support for both Markdown (human-readable) and JSON (machine-readable) formats
-- **Comprehensive Error Handling**: Clear, actionable error messages
-- **Character Limits**: Automatic truncation for large responses
-
-## Installation
-
-See [GETTING_STARTED.md](./GETTING_STARTED.md) for installation instructions.
-
-## Environment Variables Reference
-
-This is the **single source of truth** for all environment variables used by the Agent Orchestrator MCP Server.
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_COMMAND_PATH` | **Yes** | - | Absolute path to the commands directory containing Python scripts (e.g., `/path/to/agent-orchestrator-cli/commands`) |
-| `AGENT_ORCHESTRATOR_PROJECT_DIR` | **Claude Desktop: Yes**<br>Claude Code: No | Current directory (Claude Code only) | Project directory where orchestrated agents execute. Controls the base for other defaults. |
-| `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/sessions` | Custom location for agent session storage. Use for centralized session management across projects. |
-| `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/agents` | Custom location for agent definitions. Use to share agent definitions across projects. |
-| `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | No | `false` | Set to `"true"` to enable logging of orchestrated agent execution. Used for debugging agent sessions. |
-| `MCP_SERVER_DEBUG` | No | `false` | Set to `"true"` to enable debug logging to `logs/mcp-server.log`. Used for troubleshooting MCP server issues. |
-| `PATH` | **Claude Desktop only** | - | Must include path to Node.js binary. Claude Desktop does not inherit shell PATH. Example: `/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin` |
-
-### Variable Details
-
-**`AGENT_ORCHESTRATOR_COMMAND_PATH`** (Required)
-- Absolute path to the commands directory containing Python scripts
-- Example (local development): `/Users/yourname/projects/agent-orchestrator-cli/commands`
-- Example (production): `/usr/local/lib/agent-orchestrator/commands`
-- The directory should contain: `ao-new`, `ao-resume`, `ao-list-sessions`, `ao-list-agents`, `ao-clean`
-
-**`AGENT_ORCHESTRATOR_PROJECT_DIR`** (Conditionally Required)
-- Directory where orchestrated agents execute
-- Required for Claude Desktop
-- Optional for Claude Code (defaults to current directory where MCP server is invoked)
-- This is the working directory for all agent sessions
-- Example: `/Users/yourname/my-project`
-
-**`AGENT_ORCHESTRATOR_SESSIONS_DIR`** (Optional)
-- Custom path for storing session data
-- Defaults to `.agent-orchestrator/sessions/` within the project directory
-- Use when you want centralized session management across multiple projects
-- Example: `/Users/yourname/.agent-orchestrator-global/sessions`
-
-**`AGENT_ORCHESTRATOR_AGENTS_DIR`** (Optional)
-- Custom path for agent definition files
-- Defaults to `.agent-orchestrator/agents/` within the project directory
-- Use when you want to share agent definitions across multiple projects
-- Example: `/Users/yourname/.agent-orchestrator-global/agents`
-
-**`AGENT_ORCHESTRATOR_ENABLE_LOGGING`** (Optional)
-- Enable logging for orchestrated agent sessions
-- Set to `"true"` for debugging purposes
-- Logs agent execution details
-
-**`MCP_SERVER_DEBUG`** (Optional)
-- Enable debug logging for the MCP server itself
-- Set to `"true"` to write logs to `logs/mcp-server.log`
-- Logs include server startup, tool calls, script execution, and errors
-
-**`PATH`** (Claude Desktop Only)
-- Required for Claude Desktop because UI applications do not inherit shell environment PATH
-- Must include the directory containing the `node` binary
-- Common values:
-  - macOS with Homebrew: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
-  - macOS with nvm: `/Users/yourname/.nvm/versions/node/v20.x.x/bin:/usr/local/bin:/usr/bin:/bin`
-
-## Configuration Examples
-
-For complete setup instructions and configuration examples for different use cases, see:
-- **Quick setup**: [GETTING_STARTED.md](./GETTING_STARTED.md)
-- **Advanced configurations**: [SETUP_GUIDE.md](./SETUP_GUIDE.md)
-
-## Tools Reference
-
-### 1. list_agents
-
-Lists all available specialized agent definitions.
-
-**Parameters**:
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-- `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
-
-**Example**:
-```typescript
-{
-  "response_format": "json"
-}
-```
-
-**Example with project_dir override**:
-```typescript
-{
-  "project_dir": "/absolute/path/to/project",
-  "response_format": "json"
-}
-```
-
-**Response** (JSON format):
-```json
-{
-  "total": 3,
-  "agents": [
-    {
-      "name": "system-architect",
-      "description": "Expert in designing scalable system architectures"
-    },
-    {
-      "name": "code-reviewer",
-      "description": "Reviews code for best practices and improvements"
-    },
-    {
-      "name": "documentation-writer",
-      "description": "Creates comprehensive technical documentation"
-    }
-  ]
-}
-```
-
-### 2. list_sessions
-
-Lists all existing agent sessions with their session IDs and project directories.
-
-**Parameters**:
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-- `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
-
-**Example**:
-```typescript
-{
-  "response_format": "json"
-}
-```
-
-**Example with project_dir override**:
-```typescript
-{
-  "project_dir": "/absolute/path/to/project",
-  "response_format": "json"
-}
-```
-
-**Response** (JSON format):
-```json
-{
-  "total": 2,
-  "sessions": [
-    {
-      "name": "architect",
-      "session_id": "3db5dca9-6829-4cb7-a645-c64dbd98244d",
-      "project_dir": "/Users/ramon/my-project"
-    },
-    {
-      "name": "reviewer",
-      "session_id": "initializing",
-      "project_dir": "/Users/ramon/another-project"
-    }
-  ]
-}
-```
-
-### 3. start_agent
-
-Creates a new orchestrated agent session.
-
-**Parameters**:
-- `session_name` (required): Unique session name (alphanumeric, dash, underscore; max 60 chars)
-- `agent_name` (optional): Name of agent definition to use
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-- `prompt` (required): Initial task description
-
-**Example**:
-```typescript
-{
-  "session_name": "architect",
-  "agent_name": "system-architect",
-  "prompt": "Design a microservices architecture for an e-commerce platform"
-}
-```
-
-**Example with project_dir override**:
-```typescript
-{
-  "session_name": "architect",
-  "agent_name": "system-architect",
-  "project_dir": "/absolute/path/to/project",
-  "prompt": "Design a microservices architecture for an e-commerce platform"
-}
-```
-
-**Response**: The agent's result after completing the task.
-
-### 4. resume_agent
-
-Resumes an existing agent session with a new prompt.
-
-**Parameters**:
-- `session_name` (required): Name of existing session to resume
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-- `prompt` (required): Continuation prompt
-
-**Example**:
-```typescript
-{
-  "session_name": "architect",
-  "prompt": "Add security considerations to the architecture design"
-}
-```
-
-**Example with project_dir override**:
-```typescript
-{
-  "session_name": "architect",
-  "project_dir": "/absolute/path/to/project",
-  "prompt": "Add security considerations to the architecture design"
-}
-```
-
-**Response**: The agent's result after processing the new prompt.
-
-### 5. clean_sessions
-
-Removes all agent sessions permanently.
-
-**Parameters**:
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-
-**Example**:
-```typescript
-{}
-```
-
-**Example with project_dir override**:
-```typescript
-{
-  "project_dir": "/absolute/path/to/project"
-}
-```
-
-**Response**: Confirmation message (e.g., "All sessions removed" or "No sessions to remove").
-
-## Session Naming Rules
-
-Session names must follow these constraints:
-- **Length**: 1-60 characters
-- **Characters**: Only alphanumeric, dash (`-`), and underscore (`_`)
-- **Uniqueness**: Cannot create a session with a name that already exists
-- **Examples**: `architect`, `code-reviewer`, `my_agent_123`, `dev-session-1`
-
-## Error Handling
-
-The server provides clear, actionable error messages:
-
-- **Session already exists**: Use `resume_agent` or choose a different name
-- **Session does not exist**: Use `start_agent` to create it first
-- **Invalid session name**: Check naming rules (alphanumeric, dash, underscore; max 60 chars)
-- **Agent not found**: Use `list_agents` to see available agents
-- **Script execution failed**: Check that the script path and environment variables are configured correctly
-
-## Development
-
-### Project Structure
-
-```
-agent-orchestrator-mcp-server/
-├── src/
-│   ├── index.ts          # Main MCP server with tool implementations
-│   ├── types.ts          # TypeScript type definitions
-│   ├── schemas.ts        # Zod validation schemas
-│   ├── constants.ts      # Constants and configuration
-│   └── utils.ts          # Shared utility functions
-├── dist/                 # Compiled JavaScript (generated)
-├── package.json          # Dependencies and scripts
-├── tsconfig.json         # TypeScript configuration
-└── README.md             # This file
-```
-
-### Building
-
+**Run:**
 ```bash
-# Clean build artifacts
-npm run clean
-
-# Build TypeScript to JavaScript
-npm run build
-
-# Development with auto-reload
-npm run dev
+uv run /path/to/agent-orchestrator-mcp.py
 ```
 
-### Testing
+Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inline script metadata.
 
-After building, you can test the server using the MCP Inspector:
+**Example usage:**
+- "List all available orchestrated agents"
+- "Start a new agent session called 'architect' and ask it to design a microservices architecture"
+- "Check the status of the architect session"
 
-```bash
-npx @modelcontextprotocol/inspector node dist/index.js
-```
+## Configuration
 
-Make sure to set the required environment variables before testing.
+### Claude Code
 
-## Debugging and Troubleshooting
-
-The MCP server includes comprehensive debug logging to help troubleshoot issues.
-
-### Enabling Debug Logging
-
-Debug logging is **disabled by default**. To enable it, set the `MCP_SERVER_DEBUG` environment variable to `"true"`:
-
-```bash
-export MCP_SERVER_DEBUG="true"
-```
-
-Or add it to your MCP configuration:
+**simple.mcp.json:**
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/dist/index.js"],
+      "command": "uv",
+      "args": [
+        "run",
+        "/absolute/path/to/agent-orchestrator-mcp.py"
+      ],
       "env": {
-        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/path/to/agent-orchestrator-cli/commands",
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
-        "MCP_SERVER_DEBUG": "true"
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/path/to/commands",
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project"
       }
     }
   }
 }
 ```
 
-### Debug Logs Location
+### Claude Desktop
 
-When enabled, all debug logs are written to:
+**Config file location:**
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "command": "uv",
+      "args": [
+        "run",
+        "/absolute/path/to/agent-orchestrator-mcp.py"
+      ],
+      "env": {
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/path/to/commands",
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
 ```
-agent-orchestrator-mcp-server/logs/mcp-server.log
+
+**After updating:** Restart Claude Desktop. Verify 7 tools are available in the MCP icon.
+
+## Environment Variables
+
+**Required:**
+- `AGENT_ORCHESTRATOR_COMMAND_PATH` - Path to commands directory
+- `AGENT_ORCHESTRATOR_PROJECT_DIR` - Project directory (Claude Desktop only)
+- `PATH` - Include `uv` and `claude` binaries (Claude Desktop only)
+
+**Optional:**
+- `AGENT_ORCHESTRATOR_SESSIONS_DIR` - Custom session storage location
+- `AGENT_ORCHESTRATOR_AGENTS_DIR` - Custom agent definitions location
+- `MCP_SERVER_DEBUG` - Enable debug logging
+
+**For complete reference, defaults, and examples, see [ENV_VARS.md](./docs/ENV_VARS.md)**
+
+## MCP Tools
+
+The server provides 7 MCP tools for managing orchestrated agent sessions:
+
+| Tool | Description |
+|------|-------------|
+| `list_agent_definitions` | Discover available agent definition blueprints |
+| `list_agent_sessions` | View all agent session instances with their IDs and project directories |
+| `start_agent_session` | Create new agent session instances (supports async execution) |
+| `resume_agent_session` | Continue work in existing session instances (supports async execution) |
+| `delete_all_agent_sessions` | Permanently delete all session instances |
+| `get_agent_session_status` | Check status of running or completed session instances |
+| `get_agent_session_result` | Retrieve result from completed session instances |
+
+All tools support optional `project_dir` parameter for managing multiple projects.
+
+**For detailed API documentation, parameters, and examples, see [TOOLS_REFERENCE.md](./docs/TOOLS_REFERENCE.md)**
+
+## Project Structure
+
+```
+agent-orchestrator-mcp-server/
+├── agent-orchestrator-mcp.py    # Main entry point (~40 lines)
+├── libs/                        # Modular library code
+│   ├── constants.py            # Constants and configuration
+│   ├── logger.py               # Debug logging
+│   ├── schemas.py              # Input validation
+│   ├── server.py               # MCP server logic
+│   ├── types_models.py         # Type definitions
+│   └── utils.py                # Utility functions
+├── logs/                        # Debug logs (when MCP_SERVER_DEBUG=true)
+└── README.md
 ```
 
-### What's Logged
+## Debugging
 
-The logs include:
-- **Server startup**: Configuration, environment variables, working directory
-- **Tool calls**: Which tools are called with what parameters
-- **Script execution**: Full command-line arguments, environment, stdout/stderr
-- **Errors**: Detailed error messages with stack traces
-- **Performance**: Execution duration for long-running operations
+Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `logs/mcp-server.log`.
 
-### Viewing Logs
+**For comprehensive debugging guide, log filtering, and troubleshooting common issues, see [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)**
 
-**View the entire log file**:
+## Session Naming Rules
+
+- Length: 1-60 characters
+- Characters: Alphanumeric, dash (`-`), underscore (`_`) only
+- Must be unique
+
+## Common Errors
+
+- **Session already exists**: Use `resume_agent_session` or different name
+- **Session does not exist**: Use `start_agent_session` first
+- **Invalid session name**: Check naming rules
+- **Agent not found**: Use `list_agent_definitions` to see available agent definitions
+- **Command path error**: Verify `AGENT_ORCHESTRATOR_COMMAND_PATH` is correct
+
+## Testing
+
 ```bash
-cat agent-orchestrator-mcp-server/logs/mcp-server.log
+export AGENT_ORCHESTRATOR_COMMAND_PATH="/path/to/commands"
+export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/project"
+uv run agent-orchestrator-mcp.py
 ```
 
-**View formatted logs** (each line is JSON):
+With MCP Inspector:
 ```bash
-cat agent-orchestrator-mcp-server/logs/mcp-server.log | jq '.'
+uv run mcp-inspector agent-orchestrator-mcp.py
 ```
 
-**Follow logs in real-time**:
-```bash
-tail -f agent-orchestrator-mcp-server/logs/mcp-server.log | jq '.'
+## Implementation
+
+Uses UV's inline dependency management (PEP 723). Dependencies declared in script header:
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "mcp>=1.7.0",
+#   "pydantic>=2.0.0",
+# ]
+# ///
 ```
 
-**Filter by log level**:
-```bash
-# Show only errors
-cat agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.level == "ERROR")'
-
-# Show errors and warnings
-cat agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.level == "ERROR" or .level == "WARN")'
-```
-
-**Search for specific operations**:
-```bash
-# Find all start_agent calls
-cat agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.message | contains("start_agent"))'
-```
-
-### Common Issues
-
-1. **`start_agent` fails but `list_agents` works**:
-   - Check that the `claude` CLI is installed and in PATH
-   - Review script execution logs for the exact error
-   - Verify `AGENT_ORCHESTRATOR_PROJECT_DIR` is set correctly (or omit it to use current directory)
-
-2. **Command execution errors**:
-   - Look for "Command execution error" or "Command execution completed" log entries
-   - Check the `exitCode`, `stdout`, and `stderr` fields in the logs
-   - Verify the command path in `AGENT_ORCHESTRATOR_COMMAND_PATH` is correct
-
-3. **Environment issues**:
-   - Check the "Agent Orchestrator MCP Server starting" log entry
-   - Verify all environment variables are set correctly
-   - Check that `PWD` and `PATH` are what you expect
-
-## Requirements
-
-- **Node.js**: >= 18
-- **uv**: Python package manager (must be in PATH)
-- **TypeScript**: ^5.7.2
-- **MCP SDK**: ^1.6.1
-- **Zod**: ^3.23.8
+UV automatically manages virtual environment and dependencies on first run.
 
 ## License
 
 MIT
-
-## Related Projects
-
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- Agent Orchestrator CLI (Python commands referenced by this server)

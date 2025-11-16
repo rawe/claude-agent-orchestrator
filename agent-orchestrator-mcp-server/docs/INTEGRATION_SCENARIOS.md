@@ -1,30 +1,42 @@
-# Setup Guide - Integration Scenarios
+# Integration Scenarios
 
-This guide explains how to configure the Agent Orchestrator MCP Server for different use cases with Claude Code and Claude Desktop.
+Choose the right integration pattern for your workflow. This guide explains three scenarios for organizing Agent Orchestrator Framework (AOF) infrastructure:
 
-> 📖 **What is AOF?** See [README.md - Overview](./README.md#overview) for an explanation of the Agent Orchestrator Framework and how this MCP server works.
+- **Scenario 1: Local Project** - Everything in one project directory
+- **Scenario 2: Remote Project** - Coordinate from separate directory, target project stays clean
+- **Scenario 3: Hybrid** - Use target's agents, manage sessions centrally
 
-This guide helps you configure where AOF infrastructure (agent definitions and sessions) lives - in your current project, a remote project, or a combination of both.
+Each scenario determines where agent definitions and sessions live, and how you configure the MCP server.
 
 ---
 
 ## Prerequisites
 
-Before configuring, ensure you have installed and built the MCP server:
+Before configuring, ensure you have UV installed and Python ≥3.10.
 
-**See [GETTING_STARTED.md](./GETTING_STARTED.md) for installation instructions.**
+---
+
+## MCP Configuration Schema
+
+All MCP configurations follow this structure:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `command` | string | Yes | Must be `"uv"` |
+| `args` | array | Yes | `["run", "/absolute/path/to/agent-orchestrator-mcp.py"]` |
+| `env` | object | Yes | Environment variables (see Environment Variables Quick Reference below) |
 
 ---
 
 ## Environment Variables Quick Reference
 
-> 📖 **For complete environment variable documentation**, see [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
+> 📖 **For complete environment variable documentation**, see [ENV_VARS.md](./ENV_VARS.md)
 
 This table shows **which variables to use for each use case**:
 
 | Variable | Use Case 1<br>(Local) | Use Case 2<br>(Remote) | Use Case 3<br>(Hybrid) | Claude Desktop |
 |----------|------------|------------|------------|----------------|
-| `AGENT_ORCHESTRATOR_SCRIPT_PATH` | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
+| `AGENT_ORCHESTRATOR_COMMAND_PATH` | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | ❌ Omit (defaults to current) | ✅ Set to target | ✅ Set to target | ✅ Required |
 | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | ❌ Default | ✅ Set to current | ✅ Set to current | ⚙️ Optional |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | ❌ Default | ✅ Set to current | ❌ Default (use target's) | ⚙️ Optional |
@@ -46,7 +58,7 @@ All MCP tools accept an optional `project_dir` parameter that allows you to over
 - **Precedence**: Tool parameter > Environment variable > Current directory (PWD)
 
 **Example**:
-```typescript
+```python
 {
   "session_name": "architect",
   "project_dir": "/absolute/path/to/different/project",
@@ -60,13 +72,6 @@ This feature is useful when you need to temporarily work with a different projec
 
 ## Claude Code Usage
 
-### Configuration Files
-
-Claude Code uses two configuration files for MCP servers:
-
-1. **`.mcp.json`**: Project-level MCP configuration (can be committed to repo)
-2. **`.claude/settings.local.json`**: Local settings with machine-specific paths (should NOT be committed)
-
 ### Use Case 1: Local Project (Same Directory)
 
 **When to use**: You're working in a single project and want orchestrated agents to assist within that same project.
@@ -75,26 +80,15 @@ Claude Code uses two configuration files for MCP servers:
 
 **Configuration**:
 
-Create or update `.mcp.json`:
+Create `simple.mcp.json` in your project root:
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
-      "args": ["${AGENT_ORCHESTRATOR_MCP_DIST_PATH}"]
-    }
-  }
-}
-```
-
-Create or update `.claude/settings.local.json`:
-```json
-{
-  "mcpServers": {
-    "agent-orchestrator": {
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/agent-orchestrator-mcp.py"],
       "env": {
-        "AGENT_ORCHESTRATOR_MCP_DIST_PATH": "/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh"
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/commands"
       }
     }
   }
@@ -105,10 +99,9 @@ Create or update `.claude/settings.local.json`:
 - **`AGENT_ORCHESTRATOR_PROJECT_DIR` can be omitted** - defaults to current Claude Code project directory
 - Session data stored in `.agent-orchestrator/sessions/` within current project
 - Agent definitions in `.agent-orchestrator/agents/` within current project
-- `.mcp.json` contains only placeholders (safe to commit)
-- `.claude/settings.local.json` contains actual paths (do NOT commit)
+- Replace paths with your actual absolute paths
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details and defaults
 
 ### Use Case 2: Remote Project (Different Directory)
 
@@ -121,26 +114,15 @@ Create or update `.claude/settings.local.json`:
 
 **Configuration**:
 
-Create or update `.mcp.json`:
+Create `simple.mcp.json` in your coordination project:
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
-      "args": ["${AGENT_ORCHESTRATOR_MCP_DIST_PATH}"]
-    }
-  }
-}
-```
-
-Create or update `.claude/settings.local.json`:
-```json
-{
-  "mcpServers": {
-    "agent-orchestrator": {
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/agent-orchestrator-mcp.py"],
       "env": {
-        "AGENT_ORCHESTRATOR_MCP_DIST_PATH": "/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/commands",
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/target/project",
         "AGENT_ORCHESTRATOR_SESSIONS_DIR": "/absolute/path/to/current/coordination/project/.agent-orchestrator/sessions",
         "AGENT_ORCHESTRATOR_AGENTS_DIR": "/absolute/path/to/current/coordination/project/.agent-orchestrator/agents"
@@ -151,12 +133,12 @@ Create or update `.claude/settings.local.json`:
 ```
 
 **Key Points**:
-- **Requires manual absolute paths** - Claude Code doesn't support directory variables
 - All AOF infrastructure stays in your coordination project
 - Target project has zero knowledge of the orchestrator
 - Useful for managing work across multiple unrelated projects from one coordination hub
+- All paths must be absolute
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details and defaults
 
 ### Use Case 3: Hybrid Approach (Remote Agents, Local Sessions)
 
@@ -170,26 +152,15 @@ Create or update `.claude/settings.local.json`:
 
 **Configuration**:
 
-Create or update `.mcp.json`:
+Create `simple.mcp.json` in your coordination project:
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
-      "args": ["${AGENT_ORCHESTRATOR_MCP_DIST_PATH}"]
-    }
-  }
-}
-```
-
-Create or update `.claude/settings.local.json`:
-```json
-{
-  "mcpServers": {
-    "agent-orchestrator": {
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/agent-orchestrator-mcp.py"],
       "env": {
-        "AGENT_ORCHESTRATOR_MCP_DIST_PATH": "/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/commands",
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/target/project",
         "AGENT_ORCHESTRATOR_SESSIONS_DIR": "/absolute/path/to/current/coordination/project/.agent-orchestrator/sessions"
       }
@@ -204,7 +175,7 @@ Create or update `.claude/settings.local.json`:
 - Session tracking stays in your coordination project for centralized management
 - Hybrid approach: target project is AOF-aware (has agents) but sessions are external
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details and defaults
 
 ---
 
@@ -223,18 +194,20 @@ Create or update `.claude/settings.local.json`:
 
 2. **Add MCP server configuration**:
 
+**Basic Configuration**:
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
+      "command": "uv",
       "args": [
-        "/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js"
+        "run",
+        "/absolute/path/to/agent-orchestrator-mcp.py"
       ],
       "env": {
-        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/claude/code/project"
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/commands",
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project"
       }
     }
   }
@@ -243,43 +216,44 @@ Create or update `.claude/settings.local.json`:
 
 **Key Points**:
 - **`PATH`** is **REQUIRED** - Claude Desktop doesn't inherit shell PATH
-- **`AGENT_ORCHESTRATOR_SCRIPT_PATH`** must point to **agent-orchestrator.sh** (not the MCP server dist)
+- Must include paths to `uv` and `claude` binaries
+- **`AGENT_ORCHESTRATOR_COMMAND_PATH`** must point to commands directory
 - **`AGENT_ORCHESTRATOR_PROJECT_DIR`** specifies where orchestrated agents run
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details, defaults, and PATH examples
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details, defaults, and PATH examples
 
 ### Optional: Customize Session and Agent Storage
 
-If you want session data and agent definitions in the same project:
+**Default behavior** (all in project directory):
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
-      "args": ["/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js"],
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/agent-orchestrator-mcp.py"],
       "env": {
-        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/claude/code/project"
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/commands",
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project"
       }
     }
   }
 }
 ```
 
-Session and agent data will default to the project directory structure.
+Session and agent data will default to the project directory structure (`.agent-orchestrator/` subdirectories).
 
-If you want to separate storage locations:
+**Separate storage locations**:
 ```json
 {
   "mcpServers": {
     "agent-orchestrator": {
-      "command": "node",
-      "args": ["/absolute/path/to/agent-orchestrator-mcp-server/dist/index.js"],
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/agent-orchestrator-mcp.py"],
       "env": {
-        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
-        "AGENT_ORCHESTRATOR_SCRIPT_PATH": "/absolute/path/to/agent-orchestrator.sh",
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/claude/code/project",
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/absolute/path/to/commands",
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
         "AGENT_ORCHESTRATOR_SESSIONS_DIR": "/custom/path/to/sessions",
         "AGENT_ORCHESTRATOR_AGENTS_DIR": "/custom/path/to/agents"
       }
@@ -298,22 +272,30 @@ After updating the configuration, restart Claude Desktop for changes to take eff
 
 For complete environment variable documentation including descriptions, defaults, and common PATH values:
 
-> 📖 [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
+> 📖 [ENV_VARS.md](./ENV_VARS.md)
 
 ---
 
 ## Troubleshooting
 
-### "AGENT_ORCHESTRATOR_SCRIPT_PATH environment variable is required"
+### "AGENT_ORCHESTRATOR_COMMAND_PATH environment variable is required"
 
-**Solution**: Ensure the environment variable points to the **agent-orchestrator.sh** bash script, NOT the MCP server's dist/index.js.
+**Solution**: Ensure the environment variable points to the **commands directory** containing Python scripts (`ao-new`, `ao-resume`, etc.).
 
 ### Tools not appearing in Claude Desktop
 
-1. Verify PATH includes Node.js binary location
+1. Verify PATH includes `uv` and `claude` binary locations
 2. Check configuration file is valid JSON
 3. Ensure all paths are absolute (not relative)
-4. Restart Claude Desktop
+4. Verify UV is installed: `which uv`
+5. Restart Claude Desktop
+
+### UV or dependency errors
+
+1. Ensure Python >= 3.10: `python3 --version`
+2. Ensure UV is installed: `uv --version`
+3. Test the server directly: `uv run /path/to/agent-orchestrator-mcp.py`
+4. Check internet connection for dependency downloads
 
 ### Enable Debug Logging
 
@@ -325,14 +307,16 @@ Add to environment configuration:
 }
 ```
 
-View logs at: `agent-orchestrator-mcp-server/logs/mcp-server.log`
+View logs at: `agent-orchestrator-mcp-python/logs/mcp-server.log`
 
-For comprehensive debugging instructions, see [README.md - Debugging and Troubleshooting](./README.md#debugging-and-troubleshooting).
+For comprehensive debugging instructions, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 
 ---
 
 ## Additional Resources
 
-- **Quick setup**: [GETTING_STARTED.md](./GETTING_STARTED.md) - Fast path to get running
-- **Complete reference**: [README.md](./README.md) - Full documentation and API reference
-- **Environment variables**: [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
+- **Complete reference**: [README.md](../README.md) - Overview and quick reference
+- **Tools API**: [TOOLS_REFERENCE.md](./TOOLS_REFERENCE.md) - Detailed tool documentation
+- **Debugging**: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Comprehensive troubleshooting guide
+- **Environment variables**: [ENV_VARS.md](./ENV_VARS.md)
+- **Architecture**: [ARCHITECTURE.md](./ARCHITECTURE.md) - UV standalone implementation details
