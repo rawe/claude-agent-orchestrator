@@ -81,7 +81,7 @@ The standalone approach eliminates the need for:
 uv run /path/to/agent-orchestrator-mcp.py
 ```
 
-For concrete configuration see the setup guide: [SETUP_GUIDE.md](./SETUP_GUIDE.md)
+For concrete configuration see: [INTEGRATION_SCENARIOS.md](./INTEGRATION_SCENARIOS.md)
 
 ## Benefits
 
@@ -94,7 +94,7 @@ For concrete configuration see the setup guide: [SETUP_GUIDE.md](./SETUP_GUIDE.m
 
 ## Environment Variables
 
-See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for complete documentation.
+See [ENV_VARS.md](./ENV_VARS.md) for complete documentation.
 
 Required variables:
 - **AGENT_ORCHESTRATOR_COMMAND_PATH** - Path to CLI commands directory
@@ -152,7 +152,6 @@ AGENT_ORCHESTRATOR_COMMAND_PATH=/path/to/commands uv run agent-orchestrator-mcp.
 
 ## Related Documentation
 
-- **Quick Start**: [GETTING_STARTED.md](./GETTING_STARTED.md)
-- **Setup Scenarios**: [SETUP_GUIDE.md](./SETUP_GUIDE.md)
+- **Integration Scenarios**: [INTEGRATION_SCENARIOS.md](./INTEGRATION_SCENARIOS.md)
 - **Tools API**: [TOOLS_REFERENCE.md](./TOOLS_REFERENCE.md)
 - **Troubleshooting**: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)

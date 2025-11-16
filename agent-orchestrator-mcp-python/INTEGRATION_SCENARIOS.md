@@ -1,22 +1,36 @@
-# Setup Guide - Integration Scenarios
+# Integration Scenarios
 
-This guide explains how to configure the Agent Orchestrator MCP Server for different use cases with Claude Code and Claude Desktop.
+Choose the right integration pattern for your workflow. This guide explains three scenarios for organizing Agent Orchestrator Framework (AOF) infrastructure:
 
-This guide helps you configure where AOF infrastructure (agent definitions and sessions) lives - in your current project, a remote project, or a combination of both.
+- **Scenario 1: Local Project** - Everything in one project directory
+- **Scenario 2: Remote Project** - Coordinate from separate directory, target project stays clean
+- **Scenario 3: Hybrid** - Use target's agents, manage sessions centrally
+
+Each scenario determines where agent definitions and sessions live, and how you configure the MCP server.
 
 ---
 
 ## Prerequisites
 
-Before configuring, ensure you have UV installed:
+Before configuring, ensure you have UV installed and Python ≥3.10.
 
-**See [GETTING_STARTED.md](./GETTING_STARTED.md) for installation instructions.**
+---
+
+## MCP Configuration Schema
+
+All MCP configurations follow this structure:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `command` | string | Yes | Must be `"uv"` |
+| `args` | array | Yes | `["run", "/absolute/path/to/agent-orchestrator-mcp.py"]` |
+| `env` | object | Yes | Environment variables (see Environment Variables Quick Reference below) |
 
 ---
 
 ## Environment Variables Quick Reference
 
-> 📖 **For complete environment variable documentation**, see [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
+> 📖 **For complete environment variable documentation**, see [ENV_VARS.md](./ENV_VARS.md)
 
 This table shows **which variables to use for each use case**:
 
@@ -87,7 +101,7 @@ Create `simple.mcp.json` in your project root:
 - Agent definitions in `.agent-orchestrator/agents/` within current project
 - Replace paths with your actual absolute paths
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details and defaults
 
 ### Use Case 2: Remote Project (Different Directory)
 
@@ -124,7 +138,7 @@ Create `simple.mcp.json` in your coordination project:
 - Useful for managing work across multiple unrelated projects from one coordination hub
 - All paths must be absolute
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details and defaults
 
 ### Use Case 3: Hybrid Approach (Remote Agents, Local Sessions)
 
@@ -161,7 +175,7 @@ Create `simple.mcp.json` in your coordination project:
 - Session tracking stays in your coordination project for centralized management
 - Hybrid approach: target project is AOF-aware (has agents) but sessions are external
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details and defaults
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details and defaults
 
 ---
 
@@ -206,7 +220,7 @@ Create `simple.mcp.json` in your coordination project:
 - **`AGENT_ORCHESTRATOR_COMMAND_PATH`** must point to commands directory
 - **`AGENT_ORCHESTRATOR_PROJECT_DIR`** specifies where orchestrated agents run
 
-> 📖 See [README.md - Environment Variables Reference](./README.md#environment-variables-reference) for variable details, defaults, and PATH examples
+> 📖 See [ENV_VARS.md](./ENV_VARS.md) for variable details, defaults, and PATH examples
 
 ### Optional: Customize Session and Agent Storage
 
@@ -258,7 +272,7 @@ After updating the configuration, restart Claude Desktop for changes to take eff
 
 For complete environment variable documentation including descriptions, defaults, and common PATH values:
 
-> 📖 [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
+> 📖 [ENV_VARS.md](./ENV_VARS.md)
 
 ---
 
@@ -301,9 +315,8 @@ For comprehensive debugging instructions, see [TROUBLESHOOTING.md](./TROUBLESHOO
 
 ## Additional Resources
 
-- **Quick setup**: [GETTING_STARTED.md](./GETTING_STARTED.md) - Fast path to get running
 - **Complete reference**: [README.md](./README.md) - Overview and quick reference
 - **Tools API**: [TOOLS_REFERENCE.md](./TOOLS_REFERENCE.md) - Detailed tool documentation
 - **Debugging**: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Comprehensive troubleshooting guide
-- **Environment variables**: [README.md - Environment Variables Reference](./README.md#environment-variables-reference)
+- **Environment variables**: [ENV_VARS.md](./ENV_VARS.md)
 - **Architecture**: [ARCHITECTURE.md](./ARCHITECTURE.md) - UV standalone implementation details

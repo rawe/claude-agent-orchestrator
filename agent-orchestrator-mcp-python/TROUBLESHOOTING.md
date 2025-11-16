@@ -85,6 +85,24 @@ cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.message | co
 cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.message | contains("Tool called"))'
 ```
 
+## Testing with MCP Inspector
+
+Test the server locally before integrating with Claude Desktop/Code:
+
+```bash
+# Set environment variables
+export AGENT_ORCHESTRATOR_COMMAND_PATH="/absolute/path/to/commands"
+export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/your/project"
+
+# Run MCP Inspector
+npx @modelcontextprotocol/inspector uv run /path/to/agent-orchestrator-mcp.py
+```
+
+This opens a web interface where you can:
+- See all 7 available tools
+- Test tool calls with different parameters
+- View responses in real-time
+
 ## Common Issues
 
 ### 1. start_agent fails but list_agents works
