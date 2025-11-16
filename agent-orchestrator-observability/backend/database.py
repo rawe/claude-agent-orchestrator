@@ -32,6 +32,8 @@ def init_db():
             error TEXT,
             exit_code INTEGER,
             reason TEXT,
+            role TEXT,
+            content TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
         )
     """)
@@ -73,8 +75,8 @@ def insert_event(event):
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         INSERT INTO events
-        (session_id, event_type, timestamp, tool_name, tool_input, tool_output, error, exit_code, reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (session_id, event_type, timestamp, tool_name, tool_input, tool_output, error, exit_code, reason, role, content)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         event.session_id,
         event.event_type,
@@ -84,7 +86,9 @@ def insert_event(event):
         json.dumps(event.tool_output) if event.tool_output else None,
         event.error,
         event.exit_code,
-        event.reason
+        event.reason,
+        event.role,
+        json.dumps(event.content) if event.content else None
     ))
     conn.commit()
     conn.close()
@@ -119,6 +123,8 @@ def get_events(session_id: str, limit: int = 100):
             event['tool_input'] = json.loads(event['tool_input'])
         if event['tool_output']:
             event['tool_output'] = json.loads(event['tool_output'])
+        if event['content']:
+            event['content'] = json.loads(event['content'])
         events.append(event)
 
     conn.close()

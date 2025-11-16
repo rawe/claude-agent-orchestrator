@@ -27,6 +27,15 @@ See [Session model](DATA_MODELS.md#session) in DATA_MODELS.md
 ```
 See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
 
+**Event Types Received:**
+- `session_start` - When an agent session starts
+- `pre_tool` - Before a tool executes (shows input parameters)
+- `post_tool` - After a tool executes (shows input + output)
+- `session_stop` - When a session ends
+- `message` - Agent or user messages (extracted from transcript)
+
+See [Event Types](DATA_MODELS.md#event-types) for detailed schemas.
+
 ### Connection Flow
 
 1. Client connects to WebSocket

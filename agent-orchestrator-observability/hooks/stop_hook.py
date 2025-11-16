@@ -14,33 +14,59 @@ def main():
         # Read hook input from stdin
         hook_input = json.load(sys.stdin)
 
-        # Extract session completion data
-        # Note: Claude Code provides transcript_path (JSONL file) but not exit_code or reason directly
-        # Available fields: session_id, transcript_path, cwd, permission_mode, stop_hook_active
-        #
-        # TODO: To get exit_code and reason, we would need to:
-        #   1. Read the transcript JSONL file from transcript_path
-        #   2. Parse the last entries to determine completion status
-        #   3. Extract error information or success status
-        #   For now, we just capture that the session stopped.
+        # Extract last message from transcript file
+        transcript_path = hook_input.get("transcript_path")
+        last_message = None
 
-        event = {
+        if transcript_path:
+            try:
+                with open(transcript_path, "r") as f:
+                    lines = f.readlines()
+                    if lines:
+                        last_line = lines[-1]
+                        transcript_entry = json.loads(last_line)
+
+                        # Extract message if it exists
+                        if "message" in transcript_entry:
+                            msg = transcript_entry["message"]
+                            last_message = {
+                                "role": msg.get("role"),
+                                "content": msg.get("content", [])
+                            }
+            except Exception:
+                # If we can't read the transcript, continue without the message
+                pass
+
+        # Send session_stop event
+        backend_url = "http://localhost:8765/events"
+
+        session_stop_event = {
             "event_type": "session_stop",
             "session_id": hook_input.get("session_id", "unknown"),
             "session_name": hook_input.get("session_id", "unknown"),
             "timestamp": datetime.now(UTC).isoformat(),
-            # transcript_path available at: hook_input.get("transcript_path")
-            # This points to the session's JSONL file with full conversation history
         }
 
-        # Send to observability backend
-        backend_url = "http://localhost:8765/events"
-
         try:
-            httpx.post(backend_url, json=event, timeout=2.0)
+            httpx.post(backend_url, json=session_stop_event, timeout=2.0)
         except Exception:
-            # Fail silently - don't block agent execution if backend is down
             pass
+
+        # Send message event if we extracted one
+        if last_message and last_message.get("role") and last_message.get("content"):
+            message_event = {
+                "event_type": "message",
+                "session_id": hook_input.get("session_id", "unknown"),
+                "session_name": hook_input.get("session_id", "unknown"),
+                "timestamp": datetime.now(UTC).isoformat(),
+                "role": last_message["role"],
+                "content": last_message["content"]
+            }
+
+            try:
+                httpx.post(backend_url, json=message_event, timeout=2.0)
+            except Exception:
+                pass
 
     except Exception:
         # Fail silently - hooks should never crash the agent

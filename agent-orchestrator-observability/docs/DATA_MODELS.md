@@ -6,7 +6,7 @@ Common data structures used across the observability system.
 
 ```json
 {
-  "event_type": "session_start | pre_tool | post_tool | session_stop",
+  "event_type": "session_start | pre_tool | post_tool | session_stop | message",
   "session_id": "string",
   "session_name": "string",
   "timestamp": "ISO 8601 string",
@@ -15,7 +15,9 @@ Common data structures used across the observability system.
   "tool_output": "any (optional)",
   "error": "string (optional)",
   "exit_code": "number (optional)",
-  "reason": "string (optional)"
+  "reason": "string (optional)",
+  "role": "string (optional)",  // 'assistant' | 'user'
+  "content": [] // optional array of content blocks
 }
 ```
 
@@ -25,6 +27,16 @@ Common data structures used across the observability system.
 - `pre_tool` - Tool about to be executed
 - `post_tool` - Tool execution completed
 - `session_stop` - Agent session stopped
+- `message` - Agent or user message
+
+### Message Content Block
+
+```json
+{
+  "type": "text",  // Only 'text' supported for now
+  "text": "string"
+}
+```
 
 ## Session
 
@@ -88,5 +100,22 @@ Common data structures used across the observability system.
   "timestamp": "2025-11-16T10:35:00.000000Z",
   "exit_code": 0,
   "reason": "completed"
+}
+```
+
+### Message Event
+```json
+{
+  "event_type": "message",
+  "session_id": "abc-123-def",
+  "session_name": "my-agent",
+  "timestamp": "2025-11-16T10:34:55.000000Z",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "I've completed the task successfully."
+    }
+  ]
 }
 ```

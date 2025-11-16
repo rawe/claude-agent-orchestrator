@@ -1,9 +1,14 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, Any, List
+
+class MessageContent(BaseModel):
+    """Content block within a message"""
+    type: str  # 'text' (only text supported for now)
+    text: str
 
 class Event(BaseModel):
     """Event model for hook data"""
-    event_type: str  # 'session_start' | 'pre_tool' | 'post_tool' | 'session_stop'
+    event_type: str  # 'session_start' | 'pre_tool' | 'post_tool' | 'session_stop' | 'message'
     session_id: str
     session_name: str
     timestamp: str
@@ -15,3 +20,6 @@ class Event(BaseModel):
     # Session stop fields
     exit_code: Optional[int] = None
     reason: Optional[str] = None
+    # Message fields
+    role: Optional[str] = None  # 'assistant' | 'user'
+    content: Optional[List[dict]] = None  # Array of content blocks

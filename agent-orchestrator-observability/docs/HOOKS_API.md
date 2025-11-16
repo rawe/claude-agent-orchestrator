@@ -38,6 +38,27 @@ Interface between hook scripts and the observability backend.
 - `exit_code` - Exit code (0 for success)
 - `reason` - Reason for stopping (e.g., "completed")
 
+**Additional Processing:**
+This hook also reads the session transcript file and extracts the last message to send as a separate `message` event (see Message Events below).
+
+---
+
+## Message Events
+
+**Note:** Message events are **not triggered by a hook directly**. They are extracted from the session transcript by the Stop hook.
+
+**Source:** Session transcript JSONL file (last line)
+**Sent by:** `hooks/stop_hook.py` (after sending `session_stop` event)
+**Data Captured:**
+- `session_id` - Session identifier
+- `role` - Message author (`assistant` or `user`)
+- `content` - Array of content blocks (see [Message Content Block](DATA_MODELS.md#message-content-block))
+
+**Event Structure:**
+See [Message Event](DATA_MODELS.md#message-event) in DATA_MODELS.md
+
+---
+
 ## Endpoint
 
 **URL:** `http://127.0.0.1:8765/events`

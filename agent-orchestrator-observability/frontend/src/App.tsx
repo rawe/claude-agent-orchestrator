@@ -7,6 +7,11 @@ interface Session {
   created_at: string
 }
 
+interface MessageContent {
+  type: string
+  text: string
+}
+
 interface Event {
   id: number
   session_id: string
@@ -18,6 +23,8 @@ interface Event {
   error?: string
   exit_code?: number
   reason?: string
+  role?: string
+  content?: MessageContent[]
 }
 
 function App() {
@@ -230,6 +237,29 @@ function App() {
                       {event.exit_code !== undefined && (
                         <div>Exit Code: {event.exit_code}</div>
                       )}
+                    </div>
+                  )}
+
+                  {event.event_type === 'message' && event.content && (
+                    <div>
+                      <strong>{event.role === 'assistant' ? '🤖 Assistant' : '👤 User'}</strong>
+                      <div style={{ marginTop: '8px' }}>
+                        {event.content.map((block, idx) => (
+                          <div key={idx}>
+                            {block.type === 'text' && (
+                              <div style={{
+                                background: event.role === 'assistant' ? '#f0f4ff' : '#f5f5f5',
+                                padding: '12px',
+                                borderRadius: '4px',
+                                whiteSpace: 'pre-wrap',
+                                fontFamily: 'inherit'
+                              }}>
+                                {block.text}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
