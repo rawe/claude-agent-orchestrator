@@ -145,6 +145,13 @@ agent-orchestrator-framework/
 │   ├── docs/                        # Documentation
 │   └── README.md                    # Full documentation
 │
+├── agent-orchestrator-observability/ # Real-time observability platform
+│   ├── backend/                     # FastAPI + WebSocket backend
+│   ├── frontend/                    # React-based web UI
+│   ├── hooks/                       # Hook scripts for event capture
+│   ├── docker/                      # Docker setup
+│   └── README.md                    # Full documentation
+│
 └── README.md                        # This file
 ```
 
@@ -198,9 +205,28 @@ Different agents can have different MCP server configurations, enabling speciali
 The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of all three usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
+## Observability
+
+Monitor your agent orchestration in real-time with the built-in observability platform:
+
+- **Real-time monitoring** of agent sessions and tool calls
+- **WebSocket-based** live updates
+- **Docker support** for one-command deployment
+- **Hook-based integration** with Claude Code events
+
+**Quick Start:**
+```bash
+cd agent-orchestrator-observability
+docker-compose up -d
+# Open http://localhost:5173
+```
+
+See **[agent-orchestrator-observability/README.md](./agent-orchestrator-observability/README.md)** for full documentation.
+
 ## Documentation
 
 - **[Level 1: Core Framework](./agent-orchestrator/README.md)** - Plugin documentation
 - **[Level 2: Subagents Extension](./agent-orchestrator-subagents/README.md)** - Extension plugin
 - **[Level 3: MCP Server](./agent-orchestrator-mcp-server/README.md)** - MCP implementation
+- **[Observability Platform](./agent-orchestrator-observability/README.md)** - Real-time monitoring
 - **[Technical Architecture](./agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works
