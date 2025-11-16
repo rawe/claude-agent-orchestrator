@@ -917,10 +917,7 @@ async def main():
         await server.run(
             read_stream,
             write_stream,
-            InitializationOptions(
-                server_name="agent-orchestrator-mcp-server",
-                server_version="1.0.0",
-            ),
+            server.create_initialization_options(),
         )
 
 
