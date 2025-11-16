@@ -134,6 +134,9 @@ Edit `.claude/settings.json` with absolute paths:
 
 - ✅ **Real-time Session Tracking** - See all agent sessions as they start
 - ✅ **Tool Call Monitoring** - View every tool call with full input parameters
+- ✅ **Tool Results Display** - See tool outputs and execution results
+- ✅ **Session Stop Detection** - Track when sessions complete
+- ✅ **Error Display** - View errors from failed tool executions
 - ✅ **Session List** - Browse all active and historical sessions
 - ✅ **Event Timeline** - See chronological event stream per session
 - ✅ **WebSocket Updates** - Real-time updates without page refresh
@@ -141,9 +144,6 @@ Edit `.claude/settings.json` with absolute paths:
 
 ### What's NOT Included (Yet)
 
-- ❌ Tool call results/outputs (only inputs shown)
-- ❌ Session stop detection
-- ❌ Error display
 - ❌ Auto-reconnection (just refresh the page)
 - ❌ Filtering/search
 - ❌ Export functionality

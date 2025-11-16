@@ -16,9 +16,7 @@
 ## 2. What We're CUTTING from Full Architecture
 
 **Features NOT in MVP:**
-- ❌ PostToolUse hooks (add later if needed)
 - ❌ SubagentStop hooks (add later if needed)
-- ❌ Session stop hooks (sessions can just timeout)
 - ❌ Complex UI components (filters, search, export)
 - ❌ Error retry logic beyond basics
 - ❌ Authentication/authorization
@@ -30,9 +28,9 @@
 - ❌ Token usage tracking
 - ❌ Auto-reconnection logic (page refresh works)
 
-## 3. MVP Core Features (Absolute Minimum)
+## 3. MVP Core Features (Implemented)
 
-**What We're KEEPING:**
+**Initial MVP:**
 - ✅ SessionStart hook (know when agents start)
 - ✅ PreToolUse hook (see what tools are being called)
 - ✅ FastAPI backend with single WebSocket endpoint
@@ -41,6 +39,13 @@
 - ✅ Real-time updates via WebSocket
 - ✅ List of active sessions
 - ✅ Event stream for selected session
+
+**Extended MVP (Added 2025-11-16):**
+- ✅ PostToolUse hook (see tool execution results and errors)
+- ✅ Stop hook (track session completion)
+- ✅ Tool output display in frontend
+- ✅ Session status tracking (running → finished)
+- ✅ Error display for failed tool executions
 
 ## 4. File Structure
 
@@ -57,7 +62,9 @@ observability/
 │
 ├── hooks/
 │   ├── session_start_hook.py        # SessionStart hook (40 lines)
-│   └── pre_tool_hook.py             # PreToolUse hook (40 lines)
+│   ├── pre_tool_hook.py             # PreToolUse hook (40 lines)
+│   ├── post_tool_hook.py            # PostToolUse hook (40 lines)
+│   └── stop_hook.py                 # Stop hook (40 lines)
 │
 └── frontend/
     ├── package.json                 # npm dependencies
@@ -87,10 +94,14 @@ CREATE TABLE sessions (
 CREATE TABLE events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,       -- 'session_start' | 'pre_tool'
+    event_type TEXT NOT NULL,       -- 'session_start' | 'pre_tool' | 'post_tool' | 'session_stop'
     timestamp TEXT NOT NULL,
-    tool_name TEXT,                 -- Only for pre_tool events
-    tool_input TEXT,                -- JSON string
+    tool_name TEXT,                 -- For pre_tool and post_tool events
+    tool_input TEXT,                -- JSON string (for pre_tool and post_tool)
+    tool_output TEXT,               -- JSON string (for post_tool)
+    error TEXT,                     -- Error message (for post_tool)
+    exit_code INTEGER,              -- Exit code (for session_stop)
+    reason TEXT,                    -- Stop reason (for session_stop)
     FOREIGN KEY (session_id) REFERENCES sessions(session_id)
 );
 

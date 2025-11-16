@@ -28,6 +28,10 @@ def init_db():
             timestamp TEXT NOT NULL,
             tool_name TEXT,
             tool_input TEXT,
+            tool_output TEXT,
+            error TEXT,
+            exit_code INTEGER,
+            reason TEXT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
         )
     """)
@@ -53,19 +57,34 @@ def insert_session(session_id: str, session_name: str, timestamp: str):
     conn.commit()
     conn.close()
 
+def update_session_status(session_id: str, status: str):
+    """Update session status (e.g., 'running' -> 'finished')"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        UPDATE sessions
+        SET status = ?
+        WHERE session_id = ?
+    """, (status, session_id))
+    conn.commit()
+    conn.close()
+
 def insert_event(event):
     """Insert event"""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         INSERT INTO events
-        (session_id, event_type, timestamp, tool_name, tool_input)
-        VALUES (?, ?, ?, ?, ?)
+        (session_id, event_type, timestamp, tool_name, tool_input, tool_output, error, exit_code, reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         event.session_id,
         event.event_type,
         event.timestamp,
         event.tool_name,
-        json.dumps(event.tool_input) if event.tool_input else None
+        json.dumps(event.tool_input) if event.tool_input else None,
+        json.dumps(event.tool_output) if event.tool_output else None,
+        event.error,
+        event.exit_code,
+        event.reason
     ))
     conn.commit()
     conn.close()
@@ -98,6 +117,8 @@ def get_events(session_id: str, limit: int = 100):
         event = dict(row)
         if event['tool_input']:
             event['tool_input'] = json.loads(event['tool_input'])
+        if event['tool_output']:
+            event['tool_output'] = json.loads(event['tool_output'])
         events.append(event)
 
     conn.close()

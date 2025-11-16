@@ -22,6 +22,29 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ${AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH}/hooks/post_tool_hook.py",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ${AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH}/hooks/stop_hook.py",
+            "timeout": 2000
+          }
+        ]
+      }
     ]
   }
 }

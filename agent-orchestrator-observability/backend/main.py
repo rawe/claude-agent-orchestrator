@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import json
 
-from database import init_db, insert_session, insert_event, get_sessions, get_events
+from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status
 from models import Event
 
 # WebSocket connections (in-memory set)
@@ -43,6 +43,9 @@ async def receive_event(event: Event):
     # Update database
     if event.event_type == "session_start":
         insert_session(event.session_id, event.session_name, event.timestamp)
+    elif event.event_type == "session_stop":
+        # Update session status to finished
+        update_session_status(event.session_id, "finished")
 
     insert_event(event)
 

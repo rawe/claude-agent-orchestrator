@@ -14,6 +14,10 @@ interface Event {
   timestamp: string
   tool_name?: string
   tool_input?: any
+  tool_output?: any
+  error?: string
+  exit_code?: number
+  reason?: string
 }
 
 function App() {
@@ -59,6 +63,15 @@ function App() {
               created_at: event.timestamp
             }, ...prev]
           })
+        } else if (event.event_type === 'session_stop') {
+          // Update session status to finished
+          setSessions(prev =>
+            prev.map(s =>
+              s.session_id === event.session_id
+                ? { ...s, status: 'finished' }
+                : s
+            )
+          )
         }
       }
     }
@@ -165,6 +178,57 @@ function App() {
                         <pre>
                           {JSON.stringify(event.tool_input, null, 2)}
                         </pre>
+                      )}
+                    </div>
+                  )}
+
+                  {event.event_type === 'post_tool' && (
+                    <div>
+                      <strong>🔧 {event.tool_name}</strong>
+
+                      {event.tool_input && Object.keys(event.tool_input).length > 0 && (
+                        <div style={{ marginTop: '8px' }}>
+                          <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '4px' }}>
+                            <strong>Input:</strong>
+                          </div>
+                          <pre style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                            {JSON.stringify(event.tool_input, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+
+                      {event.error ? (
+                        <div style={{ marginTop: '8px' }}>
+                          <div style={{ fontSize: '0.85em', color: '#d32f2f', marginBottom: '4px' }}>
+                            <strong>Error:</strong>
+                          </div>
+                          <pre style={{ background: '#ffebee', padding: '8px', borderRadius: '4px', color: '#d32f2f' }}>
+                            {event.error}
+                          </pre>
+                        </div>
+                      ) : event.tool_output && (
+                        <div style={{ marginTop: '8px' }}>
+                          <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '4px' }}>
+                            <strong>Output:</strong>
+                          </div>
+                          <pre style={{ background: '#e8f5e9', padding: '8px', borderRadius: '4px', maxHeight: '300px', overflow: 'auto' }}>
+                            {typeof event.tool_output === 'string'
+                              ? event.tool_output
+                              : JSON.stringify(event.tool_output, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {event.event_type === 'session_stop' && (
+                    <div>
+                      <strong>Session Stopped</strong>
+                      {event.reason && (
+                        <div>Reason: {event.reason}</div>
+                      )}
+                      {event.exit_code !== undefined && (
+                        <div>Exit Code: {event.exit_code}</div>
                       )}
                     </div>
                   )}
