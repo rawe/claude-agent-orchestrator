@@ -92,7 +92,7 @@ async def execute_script(
         # Execute via subprocess
         process = await asyncio.create_subprocess_exec(
             *uv_args,
-            stdin=subprocess.PIPE if stdin_input else None,
+            stdin=subprocess.PIPE if stdin_input else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=os.environ.copy(),
