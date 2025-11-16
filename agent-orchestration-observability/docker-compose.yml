@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: agent-orchestration-observability-backend
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./backend:/app/backend
+      - observability-data:/app/.agent-orchestrator
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - observability-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: agent-orchestration-observability-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8765
+    networks:
+      - observability-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  observability-network:
+    driver: bridge
+
+volumes:
+  observability-data:
+    driver: local

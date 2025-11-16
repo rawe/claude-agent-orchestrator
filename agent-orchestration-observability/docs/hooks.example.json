@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ${AGENT_ORCHESTRATION_OBSERVABILITY_BASE_PATH}/hooks/session_start_hook.py",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ${AGENT_ORCHESTRATION_OBSERVABILITY_BASE_PATH}/hooks/pre_tool_hook.py",
+            "timeout": 2000
+          }
+        ]
+      }
+    ]
+  }
+}
