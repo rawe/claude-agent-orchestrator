@@ -58,76 +58,81 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
 }
 ```
 
-## Environment Variables
+## Environment Variables Reference
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AGENT_ORCHESTRATOR_COMMAND_PATH` | Yes | Absolute path to commands directory |
-| `AGENT_ORCHESTRATOR_PROJECT_DIR` | Claude Desktop: Yes<br>Claude Code: No | Project directory for agent execution |
-| `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | Custom session storage location |
-| `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | Custom agent definitions location |
-| `MCP_SERVER_DEBUG` | No | Set to `"true"` for debug logging to `logs/mcp-server.log` |
-| `PATH` | Claude Desktop only | Must include path to uv and claude code binary |
+This is the **single source of truth** for all environment variables used by the Agent Orchestrator MCP Server.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AGENT_ORCHESTRATOR_COMMAND_PATH` | **Yes** | - | Absolute path to the commands directory containing Python scripts (e.g., `/path/to/agent-orchestrator-cli/commands`) |
+| `AGENT_ORCHESTRATOR_PROJECT_DIR` | **Claude Desktop: Yes**<br>Claude Code: No | Current directory (Claude Code only) | Project directory where orchestrated agents execute. Controls the base for other defaults. |
+| `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/sessions` | Custom location for agent session storage. Use for centralized session management across projects. |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/agents` | Custom location for agent definitions. Use to share agent definitions across projects. |
+| `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | No | `false` | Set to `"true"` to enable logging of orchestrated agent execution. Used for debugging agent sessions. |
+| `MCP_SERVER_DEBUG` | No | `false` | Set to `"true"` to enable debug logging to `logs/mcp-server.log`. Used for troubleshooting MCP server issues. |
+| `PATH` | **Claude Desktop only** | - | Must include path to `uv` and `claude` binaries. Claude Desktop does not inherit shell PATH. Example: `/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin` |
+
+### Variable Details
+
+**`AGENT_ORCHESTRATOR_COMMAND_PATH`** (Required)
+- Absolute path to the commands directory containing Python scripts
+- Example (local development): `/Users/yourname/projects/agent-orchestrator-cli/commands`
+- Example (production): `/usr/local/lib/agent-orchestrator/commands`
+- The directory should contain: `ao-new`, `ao-resume`, `ao-list-sessions`, `ao-list-agents`, `ao-clean`
+
+**`AGENT_ORCHESTRATOR_PROJECT_DIR`** (Conditionally Required)
+- Directory where orchestrated agents execute
+- Required for Claude Desktop
+- Optional for Claude Code (defaults to current directory where MCP server is invoked)
+- This is the working directory for all agent sessions
+- Example: `/Users/yourname/my-project`
+
+**`AGENT_ORCHESTRATOR_SESSIONS_DIR`** (Optional)
+- Custom path for storing session data
+- Defaults to `.agent-orchestrator/sessions/` within the project directory
+- Use when you want centralized session management across multiple projects
+- Example: `/Users/yourname/.agent-orchestrator-global/sessions`
+
+**`AGENT_ORCHESTRATOR_AGENTS_DIR`** (Optional)
+- Custom path for agent definition files
+- Defaults to `.agent-orchestrator/agents/` within the project directory
+- Use when you want to share agent definitions across multiple projects
+- Example: `/Users/yourname/.agent-orchestrator-global/agents`
+
+**`AGENT_ORCHESTRATOR_ENABLE_LOGGING`** (Optional)
+- Enable logging for orchestrated agent sessions
+- Set to `"true"` for debugging purposes
+- Logs agent execution details
+
+**`MCP_SERVER_DEBUG`** (Optional)
+- Enable debug logging for the MCP server itself
+- Set to `"true"` to write logs to `logs/mcp-server.log`
+- Logs include server startup, tool calls, script execution, and errors
+
+**`PATH`** (Claude Desktop Only)
+- Required for Claude Desktop because UI applications do not inherit shell environment PATH
+- Must include directories containing the `uv` and `claude` binaries
+- Common values:
+  - macOS with Homebrew: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
+  - macOS with custom install: `/Users/yourname/.local/bin:/usr/local/bin:/usr/bin:/bin`
 
 ## MCP Tools
 
-### 1. list_agents
-List available agent definitions.
+The server provides 7 MCP tools for managing orchestrated agent sessions:
 
-**Parameters:**
-- `project_dir` (optional): Project directory override
-- `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
+| Tool | Description |
+|------|-------------|
+| `list_agents` | Discover available specialized agent definitions |
+| `list_sessions` | View all agent sessions with their IDs and project directories |
+| `start_agent` | Create new agent sessions (supports async execution) |
+| `resume_agent` | Continue work in existing sessions (supports async execution) |
+| `clean_sessions` | Remove all sessions |
+| `get_agent_status` | Check status of running or completed sessions |
+| `get_agent_result` | Retrieve result from completed sessions |
 
-### 2. list_sessions
-List all agent sessions with IDs and project directories.
+All tools support optional `project_dir` parameter for managing multiple projects.
 
-**Parameters:**
-- `project_dir` (optional): Project directory override
-- `response_format` (optional): `"markdown"` or `"json"`
-
-### 3. start_agent
-Create new agent session.
-
-**Parameters:**
-- `session_name` (required): Unique name (alphanumeric, dash, underscore; max 60 chars)
-- `agent_name` (optional): Agent definition to use
-- `project_dir` (optional): Project directory override
-- `prompt` (required): Task description
-- `async` (optional): Run in background (default: `false`)
-
-### 4. resume_agent
-Continue existing agent session.
-
-**Parameters:**
-- `session_name` (required): Session to resume
-- `project_dir` (optional): Project directory override
-- `prompt` (required): Continuation prompt
-- `async` (optional): Run in background (default: `false`)
-
-### 5. clean_sessions
-Remove all agent sessions.
-
-**Parameters:**
-- `project_dir` (optional): Project directory override
-
-### 6. get_agent_status
-Check session status (for async mode).
-
-**Parameters:**
-- `session_name` (required): Session to check
-- `project_dir` (optional): Project directory override
-- `wait_seconds` (optional): Wait before checking (0-300 seconds)
-
-**Returns:** `{"status": "running"|"finished"|"not_existent"}`
-
-### 7. get_agent_result
-Retrieve result from completed session (for async mode).
-
-**Parameters:**
-- `session_name` (required): Completed session name
-- `project_dir` (optional): Project directory override
-
-**Returns:** Agent's final response
+**For detailed API documentation, parameters, and examples, see [TOOLS_REFERENCE.md](./TOOLS_REFERENCE.md)**
 
 ## Project Structure
 
@@ -147,17 +152,9 @@ agent-orchestrator-mcp-python/
 
 ## Debugging
 
-Enable debug logging:
-```bash
-export MCP_SERVER_DEBUG="true"
-```
+Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `logs/mcp-server.log`.
 
-View logs:
-```bash
-tail -f logs/mcp-server.log | jq '.'
-```
-
-Logs include server startup, tool calls, script execution, and errors.
+**For comprehensive debugging guide, log filtering, and troubleshooting common issues, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**
 
 ## Session Naming Rules
 
