@@ -81,21 +81,19 @@ Use the standalone MCP server implementation to get:
 - **No Claude Code plugin required!**
 - Works with Claude Desktop, Claude Code, or any MCP-compatible system
 - 5 MCP tools for agent orchestration
-- TypeScript implementation with full type safety
+- Python implementation with automatic dependency management
 - Works with the same Python commands as Level 1
+
+**Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 **Quick Start:**
 ```bash
 # 1. Clone this repository
 git clone <your-repo-url>
 
-# 2. Build the MCP server
+# 2. Configure in Claude Desktop or Claude Code
 cd agent-orchestrator-mcp-server
-npm install
-npm run build
-
-# 3. Configure in Claude Desktop or Claude Code
-# See GETTING_STARTED.md for configuration examples
+# See README.md for configuration examples
 ```
 
 **Usage Example (from Claude Desktop):**
@@ -142,11 +140,10 @@ agent-orchestrator-framework/
 │   └── README.md
 │
 ├── agent-orchestrator-mcp-server/   # Level 3: MCP server implementation
-│   ├── src/                         # TypeScript source
-│   ├── dist/                        # Compiled output
-│   ├── README.md                    # Full documentation
-│   ├── GETTING_STARTED.md           # Quick setup guide
-│   └── SETUP_GUIDE.md               # Integration scenarios
+│   ├── agent-orchestrator-mcp.py   # Main MCP server script
+│   ├── libs/                        # Supporting libraries
+│   ├── docs/                        # Documentation
+│   └── README.md                    # Full documentation
 │
 └── README.md                        # This file
 ```
@@ -170,16 +167,16 @@ agent-orchestrator-framework/
 
 ### For Claude Desktop Users (Level 3)
 
-1. **Clone and build:**
+**Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
+
+1. **Clone repository:**
    ```bash
    git clone <your-repo-url>
    cd agent-orchestrator-framework/agent-orchestrator-mcp-server
-   npm install
-   npm run build
    ```
 
 2. **Configure MCP server:**
-   See [agent-orchestrator-mcp-server/GETTING_STARTED.md](./agent-orchestrator-mcp-server/GETTING_STARTED.md)
+   See [agent-orchestrator-mcp-server/README.md](./agent-orchestrator-mcp-server/README.md)
 
 3. **Use from Claude Desktop:**
    ```
