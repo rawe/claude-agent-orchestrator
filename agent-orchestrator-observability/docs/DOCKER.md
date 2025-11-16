@@ -19,13 +19,13 @@ docker-compose down
 
 ### Backend
 - **Port:** 8765
-- **Container:** agent-orchestration-observability-backend
+- **Container:** agent-orchestrator-observability-backend
 - **Image:** Built from `docker/backend.Dockerfile`
 - **Database:** Stored in `observability-data` volume
 
 ### Frontend
 - **Port:** 5173
-- **Container:** agent-orchestration-observability-frontend
+- **Container:** agent-orchestrator-observability-frontend
 - **Image:** Built from `docker/frontend.Dockerfile`
 - **Hot Reload:** Source files mounted for development
 
@@ -94,7 +94,7 @@ Persistent volume for SQLite database.
 **View data:**
 ```bash
 # Access backend container
-docker exec -it agent-orchestration-observability-backend sh
+docker exec -it agent-orchestrator-observability-backend sh
 
 # Query database
 sqlite3 .agent-orchestrator/observability.db "SELECT * FROM sessions;"
@@ -102,12 +102,12 @@ sqlite3 .agent-orchestrator/observability.db "SELECT * FROM sessions;"
 
 **Backup database:**
 ```bash
-docker cp agent-orchestration-observability-backend:/app/.agent-orchestrator/observability.db ./backup.db
+docker cp agent-orchestrator-observability-backend:/app/.agent-orchestrator/observability.db ./backup.db
 ```
 
 **Restore database:**
 ```bash
-docker cp ./backup.db agent-orchestration-observability-backend:/app/.agent-orchestrator/observability.db
+docker cp ./backup.db agent-orchestrator-observability-backend:/app/.agent-orchestrator/observability.db
 ```
 
 ## Networking

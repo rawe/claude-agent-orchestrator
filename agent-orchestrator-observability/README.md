@@ -92,7 +92,7 @@ To enable observability, you need to configure hooks in `.claude/settings.json`.
 
 1. Set the base path environment variable:
    ```bash
-   export AGENT_ORCHESTRATION_OBSERVABILITY_BASE_PATH="$(pwd)"
+   export AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH="$(pwd)"
    # Add to ~/.zshrc or ~/.bashrc to make it permanent
    ```
 
@@ -110,7 +110,7 @@ Edit `.claude/settings.json` with absolute paths:
     "SessionStart": [{
       "hooks": [{
         "type": "command",
-        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestration-observability/hooks/session_start_hook.py",
+        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestrator-observability/hooks/session_start_hook.py",
         "timeout": 2000
       }]
     }],
@@ -118,7 +118,7 @@ Edit `.claude/settings.json` with absolute paths:
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestration-observability/hooks/pre_tool_hook.py",
+        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestrator-observability/hooks/pre_tool_hook.py",
         "timeout": 2000
       }]
     }]
@@ -273,7 +273,7 @@ npm run dev
 ## File Structure
 
 ```
-agent-orchestration-observability/
+agent-orchestrator-observability/
 ├── README.md                    # This file
 ├── PLAN.md                      # Detailed MVP plan
 ├── pyproject.toml               # Python dependencies

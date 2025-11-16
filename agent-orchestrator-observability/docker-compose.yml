@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
-    container_name: agent-orchestration-observability-backend
+    container_name: agent-orchestrator-observability-backend
     ports:
       - "8765:8765"
     volumes:
@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
-    container_name: agent-orchestration-observability-frontend
+    container_name: agent-orchestrator-observability-frontend
     ports:
       - "5173:5173"
     volumes:

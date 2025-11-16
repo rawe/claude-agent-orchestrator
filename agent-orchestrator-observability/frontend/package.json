@@ -1,5 +1,5 @@
 {
-  "name": "agent-orchestration-observability-frontend",
+  "name": "agent-orchestrator-observability-frontend",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

@@ -9,7 +9,7 @@ Configure Claude Code hooks to enable observability.
 Add to `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-export AGENT_ORCHESTRATION_OBSERVABILITY_BASE_PATH="/path/to/agent-orchestration-observability"
+export AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH="/path/to/agent-orchestrator-observability"
 ```
 
 Replace with the absolute path to this folder. Then reload:
@@ -33,7 +33,7 @@ Or manually copy the contents from `docs/hooks.example.json` to your `.claude/se
 # Terminal 1 - Backend
 uv run backend/main.py
 
-# Terminal 2 - Frontend (in agent-orchestration-observability/frontend)
+# Terminal 2 - Frontend (in agent-orchestrator-observability/frontend)
 cd frontend
 npm run dev
 
@@ -56,7 +56,7 @@ If you don't want to use environment variables, edit `.claude/settings.json` dir
     "SessionStart": [{
       "hooks": [{
         "type": "command",
-        "command": "uv run /absolute/path/to/agent-orchestration-observability/hooks/session_start_hook.py",
+        "command": "uv run /absolute/path/to/agent-orchestrator-observability/hooks/session_start_hook.py",
         "timeout": 2000
       }]
     }],
@@ -64,7 +64,7 @@ If you don't want to use environment variables, edit `.claude/settings.json` dir
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "uv run /absolute/path/to/agent-orchestration-observability/hooks/pre_tool_hook.py",
+        "command": "uv run /absolute/path/to/agent-orchestrator-observability/hooks/pre_tool_hook.py",
         "timeout": 2000
       }]
     }]
@@ -72,4 +72,4 @@ If you don't want to use environment variables, edit `.claude/settings.json` dir
 }
 ```
 
-Replace `/absolute/path/to/` with your actual path to the agent-orchestration-observability folder.
+Replace `/absolute/path/to/` with your actual path to the agent-orchestrator-observability folder.
