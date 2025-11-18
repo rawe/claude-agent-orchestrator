@@ -4,6 +4,7 @@
 # dependencies = [
 #     "claude-agent-sdk",
 #     "typer",
+#     "httpx",
 # ]
 # ///
 """
@@ -155,6 +156,8 @@ def main(
             session_name=session_name,  # For Stage 2 metadata update
             sessions_dir=config.sessions_dir,  # For Stage 2 metadata update
             mcp_servers=mcp_servers,
+            observability_enabled=config.observability_enabled,
+            observability_url=config.observability_url,
         )
 
         # 10. Log result (if logging enabled)

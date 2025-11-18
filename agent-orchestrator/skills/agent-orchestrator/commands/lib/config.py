@@ -18,6 +18,11 @@ ENV_SESSIONS_DIR = "AGENT_ORCHESTRATOR_SESSIONS_DIR"
 ENV_AGENTS_DIR = "AGENT_ORCHESTRATOR_AGENTS_DIR"
 ENV_ENABLE_LOGGING = "AGENT_ORCHESTRATOR_ENABLE_LOGGING"
 
+# Observability environment variables
+ENV_OBSERVABILITY_ENABLED = "AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED"
+ENV_OBSERVABILITY_URL = "AGENT_ORCHESTRATOR_OBSERVABILITY_URL"
+DEFAULT_OBSERVABILITY_URL = "http://127.0.0.1:8765"
+
 
 @dataclass
 class Config:
@@ -27,6 +32,8 @@ class Config:
     sessions_dir: Path
     agents_dir: Path
     enable_logging: bool
+    observability_enabled: bool
+    observability_url: str
 
 
 def resolve_absolute_path(path_str: str) -> Path:
@@ -230,12 +237,25 @@ def load_config(
     # Enable if value is "1", "true", or "yes"
     enable_logging = env_logging in ("1", "true", "yes")
 
-    # Part H: Return Config object
+    # Part H: Parse observability configuration
+    env_observability_enabled = os.environ.get(ENV_OBSERVABILITY_ENABLED, "").lower()
+    observability_enabled = env_observability_enabled in ("1", "true", "yes")
+    observability_url = os.environ.get(ENV_OBSERVABILITY_URL, DEFAULT_OBSERVABILITY_URL)
+
+    # DEBUG LOGGING - Observability configuration
+    debug_log("load_config - OBSERVABILITY", {
+        "enabled": observability_enabled,
+        "url": observability_url,
+    })
+
+    # Part I: Return Config object
     config = Config(
         project_dir=project_dir,
         sessions_dir=sessions_dir,
         agents_dir=agents_dir,
         enable_logging=enable_logging,
+        observability_enabled=observability_enabled,
+        observability_url=observability_url,
     )
 
     # DEBUG LOGGING - Final config
@@ -244,6 +264,8 @@ def load_config(
         "sessions_dir": str(config.sessions_dir),
         "agents_dir": str(config.agents_dir),
         "enable_logging": config.enable_logging,
+        "observability_enabled": config.observability_enabled,
+        "observability_url": config.observability_url,
     })
 
     return config

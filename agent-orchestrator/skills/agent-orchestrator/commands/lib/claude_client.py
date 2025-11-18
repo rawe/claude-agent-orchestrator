@@ -3,6 +3,7 @@ Claude SDK Integration
 
 Wrapper around Claude Agent SDK for session creation and resumption.
 Implements async session execution with message streaming to .jsonl files.
+Uses programmatic hooks for observability integration.
 """
 
 from pathlib import Path
@@ -10,7 +11,17 @@ from typing import Optional
 import json
 import asyncio
 import dataclasses
-from datetime import datetime
+from datetime import datetime, UTC
+
+from observability import (
+    send_session_start,
+    set_observability_url,
+    get_observability_url,
+    user_prompt_hook,
+    pre_tool_hook,
+    post_tool_hook,
+    session_stop_hook,
+)
 
 
 async def run_claude_session(
@@ -21,6 +32,8 @@ async def run_claude_session(
     sessions_dir: Optional[Path] = None,
     mcp_servers: Optional[dict] = None,
     resume_session_id: Optional[str] = None,
+    observability_enabled: bool = False,
+    observability_url: str = "http://127.0.0.1:8765",
 ) -> tuple[str, str]:
     """
     Run Claude session and stream output to .jsonl file.
@@ -36,6 +49,8 @@ async def run_claude_session(
         sessions_dir: Sessions directory (required for Stage 2 metadata update)
         mcp_servers: MCP server configuration dict (from agent.mcp.json)
         resume_session_id: If provided, resume existing session
+        observability_enabled: If True, send events to observability backend
+        observability_url: Base URL of observability backend
 
     Returns:
         Tuple of (session_id, result)
@@ -56,6 +71,9 @@ async def run_claude_session(
         ...     sessions_dir=Path("/tmp/sessions")
         ... )
     """
+    # Set observability URL for hook functions
+    set_observability_url(observability_url)
+
     # Import SDK here to give better error message if not installed
     try:
         from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage
@@ -72,6 +90,37 @@ async def run_claude_session(
         permission_mode="bypassPermissions",
         setting_sources=["user", "project", "local"],
     )
+
+    # Add programmatic hooks for observability if enabled
+    if observability_enabled:
+        try:
+            from claude_agent_sdk.types import HookMatcher
+
+            options.hooks = {
+                # SessionStart hook not called by SDK - using fallback in message loop
+                # "SessionStart": [
+                #     HookMatcher(hooks=[session_start_hook]),
+                # ],
+                "UserPromptSubmit": [
+                    HookMatcher(hooks=[user_prompt_hook]),
+                ],
+                "PreToolUse": [
+                    HookMatcher(hooks=[pre_tool_hook]),
+                ],
+                "PostToolUse": [
+                    HookMatcher(hooks=[post_tool_hook]),
+                ],
+                "Stop": [
+                    HookMatcher(hooks=[session_stop_hook]),
+                ],
+            }
+        except ImportError as e:
+            # If HookMatcher is not available, fall back to no hooks
+            import sys
+            print(
+                f"Warning: Could not import HookMatcher for observability hooks: {e}",
+                file=sys.stderr
+            )
 
     # Add resume session ID if provided
     if resume_session_id:
@@ -93,7 +142,7 @@ async def run_claude_session(
     user_message = {
         "type": "user_message",
         "content": prompt,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(UTC).isoformat()
     }
     with open(session_file, 'a') as f:
         json.dump(user_message, f)
@@ -109,8 +158,9 @@ async def run_claude_session(
             async for message in client.receive_response():
                 # Write each message to JSONL file (append mode)
                 # Note: SDK messages are dataclasses
+                message_dict = dataclasses.asdict(message)
                 with open(session_file, 'a') as f:
-                    json.dump(dataclasses.asdict(message), f)
+                    json.dump(message_dict, f)
                     f.write('\n')
 
                 # Extract session_id and result from ResultMessage
@@ -118,6 +168,12 @@ async def run_claude_session(
                     # Capture session_id from first ResultMessage
                     if session_id is None:
                         session_id = message.session_id
+
+                        # Fallback: Send session_start event here because the SDK's
+                        # SessionStart hook is not called when using ClaudeSDKClient.
+                        # This ensures observability receives the session_start event.
+                        if observability_enabled:
+                            send_session_start(get_observability_url(), session_id)
 
                         # STAGE 2: Update metadata with session_id immediately
                         # This makes the session resumable even while still running
@@ -165,6 +221,8 @@ def run_session_sync(
     sessions_dir: Optional[Path] = None,
     mcp_servers: Optional[dict] = None,
     resume_session_id: Optional[str] = None,
+    observability_enabled: bool = False,
+    observability_url: str = "http://127.0.0.1:8765",
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -180,6 +238,8 @@ def run_session_sync(
         sessions_dir: Sessions directory (required for Stage 2 metadata update)
         mcp_servers: MCP server configuration dict (from agent.mcp.json)
         resume_session_id: If provided, resume existing session
+        observability_enabled: If True, send events to observability backend
+        observability_url: Base URL of observability backend
 
     Returns:
         Tuple of (session_id, result)
@@ -209,5 +269,7 @@ def run_session_sync(
             sessions_dir=sessions_dir,
             mcp_servers=mcp_servers,
             resume_session_id=resume_session_id,
+            observability_enabled=observability_enabled,
+            observability_url=observability_url,
         )
     )
