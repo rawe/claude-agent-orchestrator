@@ -104,9 +104,9 @@ async def run_claude_session(
                 "UserPromptSubmit": [
                     HookMatcher(hooks=[user_prompt_hook]),
                 ],
-                "PreToolUse": [
-                    HookMatcher(hooks=[pre_tool_hook]),
-                ],
+                #"PreToolUse": [
+                #    HookMatcher(hooks=[pre_tool_hook]),
+                #],
                 "PostToolUse": [
                     HookMatcher(hooks=[post_tool_hook]),
                 ],
