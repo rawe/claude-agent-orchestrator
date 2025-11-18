@@ -14,13 +14,13 @@ import dataclasses
 from datetime import datetime, UTC
 
 from observability import (
-    send_session_start,
+    send_message,
+    send_session_stop,
     set_observability_url,
     get_observability_url,
     user_prompt_hook,
     pre_tool_hook,
     post_tool_hook,
-    session_stop_hook,
 )
 
 
@@ -110,9 +110,11 @@ async def run_claude_session(
                 "PostToolUse": [
                     HookMatcher(hooks=[post_tool_hook]),
                 ],
-                "Stop": [
-                    HookMatcher(hooks=[session_stop_hook]),
-                ],
+                # Stop hook fires before message loop completes, so we send
+                # session_stop manually after loop to ensure correct event order
+                # "Stop": [
+                #     HookMatcher(hooks=[session_stop_hook]),
+                # ],
             }
         except ImportError as e:
             # If HookMatcher is not available, fall back to no hooks
@@ -169,12 +171,6 @@ async def run_claude_session(
                     if session_id is None:
                         session_id = message.session_id
 
-                        # Fallback: Send session_start event here because the SDK's
-                        # SessionStart hook is not called when using ClaudeSDKClient.
-                        # This ensures observability receives the session_start event.
-                        if observability_enabled:
-                            send_session_start(get_observability_url(), session_id)
-
                         # STAGE 2: Update metadata with session_id immediately
                         # This makes the session resumable even while still running
                         if session_name and sessions_dir:
@@ -192,6 +188,20 @@ async def run_claude_session(
 
                     # Capture result (overwrite each time to get final result)
                     result = message.result
+
+                    # Send assistant message to observability
+                    if observability_enabled and message.result:
+                        send_message(
+                            get_observability_url(),
+                            session_id,
+                            "assistant",
+                            [{"type": "text", "text": message.result}]
+                        )
+
+            # Send session_stop after message loop completes
+            # This ensures correct event order: assistant message before session_stop
+            if observability_enabled and session_id:
+                send_session_stop(get_observability_url(), session_id)
 
     except Exception as e:
         # Propagate SDK errors with context

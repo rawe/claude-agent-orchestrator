@@ -157,16 +157,29 @@ async def session_start_hook(
     return {}
 
 
+# Track if session_start has been sent (per-process)
+_session_started: bool = False
+
+
 async def user_prompt_hook(
     input_data: dict,
     tool_use_id: Optional[str],
     context: dict
 ) -> dict:
     """
-    UserPromptSubmit hook - sends user message event to observability backend.
+    UserPromptSubmit hook - sends session_start and user message events.
+
+    This is the first hook called, so we send session_start here since
+    the SessionStart hook is not called by the SDK.
     """
+    global _session_started
     session_id = input_data.get("session_id", "unknown")
     prompt = input_data.get("prompt", "")
+
+    # Send session_start on first prompt (since SessionStart hook doesn't fire)
+    if not _session_started:
+        send_session_start(_observability_url, session_id)
+        _session_started = True
 
     send_message(
         _observability_url,
@@ -218,6 +231,12 @@ async def post_tool_hook(
     return {}
 
 
+# NOTE: Stop hook is defined but not used.
+# The SDK's Stop hook fires before the message loop completes, which causes
+# session_stop to be sent before the assistant message. Instead, we send
+# session_stop manually from the message loop after all messages are processed.
+# See claude_client.run_claude_session().
+# Keeping this function for reference in case SDK behavior changes in the future.
 async def session_stop_hook(
     input_data: dict,
     tool_use_id: Optional[str],
@@ -225,6 +244,9 @@ async def session_stop_hook(
 ) -> dict:
     """
     Stop hook - sends session_stop event to observability backend.
+
+    NOTE: This hook is not used. Session stop is sent manually from the
+    message loop to ensure correct event order.
     """
     session_id = input_data.get("session_id", "unknown")
     send_session_stop(_observability_url, session_id)
