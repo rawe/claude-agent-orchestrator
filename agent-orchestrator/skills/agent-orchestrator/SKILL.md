@@ -230,3 +230,4 @@ Common errors and solutions:
 - **Example Agents**: See `example/agents/` folder for working examples
 - **Agent Details & Usage**: See `references/EXAMPLE-AGENTS.md`
 - **Architecture & Agent Creation**: See `references/AGENT-ORCHESTRATOR.md`
+- **Environment Variables**: See `references/ENV_VARS.md` for configuration options
