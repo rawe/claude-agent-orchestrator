@@ -18,6 +18,7 @@ from observability import (
     send_session_stop,
     set_observability_url,
     get_observability_url,
+    update_session_metadata,
     user_prompt_hook,
     pre_tool_hook,
     post_tool_hook,
@@ -185,6 +186,16 @@ async def run_claude_session(
                                     f"Warning: Failed to update session_id in metadata: {e}",
                                     file=sys.stderr
                                 )
+
+                        # Update observability backend with session metadata
+                        # This happens once, right after we get the session_id
+                        if observability_enabled and session_name:
+                            update_session_metadata(
+                                observability_url,
+                                session_id,
+                                session_name=session_name,
+                                project_dir=str(project_dir)
+                            )
 
                     # Capture result (overwrite each time to get final result)
                     result = message.result
