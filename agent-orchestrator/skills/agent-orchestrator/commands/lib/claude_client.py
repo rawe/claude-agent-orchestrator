@@ -77,7 +77,7 @@ async def run_claude_session(
 
     # Import SDK here to give better error message if not installed
     try:
-        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage
+        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage, SystemMessage
     except ImportError as e:
         raise ImportError(
             "claude-agent-sdk is not installed. "
@@ -166,36 +166,47 @@ async def run_claude_session(
                     json.dump(message_dict, f)
                     f.write('\n')
 
-                # Extract session_id and result from ResultMessage
-                if isinstance(message, ResultMessage):
-                    # Capture session_id from first ResultMessage
-                    if session_id is None:
-                        session_id = message.session_id
+                # Extract session_id from FIRST SystemMessage (arrives early!)
+                # SystemMessage with subtype='init' contains session_id in data dict
+                if isinstance(message, SystemMessage) and session_id is None:
+                    # Extract session_id from SystemMessage.data
+                    if message.subtype == 'init' and message.data:
+                        extracted_session_id = message.data.get('session_id')
+                        if extracted_session_id:
+                            session_id = extracted_session_id
 
-                        # STAGE 2: Update metadata with session_id immediately
-                        # This makes the session resumable even while still running
-                        if session_name and sessions_dir:
-                            try:
-                                from session import update_session_id as _update_session_id
-                                _update_session_id(session_name, session_id, sessions_dir)
-                            except Exception as e:
-                                # Don't fail the session if metadata update fails
-                                # Just log to stderr for debugging
-                                import sys
-                                print(
-                                    f"Warning: Failed to update session_id in metadata: {e}",
-                                    file=sys.stderr
+                            # STAGE 2: Update metadata with session_id immediately
+                            # This makes the session resumable even while still running
+                            # SystemMessage arrives BEFORE Claude starts processing, so this is early!
+                            if session_name and sessions_dir:
+                                try:
+                                    from session import update_session_id as _update_session_id
+                                    _update_session_id(session_name, session_id, sessions_dir)
+                                except Exception as e:
+                                    # Don't fail the session if metadata update fails
+                                    # Just log to stderr for debugging
+                                    import sys
+                                    print(
+                                        f"Warning: Failed to update session_id in metadata: {e}",
+                                        file=sys.stderr
+                                    )
+
+                            # Update observability backend with session metadata
+                            # This happens once, right after we get the session_id from SystemMessage
+                            # Since SystemMessage arrives first, this is sent BEFORE Claude processes!
+                            if observability_enabled and session_name and not resume_session_id:
+                                update_session_metadata(
+                                    observability_url,
+                                    session_id,
+                                    session_name=session_name,
+                                    project_dir=str(project_dir)
                                 )
 
-                        # Update observability backend with session metadata
-                        # This happens once, right after we get the session_id
-                        if observability_enabled and session_name:
-                            update_session_metadata(
-                                observability_url,
-                                session_id,
-                                session_name=session_name,
-                                project_dir=str(project_dir)
-                            )
+                # Extract result from ResultMessage
+                if isinstance(message, ResultMessage):
+                    # Capture session_id if we somehow didn't get it from SystemMessage
+                    if session_id is None:
+                        session_id = message.session_id
 
                     # Capture result (overwrite each time to get final result)
                     result = message.result
