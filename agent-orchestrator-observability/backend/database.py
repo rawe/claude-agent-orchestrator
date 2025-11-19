@@ -52,10 +52,12 @@ def init_db():
 def insert_session(session_id: str, session_name: str, timestamp: str):
     """Insert or update session"""
     conn = sqlite3.connect(DB_PATH)
+    # Use INSERT ... ON CONFLICT to preserve project_dir when resuming sessions
+    # Only update status to 'running', don't replace entire row
     conn.execute("""
-        INSERT OR REPLACE INTO sessions
-        (session_id, session_name, status, created_at)
+        INSERT INTO sessions (session_id, session_name, status, created_at)
         VALUES (?, ?, 'running', ?)
+        ON CONFLICT(session_id) DO UPDATE SET status = 'running'
     """, (session_id, session_name, timestamp))
     conn.commit()
     conn.close()
