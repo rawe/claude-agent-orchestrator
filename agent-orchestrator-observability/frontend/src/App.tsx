@@ -89,7 +89,15 @@ function App() {
         if (event.event_type === 'session_start') {
           setSessions(prev => {
             const exists = prev.some(s => s.session_id === event.session_id)
-            if (exists) return prev
+            if (exists) {
+              // Update existing session status to running (for resume)
+              return prev.map(s =>
+                s.session_id === event.session_id
+                  ? { ...s, status: 'running' }
+                  : s
+              )
+            }
+            // Create new session
             return [{
               session_id: event.session_id,
               session_name: event.session_name,
