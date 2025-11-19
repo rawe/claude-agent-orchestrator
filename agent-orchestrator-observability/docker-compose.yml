@@ -8,9 +8,12 @@ services:
       - "8765:8765"
     volumes:
       - ./backend:/app/backend
-      - observability-data:/app/.agent-orchestrator
+      # Database persistence disabled - starts fresh on each container creation
+      # - observability-data:/app/.agent-orchestrator
     environment:
       - PYTHONUNBUFFERED=1
+      # Enable verbose debug logging for troubleshooting (set to true to enable)
+      - DEBUG_LOGGING=false
     networks:
       - observability-network
     restart: unless-stopped
@@ -26,6 +29,7 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/index.html:/app/index.html
     environment:
+      # Backend URL for API and WebSocket connections (defaults to http://localhost:8765)
       - VITE_BACKEND_URL=http://localhost:8765
     networks:
       - observability-network
@@ -37,6 +41,7 @@ networks:
   observability-network:
     driver: bridge
 
-volumes:
-  observability-data:
-    driver: local
+# Volumes commented out - database starts fresh on each container creation
+# volumes:
+#   observability-data:
+#     driver: local

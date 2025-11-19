@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react'
 
+// Backend URL configuration with fallback
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8765'
+const WS_URL = BACKEND_URL.replace(/^http/, 'ws')
+
 interface Session {
   session_id: string
   session_name: string
@@ -35,7 +39,7 @@ function App() {
 
   useEffect(() => {
     // WebSocket connection - runs in browser, connects to host
-    const ws = new WebSocket('ws://localhost:8765/ws')
+    const ws = new WebSocket(`${WS_URL}/ws`)
 
     ws.onopen = () => {
       console.log('WebSocket connected')
@@ -104,7 +108,7 @@ function App() {
     // Only fetch if we don't have events cached
     if (events[selectedSession] && events[selectedSession].length > 0) return
 
-    fetch(`http://localhost:8765/events/${selectedSession}`)
+    fetch(`${BACKEND_URL}/events/${selectedSession}`)
       .then(r => r.json())
       .then(data => {
         console.log('Loaded events for session:', selectedSession, data.events)

@@ -3,9 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import json
+import os
 
 from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status
 from models import Event
+
+# Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
+DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
 
 # WebSocket connections (in-memory set)
 connections: set[WebSocket] = set()
@@ -40,24 +44,46 @@ app.add_middleware(
 async def receive_event(event: Event):
     """Receive events from hook scripts and broadcast to WebSocket clients"""
 
-    # Update database
-    if event.event_type == "session_start":
-        insert_session(event.session_id, event.session_name, event.timestamp)
-    elif event.event_type == "session_stop":
-        # Update session status to finished
-        update_session_status(event.session_id, "finished")
+    # Debug: Log incoming event
+    if DEBUG:
+        print(f"[DEBUG] Received event: type={event.event_type}, session_id={event.session_id}", flush=True)
+        print(f"[DEBUG] Event data: {event.dict()}", flush=True)
 
-    insert_event(event)
+    try:
+        # Update database
+        if event.event_type == "session_start":
+            insert_session(event.session_id, event.session_name, event.timestamp)
+            if DEBUG:
+                print(f"[DEBUG] Inserted session: {event.session_id}", flush=True)
+        elif event.event_type == "session_stop":
+            # Update session status to finished
+            update_session_status(event.session_id, "finished")
+            if DEBUG:
+                print(f"[DEBUG] Updated session status to finished: {event.session_id}", flush=True)
 
-    # Broadcast to all connected clients
-    message = json.dumps({"type": "event", "data": event.dict()})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+        insert_event(event)
+        if DEBUG:
+            print(f"[DEBUG] Inserted event successfully", flush=True)
 
-    return {"ok": True}
+        # Broadcast to all connected clients
+        message = json.dumps({"type": "event", "data": event.dict()})
+        broadcast_count = 0
+        for ws in connections.copy():
+            try:
+                await ws.send_text(message)
+                broadcast_count += 1
+            except:
+                connections.discard(ws)
+
+        if DEBUG:
+            print(f"[DEBUG] Broadcasted to {broadcast_count} WebSocket clients", flush=True)
+
+        return {"ok": True}
+
+    except Exception as e:
+        print(f"[ERROR] Failed to process event: {e}", flush=True)
+        print(f"[ERROR] Event that failed: {event.dict()}", flush=True)
+        raise
 
 @app.get("/sessions")
 async def list_sessions():

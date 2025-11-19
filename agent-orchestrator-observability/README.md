@@ -128,6 +128,32 @@ Edit `.claude/settings.json` with absolute paths:
 
 **See `docs/HOOKS_SETUP.md` for step-by-step setup instructions.**
 
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEBUG_LOGGING` | `false` | Backend: Enable verbose debug output for troubleshooting. Set to `true`, `1`, or `yes` to enable. |
+| `VITE_BACKEND_URL` | `http://localhost:8765` | Frontend: Backend API URL for connections. Change if backend runs on different host/port. |
+
+**Example: Enable debug logging:**
+```bash
+# Docker: Edit docker-compose.yml and set DEBUG_LOGGING=true, then restart
+docker-compose up -d
+
+# Manual: Set env variable when running
+DEBUG_LOGGING=true uv run backend/main.py
+```
+
+**Example: Change backend URL:**
+```bash
+# Docker: Edit docker-compose.yml VITE_BACKEND_URL value, then rebuild
+docker-compose up -d --build
+
+# Manual: Set env variable when running frontend
+cd frontend
+VITE_BACKEND_URL=http://192.168.1.100:8765 npm run dev
+```
+
 ## Features
 
 ### What This MVP Includes
