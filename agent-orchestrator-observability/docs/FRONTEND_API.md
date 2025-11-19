@@ -1,6 +1,12 @@
-# Frontend → Backend API
+# Frontend API
 
-Interface between the web UI and the observability backend.
+API for reading data from the observability backend.
+
+**Used by:**
+- Web UI (React frontend)
+- Any client that needs to display observability data
+
+**For writing/updating data** (used by hooks and Python commands), see [BACKEND_API.md](BACKEND_API.md).
 
 ## WebSocket
 
@@ -26,6 +32,15 @@ See [Session model](DATA_MODELS.md#session) in DATA_MODELS.md
 }
 ```
 See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
+
+**Session Update:**
+```json
+{
+  "type": "session_updated",
+  "session": Session
+}
+```
+Sent when session metadata (name or project_dir) is updated via the PATCH endpoint.
 
 **Event Types Received:**
 - `session_start` - When an agent session starts
@@ -71,3 +86,7 @@ See [Event Types](DATA_MODELS.md#event-types) for detailed schemas.
 ```
 
 Events are returned in ascending timestamp order (oldest first).
+
+---
+
+**Note:** To update session metadata, see `PATCH /sessions/{session_id}/metadata` in [BACKEND_API.md](BACKEND_API.md).

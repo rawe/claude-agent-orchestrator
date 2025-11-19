@@ -320,8 +320,8 @@ agent-orchestrator-observability/
 │   ├── HOOKS_SETUP.md           # Setup guide
 │   ├── DOCKER.md                # Docker setup guide
 │   ├── DATA_MODELS.md           # Shared data models
-│   ├── HOOKS_API.md             # Hooks → Backend API
-│   └── FRONTEND_API.md          # Frontend → Backend API
+│   ├── BACKEND_API.md           # Backend API (write/update operations)
+│   └── FRONTEND_API.md          # Frontend API (read operations)
 └── frontend/
     ├── package.json             # Node dependencies
     ├── vite.config.ts           # Vite configuration
@@ -372,8 +372,8 @@ CREATE TABLE events (
 - **`docs/HOOKS_SETUP.md`** - Hooks configuration guide
 - **`docs/DOCKER.md`** - Docker setup and commands
 - **`docs/DATA_MODELS.md`** - Shared data models (Event, Session)
-- **`docs/HOOKS_API.md`** - Hook scripts → Backend interface
-- **`docs/FRONTEND_API.md`** - Frontend → Backend interface (WebSocket + REST)
+- **`docs/BACKEND_API.md`** - Backend API for writing/updating data (hooks, Python commands)
+- **`docs/FRONTEND_API.md`** - Frontend API for reading data (WebSocket + REST)
 
 ## License
 

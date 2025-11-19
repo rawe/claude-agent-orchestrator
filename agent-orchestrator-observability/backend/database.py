@@ -15,7 +15,8 @@ def init_db():
             session_id TEXT PRIMARY KEY,
             session_name TEXT NOT NULL,
             status TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            project_dir TEXT
         )
     """)
 
@@ -67,6 +68,32 @@ def update_session_status(session_id: str, status: str):
         SET status = ?
         WHERE session_id = ?
     """, (status, session_id))
+    conn.commit()
+    conn.close()
+
+def update_session_metadata(session_id: str, session_name: str = None, project_dir: str = None):
+    """Update session metadata fields"""
+    conn = sqlite3.connect(DB_PATH)
+
+    updates = []
+    params = []
+
+    if session_name is not None:
+        updates.append("session_name = ?")
+        params.append(session_name)
+
+    if project_dir is not None:
+        updates.append("project_dir = ?")
+        params.append(project_dir)
+
+    if not updates:
+        conn.close()
+        return
+
+    params.append(session_id)
+    query = f"UPDATE sessions SET {', '.join(updates)} WHERE session_id = ?"
+
+    conn.execute(query, params)
     conn.commit()
     conn.close()
 

@@ -9,6 +9,7 @@ interface Session {
   session_name: string
   status: string
   created_at: string
+  project_dir?: string
 }
 
 interface MessageContent {
@@ -37,6 +38,19 @@ function App() {
   const [events, setEvents] = useState<{ [key: string]: Event[] }>({})
   const [connected, setConnected] = useState(false)
 
+  // Helper: Get basename from path
+  const getBasename = (path: string): string => {
+    return path.split('/').filter(Boolean).pop() || path
+  }
+
+  // Helper: Copy to clipboard
+  const copyToClipboard = (text: string, event: React.MouseEvent) => {
+    event.stopPropagation() // Prevent session selection
+    navigator.clipboard.writeText(text)
+      .then(() => console.log('Copied to clipboard:', text))
+      .catch(err => console.error('Failed to copy:', err))
+  }
+
   useEffect(() => {
     // WebSocket connection - runs in browser, connects to host
     const ws = new WebSocket(`${WS_URL}/ws`)
@@ -52,6 +66,15 @@ function App() {
       if (data.type === 'init') {
         console.log('Initial state received:', data.sessions)
         setSessions(data.sessions)
+      } else if (data.type === 'session_updated') {
+        // Update session in list
+        setSessions(prev =>
+          prev.map(s =>
+            s.session_id === data.session.session_id
+              ? data.session
+              : s
+          )
+        )
       } else if (data.type === 'event') {
         const event = data.data
         console.log('New event received:', event)
@@ -140,11 +163,37 @@ function App() {
               className={`session-item ${selectedSession === session.session_id ? 'active' : ''}`}
               onClick={() => setSelectedSession(session.session_id)}
             >
-              <div className="session-item-name">
-                {session.session_name}
-                <span className="session-item-status">{session.status}</span>
+              <div className="session-header">
+                <div className="session-name">{session.session_name}</div>
+                <span className={`session-status ${session.status}`}>
+                  {session.status}
+                </span>
               </div>
-              <div className="timestamp">
+
+              <div className="session-id">
+                {session.session_id}
+              </div>
+
+              {session.project_dir && (
+                <div className="session-project-dir">
+                  <span className="project-dir-label">📁</span>
+                  <span
+                    className="project-dir-name"
+                    title={session.project_dir}
+                  >
+                    {getBasename(session.project_dir)}
+                  </span>
+                  <button
+                    className="copy-button"
+                    onClick={(e) => copyToClipboard(session.project_dir!, e)}
+                    title="Copy full path"
+                  >
+                    📋
+                  </button>
+                </div>
+              )}
+
+              <div className="session-timestamp">
                 {new Date(session.created_at).toLocaleString()}
               </div>
             </div>

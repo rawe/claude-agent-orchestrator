@@ -1,6 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional, Any, List
 
+class SessionMetadataUpdate(BaseModel):
+    """Model for updating session metadata"""
+    session_name: Optional[str] = None
+    project_dir: Optional[str] = None
+
 class MessageContent(BaseModel):
     """Content block within a message"""
     type: str  # 'text' (only text supported for now)

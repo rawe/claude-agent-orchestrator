@@ -45,9 +45,17 @@ Common data structures used across the observability system.
   "session_id": "string",
   "session_name": "string",
   "status": "running | finished",
-  "created_at": "ISO 8601 string"
+  "created_at": "ISO 8601 string",
+  "project_dir": "string (optional)"  // Absolute path to project directory
 }
 ```
+
+**Fields:**
+- `session_id` - Unique identifier for the session
+- `session_name` - Display name for the session
+- `status` - Current session state (`running` or `finished`)
+- `created_at` - ISO 8601 timestamp when session was created
+- `project_dir` - Optional absolute path to the project directory (e.g., `/Users/name/projects/my-app`)
 
 ## Examples
 

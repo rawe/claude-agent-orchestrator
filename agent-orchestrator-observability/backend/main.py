@@ -1,12 +1,12 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import json
 import os
 
-from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status
-from models import Event
+from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status, update_session_metadata
+from models import Event, SessionMetadataUpdate
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
@@ -94,6 +94,39 @@ async def list_sessions():
 async def list_events(session_id: str):
     """Get events for a specific session"""
     return {"events": get_events(session_id)}
+
+@app.patch("/sessions/{session_id}/metadata")
+async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
+    """Update session metadata (name, project_dir)"""
+
+    # Verify session exists
+    sessions = get_sessions()
+    if not any(s['session_id'] == session_id for s in sessions):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Update metadata
+    update_session_metadata(
+        session_id=session_id,
+        session_name=metadata.session_name,
+        project_dir=metadata.project_dir
+    )
+
+    # Broadcast update to WebSocket clients
+    updated_sessions = get_sessions()
+    updated_session = next(s for s in updated_sessions if s['session_id'] == session_id)
+
+    message = json.dumps({
+        "type": "session_updated",
+        "session": updated_session
+    })
+
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    return {"ok": True, "session": updated_session}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

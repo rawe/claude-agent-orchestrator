@@ -1,6 +1,13 @@
-# Hooks → Backend API
+# Backend API
 
-Interface between hook scripts and the observability backend.
+API for writing and updating data in the observability backend.
+
+**Used by:**
+- Hook scripts (session_start, pre_tool, post_tool, stop, user_prompt_submit)
+- Python CLI commands (for updating session metadata)
+- External clients that need to send events or update sessions
+
+**For reading data** (used by the frontend UI), see [FRONTEND_API.md](FRONTEND_API.md).
 
 ## Available Hooks
 
@@ -71,17 +78,21 @@ See [Message Event](DATA_MODELS.md#message-event) in DATA_MODELS.md
 
 ---
 
-## Endpoint
+## Endpoints
+
+### POST /events
+
+Send events to the observability backend.
 
 **URL:** `http://127.0.0.1:8765/events`
 **Method:** `POST`
 **Content-Type:** `application/json`
 
-## Request Body
+**Request Body:**
 
 See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
 
-## Response
+**Response:**
 
 **Success:**
 ```json
@@ -90,6 +101,58 @@ See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
 }
 ```
 **Status Code:** `200 OK`
+
+---
+
+### PATCH /sessions/{session_id}/metadata
+
+Update session metadata (name and/or project directory).
+
+**URL:** `http://127.0.0.1:8765/sessions/{session_id}/metadata`
+**Method:** `PATCH`
+**Content-Type:** `application/json`
+
+**Request Body:**
+```json
+{
+  "session_name": "New Session Name",  // optional
+  "project_dir": "/path/to/project"    // optional
+}
+```
+
+Both fields are optional - include only the fields you want to update.
+
+**Response:**
+
+**Success:**
+```json
+{
+  "ok": true,
+  "session": {
+    "session_id": "abc-123",
+    "session_name": "New Session Name",
+    "status": "running",
+    "created_at": "2025-11-19T10:00:00Z",
+    "project_dir": "/path/to/project"
+  }
+}
+```
+**Status Code:** `200 OK`
+
+**Error (Session Not Found):**
+```json
+{
+  "detail": "Session not found"
+}
+```
+**Status Code:** `404 Not Found`
+
+**Notes:**
+- Updates are broadcast to all connected WebSocket clients via `session_updated` message (see [FRONTEND_API.md](FRONTEND_API.md))
+- At least one field must be provided
+- `project_dir` is typically an absolute path to the project directory
+
+---
 
 ## Configuration
 
