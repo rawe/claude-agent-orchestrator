@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "typer",
+#     "httpx",
 # ]
 # ///
 """
@@ -16,8 +17,27 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from typing import Optional
+import httpx
 
 app = typer.Typer(add_completion=False)
+
+
+def delete_from_observability(session_id: str, observability_url: str) -> bool:
+    """
+    Delete session from observability backend.
+
+    Returns True if successful or session not found, False on error.
+    """
+    try:
+        response = httpx.delete(
+            f"{observability_url}/sessions/{session_id}",
+            timeout=2.0
+        )
+        # 200 = deleted, 404 = not found (both OK)
+        return response.status_code in (200, 404)
+    except Exception:
+        # Silent failure - don't block cleanup
+        return False
 
 
 @app.command()
@@ -33,6 +53,7 @@ def main(
         ao-clean --sessions-dir /custom/path
     """
     from config import load_config
+    from session import list_all_sessions
     import shutil
 
     try:
@@ -45,6 +66,20 @@ def main(
 
         # Check if sessions directory exists
         if config.sessions_dir.exists():
+            # Delete from observability if enabled
+            if config.observability_enabled:
+                try:
+                    sessions = list_all_sessions(config.sessions_dir)
+                    for session_name, session_id, project_dir_path in sessions:
+                        if session_id and session_id != "unknown":
+                            delete_from_observability(
+                                session_id,
+                                config.observability_url
+                            )
+                except Exception:
+                    # Ignore errors - sessions might not exist or be incomplete
+                    pass
+
             # Remove entire directory
             shutil.rmtree(config.sessions_dir)
             print("All sessions removed")

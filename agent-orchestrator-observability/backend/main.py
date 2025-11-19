@@ -5,7 +5,7 @@ import uvicorn
 import json
 import os
 
-from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status, update_session_metadata
+from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status, update_session_metadata, delete_session
 from models import Event, SessionMetadataUpdate
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
@@ -127,6 +127,34 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
             connections.discard(ws)
 
     return {"ok": True, "session": updated_session}
+
+@app.delete("/sessions/{session_id}")
+async def delete_session_endpoint(session_id: str):
+    """Delete a session and all its events"""
+
+    # Delete from database
+    result = delete_session(session_id)
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Broadcast deletion to WebSocket clients
+    message = json.dumps({
+        "type": "session_deleted",
+        "session_id": session_id
+    })
+
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "deleted": result
+    }
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

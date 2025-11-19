@@ -75,6 +75,23 @@ function App() {
               : s
           )
         )
+      } else if (data.type === 'session_deleted') {
+        // Remove session from list
+        setSessions(prev =>
+          prev.filter(s => s.session_id !== data.session_id)
+        )
+
+        // Clear selected session if it was deleted
+        if (selectedSession === data.session_id) {
+          setSelectedSession(null)
+        }
+
+        // Remove events from cache
+        setEvents(prev => {
+          const newEvents = { ...prev }
+          delete newEvents[data.session_id]
+          return newEvents
+        })
       } else if (data.type === 'event') {
         const event = data.data
         console.log('New event received:', event)

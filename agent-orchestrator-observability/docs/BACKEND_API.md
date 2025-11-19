@@ -154,6 +154,47 @@ Both fields are optional - include only the fields you want to update.
 
 ---
 
+### DELETE /sessions/{session_id}
+
+Delete a session and all its associated events.
+
+**URL:** `http://127.0.0.1:8765/sessions/{session_id}`
+**Method:** `DELETE`
+
+**Path Parameters:**
+- `session_id` - Unique session identifier
+
+**Response:**
+
+**Success:**
+```json
+{
+  "ok": true,
+  "session_id": "abc-123",
+  "deleted": {
+    "session": true,
+    "events_count": 42
+  }
+}
+```
+**Status Code:** `200 OK`
+
+**Error (Session Not Found):**
+```json
+{
+  "detail": "Session not found"
+}
+```
+**Status Code:** `404 Not Found`
+
+**Notes:**
+- Permanently deletes session and all associated events (cannot be undone)
+- Broadcasts `session_deleted` message to all connected WebSocket clients (see [FRONTEND_API.md](FRONTEND_API.md))
+- Returns count of deleted events for confirmation
+- Used by `ao-clean` command to remove sessions from observability
+
+---
+
 ## Configuration
 
 **Environment Variable:**

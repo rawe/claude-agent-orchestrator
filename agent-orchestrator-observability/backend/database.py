@@ -158,3 +158,45 @@ def get_events(session_id: str, limit: int = 100):
 
     conn.close()
     return events
+
+def delete_session(session_id: str) -> dict | None:
+    """
+    Delete session and all associated events.
+
+    Returns:
+        dict with deletion stats if session exists, None if not found
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Count events before deleting (for response)
+    cursor.execute(
+        "SELECT COUNT(*) FROM events WHERE session_id = ?",
+        (session_id,)
+    )
+    events_count = cursor.fetchone()[0]
+
+    # Check if session exists
+    cursor.execute(
+        "SELECT COUNT(*) FROM sessions WHERE session_id = ?",
+        (session_id,)
+    )
+    session_exists = cursor.fetchone()[0] > 0
+
+    if not session_exists:
+        conn.close()
+        return None
+
+    # Delete events first (foreign key constraint)
+    cursor.execute("DELETE FROM events WHERE session_id = ?", (session_id,))
+
+    # Delete session
+    cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "session": True,
+        "events_count": events_count
+    }

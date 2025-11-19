@@ -42,6 +42,15 @@ See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
 ```
 Sent when session metadata (name or project_dir) is updated via the PATCH endpoint.
 
+**Session Deleted:**
+```json
+{
+  "type": "session_deleted",
+  "session_id": "abc-123"
+}
+```
+Sent when a session is deleted via DELETE endpoint. Frontend should remove the session from the list.
+
 **Event Types Received:**
 - `session_start` - When an agent session starts
 - `pre_tool` - Before a tool executes (shows input parameters)
