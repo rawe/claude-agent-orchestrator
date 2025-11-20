@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // Backend URL configuration with fallback
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8765'
@@ -44,6 +46,7 @@ function App() {
     showSessionEvents: true
   })
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set())
+  const [renderMarkdown, setRenderMarkdown] = useState(true)
 
   // Helper: Get unique identifier for an event
   const getEventKey = (event: Event): string => {
@@ -354,6 +357,17 @@ function App() {
               >
                 Expand All
               </button>
+
+              <div className="toolbar-divider"></div>
+
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={renderMarkdown}
+                  onChange={() => setRenderMarkdown(prev => !prev)}
+                />
+                <span>Render Markdown</span>
+              </label>
             </div>
           )}
         </div>
@@ -469,10 +483,14 @@ function App() {
                                 background: event.role === 'assistant' ? '#f0f4ff' : '#f5f5f5',
                                 padding: '12px',
                                 borderRadius: '4px',
-                                whiteSpace: 'pre-wrap',
+                                whiteSpace: renderMarkdown ? 'normal' : 'pre-wrap',
                                 fontFamily: 'inherit'
                               }}>
-                                {block.text}
+                                {renderMarkdown ? (
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text}</ReactMarkdown>
+                                ) : (
+                                  block.text
+                                )}
                               </div>
                             )}
                           </div>
