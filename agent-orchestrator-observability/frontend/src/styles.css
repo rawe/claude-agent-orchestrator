@@ -236,12 +236,88 @@ code, pre {
   background: white;
   border-bottom: 1px solid #e0e0e0;
   padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.header h3 {
+.header-title h3 {
   font-size: 16px;
   font-weight: 500;
   color: #333;
+  margin: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.toolbar-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-right: 4px;
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.filter-checkbox:hover {
+  color: #000;
+}
+
+.filter-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.filter-checkbox span {
+  font-weight: 500;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: #d0d0d0;
+  margin: 0 4px;
+}
+
+.toolbar-button {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toolbar-button:hover {
+  background: #f0f0f0;
+  border-color: #999;
+  color: #000;
+}
+
+.toolbar-button:active {
+  transform: scale(0.98);
 }
 
 .events {
@@ -257,6 +333,11 @@ code, pre {
   margin-bottom: 12px;
   border-left: 4px solid #4caf50;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.event.collapsed {
+  padding: 12px 16px;
 }
 
 .event.pre_tool {
@@ -267,10 +348,48 @@ code, pre {
   border-left-color: #ff9800;
 }
 
+.event-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.event.collapsed .event-header {
+  margin-bottom: 0;
+}
+
 .event-timestamp {
   color: #999;
   font-size: 12px;
-  margin-bottom: 8px;
+}
+
+.collapse-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  padding: 4px 8px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.collapse-button:hover {
+  background: #f0f0f0;
+  color: #000;
+}
+
+.collapse-button:active {
+  transform: scale(0.95);
+}
+
+.event-summary {
+  font-size: 13px;
+  color: #555;
+  font-weight: 500;
+  margin-top: 4px;
 }
 
 .event-content {

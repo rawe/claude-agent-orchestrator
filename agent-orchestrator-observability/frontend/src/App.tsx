@@ -19,7 +19,7 @@ interface MessageContent {
 }
 
 interface Event {
-  id: number
+  id?: number
   session_id: string
   event_type: string
   timestamp: string
@@ -38,6 +38,20 @@ function App() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
   const [events, setEvents] = useState<{ [key: string]: Event[] }>({})
   const [connected, setConnected] = useState(false)
+  const [filters, setFilters] = useState({
+    showTools: true,
+    showMessages: true,
+    showSessionEvents: true
+  })
+  const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set())
+
+  // Helper: Get unique identifier for an event
+  const getEventKey = (event: Event): string => {
+    // Use ID if available, otherwise use session_id + timestamp for uniqueness
+    return event.id !== undefined
+      ? `id-${event.id}`
+      : `${event.session_id}-${event.timestamp}`
+  }
 
   // Helper: Get basename from path
   const getBasename = (path: string): string => {
@@ -50,6 +64,38 @@ function App() {
     navigator.clipboard.writeText(text)
       .then(() => console.log('Copied to clipboard:', text))
       .catch(err => console.error('Failed to copy:', err))
+  }
+
+  // Helper: Toggle filter
+  const toggleFilter = (filterKey: keyof typeof filters) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterKey]: !prev[filterKey]
+    }))
+  }
+
+  // Helper: Toggle individual event collapse
+  const toggleEventCollapse = (eventKey: string) => {
+    setCollapsedEvents(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(eventKey)) {
+        newSet.delete(eventKey)
+      } else {
+        newSet.add(eventKey)
+      }
+      return newSet
+    })
+  }
+
+  // Helper: Collapse all events (will be called after filteredEvents is defined)
+  const collapseAll = (eventsList: Event[]) => {
+    const allEventKeys = eventsList.map(e => getEventKey(e))
+    setCollapsedEvents(new Set(allEventKeys))
+  }
+
+  // Helper: Expand all events
+  const expandAll = () => {
+    setCollapsedEvents(new Set())
   }
 
   useEffect(() => {
@@ -171,6 +217,20 @@ function App() {
 
   const currentEvents = selectedSession ? (events[selectedSession] || []) : []
 
+  // Filter events based on active filters
+  const filteredEvents = currentEvents.filter(event => {
+    if (event.event_type === 'pre_tool' || event.event_type === 'post_tool') {
+      return filters.showTools
+    }
+    if (event.event_type === 'message') {
+      return filters.showMessages
+    }
+    if (event.event_type === 'session_start' || event.event_type === 'session_stop') {
+      return filters.showSessionEvents
+    }
+    return true // Show unknown event types by default
+  })
+
   return (
     <div className="app">
       <div className="sidebar">
@@ -244,22 +304,92 @@ function App() {
 
       <div className="main">
         <div className="header">
-          {selectedSession ? (
-            <h3>Session: {sessions.find(s => s.session_id === selectedSession)?.session_name || selectedSession}</h3>
-          ) : (
-            <h3>Select a session to view events</h3>
+          <div className="header-title">
+            {selectedSession ? (
+              <h3>Session: {sessions.find(s => s.session_id === selectedSession)?.session_name || selectedSession}</h3>
+            ) : (
+              <h3>Select a session to view events</h3>
+            )}
+          </div>
+
+          {selectedSession && (
+            <div className="toolbar">
+              <span className="toolbar-label">Filters:</span>
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={filters.showTools}
+                  onChange={() => toggleFilter('showTools')}
+                />
+                <span>Tools</span>
+              </label>
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={filters.showMessages}
+                  onChange={() => toggleFilter('showMessages')}
+                />
+                <span>Messages</span>
+              </label>
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={filters.showSessionEvents}
+                  onChange={() => toggleFilter('showSessionEvents')}
+                />
+                <span>Session Events</span>
+              </label>
+
+              <div className="toolbar-divider"></div>
+
+              <button
+                className="toolbar-button"
+                onClick={() => collapseAll(filteredEvents)}
+              >
+                Collapse All
+              </button>
+              <button
+                className="toolbar-button"
+                onClick={expandAll}
+              >
+                Expand All
+              </button>
+            </div>
           )}
         </div>
 
         <div className="events">
-          {currentEvents.length > 0 ? (
-            currentEvents.map((event, index) => (
-              <div key={event.id || index} className={`event ${event.event_type}`}>
-                <div className="event-timestamp">
-                  {new Date(event.timestamp).toLocaleTimeString()}
-                </div>
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((event, index) => {
+              const eventKey = getEventKey(event)
+              const isCollapsed = collapsedEvents.has(eventKey)
+              return (
+                <div key={eventKey} className={`event ${event.event_type} ${isCollapsed ? 'collapsed' : ''}`}>
+                  <div className="event-header">
+                    <div className="event-timestamp">
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </div>
+                    <button
+                      className="collapse-button"
+                      onClick={() => toggleEventCollapse(eventKey)}
+                      title={isCollapsed ? 'Expand' : 'Collapse'}
+                    >
+                      {isCollapsed ? '▶' : '▼'}
+                    </button>
+                  </div>
 
-                <div className="event-content">
+                  {isCollapsed && (
+                    <div className="event-summary">
+                      {event.event_type === 'session_start' && <span>Session Started</span>}
+                      {event.event_type === 'session_stop' && <span>Session Stopped</span>}
+                      {event.event_type === 'pre_tool' && <span>Tool: {event.tool_name}</span>}
+                      {event.event_type === 'post_tool' && <span>🔧 {event.tool_name}</span>}
+                      {event.event_type === 'message' && <span>{event.role === 'assistant' ? '🤖 Assistant' : '👤 User'}</span>}
+                    </div>
+                  )}
+
+                  {!isCollapsed && (
+                    <div className="event-content">
                   {event.event_type === 'session_start' && (
                     <div>
                       <strong>Session Started</strong>
@@ -350,9 +480,11 @@ function App() {
                       </div>
                     </div>
                   )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           ) : selectedSession ? (
             <div className="empty-events">
               <div className="empty-events-content">
