@@ -67,7 +67,7 @@ Frontend will start on `http://localhost:5173`
 
 **Terminal 3 - Your Agents:**
 ```bash
-# First configure hooks (see Configuration section below)
+# See docs/USAGE.md for configuration (framework or standalone modes)
 # From project root directory
 cd ..
 uv run commands/ao-new my-test-agent -p "Your task"
@@ -82,51 +82,21 @@ You should see:
 - Event timeline when a session is selected
 - Real-time updates as agents execute
 
-## Configuration
+## Usage
 
-To enable observability, you need to configure hooks in `.claude/settings.json`.
+This observability platform has two usage modes:
 
-### Quick Setup
+**1. Agent Orchestrator Framework (Primary)**
+- Built-in observability for Agent Orchestrator commands (`ao-new`, `ao-resume`, etc.)
+- Automatic session metadata tracking (agent name, project directory)
+- Enable via environment variables only - no hook configuration needed
 
-**Option 1: Using Environment Variable (Recommended)**
+**2. Standalone / Testing (Secondary)**
+- Hook-based observability for any Claude Code session
+- Useful for testing or non-framework usage
+- Requires hook configuration in `.claude/settings.json`
 
-1. Set the base path environment variable:
-   ```bash
-   export AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH="$(pwd)"
-   # Add to ~/.zshrc or ~/.bashrc to make it permanent
-   ```
-
-2. Copy the example hooks configuration:
-   ```bash
-   cp docs/hooks.example.json ../.claude/settings.json
-   ```
-
-**Option 2: Using Absolute Paths**
-
-Edit `.claude/settings.json` with absolute paths:
-```json
-{
-  "hooks": {
-    "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestrator-observability/hooks/session_start_hook.py",
-        "timeout": 2000
-      }]
-    }],
-    "PreToolUse": [{
-      "matcher": "*",
-      "hooks": [{
-        "type": "command",
-        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestrator-observability/hooks/pre_tool_hook.py",
-        "timeout": 2000
-      }]
-    }]
-  }
-}
-```
-
-**See `docs/HOOKS_SETUP.md` for step-by-step setup instructions.**
+**📖 See `docs/USAGE.md` for configuration, setup instructions, and detailed workflows.**
 
 ## Environment Variables
 
@@ -317,6 +287,7 @@ agent-orchestrator-observability/
 │   └── frontend.Dockerfile      # Frontend container image
 ├── docs/
 │   ├── hooks.example.json       # Hooks configuration template
+│   ├── USAGE.md                 # Complete usage guide
 │   ├── HOOKS_SETUP.md           # Setup guide
 │   ├── DOCKER.md                # Docker setup guide
 │   ├── DATABASE_SCHEMA.md       # Database schema and tables
@@ -345,6 +316,7 @@ agent-orchestrator-observability/
 
 ## Documentation
 
+- **`docs/USAGE.md`** - Complete usage guide (framework integration and standalone modes)
 - **`docs/HOOKS_SETUP.md`** - Hooks configuration guide
 - **`docs/DOCKER.md`** - Docker setup and commands
 - **`docs/DATABASE_SCHEMA.md`** - Database schema and table definitions
