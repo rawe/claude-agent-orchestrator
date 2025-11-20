@@ -132,19 +132,21 @@ def update_session_metadata(
     base_url: str,
     session_id: str,
     session_name: Optional[str] = None,
-    project_dir: Optional[str] = None
+    project_dir: Optional[str] = None,
+    agent_name: Optional[str] = None
 ) -> None:
     """
-    Update session metadata (name and/or project directory).
+    Update session metadata (name, project directory, and/or agent name).
 
     Sends a PATCH request to /sessions/{session_id}/metadata.
-    At least one of session_name or project_dir should be provided.
+    At least one of session_name, project_dir, or agent_name should be provided.
 
     Args:
         base_url: Base URL of observability backend (e.g., http://127.0.0.1:8765)
         session_id: Claude session ID
         session_name: Human-readable session name (optional)
         project_dir: Project directory path (optional)
+        agent_name: Agent name (optional)
     """
     # Build request body with only provided fields
     metadata = {}
@@ -152,6 +154,8 @@ def update_session_metadata(
         metadata["session_name"] = session_name
     if project_dir is not None:
         metadata["project_dir"] = project_dir
+    if agent_name is not None:
+        metadata["agent_name"] = agent_name
 
     # Skip if no metadata to update
     if not metadata:

@@ -67,7 +67,7 @@ Frontend will start on `http://localhost:5173`
 
 **Terminal 3 - Your Agents:**
 ```bash
-# First configure hooks (see Configuration section below)
+# See docs/USAGE.md for configuration (framework or standalone modes)
 # From project root directory
 cd ..
 uv run commands/ao-new my-test-agent -p "Your task"
@@ -82,51 +82,21 @@ You should see:
 - Event timeline when a session is selected
 - Real-time updates as agents execute
 
-## Configuration
+## Usage
 
-To enable observability, you need to configure hooks in `.claude/settings.json`.
+This observability platform has two usage modes:
 
-### Quick Setup
+**1. Agent Orchestrator Framework (Primary)**
+- Built-in observability for Agent Orchestrator commands (`ao-new`, `ao-resume`, etc.)
+- Automatic session metadata tracking (agent name, project directory)
+- Enable via environment variables only - no hook configuration needed
 
-**Option 1: Using Environment Variable (Recommended)**
+**2. Standalone / Testing (Secondary)**
+- Hook-based observability for any Claude Code session
+- Useful for testing or non-framework usage
+- Requires hook configuration in `.claude/settings.json`
 
-1. Set the base path environment variable:
-   ```bash
-   export AGENT_ORCHESTRATOR_OBSERVABILITY_BASE_PATH="$(pwd)"
-   # Add to ~/.zshrc or ~/.bashrc to make it permanent
-   ```
-
-2. Copy the example hooks configuration:
-   ```bash
-   cp docs/hooks.example.json ../.claude/settings.json
-   ```
-
-**Option 2: Using Absolute Paths**
-
-Edit `.claude/settings.json` with absolute paths:
-```json
-{
-  "hooks": {
-    "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestrator-observability/hooks/session_start_hook.py",
-        "timeout": 2000
-      }]
-    }],
-    "PreToolUse": [{
-      "matcher": "*",
-      "hooks": [{
-        "type": "command",
-        "command": "uv run /ABSOLUTE/PATH/TO/agent-orchestrator-observability/hooks/pre_tool_hook.py",
-        "timeout": 2000
-      }]
-    }]
-  }
-}
-```
-
-**See `docs/HOOKS_SETUP.md` for step-by-step setup instructions.**
+**📖 See `docs/USAGE.md` for configuration, setup instructions, and detailed workflows.**
 
 ## Environment Variables
 
@@ -317,8 +287,10 @@ agent-orchestrator-observability/
 │   └── frontend.Dockerfile      # Frontend container image
 ├── docs/
 │   ├── hooks.example.json       # Hooks configuration template
+│   ├── USAGE.md                 # Complete usage guide
 │   ├── HOOKS_SETUP.md           # Setup guide
 │   ├── DOCKER.md                # Docker setup guide
+│   ├── DATABASE_SCHEMA.md       # Database schema and tables
 │   ├── DATA_MODELS.md           # Shared data models
 │   ├── BACKEND_API.md           # Backend API (write/update operations)
 │   └── FRONTEND_API.md          # Frontend API (read operations)
@@ -342,47 +314,13 @@ agent-orchestrator-observability/
 3. Add hook to `.claude/settings.json`
 4. Update frontend to display new event type in `App.tsx`
 
-### Database Schema
-
-**Sessions Table:**
-```sql
-CREATE TABLE sessions (
-    session_id TEXT PRIMARY KEY,
-    session_name TEXT NOT NULL,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-```
-
-**Events Table:**
-```sql
-CREATE TABLE events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    tool_name TEXT,
-    tool_input TEXT,
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-);
-```
-
 ## Documentation
 
+- **`docs/USAGE.md`** - Complete usage guide (framework integration and standalone modes)
 - **`docs/HOOKS_SETUP.md`** - Hooks configuration guide
 - **`docs/DOCKER.md`** - Docker setup and commands
+- **`docs/DATABASE_SCHEMA.md`** - Database schema and table definitions
 - **`docs/DATA_MODELS.md`** - Shared data models (Event, Session)
 - **`docs/BACKEND_API.md`** - Backend API for writing/updating data (hooks, Python commands)
 - **`docs/FRONTEND_API.md`** - Frontend API for reading data (WebSocket + REST)
 
-## License
-
-Part of the Agent Orchestrator Framework.
-
-## Next Steps
-
-See `PLAN.md` for planned Phase 2 features:
-- PostToolUse hooks for tool results
-- Session stop detection
-- Error handling UI
-- Auto-reconnection logic

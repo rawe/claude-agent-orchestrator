@@ -5,6 +5,7 @@ class SessionMetadataUpdate(BaseModel):
     """Model for updating session metadata"""
     session_name: Optional[str] = None
     project_dir: Optional[str] = None
+    agent_name: Optional[str] = None
 
 class MessageContent(BaseModel):
     """Content block within a message"""

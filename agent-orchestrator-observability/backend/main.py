@@ -97,7 +97,7 @@ async def list_events(session_id: str):
 
 @app.patch("/sessions/{session_id}/metadata")
 async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
-    """Update session metadata (name, project_dir)"""
+    """Update session metadata (name, project_dir, agent_name)"""
 
     # Verify session exists
     sessions = get_sessions()
@@ -108,7 +108,8 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
     update_session_metadata(
         session_id=session_id,
         session_name=metadata.session_name,
-        project_dir=metadata.project_dir
+        project_dir=metadata.project_dir,
+        agent_name=metadata.agent_name
     )
 
     # Broadcast update to WebSocket clients

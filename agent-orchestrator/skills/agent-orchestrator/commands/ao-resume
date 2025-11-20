@@ -162,6 +162,7 @@ def main(
             resume_session_id=resume_session_id,  # KEY: Enable resume
             observability_enabled=config.observability_enabled,
             observability_url=config.observability_url,
+            agent_name=metadata.agent,
         )
 
         # 11. Update session metadata timestamp

@@ -35,6 +35,7 @@ async def run_claude_session(
     resume_session_id: Optional[str] = None,
     observability_enabled: bool = False,
     observability_url: str = "http://127.0.0.1:8765",
+    agent_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Run Claude session and stream output to .jsonl file.
@@ -52,6 +53,7 @@ async def run_claude_session(
         resume_session_id: If provided, resume existing session
         observability_enabled: If True, send events to observability backend
         observability_url: Base URL of observability backend
+        agent_name: Agent name (optional, for observability metadata)
 
     Returns:
         Tuple of (session_id, result)
@@ -199,7 +201,8 @@ async def run_claude_session(
                                     observability_url,
                                     session_id,
                                     session_name=session_name,
-                                    project_dir=str(project_dir)
+                                    project_dir=str(project_dir),
+                                    agent_name=agent_name
                                 )
 
                 # Extract result from ResultMessage
@@ -255,6 +258,7 @@ def run_session_sync(
     resume_session_id: Optional[str] = None,
     observability_enabled: bool = False,
     observability_url: str = "http://127.0.0.1:8765",
+    agent_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -272,6 +276,7 @@ def run_session_sync(
         resume_session_id: If provided, resume existing session
         observability_enabled: If True, send events to observability backend
         observability_url: Base URL of observability backend
+        agent_name: Agent name (optional, for observability metadata)
 
     Returns:
         Tuple of (session_id, result)
@@ -303,5 +308,6 @@ def run_session_sync(
             resume_session_id=resume_session_id,
             observability_enabled=observability_enabled,
             observability_url=observability_url,
+            agent_name=agent_name,
         )
     )

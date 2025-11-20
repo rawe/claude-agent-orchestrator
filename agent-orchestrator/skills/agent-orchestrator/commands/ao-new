@@ -158,6 +158,7 @@ def main(
             mcp_servers=mcp_servers,
             observability_enabled=config.observability_enabled,
             observability_url=config.observability_url,
+            agent_name=agent_name,
         )
 
         # 10. Log result (if logging enabled)

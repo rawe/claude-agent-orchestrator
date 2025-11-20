@@ -10,6 +10,7 @@ interface Session {
   status: string
   created_at: string
   project_dir?: string
+  agent_name?: string
 }
 
 interface MessageContent {
@@ -198,6 +199,15 @@ function App() {
               <div className="session-id">
                 {session.session_id}
               </div>
+
+              {session.agent_name && (
+                <div className="session-agent-name">
+                  <span className="agent-name-label">🤖</span>
+                  <span className="agent-name-text">
+                    {session.agent_name}
+                  </span>
+                </div>
+              )}
 
               {session.project_dir && (
                 <div className="session-project-dir">
