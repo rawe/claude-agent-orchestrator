@@ -47,6 +47,8 @@ function App() {
   })
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set())
   const [renderMarkdown, setRenderMarkdown] = useState(true)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const eventsContainerRef = React.useRef<HTMLDivElement>(null)
 
   // Helper: Get unique identifier for an event
   const getEventKey = (event: Event): string => {
@@ -220,6 +222,16 @@ function App() {
 
   const currentEvents = selectedSession ? (events[selectedSession] || []) : []
 
+  // Auto-scroll to bottom when new events arrive
+  useEffect(() => {
+    if (autoScroll && eventsContainerRef.current) {
+      eventsContainerRef.current.scrollTo({
+        top: eventsContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      })
+    }
+  }, [currentEvents.length, autoScroll])
+
   // Filter events based on active filters
   const filteredEvents = currentEvents.filter(event => {
     if (event.event_type === 'pre_tool' || event.event_type === 'post_tool') {
@@ -368,11 +380,20 @@ function App() {
                 />
                 <span>Render Markdown</span>
               </label>
+
+              <label className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={autoScroll}
+                  onChange={() => setAutoScroll(prev => !prev)}
+                />
+                <span>Auto-Scroll</span>
+              </label>
             </div>
           )}
         </div>
 
-        <div className="events">
+        <div className="events" ref={eventsContainerRef}>
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
               const eventKey = getEventKey(event)
