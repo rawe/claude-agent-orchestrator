@@ -401,17 +401,17 @@ function App() {
               const roleClass = event.event_type === 'message' && event.role ? event.role : ''
               return (
                 <div key={eventKey} className={`event ${event.event_type} ${roleClass} ${isCollapsed ? 'collapsed' : ''}`}>
-                  <div className="event-header">
+                  <div
+                    className="event-header"
+                    onClick={() => toggleEventCollapse(eventKey)}
+                    title={isCollapsed ? 'Click to expand' : 'Click to collapse'}
+                  >
                     <div className="event-timestamp">
                       {new Date(event.timestamp).toLocaleTimeString()}
                     </div>
-                    <button
-                      className="collapse-button"
-                      onClick={() => toggleEventCollapse(eventKey)}
-                      title={isCollapsed ? 'Expand' : 'Collapse'}
-                    >
+                    <div className="collapse-button">
                       {isCollapsed ? '▶' : '▼'}
-                    </button>
+                    </div>
                   </div>
 
                   {isCollapsed && (

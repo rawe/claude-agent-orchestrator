@@ -251,6 +251,7 @@ code, pre {
 .toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 12px 16px;
   background: #f8f9fa;
@@ -268,7 +269,7 @@ code, pre {
 .filter-checkbox {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
   font-size: 13px;
   color: #333;
@@ -281,10 +282,43 @@ code, pre {
 }
 
 .filter-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 40px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 20px;
+  position: relative;
   cursor: pointer;
+  transition: background 0.3s ease;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.filter-checkbox input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
   width: 16px;
   height: 16px;
-  margin: 0;
+  border-radius: 50%;
+  background: white;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.filter-checkbox input[type="checkbox"]:checked {
+  background: #4CAF50;
+}
+
+.filter-checkbox input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
+}
+
+.filter-checkbox input[type="checkbox"]:hover {
+  opacity: 0.9;
 }
 
 .filter-checkbox span {
@@ -372,10 +406,23 @@ code, pre {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+  padding: 4px 8px;
+  margin: -4px -8px 8px -8px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.event-header:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .event.collapsed .event-header {
-  margin-bottom: 0;
+  margin-bottom: -4px;
 }
 
 .event-timestamp {
@@ -384,24 +431,19 @@ code, pre {
 }
 
 .collapse-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  color: #666;
-  padding: 4px 8px;
-  border-radius: 3px;
-  transition: all 0.15s;
+  font-size: 16px;
+  color: #999;
+  padding: 2px 8px;
+  transition: all 0.2s ease;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.collapse-button:hover {
-  background: #f0f0f0;
-  color: #000;
-}
-
-.collapse-button:active {
-  transform: scale(0.95);
+.event-header:hover .collapse-button {
+  color: #333;
+  transform: scale(1.15);
 }
 
 .event-summary {
