@@ -340,12 +340,31 @@ code, pre {
   padding: 12px 16px;
 }
 
+/* Tools - Green */
 .event.pre_tool {
-  border-left-color: #2196f3;
+  border-left-color: #43A047;
 }
 
+.event.post_tool {
+  border-left-color: #43A047;
+}
+
+/* Session Events */
 .event.session_start {
   border-left-color: #ff9800;
+}
+
+.event.session_stop {
+  border-left-color: #546E7A;
+}
+
+/* Messages - User (Blue) and Agent (Purple) */
+.event.message.user {
+  border-left-color: #2196F3;
+}
+
+.event.message.assistant {
+  border-left-color: #9B7EDC;
 }
 
 .event-header {

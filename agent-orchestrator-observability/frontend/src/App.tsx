@@ -398,8 +398,9 @@ function App() {
             filteredEvents.map((event) => {
               const eventKey = getEventKey(event)
               const isCollapsed = collapsedEvents.has(eventKey)
+              const roleClass = event.event_type === 'message' && event.role ? event.role : ''
               return (
-                <div key={eventKey} className={`event ${event.event_type} ${isCollapsed ? 'collapsed' : ''}`}>
+                <div key={eventKey} className={`event ${event.event_type} ${roleClass} ${isCollapsed ? 'collapsed' : ''}`}>
                   <div className="event-header">
                     <div className="event-timestamp">
                       {new Date(event.timestamp).toLocaleTimeString()}
@@ -471,7 +472,7 @@ function App() {
                           <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '4px' }}>
                             <strong>Output:</strong>
                           </div>
-                          <pre style={{ background: '#e8f5e9', padding: '8px', borderRadius: '4px', maxHeight: '300px', overflow: 'auto' }}>
+                          <pre style={{ background: '#E8F5E9', padding: '8px', borderRadius: '4px', maxHeight: '300px', overflow: 'auto' }}>
                             {typeof event.tool_output === 'string'
                               ? event.tool_output
                               : JSON.stringify(event.tool_output, null, 2)}
@@ -501,7 +502,7 @@ function App() {
                           <div key={idx}>
                             {block.type === 'text' && (
                               <div style={{
-                                background: event.role === 'assistant' ? '#f0f4ff' : '#f5f5f5',
+                                background: 'white',
                                 padding: '12px',
                                 borderRadius: '4px',
                                 whiteSpace: renderMarkdown ? 'normal' : 'pre-wrap',
