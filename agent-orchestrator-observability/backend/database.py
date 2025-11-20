@@ -16,7 +16,8 @@ def init_db():
             session_name TEXT NOT NULL,
             status TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            project_dir TEXT
+            project_dir TEXT,
+            agent_name TEXT
         )
     """)
 
@@ -73,7 +74,7 @@ def update_session_status(session_id: str, status: str):
     conn.commit()
     conn.close()
 
-def update_session_metadata(session_id: str, session_name: str = None, project_dir: str = None):
+def update_session_metadata(session_id: str, session_name: str = None, project_dir: str = None, agent_name: str = None):
     """Update session metadata fields"""
     conn = sqlite3.connect(DB_PATH)
 
@@ -87,6 +88,10 @@ def update_session_metadata(session_id: str, session_name: str = None, project_d
     if project_dir is not None:
         updates.append("project_dir = ?")
         params.append(project_dir)
+
+    if agent_name is not None:
+        updates.append("agent_name = ?")
+        params.append(agent_name)
 
     if not updates:
         conn.close()
