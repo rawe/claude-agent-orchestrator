@@ -319,6 +319,7 @@ agent-orchestrator-observability/
 │   ├── hooks.example.json       # Hooks configuration template
 │   ├── HOOKS_SETUP.md           # Setup guide
 │   ├── DOCKER.md                # Docker setup guide
+│   ├── DATABASE_SCHEMA.md       # Database schema and tables
 │   ├── DATA_MODELS.md           # Shared data models
 │   ├── BACKEND_API.md           # Backend API (write/update operations)
 │   └── FRONTEND_API.md          # Frontend API (read operations)
@@ -342,47 +343,12 @@ agent-orchestrator-observability/
 3. Add hook to `.claude/settings.json`
 4. Update frontend to display new event type in `App.tsx`
 
-### Database Schema
-
-**Sessions Table:**
-```sql
-CREATE TABLE sessions (
-    session_id TEXT PRIMARY KEY,
-    session_name TEXT NOT NULL,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-```
-
-**Events Table:**
-```sql
-CREATE TABLE events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    tool_name TEXT,
-    tool_input TEXT,
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
-);
-```
-
 ## Documentation
 
 - **`docs/HOOKS_SETUP.md`** - Hooks configuration guide
 - **`docs/DOCKER.md`** - Docker setup and commands
+- **`docs/DATABASE_SCHEMA.md`** - Database schema and table definitions
 - **`docs/DATA_MODELS.md`** - Shared data models (Event, Session)
 - **`docs/BACKEND_API.md`** - Backend API for writing/updating data (hooks, Python commands)
 - **`docs/FRONTEND_API.md`** - Frontend API for reading data (WebSocket + REST)
 
-## License
-
-Part of the Agent Orchestrator Framework.
-
-## Next Steps
-
-See `PLAN.md` for planned Phase 2 features:
-- PostToolUse hooks for tool results
-- Session stop detection
-- Error handling UI
-- Auto-reconnection logic
