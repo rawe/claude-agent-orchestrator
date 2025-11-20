@@ -360,7 +360,7 @@ function App() {
 
         <div className="events">
           {filteredEvents.length > 0 ? (
-            filteredEvents.map((event, index) => {
+            filteredEvents.map((event) => {
               const eventKey = getEventKey(event)
               const isCollapsed = collapsedEvents.has(eventKey)
               return (
