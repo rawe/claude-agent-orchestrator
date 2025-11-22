@@ -8,6 +8,7 @@ class DocumentMetadata(BaseModel):
     filename: str
     content_type: str
     size_bytes: int
+    checksum: str = ""  # SHA256 checksum for integrity verification
     storage_path: str
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
