@@ -215,17 +215,6 @@ FastAPI provides auto-generated interactive documentation:
 
 Use Swagger UI to test endpoints interactively with a web interface.
 
-### Current Implementation Status
-
-**Completed Blocks**:
-- **Block 01**: Server Foundation - FastAPI application with endpoints and models
-- **Block 02**: Storage & Database - File storage, SQLite, checksums, tag querying
-
-**Not Yet Implemented**:
-- **Block 03**: CLI Commands
-- **Block 04**: Integration Testing
-- **Block 05**: Skill Registration
-
 ### Troubleshooting
 
 #### Port Already in Use
@@ -295,12 +284,3 @@ End-to-end tests verify all API endpoints (upload, query, download, delete) incl
 **Quick start**: `./tests/e2e.sh` (requires running server)
 
 For detailed instructions, see [tests/README.md](tests/README.md).
-
-## Next Steps
-
-**Completed**: Blocks 01 & 02
-
-**Upcoming**:
-- **Block 03**: CLI Commands (doc-push, doc-pull, doc-query, doc-delete)
-- **Block 04**: Integration Testing
-- **Block 05**: Skill Registration

@@ -54,5 +54,4 @@ Before starting this block:
 
 ## Next Steps After Completion
 
-Once Block 03 is complete and all tests pass, proceed to:
-- **Block 04**: Integration Testing & Docker setup
+Once Block 03 is complete and all tests pass, upodate the README.md in document-server/ to reflect the current implementation changes

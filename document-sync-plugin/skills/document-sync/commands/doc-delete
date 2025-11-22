@@ -1,0 +1,48 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Delete a document from the document sync server."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+from client import DocumentClient
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    document_id: str = typer.Argument(..., help="ID of the document to delete"),
+):
+    """Delete a document from the document sync server."""
+    try:
+        # Create client and delete document
+        config = Config()
+        client = DocumentClient(config)
+
+        result = client.delete_document(document_id)
+
+        # Output success result as JSON
+        print(json.dumps(result, indent=2))
+
+    except Exception as e:
+        # Output error as JSON to stderr
+        error = {"error": str(e)}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()
