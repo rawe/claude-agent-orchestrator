@@ -36,17 +36,17 @@ Mark each task as complete by checking the box: `- [x]` when done. Work through 
 
 ## Phase 1: Project Setup
 
-- [ ] Create `document-server/` directory at project root
-- [ ] Navigate to `document-server/` and run `uv init` to initialize UV project
-- [ ] Configure `document-server/pyproject.toml` with:
-  - [ ] Project name: "document-server"
-  - [ ] Python version requirement: ">=3.11"
-  - [ ] Dependencies: fastapi, uvicorn[standard], python-multipart
-  - [ ] Script entry point (optional): "start = document_server.main:main"
-- [ ] Run `uv sync` to create lockfile and install dependencies
-- [ ] Create `document-server/src/` directory
-- [ ] Create `document-server/src/__init__.py` (empty file to mark as package)
-- [ ] Verify directory structure:
+- [x] Create `document-server/` directory at project root
+- [x] Navigate to `document-server/` and run `uv init` to initialize UV project
+- [x] Configure `document-server/pyproject.toml` with:
+  - [x] Project name: "document-server"
+  - [x] Python version requirement: ">=3.11"
+  - [x] Dependencies: fastapi, uvicorn[standard], python-multipart
+  - [x] Script entry point (optional): "start = document_server.main:main"
+- [x] Run `uv sync` to create lockfile and install dependencies
+- [x] Create `document-server/src/` directory
+- [x] Create `document-server/src/__init__.py` (empty file to mark as package)
+- [x] Verify directory structure:
   ```
   document-server/
   ├── pyproject.toml
@@ -59,43 +59,43 @@ Mark each task as complete by checking the box: `- [x]` when done. Work through 
 
 ## Phase 2: Pydantic Models (models.py)
 
-- [ ] Create `document-server/src/models.py`
-- [ ] Import required types: `from pydantic import BaseModel, Field`
-- [ ] Import `from datetime import datetime`
-- [ ] Implement `DocumentMetadata` model with fields:
-  - [ ] `id: str` - Document unique identifier
-  - [ ] `filename: str` - Original filename
-  - [ ] `content_type: str` - MIME type (e.g., "text/markdown")
-  - [ ] `size_bytes: int` - File size
-  - [ ] `storage_path: str` - Internal filesystem path
-  - [ ] `created_at: datetime` - Creation timestamp with default_factory
-  - [ ] `updated_at: datetime` - Last update timestamp with default_factory
-  - [ ] `tags: list[str]` - Optional tags with default empty list
-  - [ ] `metadata: dict[str, str]` - Additional key-value metadata with default empty dict
-- [ ] Implement `DocumentUploadRequest` model:
-  - [ ] `filename: str` - Required filename
-  - [ ] `content_type: str` - Required MIME type with default "text/markdown"
-  - [ ] `tags: list[str]` - Optional tags with default empty list
-  - [ ] `metadata: dict[str, str]` - Optional metadata with default empty dict
-- [ ] Implement `DocumentQueryParams` model:
-  - [ ] `tags: list[str] | None` - Optional tag filter with default None
-  - [ ] `content_type: str | None` - Optional content type filter with default None
-  - [ ] `limit: int` - Result limit with default 100
-  - [ ] `offset: int` - Pagination offset with default 0
-- [ ] Implement `DocumentResponse` model (public-facing, excludes storage_path):
-  - [ ] `id: str`
-  - [ ] `filename: str`
-  - [ ] `content_type: str`
-  - [ ] `size_bytes: int`
-  - [ ] `created_at: datetime`
-  - [ ] `updated_at: datetime`
-  - [ ] `tags: list[str]`
-  - [ ] `metadata: dict[str, str]`
-- [ ] Implement `DeleteResponse` model:
-  - [ ] `success: bool`
-  - [ ] `message: str`
-  - [ ] `document_id: str`
-- [ ] Test imports: Run `python -c "from src.models import DocumentMetadata, DocumentResponse"`
+- [x] Create `document-server/src/models.py`
+- [x] Import required types: `from pydantic import BaseModel, Field`
+- [x] Import `from datetime import datetime`
+- [x] Implement `DocumentMetadata` model with fields:
+  - [x] `id: str` - Document unique identifier
+  - [x] `filename: str` - Original filename
+  - [x] `content_type: str` - MIME type (e.g., "text/markdown")
+  - [x] `size_bytes: int` - File size
+  - [x] `storage_path: str` - Internal filesystem path
+  - [x] `created_at: datetime` - Creation timestamp with default_factory
+  - [x] `updated_at: datetime` - Last update timestamp with default_factory
+  - [x] `tags: list[str]` - Optional tags with default empty list
+  - [x] `metadata: dict[str, str]` - Additional key-value metadata with default empty dict
+- [x] Implement `DocumentUploadRequest` model:
+  - [x] `filename: str` - Required filename
+  - [x] `content_type: str` - Required MIME type with default "text/markdown"
+  - [x] `tags: list[str]` - Optional tags with default empty list
+  - [x] `metadata: dict[str, str]` - Optional metadata with default empty dict
+- [x] Implement `DocumentQueryParams` model:
+  - [x] `tags: list[str] | None` - Optional tag filter with default None
+  - [x] `content_type: str | None` - Optional content type filter with default None
+  - [x] `limit: int` - Result limit with default 100
+  - [x] `offset: int` - Pagination offset with default 0
+- [x] Implement `DocumentResponse` model (public-facing, excludes storage_path):
+  - [x] `id: str`
+  - [x] `filename: str`
+  - [x] `content_type: str`
+  - [x] `size_bytes: int`
+  - [x] `created_at: datetime`
+  - [x] `updated_at: datetime`
+  - [x] `tags: list[str]`
+  - [x] `metadata: dict[str, str]`
+- [x] Implement `DeleteResponse` model:
+  - [x] `success: bool`
+  - [x] `message: str`
+  - [x] `document_id: str`
+- [x] Test imports: Run `python -c "from src.models import DocumentMetadata, DocumentResponse"`
 
 ---
 
@@ -103,116 +103,116 @@ Mark each task as complete by checking the box: `- [x]` when done. Work through 
 
 ### 3.1 Initial Setup
 
-- [ ] Create `document-server/src/main.py`
-- [ ] Import required modules:
-  - [ ] `from fastapi import FastAPI, File, UploadFile, HTTPException, Query`
-  - [ ] `from fastapi.responses import JSONResponse`
-  - [ ] `from typing import Optional`
-  - [ ] `import uvicorn, os`
-- [ ] Import models: `from .models import DocumentMetadata, DocumentResponse, DocumentQueryParams, DeleteResponse`
-- [ ] Create FastAPI app instance:
-  - [ ] Set title: "Document Sync Server"
-  - [ ] Set version: "0.1.0"
-  - [ ] Set description: "FastAPI server for document management and synchronization"
+- [x] Create `document-server/src/main.py`
+- [x] Import required modules:
+  - [x] `from fastapi import FastAPI, File, UploadFile, HTTPException, Query`
+  - [x] `from fastapi.responses import JSONResponse`
+  - [x] `from typing import Optional`
+  - [x] `import uvicorn, os`
+- [x] Import models: `from .models import DocumentMetadata, DocumentResponse, DocumentQueryParams, DeleteResponse`
+- [x] Create FastAPI app instance:
+  - [x] Set title: "Document Sync Server"
+  - [x] Set version: "0.1.0"
+  - [x] Set description: "FastAPI server for document management and synchronization"
 
 ### 3.2 Configuration
 
-- [ ] Add centralized configuration constants:
-  - [ ] `DEFAULT_HOST = "0.0.0.0"`
-  - [ ] `DEFAULT_PORT = 8766`
-  - [ ] `DEFAULT_STORAGE_DIR = "./storage"`
-- [ ] Add environment variable reading:
-  - [ ] `DOCUMENT_SERVER_HOST = os.getenv("DOCUMENT_SERVER_HOST", DEFAULT_HOST)`
-  - [ ] `DOCUMENT_SERVER_PORT = int(os.getenv("DOCUMENT_SERVER_PORT", DEFAULT_PORT))`
-  - [ ] `DOCUMENT_SERVER_STORAGE = os.getenv("DOCUMENT_SERVER_STORAGE", DEFAULT_STORAGE_DIR)`
+- [x] Add centralized configuration constants:
+  - [x] `DEFAULT_HOST = "0.0.0.0"`
+  - [x] `DEFAULT_PORT = 8766`
+  - [x] `DEFAULT_STORAGE_DIR = "./storage"`
+- [x] Add environment variable reading:
+  - [x] `DOCUMENT_SERVER_HOST = os.getenv("DOCUMENT_SERVER_HOST", DEFAULT_HOST)`
+  - [x] `DOCUMENT_SERVER_PORT = int(os.getenv("DOCUMENT_SERVER_PORT", DEFAULT_PORT))`
+  - [x] `DOCUMENT_SERVER_STORAGE = os.getenv("DOCUMENT_SERVER_STORAGE", DEFAULT_STORAGE_DIR)`
 
 ### 3.3 POST /documents Endpoint
 
-- [ ] Create `POST /documents` endpoint with:
-  - [ ] Path: `/documents`
-  - [ ] Response model: `DocumentResponse`
-  - [ ] Status code: 201
-- [ ] Add parameters:
-  - [ ] `file: UploadFile = File(...)` - Required file upload
-  - [ ] `tags: Optional[str] = Query(None)` - Comma-separated tags
-  - [ ] `metadata: Optional[str] = Query(None)` - JSON string of metadata
-- [ ] Implement stub logic:
-  - [ ] Parse tags from comma-separated string to list
-  - [ ] Parse metadata from JSON string to dict (handle parse errors)
-  - [ ] Create dummy DocumentResponse with:
-    - [ ] `id: "doc_stub_123"`
-    - [ ] `filename: file.filename`
-    - [ ] `content_type: file.content_type or "application/octet-stream"`
-    - [ ] `size_bytes: 0`
-    - [ ] `created_at: datetime.now()`
-    - [ ] `updated_at: datetime.now()`
-    - [ ] `tags: parsed_tags or []`
-    - [ ] `metadata: parsed_metadata or {}`
-  - [ ] Return JSONResponse with status_code=201
+- [x] Create `POST /documents` endpoint with:
+  - [x] Path: `/documents`
+  - [x] Response model: `DocumentResponse`
+  - [x] Status code: 201
+- [x] Add parameters:
+  - [x] `file: UploadFile = File(...)` - Required file upload
+  - [x] `tags: Optional[str] = Form(None)` - Comma-separated tags
+  - [x] `metadata: Optional[str] = Form(None)` - JSON string of metadata
+- [x] Implement stub logic:
+  - [x] Parse tags from comma-separated string to list
+  - [x] Parse metadata from JSON string to dict (handle parse errors)
+  - [x] Create dummy DocumentResponse with:
+    - [x] `id: "doc_stub_123"`
+    - [x] `filename: file.filename`
+    - [x] `content_type: file.content_type or "application/octet-stream"`
+    - [x] `size_bytes: 0`
+    - [x] `created_at: datetime.now()`
+    - [x] `updated_at: datetime.now()`
+    - [x] `tags: parsed_tags or []`
+    - [x] `metadata: parsed_metadata or {}`
+  - [x] Return JSONResponse with status_code=201
 
 ### 3.4 GET /documents/{id} Endpoint
 
-- [ ] Create `GET /documents/{id}` endpoint with:
-  - [ ] Path: `/documents/{document_id}`
-  - [ ] Response model: `DocumentResponse`
-  - [ ] Path parameter: `document_id: str`
-- [ ] Implement stub logic:
-  - [ ] Raise `HTTPException(status_code=501, detail="Document retrieval not yet implemented")`
+- [x] Create `GET /documents/{id}` endpoint with:
+  - [x] Path: `/documents/{document_id}`
+  - [x] Response model: `DocumentResponse`
+  - [x] Path parameter: `document_id: str`
+- [x] Implement stub logic:
+  - [x] Raise `HTTPException(status_code=501, detail="Document retrieval not yet implemented")`
 
 ### 3.5 GET /documents Endpoint
 
-- [ ] Create `GET /documents` endpoint with:
-  - [ ] Path: `/documents`
-  - [ ] Response model: `list[DocumentResponse]`
-- [ ] Add query parameters:
-  - [ ] `tags: Optional[str] = Query(None)` - Comma-separated tag filter
-  - [ ] `content_type: Optional[str] = Query(None)` - Content type filter
-  - [ ] `limit: int = Query(100)` - Result limit
-  - [ ] `offset: int = Query(0)` - Pagination offset
-- [ ] Implement stub logic:
-  - [ ] Parse tags if provided
-  - [ ] Return empty list: `[]`
-  - [ ] Add comment: "# Stub: Will query database in Block 02"
+- [x] Create `GET /documents` endpoint with:
+  - [x] Path: `/documents`
+  - [x] Response model: `list[DocumentResponse]`
+- [x] Add query parameters:
+  - [x] `tags: Optional[str] = Query(None)` - Comma-separated tag filter
+  - [x] `content_type: Optional[str] = Query(None)` - Content type filter
+  - [x] `limit: int = Query(100)` - Result limit
+  - [x] `offset: int = Query(0)` - Pagination offset
+- [x] Implement stub logic:
+  - [x] Parse tags if provided
+  - [x] Return empty list: `[]`
+  - [x] Add comment: "# Stub: Will query database in Block 02"
 
 ### 3.6 DELETE /documents/{id} Endpoint
 
-- [ ] Create `DELETE /documents/{id}` endpoint with:
-  - [ ] Path: `/documents/{document_id}`
-  - [ ] Response model: `DeleteResponse`
-  - [ ] Path parameter: `document_id: str`
-- [ ] Implement stub logic:
-  - [ ] Return DeleteResponse with:
-    - [ ] `success: True`
-    - [ ] `message: "Document deletion stub (not yet implemented)"`
-    - [ ] `document_id: document_id`
+- [x] Create `DELETE /documents/{id}` endpoint with:
+  - [x] Path: `/documents/{document_id}`
+  - [x] Response model: `DeleteResponse`
+  - [x] Path parameter: `document_id: str`
+- [x] Implement stub logic:
+  - [x] Return DeleteResponse with:
+    - [x] `success: True`
+    - [x] `message: "Document deletion stub (not yet implemented)"`
+    - [x] `document_id: document_id`
 
 ### 3.7 Error Handling & Server Entry Point
 
-- [ ] Add global exception handler for validation errors (optional but recommended)
-- [ ] Add `if __name__ == "__main__":` block:
-  - [ ] Call `uvicorn.run()`
-  - [ ] Parameters: `app`, `host=DOCUMENT_SERVER_HOST`, `port=DOCUMENT_SERVER_PORT`
-  - [ ] Add `reload=True` for development
+- [x] Add global exception handler for validation errors (optional but recommended)
+- [x] Add `if __name__ == "__main__":` block:
+  - [x] Call `uvicorn.run()`
+  - [x] Parameters: `app`, `host=DOCUMENT_SERVER_HOST`, `port=DOCUMENT_SERVER_PORT`
+  - [x] Add `reload=True` for development
 
 ---
 
 ## Phase 4: Stub Files
 
-- [ ] Create `document-server/src/storage.py`:
-  - [ ] Add docstring: "Storage layer for filesystem operations (Block 02 implementation)"
-  - [ ] Create `DocumentStorage` class stub:
-    - [ ] `def __init__(self, storage_dir: str): pass`
-    - [ ] `async def save_document(self, doc_id: str, file_content: bytes) -> str: raise NotImplementedError()`
-    - [ ] `async def get_document(self, doc_id: str) -> bytes: raise NotImplementedError()`
-    - [ ] `async def delete_document(self, doc_id: str) -> bool: raise NotImplementedError()`
-- [ ] Create `document-server/src/database.py`:
-  - [ ] Add docstring: "Database layer for metadata persistence (Block 02 implementation)"
-  - [ ] Create `DocumentDatabase` class stub:
-    - [ ] `def __init__(self, db_path: str): pass`
-    - [ ] `async def insert_metadata(self, metadata: DocumentMetadata) -> None: raise NotImplementedError()`
-    - [ ] `async def get_metadata(self, doc_id: str) -> DocumentMetadata | None: raise NotImplementedError()`
-    - [ ] `async def query_metadata(self, params: DocumentQueryParams) -> list[DocumentMetadata]: raise NotImplementedError()`
-    - [ ] `async def delete_metadata(self, doc_id: str) -> bool: raise NotImplementedError()`
+- [x] Create `document-server/src/storage.py`:
+  - [x] Add docstring: "Storage layer for filesystem operations (Block 02 implementation)"
+  - [x] Create `DocumentStorage` class stub:
+    - [x] `def __init__(self, storage_dir: str): pass`
+    - [x] `async def save_document(self, doc_id: str, file_content: bytes) -> str: raise NotImplementedError()`
+    - [x] `async def get_document(self, doc_id: str) -> bytes: raise NotImplementedError()`
+    - [x] `async def delete_document(self, doc_id: str) -> bool: raise NotImplementedError()`
+- [x] Create `document-server/src/database.py`:
+  - [x] Add docstring: "Database layer for metadata persistence (Block 02 implementation)"
+  - [x] Create `DocumentDatabase` class stub:
+    - [x] `def __init__(self, db_path: str): pass`
+    - [x] `async def insert_metadata(self, metadata: DocumentMetadata) -> None: raise NotImplementedError()`
+    - [x] `async def get_metadata(self, doc_id: str) -> DocumentMetadata | None: raise NotImplementedError()`
+    - [x] `async def query_metadata(self, params: DocumentQueryParams) -> list[DocumentMetadata]: raise NotImplementedError()`
+    - [x] `async def delete_metadata(self, doc_id: str) -> bool: raise NotImplementedError()`
 
 ---
 
@@ -220,165 +220,165 @@ Mark each task as complete by checking the box: `- [x]` when done. Work through 
 
 ### 5.1 Server Startup
 
-- [ ] Navigate to `document-server/` directory
-- [ ] Start server: `uv run src/main.py`
-- [ ] Verify console output shows: "Uvicorn running on http://0.0.0.0:8766"
-- [ ] Verify no startup errors or import failures
-- [ ] Check server responds: `curl http://localhost:8766/docs` (should return HTML)
+- [x] Navigate to `document-server/` directory
+- [x] Start server: `uv run src/main.py`
+- [x] Verify console output shows: "Uvicorn running on http://0.0.0.0:8766"
+- [x] Verify no startup errors or import failures
+- [x] Check server responds: `curl http://localhost:8766/docs` (should return HTML)
 
 ### 5.2 Endpoint Testing
 
-- [ ] Test POST /documents with multipart form data:
+- [x] Test POST /documents with multipart form data:
   ```bash
   curl -X POST http://localhost:8766/documents \
     -F "file=@test.md" \
     -F "tags=test,demo" \
     -F "metadata={\"author\":\"test\"}"
   ```
-  - [ ] Verify returns 201 status
-  - [ ] Verify response contains `id: "doc_stub_123"`
-  - [ ] Verify filename, tags, and metadata are parsed correctly
+  - [x] Verify returns 201 status
+  - [x] Verify response contains `id: "doc_stub_123"`
+  - [x] Verify filename, tags, and metadata are parsed correctly
 
-- [ ] Test GET /documents (list all):
+- [x] Test GET /documents (list all):
   ```bash
   curl http://localhost:8766/documents
   ```
-  - [ ] Verify returns 200 status
-  - [ ] Verify returns empty array: `[]`
+  - [x] Verify returns 200 status
+  - [x] Verify returns empty array: `[]`
 
-- [ ] Test GET /documents with query parameters:
+- [x] Test GET /documents with query parameters:
   ```bash
   curl "http://localhost:8766/documents?tags=test&limit=10"
   ```
-  - [ ] Verify returns 200 status
-  - [ ] Verify returns empty array: `[]`
+  - [x] Verify returns 200 status
+  - [x] Verify returns empty array: `[]`
 
-- [ ] Test GET /documents/{id} (single document):
+- [x] Test GET /documents/{id} (single document):
   ```bash
   curl http://localhost:8766/documents/doc_123
   ```
-  - [ ] Verify returns 501 status
-  - [ ] Verify error detail: "Document retrieval not yet implemented"
+  - [x] Verify returns 501 status
+  - [x] Verify error detail: "Document retrieval not yet implemented"
 
-- [ ] Test DELETE /documents/{id}:
+- [x] Test DELETE /documents/{id}:
   ```bash
   curl -X DELETE http://localhost:8766/documents/doc_123
   ```
-  - [ ] Verify returns 200 status
-  - [ ] Verify response: `{"success": true, "message": "...", "document_id": "doc_123"}`
+  - [x] Verify returns 200 status
+  - [x] Verify response: `{"success": true, "message": "...", "document_id": "doc_123"}`
 
 ### 5.3 FastAPI Interactive Docs
 
-- [ ] Open browser to http://localhost:8766/docs
-- [ ] Verify all 4 endpoints are listed:
-  - [ ] POST /documents
-  - [ ] GET /documents/{document_id}
-  - [ ] GET /documents
-  - [ ] DELETE /documents/{document_id}
-- [ ] Test POST /documents through Swagger UI:
-  - [ ] Upload a test file
-  - [ ] Add tags and metadata
-  - [ ] Verify 201 response with correct data
-- [ ] Verify schema definitions show all models correctly
+- [x] Open browser to http://localhost:8766/docs
+- [x] Verify all 4 endpoints are listed:
+  - [x] POST /documents
+  - [x] GET /documents/{document_id}
+  - [x] GET /documents
+  - [x] DELETE /documents/{document_id}
+- [x] Test POST /documents through Swagger UI:
+  - [x] Upload a test file
+  - [x] Add tags and metadata
+  - [x] Verify 201 response with correct data
+- [x] Verify schema definitions show all models correctly
 
 ### 5.4 Validation Testing
 
-- [ ] Test invalid POST request (missing file):
+- [x] Test invalid POST request (missing file):
   ```bash
   curl -X POST http://localhost:8766/documents
   ```
-  - [ ] Verify returns 422 Unprocessable Entity
-  - [ ] Verify error mentions "field required"
+  - [x] Verify returns 422 Unprocessable Entity
+  - [x] Verify error mentions "field required"
 
-- [ ] Test invalid query parameters (negative limit):
+- [x] Test invalid query parameters (negative limit):
   ```bash
   curl "http://localhost:8766/documents?limit=-1"
   ```
-  - [ ] Verify Pydantic validation (may return 422 if validation added)
+  - [x] Verify Pydantic validation (may return 422 if validation added)
 
-- [ ] Test invalid JSON metadata:
+- [x] Test invalid JSON metadata:
   ```bash
   curl -X POST http://localhost:8766/documents \
     -F "file=@test.md" \
     -F "metadata=invalid-json"
   ```
-  - [ ] Verify handles gracefully (check server logs)
+  - [x] Verify handles gracefully (check server logs)
 
 ### 5.5 Configuration Testing
 
-- [ ] Stop the server (Ctrl+C)
-- [ ] Test environment variable override:
+- [x] Stop the server (Ctrl+C)
+- [x] Test environment variable override:
   ```bash
   DOCUMENT_SERVER_PORT=9999 uv run src/main.py
   ```
-  - [ ] Verify server starts on port 9999
-  - [ ] Test endpoint: `curl http://localhost:9999/documents`
-  - [ ] Stop server
+  - [x] Verify server starts on port 9999
+  - [x] Test endpoint: `curl http://localhost:9999/documents`
+  - [x] Stop server
 
-- [ ] Restart server on default port 8766:
+- [x] Restart server on default port 8766:
   ```bash
   uv run src/main.py
   ```
-  - [ ] Verify clean startup
-  - [ ] Verify port 8766 is used
+  - [x] Verify clean startup
+  - [x] Verify port 8766 is used
 
 ### 5.6 Cleanup
 
-- [ ] Stop server cleanly (Ctrl+C)
-- [ ] Verify no zombie processes: `lsof -i :8766` (should be empty)
+- [x] Stop server cleanly (Ctrl+C)
+- [x] Verify no zombie processes: `lsof -i :8766` (should be empty)
 
 ---
 
 ## Phase 6: Documentation
 
-- [ ] Create `document-server/README.md` with sections:
+- [x] Create `document-server/README.md` with sections:
 
 ### 6.1 Setup Instructions
 
-- [ ] Add project overview and purpose
-- [ ] Document prerequisites:
-  - [ ] Python 3.11+
-  - [ ] UV package manager
-- [ ] Add installation steps:
+- [x] Add project overview and purpose
+- [x] Document prerequisites:
+  - [x] Python 3.11+
+  - [x] UV package manager
+- [x] Add installation steps:
   ```bash
   cd document-server
   uv sync
   ```
-- [ ] Add startup instructions:
+- [x] Add startup instructions:
   ```bash
   uv run src/main.py
   ```
 
 ### 6.2 Available Endpoints
 
-- [ ] Document POST /documents:
-  - [ ] Description: Upload a new document
-  - [ ] Request format: multipart/form-data
-  - [ ] Parameters: file (required), tags (optional), metadata (optional)
-  - [ ] Response: 201 Created with DocumentResponse
-  - [ ] Current status: Stub implementation
+- [x] Document POST /documents:
+  - [x] Description: Upload a new document
+  - [x] Request format: multipart/form-data
+  - [x] Parameters: file (required), tags (optional), metadata (optional)
+  - [x] Response: 201 Created with DocumentResponse
+  - [x] Current status: Stub implementation
 
-- [ ] Document GET /documents:
-  - [ ] Description: List all documents with optional filters
-  - [ ] Query parameters: tags, content_type, limit, offset
-  - [ ] Response: 200 OK with list of DocumentResponse
-  - [ ] Current status: Returns empty list
+- [x] Document GET /documents:
+  - [x] Description: List all documents with optional filters
+  - [x] Query parameters: tags, content_type, limit, offset
+  - [x] Response: 200 OK with list of DocumentResponse
+  - [x] Current status: Returns empty list
 
-- [ ] Document GET /documents/{id}:
-  - [ ] Description: Retrieve a specific document by ID
-  - [ ] Path parameter: document_id
-  - [ ] Response: 200 OK with DocumentResponse
-  - [ ] Current status: Returns 501 Not Implemented
+- [x] Document GET /documents/{id}:
+  - [x] Description: Retrieve a specific document by ID
+  - [x] Path parameter: document_id
+  - [x] Response: 200 OK with DocumentResponse
+  - [x] Current status: Returns 501 Not Implemented
 
-- [ ] Document DELETE /documents/{id}:
-  - [ ] Description: Delete a document by ID
-  - [ ] Path parameter: document_id
-  - [ ] Response: 200 OK with DeleteResponse
-  - [ ] Current status: Stub implementation
+- [x] Document DELETE /documents/{id}:
+  - [x] Description: Delete a document by ID
+  - [x] Path parameter: document_id
+  - [x] Response: 200 OK with DeleteResponse
+  - [x] Current status: Stub implementation
 
 ### 6.3 Example curl Commands
 
-- [ ] Add upload example:
+- [x] Add upload example:
   ```bash
   curl -X POST http://localhost:8766/documents \
     -F "file=@example.md" \
@@ -386,51 +386,51 @@ Mark each task as complete by checking the box: `- [x]` when done. Work through 
     -F "metadata={\"author\":\"John Doe\",\"version\":\"1.0\"}"
   ```
 
-- [ ] Add list example:
+- [x] Add list example:
   ```bash
   curl http://localhost:8766/documents
   ```
 
-- [ ] Add filtered list example:
+- [x] Add filtered list example:
   ```bash
   curl "http://localhost:8766/documents?tags=documentation&limit=10"
   ```
 
-- [ ] Add retrieve example:
+- [x] Add retrieve example:
   ```bash
   curl http://localhost:8766/documents/doc_123
   ```
 
-- [ ] Add delete example:
+- [x] Add delete example:
   ```bash
   curl -X DELETE http://localhost:8766/documents/doc_123
   ```
 
 ### 6.4 Environment Variables
 
-- [ ] Document `DOCUMENT_SERVER_HOST`:
-  - [ ] Description: Server bind address
-  - [ ] Default: "0.0.0.0"
-  - [ ] Example: `DOCUMENT_SERVER_HOST=127.0.0.1 uv run src/main.py`
+- [x] Document `DOCUMENT_SERVER_HOST`:
+  - [x] Description: Server bind address
+  - [x] Default: "0.0.0.0"
+  - [x] Example: `DOCUMENT_SERVER_HOST=127.0.0.1 uv run src/main.py`
 
-- [ ] Document `DOCUMENT_SERVER_PORT`:
-  - [ ] Description: Server port number
-  - [ ] Default: 8766
-  - [ ] Example: `DOCUMENT_SERVER_PORT=9000 uv run src/main.py`
+- [x] Document `DOCUMENT_SERVER_PORT`:
+  - [x] Description: Server port number
+  - [x] Default: 8766
+  - [x] Example: `DOCUMENT_SERVER_PORT=9000 uv run src/main.py`
 
-- [ ] Document `DOCUMENT_SERVER_STORAGE`:
-  - [ ] Description: Storage directory path
-  - [ ] Default: "./storage"
-  - [ ] Example: `DOCUMENT_SERVER_STORAGE=/var/documents uv run src/main.py`
+- [x] Document `DOCUMENT_SERVER_STORAGE`:
+  - [x] Description: Storage directory path
+  - [x] Default: "./storage"
+  - [x] Example: `DOCUMENT_SERVER_STORAGE=/var/documents uv run src/main.py`
 
 ### 6.5 Development Notes
 
-- [ ] Add note about FastAPI interactive docs: http://localhost:8766/docs
-- [ ] Add note about stub implementations and future work (Blocks 02-05)
-- [ ] Add troubleshooting section:
-  - [ ] Port already in use: Change port with environment variable
-  - [ ] Import errors: Run `uv sync` to install dependencies
-  - [ ] Module not found: Ensure running from document-server/ directory
+- [x] Add note about FastAPI interactive docs: http://localhost:8766/docs
+- [x] Add note about stub implementations and future work (Blocks 02-05)
+- [x] Add troubleshooting section:
+  - [x] Port already in use: Change port with environment variable
+  - [x] Import errors: Run `uv sync` to install dependencies
+  - [x] Module not found: Ensure running from document-server/ directory
 
 ---
 
@@ -438,19 +438,19 @@ Mark each task as complete by checking the box: `- [x]` when done. Work through 
 
 Upon completion of this checklist, verify all criteria are met:
 
-- [ ] FastAPI server starts successfully on port 8766
-- [ ] All 4 HTTP endpoints (POST, GET list, GET single, DELETE) respond correctly
-- [ ] POST /documents accepts multipart form data and returns 201 with stub response
-- [ ] GET /documents returns empty list with 200 status
-- [ ] GET /documents/{id} returns 501 Not Implemented
-- [ ] DELETE /documents/{id} returns stub success response
-- [ ] Pydantic models validate request/response data correctly
-- [ ] Invalid requests return 422 validation errors
-- [ ] Environment variables (PORT, HOST, STORAGE) override defaults correctly
-- [ ] FastAPI interactive docs accessible at /docs
-- [ ] Server can be stopped and restarted cleanly
-- [ ] README.md documents setup, endpoints, and usage examples
-- [ ] Project structure follows conventions:
+- [x] FastAPI server starts successfully on port 8766
+- [x] All 4 HTTP endpoints (POST, GET list, GET single, DELETE) respond correctly
+- [x] POST /documents accepts multipart form data and returns 201 with stub response
+- [x] GET /documents returns empty list with 200 status
+- [x] GET /documents/{id} returns 501 Not Implemented
+- [x] DELETE /documents/{id} returns stub success response
+- [x] Pydantic models validate request/response data correctly
+- [x] Invalid requests return 422 validation errors
+- [x] Environment variables (PORT, HOST, STORAGE) override defaults correctly
+- [x] FastAPI interactive docs accessible at /docs
+- [x] Server can be stopped and restarted cleanly
+- [x] README.md documents setup, endpoints, and usage examples
+- [x] Project structure follows conventions:
   ```
   document-server/
   ├── pyproject.toml
