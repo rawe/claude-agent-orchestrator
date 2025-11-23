@@ -102,9 +102,38 @@ test_query_documents() {
     fi
 }
 
-# TC-03: Download Document
+# TC-03: Get Document Metadata
+test_get_metadata() {
+    log_test "TC-03: Get Document Metadata"
+
+    # Upload a document
+    upload_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -F "file=@${TEST_DATA_DIR}/small.txt" \
+        -F "tags=meta,test")
+    doc_id=$(echo "$upload_response" | jq -r '.id')
+
+    # Get metadata
+    metadata_response=$(curl -s "${SERVER_URL}/documents/${doc_id}/metadata")
+
+    # Verify metadata fields
+    meta_id=$(echo "$metadata_response" | jq -r '.id')
+    meta_filename=$(echo "$metadata_response" | jq -r '.filename')
+    meta_content_type=$(echo "$metadata_response" | jq -r '.content_type')
+    meta_size=$(echo "$metadata_response" | jq -r '.size_bytes')
+
+    # Verify no file content in response (should be JSON metadata only)
+    is_json=$(echo "$metadata_response" | jq -e 'type == "object"' > /dev/null 2>&1 && echo "true" || echo "false")
+
+    if [ "$meta_id" = "$doc_id" ] && [ -n "$meta_filename" ] && [ "$is_json" = "true" ] && [ "$meta_size" -gt 0 ]; then
+        log_pass "Metadata retrieved successfully (id: $meta_id, size: $meta_size bytes)"
+    else
+        log_fail "Failed to retrieve correct metadata"
+    fi
+}
+
+# TC-04: Download Document
 test_download_document() {
-    log_test "TC-03: Download Document"
+    log_test "TC-04: Download Document"
 
     # Upload a document
     upload_response=$(curl -s -X POST "${SERVER_URL}/documents" \
@@ -122,9 +151,9 @@ test_download_document() {
     fi
 }
 
-# TC-04: Delete Document
+# TC-05: Delete Document
 test_delete_document() {
-    log_test "TC-04: Delete Document"
+    log_test "TC-05: Delete Document"
 
     # Upload a document
     upload_response=$(curl -s -X POST "${SERVER_URL}/documents" \
@@ -145,9 +174,9 @@ test_delete_document() {
     fi
 }
 
-# TC-05: Upload Multiple Documents
+# TC-06: Upload Multiple Documents
 test_upload_multiple() {
-    log_test "TC-05: Upload Multiple Documents"
+    log_test "TC-06: Upload Multiple Documents"
 
     doc_ids=()
     for i in {1..10}; do
@@ -170,9 +199,9 @@ test_upload_multiple() {
     fi
 }
 
-# TC-06: Mixed Operations
+# TC-07: Mixed Operations
 test_mixed_operations() {
-    log_test "TC-06: Mixed Operations"
+    log_test "TC-07: Mixed Operations"
 
     cleanup
 
@@ -210,9 +239,9 @@ test_mixed_operations() {
     fi
 }
 
-# TC-07: Empty File
+# TC-08: Empty File
 test_empty_file() {
-    log_test "TC-07: Empty File"
+    log_test "TC-08: Empty File"
 
     response=$(curl -s -X POST "${SERVER_URL}/documents" \
         -F "file=@${TEST_DATA_DIR}/empty.txt")
@@ -271,9 +300,23 @@ test_unicode_content() {
     fi
 }
 
-# TC-11: Download Non-existent Document
+# TC-11: Get Metadata for Non-existent Document
+test_metadata_nonexistent() {
+    log_test "TC-11: Get Metadata for Non-existent Document"
+
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        "${SERVER_URL}/documents/nonexistent-doc-id-12345/metadata")
+
+    if [ "$http_code" = "404" ]; then
+        log_pass "Correctly returned 404 for non-existent document metadata"
+    else
+        log_fail "Expected 404, got $http_code"
+    fi
+}
+
+# TC-12: Download Non-existent Document
 test_download_nonexistent() {
-    log_test "TC-11: Download Non-existent Document"
+    log_test "TC-12: Download Non-existent Document"
 
     http_code=$(curl -s -o /dev/null -w "%{http_code}" \
         "${SERVER_URL}/documents/nonexistent-doc-id-12345")
@@ -285,9 +328,9 @@ test_download_nonexistent() {
     fi
 }
 
-# TC-12: Delete Non-existent Document
+# TC-13: Delete Non-existent Document
 test_delete_nonexistent() {
-    log_test "TC-12: Delete Non-existent Document"
+    log_test "TC-13: Delete Non-existent Document"
 
     http_code=$(curl -s -o /dev/null -w "%{http_code}" \
         -X DELETE "${SERVER_URL}/documents/nonexistent-doc-id-12345")
@@ -299,9 +342,9 @@ test_delete_nonexistent() {
     fi
 }
 
-# TC-13: Query with Filters
+# TC-14: Query with Filters
 test_query_with_filters() {
-    log_test "TC-13: Query with Filters"
+    log_test "TC-14: Query with Filters"
 
     cleanup
 
@@ -329,9 +372,9 @@ test_query_with_filters() {
     fi
 }
 
-# TC-14: Metadata in Upload
+# TC-15: Metadata in Upload
 test_metadata_upload() {
-    log_test "TC-14: Metadata in Upload"
+    log_test "TC-15: Metadata in Upload"
 
     metadata='{"author": "test", "version": "1.0"}'
     response=$(curl -s -X POST "${SERVER_URL}/documents" \
@@ -389,6 +432,7 @@ main() {
     check_server
     test_upload_document
     test_query_documents
+    test_get_metadata
     test_download_document
     test_delete_document
     test_upload_multiple
@@ -396,6 +440,7 @@ main() {
     test_empty_file
     test_special_chars_filename
     test_unicode_content
+    test_metadata_nonexistent
     test_download_nonexistent
     test_delete_nonexistent
     test_query_with_filters

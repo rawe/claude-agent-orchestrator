@@ -6,8 +6,10 @@ A document management system that enables Claude Code sessions to store, retriev
 
 The Document Sync Plugin provides a simple interface for Claude Code to:
 - **Store documents** with metadata (tags, descriptions) for future reference
-- **Retrieve documents** by ID to access previously saved information
 - **Query documents** by name or tags to discover relevant content
+- **Get document metadata** to inspect file info without downloading
+- **Read text documents** directly to stdout for piping and processing
+- **Retrieve documents** by ID to access previously saved information
 - **Delete documents** to manage the document repository
 
 ## Architecture
@@ -34,7 +36,7 @@ The Document Sync Plugin provides a simple interface for Claude Code to:
 ### Components
 
 - **Document Server** - FastAPI application with RESTful API, file storage, and SQLite database
-- **CLI Commands** - UV-based scripts for document operations: `doc-push`, `doc-pull`, `doc-query`, `doc-delete`
+- **CLI Commands** - UV-based scripts for document operations: `doc-push`, `doc-query`, `doc-info`, `doc-read`, `doc-pull`, `doc-delete`
 
 ## Quick Start
 
@@ -82,6 +84,12 @@ uv run skills/document-sync/commands/doc-push file.txt --tags "tag1,tag2"
 
 # Query documents
 uv run skills/document-sync/commands/doc-query --tags "tag1"
+
+# Get document metadata
+uv run skills/document-sync/commands/doc-info doc_abc123...
+
+# Read text document content
+uv run skills/document-sync/commands/doc-read doc_abc123...
 
 # Download a document
 uv run skills/document-sync/commands/doc-pull doc_abc123...

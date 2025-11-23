@@ -36,6 +36,18 @@ uv run commands/doc-query [--tags TEXT] [--name TEXT]
 ```
 **Use when**: Find documents by tags (AND logic) or name patterns.
 
+### `doc-info` - Get Document Metadata
+```bash
+uv run commands/doc-info <document-id>
+```
+**Use when**: View metadata for a specific document without downloading it.
+
+### `doc-read` - Read Text Documents
+```bash
+uv run commands/doc-read <document-id>
+```
+**Use when**: Output text document content directly to stdout (text files only). Useful for piping to other tools.
+
 ### `doc-pull` - Download Documents
 ```bash
 uv run commands/doc-pull <document-id> [-o PATH]
@@ -118,6 +130,10 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 **Store document?** → `doc-push <file> --tags "tag1,tag2"`
 
 **Find documents?** → `doc-query --tags "tag1,tag2"` (AND logic)
+
+**Check metadata?** → `doc-info <doc-id>` (metadata only)
+
+**Read text file?** → `doc-read <doc-id>` (text files to stdout)
 
 **Get document?** → `doc-pull <doc-id>` (ID from query)
 

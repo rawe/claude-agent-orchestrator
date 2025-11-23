@@ -36,6 +36,14 @@ Simply ask Claude in natural language to manage documents:
 > "Show me all documents tagged with 'mvp'"
 > "Find documents that have both 'python' and 'tutorial' tags"
 
+**Check document info**:
+> "Show me the metadata for that document"
+> "What's the file size and type?"
+
+**Read document content**:
+> "Read the content of the specification document"
+> "Show me the first 20 lines of that file"
+
 **Retrieve a document**:
 > "Download the API specification document"
 
@@ -56,6 +64,17 @@ Claude understands these types of requests:
 - "Show me documents tagged with 'design'"
 - "Find documents with both 'api' and 'spec' tags"
 - "Search for documents containing 'architecture' in the name"
+
+### Checking Document Metadata
+- "Show me the metadata for document doc_abc123..."
+- "What's the file size and type of this document?"
+- "Check the tags and creation date for doc_abc123..."
+
+### Reading Document Content
+- "Read the content of document doc_abc123..."
+- "Show me the contents of the API spec document"
+- "Pipe the document content to grep and search for 'authentication'"
+- "Preview the first 10 lines of document doc_abc123..."
 
 ### Downloading Documents
 - "Download document doc_abc123..."

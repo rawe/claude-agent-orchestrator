@@ -1,6 +1,6 @@
 # Document Sync CLI Commands
 
-Command-line tools for interacting with the Document Sync Server. These UV-based scripts enable Claude Code sessions to store, retrieve, query, and delete documents with metadata and tags.
+Command-line tools for interacting with the Document Sync Server. These UV-based scripts enable Claude Code sessions to store, retrieve, query, inspect, read, and delete documents with metadata and tags.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ Command-line tools for interacting with the Document Sync Server. These UV-based
 
 ## Available Commands
 
-All commands output JSON for easy parsing and integration with Claude Code.
+All commands output JSON for easy parsing and integration with Claude Code (except `doc-read`, which outputs raw text).
 
 ### doc-push - Upload Documents
 
@@ -92,6 +92,78 @@ uv run doc-query --name "guide" --tags "python" --limit 5
   }
 ]
 ```
+
+### doc-info - Get Document Metadata
+
+Retrieve metadata for a specific document without downloading the file.
+
+```bash
+uv run /path/to/doc-info <document_id>
+```
+
+**Arguments:**
+- `document_id` - The document's unique identifier (required)
+
+**Example:**
+```bash
+uv run doc-info doc_abc123...
+```
+
+**Output:**
+```json
+{
+  "id": "doc_abc123...",
+  "filename": "architecture.md",
+  "content_type": "text/markdown",
+  "size_bytes": 2048,
+  "created_at": "2025-11-23T00:00:00",
+  "updated_at": "2025-11-23T00:00:00",
+  "tags": ["design", "architecture"],
+  "metadata": {"description": "System architecture document"}
+}
+```
+
+**Use Case:** Check document metadata (file size, MIME type, tags) before downloading.
+
+### doc-read - Read Text Documents
+
+Read text document content directly to stdout without downloading to file.
+
+```bash
+uv run /path/to/doc-read <document_id>
+```
+
+**Arguments:**
+- `document_id` - The document's unique identifier (required)
+
+**Supported File Types:**
+- Text files (`text/*`)
+- JSON files (`application/json`)
+- XML files (`application/xml`)
+
+**Examples:**
+```bash
+# Output content to terminal
+uv run doc-read doc_abc123...
+
+# Pipe to grep
+uv run doc-read doc_abc123... | grep "search term"
+
+# Pipe to jq (for JSON documents)
+uv run doc-read doc_abc123... | jq '.field'
+
+# Save to file
+uv run doc-read doc_abc123... > output.txt
+```
+
+**Output:** Raw text content (no JSON wrapper)
+
+**Error (for non-text files):**
+```json
+{"error": "Cannot read non-text file (MIME type: image/png). Use doc-pull to download binary files."}
+```
+
+**Use Case:** Quick inspection of text files, piping content to other tools, processing documents in scripts without creating temporary files.
 
 ### doc-pull - Download Documents
 
@@ -197,7 +269,13 @@ uv run doc-push specs.md --tags "api,specification"
 # 2. Later, query for it
 uv run doc-query --tags "api,specification"
 
-# 3. Download it
+# 3. Check metadata before downloading
+uv run doc-info doc_abc123...
+
+# 4. Read content (for text files)
+uv run doc-read doc_abc123... | less
+
+# 5. Download it
 uv run doc-pull doc_abc123... --output specs-copy.md
 ```
 
@@ -209,6 +287,8 @@ uv run doc-push architecture.md --tags "design,mvp" \
 
 # Session 2: Query and retrieve
 uv run doc-query --tags "design,mvp"
+uv run doc-info doc_abc123...  # Check metadata
+uv run doc-read doc_abc123... | head -20  # Preview first 20 lines
 uv run doc-pull doc_abc123... --output architecture.md
 ```
 
@@ -238,6 +318,11 @@ All commands output errors to stderr in JSON format and exit with code 1 on fail
 **Document not found:**
 ```json
 {"error": "Document not found: doc_invalid123"}
+```
+
+**Non-text file (doc-read only):**
+```json
+{"error": "Cannot read non-text file (MIME type: image/png). Use doc-pull to download binary files."}
 ```
 
 **Network error:**

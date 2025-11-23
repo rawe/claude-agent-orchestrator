@@ -12,24 +12,30 @@
 - Query all documents
 - Verify count and metadata
 
-### TC-03: Download Document
+### TC-03: Get Document Metadata
+- Upload a document
+- Get metadata by ID
+- Verify metadata fields (id, filename, content_type, size_bytes, tags, etc.)
+- Verify no file content in response (metadata only)
+
+### TC-04: Download Document
 - Upload a document
 - Download by ID
 - Verify content matches original
 
-### TC-04: Delete Document
+### TC-05: Delete Document
 - Upload a document
 - Delete by ID
 - Verify 404 on subsequent access
 
 ## Multiple Document Management
 
-### TC-05: Upload Multiple Documents
+### TC-06: Upload Multiple Documents
 - Upload 10 different documents
 - Verify all IDs are unique
 - Query and verify all present
 
-### TC-06: Mixed Operations
+### TC-07: Mixed Operations
 - Upload 5 documents
 - Delete 2 documents
 - Upload 3 more documents
@@ -37,7 +43,7 @@
 
 ## Edge Cases
 
-### TC-07: Empty File
+### TC-08: Empty File
 - Upload empty file
 - Verify successful storage
 - Download and verify empty
@@ -55,25 +61,29 @@
 
 ## Error Scenarios
 
-### TC-11: Download Non-existent Document
+### TC-11: Get Metadata for Non-existent Document
+- Request metadata for invalid document ID
+- Verify 404 response
+
+### TC-12: Download Non-existent Document
 - Request invalid document ID
 - Verify 404 response
 
-### TC-12: Delete Non-existent Document
+### TC-13: Delete Non-existent Document
 - Delete invalid document ID
 - Verify 404 response
 
-### TC-13: Path Traversal Protection
+### TC-14: Path Traversal Protection
 - Attempt path traversal in document ID
 - Verify rejection/sanitization
 
-### TC-14: Invalid Document ID Format
+### TC-15: Invalid Document ID Format
 - Use invalid characters in ID
 - Verify appropriate error handling
 
 ## Persistence Testing
 
-### TC-15: Data Persistence Across Restarts
+### TC-16: Data Persistence Across Restarts
 - Upload documents
 - Stop container
 - Start container
@@ -81,27 +91,27 @@
 
 ## Configuration Testing
 
-### TC-16: Custom Storage Path
+### TC-17: Custom Storage Path
 - Set DOCUMENT_STORAGE_PATH
 - Verify documents stored in correct location
 
-### TC-17: Custom Port
+### TC-18: Custom Port
 - Set DOCUMENT_SERVER_PORT
 - Verify server listens on custom port
 
 ## Performance Smoke Tests
 
-### TC-18: Bulk Upload
+### TC-19: Bulk Upload
 - Upload 50 documents
 - Measure total time
 - Verify all successful
 
-### TC-19: Bulk Query
+### TC-20: Bulk Query
 - With 100 documents stored
 - Query all documents
 - Measure response time
 
-### TC-20: Concurrent Operations
+### TC-21: Concurrent Operations
 - Simulate multiple clients
 - Verify no race conditions
 - Check data integrity

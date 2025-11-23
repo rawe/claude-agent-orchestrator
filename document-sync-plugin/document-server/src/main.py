@@ -85,6 +85,30 @@ async def upload_document(
     return JSONResponse(status_code=201, content=response.model_dump(mode="json"))
 
 
+@app.get("/documents/{document_id}/metadata", response_model=DocumentResponse)
+async def get_document_metadata(document_id: str):
+    """Retrieve metadata for a specific document by ID."""
+    # Get metadata from database
+    doc_metadata = db.get_document(document_id)
+
+    if not doc_metadata:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Return metadata response
+    response = DocumentResponse(
+        id=doc_metadata.id,
+        filename=doc_metadata.filename,
+        content_type=doc_metadata.content_type,
+        size_bytes=doc_metadata.size_bytes,
+        created_at=doc_metadata.created_at,
+        updated_at=doc_metadata.updated_at,
+        tags=doc_metadata.tags,
+        metadata=doc_metadata.metadata
+    )
+
+    return response
+
+
 @app.get("/documents/{document_id}")
 async def get_document(document_id: str):
     """Retrieve a specific document by ID and stream the file."""

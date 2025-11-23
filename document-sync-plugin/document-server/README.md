@@ -140,6 +140,41 @@ curl "http://localhost:8766/documents?filename=guide&tags=python"
 
 **Tag AND Logic**: When querying with multiple tags (e.g., `tags=python,tutorial`), only documents that have BOTH tags will be returned.
 
+### GET /documents/{document_id}/metadata
+
+Retrieve metadata for a specific document without downloading the file content.
+
+- **Path parameter**: `document_id` - The document's unique identifier
+- **Response**: 200 OK with `DocumentResponse` (JSON metadata only)
+
+**Example**:
+```bash
+curl http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2/metadata
+```
+
+**Success Response**:
+```json
+{
+  "id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+  "filename": "example.md",
+  "content_type": "text/markdown",
+  "size_bytes": 1234,
+  "created_at": "2025-11-22T12:34:56.789012",
+  "updated_at": "2025-11-22T12:34:56.789012",
+  "tags": ["documentation", "example"],
+  "metadata": {"author": "John Doe", "version": "1.0"}
+}
+```
+
+**Error Response** (404 if not found):
+```json
+{
+  "detail": "Document not found"
+}
+```
+
+**Use Case**: Check document metadata (file size, MIME type, tags, timestamps) before downloading. Useful for filtering or validating documents without transferring the full file content.
+
 ### GET /documents/{document_id}
 
 Download a document by ID. Returns the file content with appropriate headers.

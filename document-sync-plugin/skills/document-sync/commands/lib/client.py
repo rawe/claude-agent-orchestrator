@@ -5,6 +5,38 @@ from typing import Optional
 import mimetypes
 
 
+# Supported MIME types for doc-read command (text files only)
+SUPPORTED_TEXT_MIME_TYPES = [
+    "text/*",
+    "application/json",
+    "application/xml",
+]
+
+
+def _is_text_mime_type(mime_type: str) -> bool:
+    """Check if a MIME type is supported for text reading.
+
+    Args:
+        mime_type: The MIME type to check
+
+    Returns:
+        True if the MIME type is text-compatible, False otherwise
+    """
+    if not mime_type:
+        return False
+
+    for supported in SUPPORTED_TEXT_MIME_TYPES:
+        if supported.endswith("*"):
+            # Handle wildcard patterns like "text/*"
+            prefix = supported[:-1]
+            if mime_type.startswith(prefix):
+                return True
+        elif mime_type == supported:
+            return True
+
+    return False
+
+
 class DocumentClient:
     """Client for interacting with the document sync server."""
 
@@ -182,6 +214,82 @@ class DocumentClient:
             )
             response.raise_for_status()
             return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Document not found: {document_id}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def get_document_info(self, document_id: str) -> dict:
+        """Get metadata for a document without downloading the file.
+
+        Args:
+            document_id: ID of the document to get info for
+
+        Returns:
+            Dictionary with document metadata (id, filename, content_type,
+            size_bytes, created_at, updated_at, tags, metadata)
+
+        Raises:
+            Exception: On network or HTTP errors, including 404 if not found
+        """
+        try:
+            response = httpx.get(
+                f"{self.base_url}/documents/{document_id}/metadata",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Document not found: {document_id}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def read_document(self, document_id: str) -> str:
+        """Read text document content directly without downloading to file.
+
+        This method only supports text files. For binary files, use pull_document().
+
+        Args:
+            document_id: ID of the document to read
+
+        Returns:
+            String content of the document (UTF-8 decoded)
+
+        Raises:
+            Exception: On network or HTTP errors, including:
+                - 404 if document not found
+                - Error if file is not a text file (non-text MIME type)
+                - Error if file cannot be decoded as UTF-8
+        """
+        try:
+            response = httpx.get(
+                f"{self.base_url}/documents/{document_id}",
+                timeout=30.0
+            )
+            response.raise_for_status()
+
+            # Get content type from response headers
+            content_type = response.headers.get("content-type", "")
+
+            # Validate MIME type is text-compatible
+            if not _is_text_mime_type(content_type):
+                raise Exception(
+                    f"Cannot read non-text file (MIME type: {content_type}). "
+                    f"Use doc-pull to download binary files."
+                )
+
+            # Decode content to UTF-8 string
+            try:
+                return response.content.decode("utf-8")
+            except UnicodeDecodeError:
+                raise Exception(
+                    "File is not valid UTF-8 text. Use doc-pull to download."
+                )
+
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise Exception(f"Document not found: {document_id}")
