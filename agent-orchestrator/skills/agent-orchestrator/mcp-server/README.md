@@ -8,10 +8,12 @@ Model Context Protocol (MCP) server for orchestrating specialized Claude Code ag
 
 **Run:**
 ```bash
-uv run /path/to/agent-orchestrator-mcp.py
+uv run /path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py
 ```
 
 Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inline script metadata.
+
+**Note:** The MCP server now automatically discovers the commands directory relative to its location. No `AGENT_ORCHESTRATOR_COMMAND_PATH` environment variable needed for basic setup!
 
 **Example usage:**
 - "List all available orchestrated agents"
@@ -22,7 +24,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
 
 ### Claude Code
 
-**simple.mcp.json:**
+**Minimal Configuration (auto-discovery):**
 ```json
 {
   "mcpServers": {
@@ -30,16 +32,32 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
-        "/absolute/path/to/agent-orchestrator-mcp.py"
+        "/absolute/path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
+      ]
+    }
+  }
+}
+```
+
+**With Custom Project Directory:**
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "command": "uv",
+      "args": [
+        "run",
+        "/absolute/path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {
-        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/path/to/commands",
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project"
       }
     }
   }
 }
 ```
+
+**Note:** `AGENT_ORCHESTRATOR_COMMAND_PATH` is no longer required (auto-discovered). Set `AGENT_ORCHESTRATOR_PROJECT_DIR` only if you want orchestrated agents to run in a specific directory instead of the current directory.
 
 ### Claude Desktop
 
@@ -48,7 +66,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - Linux: `~/.config/Claude/claude_desktop_config.json`
 
-**Configuration:**
+**Minimal Configuration:**
 ```json
 {
   "mcpServers": {
@@ -56,10 +74,9 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
-        "/absolute/path/to/agent-orchestrator-mcp.py"
+        "/absolute/path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {
-        "AGENT_ORCHESTRATOR_COMMAND_PATH": "/path/to/commands",
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
       }
@@ -68,14 +85,21 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
 }
 ```
 
+**Note:**
+- `AGENT_ORCHESTRATOR_COMMAND_PATH` is no longer required (auto-discovered)
+- `AGENT_ORCHESTRATOR_PROJECT_DIR` sets where orchestrated agents run
+- `PATH` must include `uv` and `claude` binaries (Claude Desktop doesn't inherit shell PATH)
+
 **After updating:** Restart Claude Desktop. Verify 7 tools are available in the MCP icon.
 
 ## Environment Variables
 
-**Required:**
-- `AGENT_ORCHESTRATOR_COMMAND_PATH` - Path to commands directory
-- `AGENT_ORCHESTRATOR_PROJECT_DIR` - Project directory (Claude Desktop only)
-- `PATH` - Include `uv` and `claude` binaries (Claude Desktop only)
+**Auto-Discovered (No Configuration Needed):**
+- `AGENT_ORCHESTRATOR_COMMAND_PATH` - Now auto-discovered relative to MCP server location. Can still be set to override.
+
+**Required for Claude Desktop:**
+- `AGENT_ORCHESTRATOR_PROJECT_DIR` - Project directory where orchestrated agents run (must be set for Claude Desktop only)
+- `PATH` - Include `uv` and `claude` binaries (Claude Desktop doesn't inherit shell PATH)
 
 **Optional:**
 - `AGENT_ORCHESTRATOR_SESSIONS_DIR` - Custom session storage location
@@ -141,7 +165,12 @@ Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `
 ## Testing
 
 ```bash
-export AGENT_ORCHESTRATOR_COMMAND_PATH="/path/to/commands"
+# No environment variables needed! Commands are auto-discovered
+uv run agent-orchestrator-mcp.py
+```
+
+With custom project directory:
+```bash
 export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/project"
 uv run agent-orchestrator-mcp.py
 ```

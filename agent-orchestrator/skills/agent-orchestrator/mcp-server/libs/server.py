@@ -61,8 +61,8 @@ def get_server_config() -> ServerConfig:
     """Get configuration from environment variables"""
     command_path = os.environ.get(ENV_COMMAND_PATH)
     if not command_path:
-        print(f"ERROR: {ENV_COMMAND_PATH} environment variable is required", file=sys.stderr)
-        print("Please set it to the absolute path of the commands directory", file=sys.stderr)
+        print(f"ERROR: {ENV_COMMAND_PATH} environment variable not set and auto-discovery failed", file=sys.stderr)
+        print("This should not happen - please check the MCP server installation", file=sys.stderr)
         sys.exit(1)
 
     # Normalize path: remove trailing slash if present

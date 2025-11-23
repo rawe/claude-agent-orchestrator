@@ -6,7 +6,7 @@ This is the **single source of truth** for all environment variables used by the
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_COMMAND_PATH` | **Yes** | - | Absolute path to the commands directory containing Python scripts (e.g., `/path/to/agent-orchestrator-cli/commands`) |
+| `AGENT_ORCHESTRATOR_COMMAND_PATH` | No | **Auto-discovered** from MCP server location | Absolute path to the commands directory containing Python scripts. Now auto-discovered, but can be overridden. |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | **Claude Desktop: Yes**<br>Claude Code: No | Current directory (Claude Code only) | Project directory where orchestrated agents execute. Controls the base for other defaults. |
 | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/sessions` | Custom location for agent session storage. Use for centralized session management across projects. |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | No | `$PROJECT_DIR/.agent-orchestrator/agents` | Custom location for agent definitions. Use to share agent definitions across projects. |
@@ -16,7 +16,7 @@ This is the **single source of truth** for all environment variables used by the
 
 ## Variable Details
 
-### `AGENT_ORCHESTRATOR_COMMAND_PATH` (Required)
+### `AGENT_ORCHESTRATOR_COMMAND_PATH` (Auto-Discovered)
 
 - Absolute path to the commands directory containing Python scripts
 - Example (local development): `/Users/yourname/projects/agent-orchestrator-cli/commands`

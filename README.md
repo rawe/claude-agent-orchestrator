@@ -92,8 +92,8 @@ Use the standalone MCP server implementation to get:
 git clone <your-repo-url>
 
 # 2. Configure in Claude Desktop or Claude Code
-cd agent-orchestrator-mcp-server
-# See README.md for configuration examples
+# MCP server now auto-discovers commands - minimal setup required!
+# See agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md
 ```
 
 **Usage Example (from Claude Desktop):**
@@ -102,7 +102,7 @@ List available agents
 Create a new agent session called "code-review" using the code-reviewer agent
 ```
 
-**Documentation:** [agent-orchestrator-mcp-server/README.md](./agent-orchestrator-mcp-server/README.md)
+**Documentation:** [agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md](./agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md)
 
 **Important Limitation:**
 Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 3 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1/2 integration approaches which operate within a single Claude Code session.
@@ -127,6 +127,10 @@ agent-orchestrator-framework/
 │   ├── skills/
 │   │   └── agent-orchestrator/
 │   │       ├── commands/                # Python ao-* commands
+│   │       ├── mcp-server/              # Level 3: MCP server (collocated)
+│   │       │   ├── agent-orchestrator-mcp.py
+│   │       │   ├── libs/
+│   │       │   └── docs/
 │   │       ├── SKILL.md                 # Skill definition
 │   │       ├── references/              # Technical documentation
 │   │       └── example/                 # Example agent definitions
@@ -138,12 +142,6 @@ agent-orchestrator-framework/
 │   │   ├── orchestrated-agent-launcher.md
 │   │   └── orchestrated-agent-lister.md
 │   └── README.md
-│
-├── agent-orchestrator-mcp-server/   # Level 3: MCP server implementation
-│   ├── agent-orchestrator-mcp.py   # Main MCP server script
-│   ├── libs/                        # Supporting libraries
-│   ├── docs/                        # Documentation
-│   └── README.md                    # Full documentation
 │
 ├── agent-orchestrator-observability/ # Real-time observability platform
 │   ├── backend/                     # FastAPI + WebSocket backend
@@ -227,6 +225,6 @@ See **[agent-orchestrator-observability/README.md](./agent-orchestrator-observab
 
 - **[Level 1: Core Framework](./agent-orchestrator/README.md)** - Plugin documentation
 - **[Level 2: Subagents Extension](./agent-orchestrator-subagents/README.md)** - Extension plugin
-- **[Level 3: MCP Server](./agent-orchestrator-mcp-server/README.md)** - MCP implementation
+- **[Level 3: MCP Server](./agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md)** - MCP implementation (collocated with commands)
 - **[Observability Platform](./agent-orchestrator-observability/README.md)** - Real-time monitoring
 - **[Technical Architecture](./agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works

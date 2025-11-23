@@ -16,17 +16,24 @@ Usage:
     uv run agent-orchestrator-mcp.py
 
 Environment Variables:
-    AGENT_ORCHESTRATOR_COMMAND_PATH - Required: Path to commands directory
+    AGENT_ORCHESTRATOR_COMMAND_PATH - Optional: Path to commands directory (auto-discovered if not set)
     AGENT_ORCHESTRATOR_PROJECT_DIR  - Optional: Default project directory
     MCP_SERVER_DEBUG                - Optional: Enable debug logging (true/false)
 """
 
+import os
 import sys
 from pathlib import Path
 
 # Add libs directory to Python path
-SCRIPT_DIR = Path(__file__).parent
+SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "libs"))
+
+# Auto-discover commands directory if not set
+# Structure: mcp-server/ -> agent-orchestrator/ -> commands/
+if "AGENT_ORCHESTRATOR_COMMAND_PATH" not in os.environ:
+    COMMANDS_DIR = SCRIPT_DIR.parent / "commands"
+    os.environ["AGENT_ORCHESTRATOR_COMMAND_PATH"] = str(COMMANDS_DIR)
 
 # Import and run the server
 from server import main
