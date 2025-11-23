@@ -103,11 +103,12 @@ curl -X POST http://localhost:8766/documents \
   "created_at": "2025-11-22T12:34:56.789012",
   "updated_at": "2025-11-22T12:34:56.789012",
   "tags": ["documentation", "example"],
-  "metadata": {"author": "John Doe", "version": "1.0"}
+  "metadata": {"author": "John Doe", "version": "1.0"},
+  "url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2"
 }
 ```
 
-The server generates a unique document ID, calculates a SHA256 checksum for integrity verification, and detects the MIME type automatically.
+The server generates a unique document ID, calculates a SHA256 checksum for integrity verification, detects the MIME type automatically, and provides a fully qualified URL for document retrieval.
 
 ### GET /documents
 
@@ -162,7 +163,8 @@ curl http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2/metadata
   "created_at": "2025-11-22T12:34:56.789012",
   "updated_at": "2025-11-22T12:34:56.789012",
   "tags": ["documentation", "example"],
-  "metadata": {"author": "John Doe", "version": "1.0"}
+  "metadata": {"author": "John Doe", "version": "1.0"},
+  "url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2"
 }
 ```
 
@@ -173,7 +175,7 @@ curl http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2/metadata
 }
 ```
 
-**Use Case**: Check document metadata (file size, MIME type, tags, timestamps) before downloading. Useful for filtering or validating documents without transferring the full file content.
+**Use Case**: Check document metadata (file size, MIME type, tags, timestamps) before downloading. The `url` field provides a direct link to retrieve the document content. Useful for filtering or validating documents without transferring the full file content.
 
 ### GET /documents/{document_id}
 
@@ -233,6 +235,47 @@ curl -X DELETE http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2
 
 Tags associated with the document are automatically removed (CASCADE deletion).
 
+## Document URL Behavior
+
+All document metadata responses include a `url` field that provides a direct link to retrieve the document content. This URL points to the `GET /documents/{document_id}` endpoint.
+
+### Using URLs in a Browser
+
+When you open a document URL in a web browser (e.g., `http://localhost:8766/documents/doc_123`), the behavior depends on the document's MIME type:
+
+| Content Type | Browser Behavior | Example |
+|-------------|------------------|---------|
+| `text/plain`, `text/markdown` | **Displays inline** as plain text | README files, logs |
+| `text/html` | **Renders** the HTML page | Web pages |
+| `image/png`, `image/jpeg`, `image/gif` | **Displays** the image | Photos, diagrams |
+| `application/pdf` | **Opens** in built-in PDF viewer | PDF documents |
+| `application/json` | **Displays** formatted JSON | API responses, configs |
+| `video/mp4`, `audio/mp3` | **Plays** in media player | Videos, audio files |
+| `application/octet-stream` | **Downloads** the file | Binary files, executables |
+| Other binary types | **Downloads** with suggested filename | Archives, Office docs |
+
+The server sets appropriate headers:
+- `Content-Type`: The document's detected MIME type
+- `Content-Disposition`: Includes the original filename for downloads
+
+### Programmatic Access
+
+For programmatic access (API clients, scripts), use the URL to download the document:
+
+```bash
+# Download using curl
+curl http://localhost:8766/documents/doc_123 -o downloaded_file.md
+
+# Download using wget
+wget http://localhost:8766/documents/doc_123 -O downloaded_file.md
+
+# In Python
+import requests
+response = requests.get("http://localhost:8766/documents/doc_123")
+with open("downloaded_file.md", "wb") as f:
+    f.write(response.content)
+```
+
 ## Environment Variables
 
 Configure the server using environment variables:
@@ -254,6 +297,29 @@ Configure the server using environment variables:
   ```bash
   DOCUMENT_SERVER_PORT=9000 uv run python -m src.main
   ```
+
+### DOCUMENT_SERVER_PUBLIC_URL
+
+- **Description**: Public-facing base URL for generating document retrieval links. This is **critical for Docker deployments** where the internal port may differ from the external port, or when the server is behind a reverse proxy.
+- **Default**: `http://localhost:{DOCUMENT_SERVER_PORT}`
+- **Format**: `{protocol}://{host}[:{port}]` (no trailing slash)
+- **Use Cases**:
+  - **Docker with port mapping**: If container uses internal port 8766 but is exposed as 9000: `http://localhost:9000`
+  - **Remote access**: If server runs on a remote host: `http://192.168.1.100:8766`
+  - **Reverse proxy/HTTPS**: If behind nginx with SSL: `https://api.example.com`
+  - **Custom domain**: If using a domain name: `https://docs.mycompany.com`
+- **Examples**:
+  ```bash
+  # Docker with different external port
+  DOCUMENT_SERVER_PUBLIC_URL=http://localhost:9000 uv run python -m src.main
+
+  # Remote server
+  DOCUMENT_SERVER_PUBLIC_URL=http://192.168.1.100:8766 uv run python -m src.main
+
+  # Production with HTTPS
+  DOCUMENT_SERVER_PUBLIC_URL=https://api.example.com uv run python -m src.main
+  ```
+- **Note**: The `url` field in all document metadata responses will use this base URL. For example, with `DOCUMENT_SERVER_PUBLIC_URL=https://api.example.com`, a document's URL will be `https://api.example.com/documents/{document_id}`
 
 ### DOCUMENT_SERVER_STORAGE
 

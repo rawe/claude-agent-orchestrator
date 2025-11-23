@@ -15,6 +15,10 @@ services:
       - DOCUMENT_SERVER_PORT=8766
       - DOCUMENT_SERVER_STORAGE=/app/data/files
       - DOCUMENT_SERVER_DB=/app/data/documents.db
+      # Public URL for generating document retrieval links
+      # Change this if accessing from a different host/port or behind a proxy
+      # Examples: "http://192.168.1.100:8766", "https://docs.example.com"
+      - DOCUMENT_SERVER_PUBLIC_URL=http://localhost:8766
       - LOG_LEVEL=INFO
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')"]

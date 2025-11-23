@@ -21,6 +21,14 @@ DOCUMENT_SERVER_PORT = int(os.getenv("DOCUMENT_SERVER_PORT", str(DEFAULT_PORT)))
 STORAGE_DIR = os.getenv("DOCUMENT_SERVER_STORAGE", DEFAULT_STORAGE_DIR)
 DB_PATH = os.getenv("DOCUMENT_SERVER_DB", DEFAULT_DB_PATH)
 
+# Public URL configuration for generating document URLs
+# This should be the externally accessible URL (important for Docker/proxy setups)
+# Examples: "http://localhost:8766", "https://api.example.com", "http://192.168.1.100:9000"
+DOCUMENT_SERVER_PUBLIC_URL = os.getenv(
+    "DOCUMENT_SERVER_PUBLIC_URL",
+    f"http://localhost:{DOCUMENT_SERVER_PORT}"  # Fallback to localhost with configured port
+)
+
 # Initialize storage and database
 storage = DocumentStorage(STORAGE_DIR)
 db = DocumentDatabase(DB_PATH)
@@ -31,6 +39,24 @@ app = FastAPI(
     version="0.1.0",
     description="FastAPI server for document management and synchronization"
 )
+
+
+def get_document_url(document_id: str) -> str:
+    """
+    Construct the full URL for retrieving a document.
+
+    Uses DOCUMENT_SERVER_PUBLIC_URL as the base, which can be configured
+    to handle Docker port mapping, reverse proxies, or custom domains.
+
+    Args:
+        document_id: The unique document identifier
+
+    Returns:
+        Fully qualified URL (e.g., "http://localhost:8766/documents/doc_123")
+    """
+    # Remove trailing slash if present to avoid double slashes
+    base_url = DOCUMENT_SERVER_PUBLIC_URL.rstrip('/')
+    return f"{base_url}/documents/{document_id}"
 
 
 @app.get("/health")
@@ -83,7 +109,8 @@ async def upload_document(
         created_at=doc_metadata.created_at,
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
-        metadata=doc_metadata.metadata
+        metadata=doc_metadata.metadata,
+        url=get_document_url(doc_metadata.id)
     )
 
     return JSONResponse(status_code=201, content=response.model_dump(mode="json"))
@@ -107,7 +134,8 @@ async def get_document_metadata(document_id: str):
         created_at=doc_metadata.created_at,
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
-        metadata=doc_metadata.metadata
+        metadata=doc_metadata.metadata,
+        url=get_document_url(doc_metadata.id)
     )
 
     return response
@@ -160,7 +188,8 @@ async def list_documents(
             created_at=doc.created_at,
             updated_at=doc.updated_at,
             tags=doc.tags,
-            metadata=doc.metadata
+            metadata=doc.metadata,
+            url=get_document_url(doc.id)
         )
         for doc in documents
     ]

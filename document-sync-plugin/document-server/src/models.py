@@ -42,6 +42,7 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
     tags: list[str]
     metadata: dict[str, str]
+    url: str  # Fully qualified URL to retrieve the document
 
 
 class DeleteResponse(BaseModel):
