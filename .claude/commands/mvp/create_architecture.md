@@ -1,0 +1,1 @@
+TODO: concrete prompt we need to abstract in a command is: document-sync-plugin/docs/architecture-prompt.md

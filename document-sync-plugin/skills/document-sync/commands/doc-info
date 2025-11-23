@@ -1,0 +1,48 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Retrieve metadata for a document from the document sync server."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+from client import DocumentClient
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    document_id: str = typer.Argument(..., help="Document ID to retrieve metadata for"),
+):
+    """Retrieve metadata for a document without downloading the file."""
+    try:
+        # Create client and get document info
+        config = Config()
+        client = DocumentClient(config)
+
+        result = client.get_document_info(document_id)
+
+        # Output metadata as JSON
+        print(json.dumps(result, indent=2))
+
+    except Exception as e:
+        # Output error as JSON to stderr
+        error = {"error": str(e)}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()

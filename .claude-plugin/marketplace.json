@@ -16,6 +16,10 @@
     {
       "name": "agent-orchestrator-subagents",
       "source": "./agent-orchestrator-subagents"
+    },
+    {
+      "name": "document-sync",
+      "source": "./document-sync-plugin"
     }
   ]
 }

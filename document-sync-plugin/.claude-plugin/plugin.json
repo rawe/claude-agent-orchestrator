@@ -1,0 +1,17 @@
+{
+  "name": "document-sync",
+  "description": "Document management system for storing, querying, and retrieving documents across Claude Code sessions. Provides doc-* commands for document operations with a centralized server. Requires Document Sync Server running and Python with uv.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Document Sync Contributors",
+    "email": "noreply@example.com"
+  },
+  "keywords": [
+    "document",
+    "storage",
+    "sync",
+    "query",
+    "knowledge-base",
+    "session-persistence"
+  ]
+}

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  document-server:
+    build:
+      context: ./document-server
+      dockerfile: Dockerfile
+    container_name: document-sync-server
+    ports:
+      - "8766:8766"
+    volumes:
+      - document-data:/app/data
+    environment:
+      - DOCUMENT_SERVER_HOST=0.0.0.0
+      - DOCUMENT_SERVER_PORT=8766
+      - DOCUMENT_SERVER_STORAGE=/app/data/files
+      - DOCUMENT_SERVER_DB=/app/data/documents.db
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  document-data:
+    driver: local

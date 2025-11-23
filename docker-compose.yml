@@ -1,0 +1,92 @@
+
+services:
+  # ============================================================================
+  # OBSERVABILITY BACKEND
+  # ============================================================================
+  observability-backend:
+    container_name: agent-orchestrator-observability-backend
+    build:
+      context: ./agent-orchestrator-observability
+      dockerfile: docker/backend.Dockerfile
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./agent-orchestrator-observability/backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG_LOGGING=false
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/sessions')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # OBSERVABILITY FRONTEND
+  # ============================================================================
+  observability-frontend:
+    container_name: agent-orchestrator-observability-frontend
+    build:
+      context: ./agent-orchestrator-observability
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./agent-orchestrator-observability/frontend/src:/app/src
+      - ./agent-orchestrator-observability/frontend/index.html:/app/index.html
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8765
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    depends_on:
+      observability-backend:
+        condition: service_healthy
+
+  # ============================================================================
+  # DOCUMENT SYNC SERVER
+  # ============================================================================
+  document-server:
+    container_name: document-sync-server
+    build:
+      context: ./document-sync-plugin/document-server
+      dockerfile: Dockerfile
+    ports:
+      - "8766:8766"
+    volumes:
+      - document-data:/app/data
+    environment:
+      - DOCUMENT_SERVER_HOST=0.0.0.0
+      - DOCUMENT_SERVER_PORT=8766
+      - DOCUMENT_SERVER_STORAGE=/app/data/files
+      - DOCUMENT_SERVER_DB=/app/data/documents.db
+      - LOG_LEVEL=INFO
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+# ==============================================================================
+# NETWORKS
+# ==============================================================================
+networks:
+  agent-orchestrator-network:
+    driver: bridge
+    name: agent-orchestrator-network
+
+# ==============================================================================
+# VOLUMES
+# ==============================================================================
+volumes:
+  document-data:
+    name: agent-orchestrator-document-data
+    driver: local
