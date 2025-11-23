@@ -5,6 +5,28 @@ from typing import Optional
 import mimetypes
 
 
+def _init_custom_mime_types():
+    """Register custom MIME types for common file extensions not in system database."""
+    custom_types = {
+        '.md': 'text/markdown',
+        '.markdown': 'text/markdown',
+        '.yaml': 'text/yaml',
+        '.yml': 'text/yaml',
+        '.json': 'application/json',
+        '.jsonl': 'application/jsonl',
+        '.toml': 'application/toml',
+        '.ini': 'text/plain',
+        '.conf': 'text/plain',
+        '.log': 'text/plain',
+    }
+    for ext, mime_type in custom_types.items():
+        mimetypes.add_type(mime_type, ext)
+
+
+# Initialize custom MIME types on module import
+_init_custom_mime_types()
+
+
 # Supported MIME types for doc-read command (text files only)
 SUPPORTED_TEXT_MIME_TYPES = [
     "text/*",

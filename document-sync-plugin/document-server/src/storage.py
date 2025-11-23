@@ -1,11 +1,32 @@
 """Storage layer for filesystem operations (Block 02 implementation)"""
 
-import os
 import hashlib
 import secrets
 import mimetypes
 from pathlib import Path
 from .models import DocumentMetadata
+
+
+def _init_custom_mime_types():
+    """Register custom MIME types for common file extensions not in system database."""
+    custom_types = {
+        '.md': 'text/markdown',
+        '.markdown': 'text/markdown',
+        '.yaml': 'text/yaml',
+        '.yml': 'text/yaml',
+        '.json': 'application/json',
+        '.jsonl': 'application/jsonl',
+        '.toml': 'application/toml',
+        '.ini': 'text/plain',
+        '.conf': 'text/plain',
+        '.log': 'text/plain',
+    }
+    for ext, mime_type in custom_types.items():
+        mimetypes.add_type(mime_type, ext)
+
+
+# Initialize custom MIME types on module import
+_init_custom_mime_types()
 
 
 class DocumentStorage:
@@ -16,16 +37,26 @@ class DocumentStorage:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def store_document(self, content: bytes, filename: str) -> DocumentMetadata:
-        """Store document and return metadata with checksum."""
+    def store_document(self, content: bytes, filename: str, content_type: str | None = None) -> DocumentMetadata:
+        """Store document and return metadata with checksum.
+
+        Args:
+            content: File content as bytes
+            filename: Original filename
+            content_type: Optional MIME type from client. If not provided, will detect from filename.
+
+        Returns:
+            DocumentMetadata with all file information
+        """
         # Generate unique document ID
         doc_id = f"doc_{secrets.token_hex(12)}"
 
         # Calculate SHA256 checksum
         checksum = hashlib.sha256(content).hexdigest()
 
-        # Detect MIME type with fallback
-        content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        # Use client-provided MIME type, or detect from filename as fallback
+        if not content_type:
+            content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
 
         # Calculate file size
         size_bytes = len(content)

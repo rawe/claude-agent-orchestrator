@@ -60,8 +60,12 @@ async def upload_document(
     # Read file content
     content = await file.read()
 
-    # Store document and get metadata
-    doc_metadata = storage.store_document(content, file.filename or "unknown")
+    # Store document and get metadata (use client's MIME type if provided)
+    doc_metadata = storage.store_document(
+        content,
+        file.filename or "unknown",
+        content_type=file.content_type
+    )
 
     # Add tags to metadata
     doc_metadata.tags = parsed_tags
