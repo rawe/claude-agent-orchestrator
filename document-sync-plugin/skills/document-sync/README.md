@@ -43,7 +43,8 @@ uv run doc-push architecture.md --tags "design,architecture" --description "Syst
   "created_at": "2025-11-23T00:00:00",
   "updated_at": "2025-11-23T00:00:00",
   "tags": ["design", "architecture"],
-  "metadata": {"description": "System architecture document"}
+  "metadata": {"description": "System architecture document"},
+  "url": "http://localhost:8766/documents/doc_abc123..."
 }
 ```
 
@@ -88,7 +89,8 @@ uv run doc-query --name "guide" --tags "python" --limit 5
     "created_at": "2025-11-23T00:00:00",
     "updated_at": "2025-11-23T00:00:00",
     "tags": ["python", "tutorial"],
-    "metadata": {}
+    "metadata": {},
+    "url": "http://localhost:8766/documents/doc_abc123..."
   }
 ]
 ```
@@ -119,11 +121,12 @@ uv run doc-info doc_abc123...
   "created_at": "2025-11-23T00:00:00",
   "updated_at": "2025-11-23T00:00:00",
   "tags": ["design", "architecture"],
-  "metadata": {"description": "System architecture document"}
+  "metadata": {"description": "System architecture document"},
+  "url": "http://localhost:8766/documents/doc_abc123..."
 }
 ```
 
-**Use Case:** Check document metadata (file size, MIME type, tags) before downloading.
+**Use Case:** Check document metadata (file size, MIME type, tags) before downloading. The `url` field provides a direct link to retrieve the document, mostly interesting for the user or system having no access to the skill itself.
 
 ### doc-read - Read Text Documents
 

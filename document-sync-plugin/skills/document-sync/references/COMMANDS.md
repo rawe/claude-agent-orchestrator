@@ -29,7 +29,8 @@ uv run commands/doc-push arch.md --tags "design,mvp" --description "MVP architec
   "created_at": "2025-11-23T00:00:00",
   "updated_at": "2025-11-23T00:00:00",
   "tags": ["api", "v2"],
-  "metadata": {"description": "Specification document for API v2"}
+  "metadata": {"description": "Specification document for API v2"},
+  "url": "http://localhost:8766/documents/doc_abc123def456..."
 }
 ```
 
@@ -66,7 +67,8 @@ uv run commands/doc-query --name "spec"      # Name contains "spec"
     "created_at": "2025-11-23T00:00:00",
     "updated_at": "2025-11-23T00:00:00",
     "tags": ["api", "v2"],
-    "metadata": {}
+    "metadata": {},
+    "url": "http://localhost:8766/documents/doc_abc123..."
   }
 ]
 ```
@@ -98,11 +100,12 @@ uv run commands/doc-info doc_abc123...
   "created_at": "2025-11-23T00:00:00",
   "updated_at": "2025-11-23T00:00:00",
   "tags": ["api", "v2"],
-  "metadata": {"description": "API specification"}
+  "metadata": {"description": "API specification"},
+  "url": "http://localhost:8766/documents/doc_abc123..."
 }
 ```
 
-**Use Case**: View document metadata without downloading the file. Useful for checking file size, MIME type, tags, and timestamps before downloading.
+**Use Case**: View document metadata without downloading the file. The `url` field provides a direct link to retrieve the document. Useful to provide this url to a user if you don't want to download the file yourself.
 
 **Error Output** (stderr):
 ```json

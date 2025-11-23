@@ -135,7 +135,7 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 
 **Read text file?** → `doc-read <doc-id>` (text files to stdout)
 
-**Get document?** → `doc-pull <doc-id>` (ID from query)
+**Download document?** → `doc-pull <doc-id>` (ID from query)
 
 **Remove document?** → `doc-delete <doc-id>` (permanent)
 
@@ -148,4 +148,3 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 - **Detailed Command Reference**: See `references/COMMANDS.md`
 - **Configuration Options**: See `references/CONFIGURATION.md`
 - **Error Handling**: See `references/TROUBLESHOOTING.md`
-- **Server Setup**: See `../../document-server/README.md`
