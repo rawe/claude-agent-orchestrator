@@ -23,6 +23,23 @@ FastAPI server for document management and synchronization. This server provides
 
 ## Starting the Server
 
+### Option 1: Using Docker (Recommended)
+
+From the project root:
+```bash
+cd ..
+docker-compose up -d
+```
+
+The server will be available at `http://localhost:8766`
+
+Check health:
+```bash
+curl http://localhost:8766/health
+```
+
+### Option 2: Running Locally
+
 Run the server using UV:
 
 ```bash
@@ -39,6 +56,23 @@ INFO:     Application startup complete.
 ```
 
 ## Available Endpoints
+
+### GET /health
+
+Health check endpoint for monitoring and Docker health checks.
+
+**Example**:
+```bash
+curl http://localhost:8766/health
+```
+
+**Response**:
+```json
+{
+  "status": "healthy",
+  "service": "document-sync-server"
+}
+```
 
 ### POST /documents
 
@@ -204,6 +238,33 @@ Configure the server using environment variables:
   DOCUMENT_SERVER_DB=/var/db/documents.db uv run python -m src.main
   ```
 
+## Docker Operations
+
+### Docker Commands
+
+```bash
+# Build and start
+docker-compose build
+docker-compose up -d
+
+# Check status
+docker-compose ps
+docker-compose logs document-server
+
+# Restart
+docker-compose restart document-server
+
+# Monitor resources
+docker stats document-sync-server
+
+# Check health
+docker inspect --format='{{json .State.Health}}' document-sync-server
+
+# Stop
+docker-compose down        # Keep data
+docker-compose down -v     # Remove data
+```
+
 ## Development
 
 ### Interactive API Documentation
@@ -279,8 +340,6 @@ document-server/
 
 ## Testing
 
-End-to-end tests verify all API endpoints (upload, query, download, delete) including tag AND logic and path traversal protection.
+Comprehensive integration test suite covering all API endpoints, edge cases, and error scenarios.
 
-**Quick start**: `./tests/e2e.sh` (requires running server)
-
-For detailed instructions, see [tests/README.md](tests/README.md).
+For test documentation and how to run tests, see [tests/README.md](tests/README.md).

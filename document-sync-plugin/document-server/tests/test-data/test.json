@@ -1,0 +1,9 @@
+{
+  "type": "test",
+  "data": {
+    "items": [1, 2, 3],
+    "nested": {
+      "value": true
+    }
+  }
+}

@@ -13,8 +13,9 @@ ENV/
 # Data directory - don't commit uploaded documents
 document-data/
 
-# Test data
-test-data/
+# Test data - exclude large binary files
+tests/test-data/large.bin
+tests/test-data/*.bin
 
 # IDE
 .vscode/

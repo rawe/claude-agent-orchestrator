@@ -1,20 +1,24 @@
-# Tests
+# Integration Tests
 
-## End-to-End Test
+Comprehensive test suite for the Document Sync Server.
 
-Tests all API endpoints (upload, query, download, delete).
+## Running Tests
 
 **Requirements**: Server must be running on `http://localhost:8766`
 
 **Run**:
 ```bash
-# From document-server/ directory
-./tests/e2e.sh
+# From document-server/tests/ directory
+./run-integration-tests.sh
 ```
 
-**What it tests**:
-- Document upload with tags
-- Query by filename and tags (including AND logic)
-- Document download
-- Document deletion
-- Path traversal protection
+## Test Coverage
+
+The test suite includes 14 scenarios covering:
+- Basic CRUD operations (upload, query, download, delete)
+- Edge cases (empty files, unicode content, special characters)
+- Error handling (404 responses, invalid inputs)
+- Tag filtering with AND logic
+- Metadata handling
+
+For detailed test case documentation, see [test-scenarios.md](test-scenarios.md).

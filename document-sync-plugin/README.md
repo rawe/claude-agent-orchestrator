@@ -2,9 +2,9 @@
 
 A document management system that enables Claude Code sessions to store, retrieve, and query documents across different sessions through a centralized server.
 
-## Purpose
+## Overview
 
-The Document Sync Plugin allows Claude Code to:
+The Document Sync Plugin provides a simple interface for Claude Code to:
 - **Store documents** with metadata (tags, descriptions) for future reference
 - **Retrieve documents** by ID to access previously saved information
 - **Query documents** by name or tags to discover relevant content
@@ -12,29 +12,18 @@ The Document Sync Plugin allows Claude Code to:
 
 ## Architecture
 
-The system uses a client-server architecture with two main components:
-
 ```
 ┌─────────────────────────┐
 │   Claude Code Session   │
-│                         │
 │  Uses document-sync     │
 │  skill commands         │
 └───────────┬─────────────┘
-            │
             │ HTTP Requests
-            │ (push/pull/query/delete)
             ▼
 ┌─────────────────────────┐
 │   Document Server       │
 │   (FastAPI)             │
-│                         │
-│  - Receives documents   │
-│  - Stores files         │
-│  - Manages metadata     │
-│  - Handles queries      │
 └───────────┬─────────────┘
-            │
             ▼
     ┌───────────────┐
     │  File Storage │
@@ -44,28 +33,31 @@ The system uses a client-server architecture with two main components:
 
 ### Components
 
-1. **Document Server** (`document-server/`)
-   - FastAPI application with RESTful API
-   - File storage with SQLite metadata database
-   - Tag-based querying with AND logic
-   - SHA256 checksums for integrity
-
-2. **CLI Commands** (`skills/document-sync/`)
-   - UV-based scripts: `doc-push`, `doc-pull`, `doc-query`, `doc-delete`
-   - JSON output for easy integration
-   - Environment-based configuration
+- **Document Server** - FastAPI application with RESTful API, file storage, and SQLite database
+- **CLI Commands** - UV-based scripts for document operations: `doc-push`, `doc-pull`, `doc-query`, `doc-delete`
 
 ## Quick Start
 
 ### 1. Start the Document Server
 
+Using Docker:
+
 ```bash
-cd document-server
-uv sync
-uv run python -m src.main
+docker-compose up -d
 ```
 
-Server runs on `http://localhost:8766` (configurable via environment variables).
+Server available at `http://localhost:8766`. Verify it's running:
+
+```bash
+curl http://localhost:8766/health
+```
+
+Stop the server:
+```bash
+docker-compose down
+```
+
+> For local development setup, see the [Document Server README](document-server/README.md)
 
 ### 2. Use CLI Commands
 
@@ -85,18 +77,18 @@ uv run skills/document-sync/commands/doc-delete doc_abc123...
 
 ## Documentation
 
-- **[Document Server](document-server/README.md)** - Server setup, API reference, configuration
-- **[CLI Commands](skills/document-sync/README.md)** - Command usage, examples, configuration
-- **[Architecture](docs/goal.md)** - Detailed vision and architecture decisions
+- **[Document Server](document-server/README.md)** - Server setup, API, configuration, testing
+- **[CLI Commands](skills/document-sync/README.md)** - Command usage and examples
+- **[Architecture Details](docs/goal.md)** - Vision and design decisions
 - **[Implementation Guides](docs/implementation/)** - Block-by-block implementation checklists
 
 ## Key Features
 
 - **Metadata-rich storage** - Documents include tags, descriptions, checksums, MIME types
-- **Tag-based querying** - Find documents by tags with AND logic for precise filtering
-- **Integrity verification** - SHA256 checksums ensure document integrity
-- **Environment configuration** - Flexible setup via environment variables
-- **UV-based scripts** - Zero-installation CLI with automatic dependency management
+- **Tag-based querying** - Find documents by tags with AND logic
+- **Integrity verification** - SHA256 checksums
+- **Docker deployment** - Simple containerized setup
+- **RESTful API** - Clean HTTP interface
 
 ## Use Cases
 
@@ -107,20 +99,16 @@ uv run skills/document-sync/commands/doc-delete doc_abc123...
 
 ## Requirements
 
-- **Python 3.11+** - Required for both server and CLI
-- **UV package manager** - For dependency management and script execution
-- **SQLite** - Included with Python, used for metadata storage
+- **Docker and Docker Compose** - For containerized deployment (recommended)
+- **Python 3.11+** - Required for local development
+- **UV package manager** - For dependency management and CLI script execution
+- **jq** - Optional, for running integration tests
 
 
-## Implementation Progress (can be removed when complete!)
+## Implementation Status
 
-### ✅ Completed Blocks
-
-- **Block 01: Server Foundation** - FastAPI application with REST endpoints
-- **Block 02: Storage & Database** - File storage, SQLite, checksums, tag querying
-- **Block 03: CLI Commands** - UV-based scripts for document operations
-
-### 📋 Pending Blocks
-
-- **Block 04: Integration Testing** - End-to-end testing of CLI + Server workflow
-- **Block 05: Skill Registration** - Register plugin with Claude Code skill system
+✅ **Block 01** - Server Foundation
+✅ **Block 02** - Storage & Database
+✅ **Block 03** - CLI Commands
+✅ **Block 04** - Integration & Docker
+📋 **Block 05** - Skill Registration (pending)

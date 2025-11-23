@@ -33,6 +33,12 @@ app = FastAPI(
 )
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for container monitoring."""
+    return {"status": "healthy", "service": "document-sync-server"}
+
+
 @app.post("/documents", response_model=DocumentResponse, status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
