@@ -32,22 +32,25 @@ Mark each checkpoint with `[x]` when completed. Work through phases sequentially
 
 ## Files to Create/Modify
 
-- [ ] `skills/document-sync/skill.json` - Skill metadata and command registration
-- [ ] `skills/document-sync/SKILL.md` - Comprehensive skill documentation for Claude
-- [ ] `USER-GUIDE.md` - User-facing documentation and examples
-- [ ] `README.md` - Update with skill usage section
+- [x] `.claude-plugin/plugin.json` - Plugin metadata and registration
+- [x] `skills/document-sync/SKILL.md` - Comprehensive skill documentation for Claude
+- [x] `skills/document-sync/references/COMMANDS.md` - Detailed command reference
+- [x] `skills/document-sync/references/CONFIGURATION.md` - Configuration options
+- [x] `skills/document-sync/references/TROUBLESHOOTING.md` - Error handling guide
+- [x] `USER-GUIDE.md` - User-facing documentation and examples
+- [x] `README.md` - Updated with skill usage section
 
 ---
 
 ## Phase 1: Create Skill Registration Files
 
-### 1.1 Create skill.json
+### 1.1 Create plugin.json
 
-- [ ] Create directory structure: `skills/document-sync/`
-- [ ] Create `skills/document-sync/skill.json` with required metadata:
-  - [ ] Set name: "document-sync"
-  - [ ] Set version: "0.1.0"
-  - [ ] Add description: "Document management system for storing, querying, and retrieving documents across Claude Code sessions"
+- [x] Create directory structure: `.claude-plugin/`
+- [x] Create `.claude-plugin/plugin.json` with required metadata:
+  - [x] Set name: "document-sync"
+  - [x] Set version: "0.1.0"
+  - [x] Add description: "Document management system for storing, querying, and retrieving documents across Claude Code sessions"
   - [ ] Add author and license information
 - [ ] Register all four commands
 - [ ] Specify command paths relative to skill directory

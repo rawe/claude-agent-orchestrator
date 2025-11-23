@@ -59,7 +59,22 @@ docker-compose down
 
 > For local development setup, see the [Document Server README](document-server/README.md)
 
-### 2. Use CLI Commands
+### 2. Working with Claude Code
+
+Ask Claude in natural language to manage documents:
+
+```
+"Store this architecture document with tags design and api"
+"Show me all documents tagged with 'mvp'"
+"Find documents that have both 'python' and 'tutorial' tags"
+"Download the API specification document"
+```
+
+Claude will use the document-sync commands automatically. See [USER-GUIDE.md](USER-GUIDE.md) for more examples and workflows.
+
+### 3. Manual Command Usage
+
+You can also run commands directly:
 
 ```bash
 # Upload a document
@@ -77,8 +92,10 @@ uv run skills/document-sync/commands/doc-delete doc_abc123...
 
 ## Documentation
 
+- **[USER GUIDE](USER-GUIDE.md)** - How to use with Claude Code (start here!)
 - **[Document Server](document-server/README.md)** - Server setup, API, configuration, testing
 - **[CLI Commands](skills/document-sync/README.md)** - Command usage and examples
+- **[Claude Code Skill](skills/document-sync/SKILL.md)** - Documentation for Claude
 - **[Architecture Details](docs/goal.md)** - Vision and design decisions
 - **[Implementation Guides](docs/implementation/)** - Block-by-block implementation checklists
 
@@ -111,4 +128,4 @@ uv run skills/document-sync/commands/doc-delete doc_abc123...
 ✅ **Block 02** - Storage & Database
 ✅ **Block 03** - CLI Commands
 ✅ **Block 04** - Integration & Docker
-📋 **Block 05** - Skill Registration (pending)
+✅ **Block 05** - Skill Registration & Claude Code Integration
