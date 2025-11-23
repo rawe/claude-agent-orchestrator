@@ -1,6 +1,6 @@
 ---
 name: document-sync
-description: Document management system for storing, querying, and retrieving documents across Claude Code sessions. Use this to maintain knowledge bases, share documents between sessions, and build persistent documentation repositories.
+description: Document management system for storing, querying, and retrieving documents across Claude Code sessions. Use this to maintain knowledge bases, share documents between agent. Whenever you encounter a <document id=*> in a session, use this skill to retrieve its content.
 ---
 
 # Document Sync Skill
@@ -24,52 +24,49 @@ description: Document management system for storing, querying, and retrieving do
 
 ## Quick Reference
 
+**CRITICAL**: Always use absolute paths - NEVER use `cd`:
+
 ### `doc-push` - Upload Documents
 ```bash
-uv run commands/doc-push <file> [--tags TEXT] [--description TEXT]
+uv run <skill-root>/commands/doc-push <file> [--tags TEXT] [--description TEXT]
+# Example: uv run <skill-root>/commands/doc-push specs.md --tags "api,v2"
 ```
 **Use when**: Store a document for future reference.
 
 ### `doc-query` - Search Documents
 ```bash
-uv run commands/doc-query [--tags TEXT] [--name TEXT]
+uv run <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT]
+# Example: uv run <skill-root>/commands/doc-query --tags "api,v2"
 ```
 **Use when**: Find documents by tags (AND logic) or name patterns.
 
 ### `doc-info` - Get Document Metadata
 ```bash
-uv run commands/doc-info <document-id>
+uv run <skill-root>/commands/doc-info <document-id>
+# Example: uv run <skill-root>/commands/doc-info doc_abc123
 ```
 **Use when**: View metadata for a specific document without downloading it.
 
 ### `doc-read` - Read Text Documents
 ```bash
-uv run commands/doc-read <document-id>
+uv run <skill-root>/commands/doc-read <document-id>
+# Example: uv run <skill-root>/commands/doc-read doc_abc123
 ```
-**Use when**: Output text document content directly to stdout (text files only). Useful for piping to other tools.
+**Use when**: Output text document content directly to stdout (text files only).
 
 ### `doc-pull` - Download Documents
 ```bash
-uv run commands/doc-pull <document-id> [-o PATH]
+uv run <skill-root>/commands/doc-pull <document-id> [-o PATH]
+# Example: uv run <skill-root>/commands/doc-pull doc_abc123 -o specs.md
 ```
 **Use when**: Retrieve a document by its ID.
 
 ### `doc-delete` - Remove Documents
 ```bash
-uv run commands/doc-delete <document-id>
+uv run <skill-root>/commands/doc-delete <document-id>
+# Example: uv run <skill-root>/commands/doc-delete doc_abc123
 ```
 **Use when**: Permanently remove a document.
-
----
-
-## Command Location
-
-**IMPORTANT**: All commands are in the `commands/` subdirectory.
-
-```bash
-# Execute using full path to commands
-uv run <skill-root>/commands/doc-push architecture.md --tags "design,api"
-```
 
 ---
 
@@ -78,23 +75,23 @@ uv run <skill-root>/commands/doc-push architecture.md --tags "design,api"
 ### Store and Retrieve
 ```bash
 # Upload with tags
-uv run commands/doc-push specs.md --tags "api,v2"
+uv run <skill-root>/commands/doc-push specs.md --tags "api,v2"
 
 # Find it later
-uv run commands/doc-query --tags "api,v2"
+uv run <skill-root>/commands/doc-query --tags "api,v2"
 
 # Download it
-uv run commands/doc-pull doc_abc123...
+uv run <skill-root>/commands/doc-pull doc_abc123
 ```
 
 ### Build Knowledge Base
 ```bash
 # Upload multiple documents with consistent tags
-uv run commands/doc-push architecture.md --tags "design,mvp"
-uv run commands/doc-push api-spec.md --tags "api,mvp"
+uv run <skill-root>/commands/doc-push architecture.md --tags "design,mvp"
+uv run <skill-root>/commands/doc-push api-spec.md --tags "api,mvp"
 
 # Query by project phase
-uv run commands/doc-query --tags "mvp"
+uv run <skill-root>/commands/doc-query --tags "mvp"
 ```
 
 ---
@@ -105,10 +102,6 @@ uv run commands/doc-query --tags "mvp"
 **IMPORTANT**: Multiple tags means ALL must match:
 - `--tags "python,api"` → Document must have BOTH tags
 - `--tags "v2,design,spec"` → Document must have ALL THREE tags
-
-### Prerequisites
-- Document server must be running (default: `http://localhost:8766`)
-- Check health: `curl http://localhost:8766/health`
 
 ### Output Format
 All commands output JSON. Save document IDs from upload for later retrieval/deletion.

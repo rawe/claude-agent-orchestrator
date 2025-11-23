@@ -15,17 +15,17 @@ The Agent Orchestrator Framework (AOF) enables you to create, manage, and orches
 - Create reusable agent definitions for common tasks
 - Support for long-running and background tasks
 
-## Three Usage Levels
+## Two Usage Levels
 
-AOF provides three distinct usage levels, allowing you to choose the integration approach that best fits your needs:
+AOF provides two distinct usage levels, allowing you to choose the integration approach that best fits your needs:
 
-### Level 1: Claude Code Plugin (Core Framework)
+### Level 1: Claude Code Plugin
 
-**Best for:** Direct, low-level control of agent orchestration within Claude Code
+**Best for:** Direct integration within Claude Code with full control
 
 Install the `agent-orchestrator` plugin to get:
 - Python-based `ao-*` commands for agent orchestration
-- 4 slash commands for agent management
+- Slash commands for agent management
 - Skills for creating and managing agents
 - Complete control over agent lifecycle
 
@@ -41,41 +41,13 @@ Install the `agent-orchestrator` plugin to get:
 Use the agent-orchestrator skill to create a new session called "code-review"
 ```
 
-**Documentation:** [agent-orchestrator/README.md](./agent-orchestrator/README.md)
+**Documentation:** [plugins/agent-orchestrator/README.md](./plugins/agent-orchestrator/README.md)
 
 ---
 
-### Level 2: Claude Code Plugin + Subagents Extension
+### Level 2: MCP Server (Alternative for Claude Desktop)
 
-**Best for:** Simplified, delegation-based workflow with pre-configured subagents
-
-Install both the `agent-orchestrator` plugin AND the `agent-orchestrator-subagents` extension to get:
-- All Level 1 capabilities
-- Pre-configured Claude Code subagents for common tasks
-- Natural language delegation interface
-- Automatic session management
-
-**Quick Start:**
-```bash
-# Install both plugins:
-# 1. agent-orchestrator (core framework)
-# 2. agent-orchestrator-subagents (extension)
-```
-
-**Usage Example:**
-```
-Use the orchestrated-agent-launcher subagent to create a new code review session
-```
-
-**Documentation:**
-- [agent-orchestrator-subagents/README.md](./agent-orchestrator-subagents/README.md)
-- [agent-orchestrator/README.md](./agent-orchestrator/README.md)
-
----
-
-### Level 3: MCP Server (Protocol Abstraction)
-
-**Best for:** Integration with any MCP-compatible AI system (Claude Desktop, other AI tools)
+**Best for:** Integration with AI assistants that only support MCP protocol (like Claude Desktop)
 
 Use the standalone MCP server implementation to get:
 - **No Claude Code plugin required!**
@@ -93,7 +65,7 @@ git clone <your-repo-url>
 
 # 2. Configure in Claude Desktop or Claude Code
 # MCP server now auto-discovers commands - minimal setup required!
-# See agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md
+# See plugins/agent-orchestrator/mcp-server/README.md
 ```
 
 **Usage Example (from Claude Desktop):**
@@ -102,10 +74,10 @@ List available agents
 Create a new agent session called "code-review" using the code-reviewer agent
 ```
 
-**Documentation:** [agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md](./agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md)
+**Documentation:** [plugins/agent-orchestrator/mcp-server/README.md](./plugins/agent-orchestrator/mcp-server/README.md)
 
 **Important Limitation:**
-Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 3 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1/2 integration approaches which operate within a single Claude Code session.
+Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 2 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1 integration which operates within a single Claude Code session.
 
 ---
 
@@ -113,35 +85,34 @@ Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/is
 
 | Usage Level | Use When... | Installation | Integration |
 |-------------|-------------|--------------|-------------|
-| **Level 1** | You want direct control within Claude Code | Install plugin | Claude Code only |
-| **Level 2** | You want simplified delegation workflow | Install 2 plugins | Claude Code only |
-| **Level 3** | You want to use with Claude Desktop or other AI systems | Build & configure MCP | Any MCP system |
+| **Level 1** | You want direct control within Claude Code | Install plugins | Claude Code only |
+| **Level 2** | You need to use with Claude Desktop or other MCP-only AI assistants | Configure MCP server | Any MCP system |
 
-**Can you use multiple levels?** Yes! Level 3 (MCP) can be used independently or alongside Level 1/2 plugins.
+**Can you use multiple levels?** Yes! Level 2 (MCP) can be used independently or alongside Level 1 plugins.
 
 ## Repository Structure
 
 ```
 agent-orchestrator-framework/
-├── agent-orchestrator/              # Level 1: Core framework plugin
-│   ├── skills/
-│   │   └── agent-orchestrator/
-│   │       ├── commands/                # Python ao-* commands
-│   │       ├── mcp-server/              # Level 3: MCP server (collocated)
-│   │       │   ├── agent-orchestrator-mcp.py
-│   │       │   ├── libs/
-│   │       │   └── docs/
-│   │       ├── SKILL.md                 # Skill definition
-│   │       ├── references/              # Technical documentation
-│   │       └── example/                 # Example agent definitions
-│   ├── commands/                    # Slash commands
-│   └── README.md
-│
-├── agent-orchestrator-subagents/    # Level 2: Subagents extension plugin
-│   ├── agents/
-│   │   ├── orchestrated-agent-launcher.md
-│   │   └── orchestrated-agent-lister.md
-│   └── README.md
+├── plugins/                         # Claude Code plugins
+│   ├── agent-orchestrator/          # Core framework plugin
+│   │   ├── skills/
+│   │   │   └── agent-orchestrator/
+│   │   │       ├── commands/            # Python ao-* commands
+│   │   │       ├── SKILL.md             # Skill definition
+│   │   │       ├── references/          # Technical documentation
+│   │   │       └── example/             # Example agent definitions
+│   │   ├── commands/                # Slash commands
+│   │   ├── mcp-server/              # Level 2: MCP server
+│   │   │   ├── agent-orchestrator-mcp.py
+│   │   │   ├── libs/
+│   │   │   └── docs/
+│   │   └── README.md
+│   │
+│   └── document-sync/               # Document sync plugin
+│       ├── document-server/         # FastAPI document server
+│       ├── skills/                  # Document sync skill
+│       └── README.md
 │
 ├── agent-orchestrator-observability/ # Real-time observability platform
 │   ├── backend/                     # FastAPI + WebSocket backend
@@ -150,42 +121,43 @@ agent-orchestrator-framework/
 │   ├── docker/                      # Docker setup
 │   └── README.md                    # Full documentation
 │
+├── docker-compose.yml               # Multi-service Docker setup
+├── Makefile                         # Convenience commands
 └── README.md                        # This file
 ```
 
 ## Quick Start Guide
 
-### For Claude Code Users (Level 1 or 2)
+### For Claude Code Users (Level 1)
 
 1. **Add this repository to Claude Code:**
    - Your repository URL will point to this marketplace
    - Claude Code will discover all available plugins
 
-2. **Choose your plugins:**
-   - **Level 1**: Install `agent-orchestrator` only
-   - **Level 2**: Install both `agent-orchestrator` and `agent-orchestrator-subagents`
+2. **Install plugins:**
+   - Install `agent-orchestrator` for orchestration capabilities
+   - Install `document-sync` for document management
 
 3. **Start orchestrating:**
    ```
    /agent-orchestrator-init
    ```
 
-### For Claude Desktop Users (Level 3)
+### For Claude Desktop Users (Level 2)
 
 **Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 1. **Clone repository:**
    ```bash
    git clone <your-repo-url>
-   cd agent-orchestrator-framework/agent-orchestrator-mcp-server
    ```
 
 2. **Configure MCP server:**
-   See [agent-orchestrator-mcp-server/README.md](./agent-orchestrator-mcp-server/README.md)
+   See [plugins/agent-orchestrator/mcp-server/README.md](./plugins/agent-orchestrator/mcp-server/README.md)
 
 3. **Use from Claude Desktop:**
    ```
-   List available agents
+   List available agent defintions
    ```
 
 ## Core Concepts
@@ -200,7 +172,7 @@ Isolated Claude Code sessions for individual agents. Each session has a unique I
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
 
 ### Orchestration Commands
-The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of all three usage levels. They handle session lifecycle, agent configuration, and result extraction.
+The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
 ## Observability
@@ -223,8 +195,8 @@ See **[agent-orchestrator-observability/README.md](./agent-orchestrator-observab
 
 ## Documentation
 
-- **[Level 1: Core Framework](./agent-orchestrator/README.md)** - Plugin documentation
-- **[Level 2: Subagents Extension](./agent-orchestrator-subagents/README.md)** - Extension plugin
-- **[Level 3: MCP Server](./agent-orchestrator/skills/agent-orchestrator/mcp-server/README.md)** - MCP implementation (collocated with commands)
+- **[Agent Orchestrator Plugin](./plugins/agent-orchestrator/README.md)** - Level 1: Claude Code plugin
+- **[Agent Orchestrator MCP Server](./plugins/agent-orchestrator/mcp-server/README.md)** - Level 2: MCP implementation
+- **[Document Sync Plugin](./plugins/document-sync/README.md)** - Agent overarching document management plugin
 - **[Observability Platform](./agent-orchestrator-observability/README.md)** - Real-time monitoring
-- **[Technical Architecture](./agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works
+- **[Technical Architecture](./plugins/agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works

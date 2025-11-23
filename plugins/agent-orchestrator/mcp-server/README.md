@@ -8,7 +8,7 @@ Model Context Protocol (MCP) server for orchestrating specialized Claude Code ag
 
 **Run:**
 ```bash
-uv run /path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py
+uv run /path/to/plugins/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py
 ```
 
 Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inline script metadata.
@@ -32,7 +32,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
-        "/absolute/path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
+        "/absolute/path/to/plugins/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
       ]
     }
   }
@@ -47,7 +47,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
-        "/absolute/path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
+        "/absolute/path/to/plugins/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project"
@@ -74,7 +74,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
-        "/absolute/path/to/agent-orchestrator/skills/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
+        "/absolute/path/to/plugins/agent-orchestrator/mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",

@@ -30,9 +30,9 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "libs"))
 
 # Auto-discover commands directory if not set
-# Structure: mcp-server/ -> agent-orchestrator/ -> commands/
+# Structure: mcp-server/ -> agent-orchestrator/ -> skills/agent-orchestrator/commands/
 if "AGENT_ORCHESTRATOR_COMMAND_PATH" not in os.environ:
-    COMMANDS_DIR = SCRIPT_DIR.parent / "commands"
+    COMMANDS_DIR = SCRIPT_DIR.parent / "skills" / "agent-orchestrator" / "commands"
     os.environ["AGENT_ORCHESTRATOR_COMMAND_PATH"] = str(COMMANDS_DIR)
 
 # Import and run the server

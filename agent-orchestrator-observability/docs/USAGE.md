@@ -404,7 +404,6 @@ See `docs/DOCKER.md` for details.
 - **`DATABASE_SCHEMA.md`** - Database schema and tables
 - **`BACKEND_API.md`** - Backend HTTP API reference
 - **`FRONTEND_API.md`** - Frontend WebSocket and REST API
-- **`../agent-orchestrator/skills/agent-orchestrator/SKILL.md`** - Agent Orchestrator Framework commands
 
 ---
 

@@ -11,15 +11,11 @@
   "plugins": [
     {
       "name": "agent-orchestrator",
-      "source": "./agent-orchestrator"
-    },
-    {
-      "name": "agent-orchestrator-subagents",
-      "source": "./agent-orchestrator-subagents"
+      "source": "./plugins/agent-orchestrator"
     },
     {
       "name": "document-sync",
-      "source": "./document-sync-plugin"
+      "source": "./plugins/document-sync"
     }
   ]
 }

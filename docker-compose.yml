@@ -54,7 +54,7 @@ services:
   document-server:
     container_name: document-sync-server
     build:
-      context: ./document-sync-plugin/document-server
+      context: ./plugins/document-sync/document-server
       dockerfile: Dockerfile
     ports:
       - "8766:8766"
