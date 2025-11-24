@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Form
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from datetime import datetime
 import uvicorn
@@ -33,11 +34,22 @@ DOCUMENT_SERVER_PUBLIC_URL = os.getenv(
 storage = DocumentStorage(STORAGE_DIR)
 db = DocumentDatabase(DB_PATH)
 
+# CORS configuration - allow frontend origins
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+
 # FastAPI app instance
 app = FastAPI(
     title="Document Sync Server",
     version="0.1.0",
     description="FastAPI server for document management and synchronization"
+)
+
+# Enable CORS for frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

@@ -1,0 +1,31 @@
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:80"
+    environment:
+      # These are baked in at build time via Vite
+      # For runtime config, use nginx reverse proxy or rebuild
+      - VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
+      - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
+      - VITE_AGENT_MANAGER_URL=http://localhost:8767
+      - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
+    restart: unless-stopped
+
+  # Development mode with hot reload
+  frontend-dev:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      - VITE_OBSERVABILITY_BACKEND_URL=http://host.docker.internal:8765
+      - VITE_DOCUMENT_SERVER_URL=http://host.docker.internal:8766
+      - VITE_AGENT_MANAGER_URL=http://host.docker.internal:8767
+      - VITE_WEBSOCKET_URL=ws://host.docker.internal:8765/ws
+    profiles:
+      - dev
