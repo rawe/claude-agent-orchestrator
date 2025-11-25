@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SessionEvent, EventType } from '@/types';
 import { formatTime } from '@/utils/formatters';
-import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface EventCardProps {
@@ -69,18 +69,34 @@ export function EventCard({ event, forceExpanded = false }: EventCardProps) {
               Tool: {event.tool_name}
               {hasError && <span className="text-red-600 ml-2">Failed</span>}
             </p>
-            {hasError && event.error && (
-              <div className="flex items-start gap-2 text-red-600 mb-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span className="text-xs">{event.error}</span>
+            {/* Input section */}
+            {expanded && event.tool_input && Object.keys(event.tool_input).length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-500 mb-1 font-medium">Input:</p>
+                <pre className="bg-gray-100 text-gray-800 p-3 rounded-md overflow-x-auto text-xs">
+                  {JSON.stringify(event.tool_input, null, 2)}
+                </pre>
               </div>
             )}
-            {expanded && event.tool_output !== undefined && event.tool_output !== null && (
-              <pre className="bg-gray-900 text-gray-100 p-3 rounded-md overflow-x-auto text-xs max-h-64">
-                {typeof event.tool_output === 'string'
-                  ? event.tool_output
-                  : JSON.stringify(event.tool_output, null, 2)}
-              </pre>
+            {/* Error or Output section */}
+            {expanded && (
+              hasError && event.error ? (
+                <div className="mt-2">
+                  <p className="text-xs text-red-600 mb-1 font-medium">Error:</p>
+                  <pre className="bg-red-50 text-red-700 p-3 rounded-md overflow-x-auto text-xs">
+                    {event.error}
+                  </pre>
+                </div>
+              ) : event.tool_output !== undefined && event.tool_output !== null && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-500 mb-1 font-medium">Output:</p>
+                  <pre className="bg-green-50 text-gray-800 p-3 rounded-md overflow-x-auto text-xs max-h-64">
+                    {typeof event.tool_output === 'string'
+                      ? event.tool_output
+                      : JSON.stringify(event.tool_output, null, 2)}
+                  </pre>
+                </div>
+              )
             )}
           </div>
         );

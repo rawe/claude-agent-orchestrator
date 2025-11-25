@@ -3,13 +3,14 @@ import { useSessions, useSessionEvents } from '@/hooks/useSessions';
 import { SessionList, EventTimeline } from '@/components/features/sessions';
 import { ConfirmModal, EmptyState } from '@/components/common';
 import { useNotification } from '@/contexts';
-import { Activity } from 'lucide-react';
+import { Activity, PanelLeftClose, PanelLeft } from 'lucide-react';
 
 export function AgentSessions() {
   const { sessions, loading, stopSession, deleteSession } = useSessions();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const { events, loading: eventsLoading } = useSessionEvents(selectedSessionId);
   const { showSuccess, showError, showWarning } = useNotification();
+  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -60,34 +61,60 @@ export function AgentSessions() {
   return (
     <div className="h-full flex">
       {/* Session List Sidebar */}
-      <div className="w-80 border-r border-gray-200 bg-white flex-shrink-0">
-        <SessionList
-          sessions={sessions}
-          selectedSessionId={selectedSessionId}
-          onSelectSession={setSelectedSessionId}
-          onStopSession={(id) => setConfirmModal({ isOpen: true, type: 'stop', sessionId: id })}
-          onDeleteSession={(id) => setConfirmModal({ isOpen: true, type: 'delete', sessionId: id })}
-          loading={loading}
-        />
-      </div>
+      {sidebarVisible && (
+        <div className="w-80 border-r border-gray-200 bg-white flex-shrink-0">
+          <SessionList
+            sessions={sessions}
+            selectedSessionId={selectedSessionId}
+            onSelectSession={setSelectedSessionId}
+            onStopSession={(id) => setConfirmModal({ isOpen: true, type: 'stop', sessionId: id })}
+            onDeleteSession={(id) => setConfirmModal({ isOpen: true, type: 'delete', sessionId: id })}
+            loading={loading}
+          />
+        </div>
+      )}
 
       {/* Event Timeline */}
-      <div className="flex-1 bg-gray-50">
-        {selectedSessionId ? (
-          <EventTimeline
-            events={events}
-            loading={eventsLoading}
-            isRunning={selectedSession?.status === 'running'}
-          />
-        ) : (
-          <div className="h-full flex items-center justify-center">
-            <EmptyState
-              icon={<Activity className="w-16 h-16" />}
-              title="Select a session"
-              description="Choose a session from the list to view its events"
+      <div className="flex-1 bg-gray-50 flex flex-col min-w-0 overflow-hidden">
+        {/* Sidebar toggle */}
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1">
+          <button
+            onClick={() => setSidebarVisible(!sidebarVisible)}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            title={sidebarVisible ? 'Hide session list' : 'Show session list'}
+          >
+            {sidebarVisible ? (
+              <>
+                <PanelLeftClose className="w-4 h-4" />
+                <span>Hide Sessions</span>
+              </>
+            ) : (
+              <>
+                <PanelLeft className="w-4 h-4" />
+                <span>Show Sessions</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Timeline content */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {selectedSessionId ? (
+            <EventTimeline
+              events={events}
+              loading={eventsLoading}
+              isRunning={selectedSession?.status === 'running'}
             />
-          </div>
-        )}
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <EmptyState
+                icon={<Activity className="w-16 h-16" />}
+                title="Select a session"
+                description="Choose a session from the list to view its events"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Confirm Modal */}

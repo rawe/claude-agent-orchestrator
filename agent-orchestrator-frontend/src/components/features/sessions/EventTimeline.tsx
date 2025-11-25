@@ -42,12 +42,29 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
     });
   }, [events, filters]);
 
-  // Auto-scroll to bottom when new events come in
-  useEffect(() => {
-    if (autoScroll && isRunning && bottomRef.current) {
+  // Scroll to bottom helper
+  const scrollToBottom = () => {
+    if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  // Auto-scroll to bottom when new events come in (only when autoScroll is enabled AND session is running)
+  useEffect(() => {
+    if (autoScroll && isRunning) {
+      scrollToBottom();
+    }
   }, [filteredEvents.length, autoScroll, isRunning]);
+
+  // Handle auto-scroll button click: toggle state AND scroll to bottom
+  const handleAutoScrollClick = () => {
+    const newState = !autoScroll;
+    setAutoScroll(newState);
+    // Always scroll to bottom when enabling auto-scroll
+    if (newState) {
+      scrollToBottom();
+    }
+  };
 
   const toggleFilter = (key: keyof EventFilter) => {
     setFilters((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -58,9 +75,9 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4 p-4 border-b border-gray-200 bg-white">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Toolbar - always visible, never shrinks */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-4 p-4 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-2">
           <ListFilter className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-500">Filter:</span>
@@ -92,25 +109,23 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
             <ChevronsUpDown className="w-3.5 h-3.5" />
             {allExpanded ? 'Collapse' : 'Expand'}
           </button>
-          {isRunning && (
-            <button
-              onClick={() => setAutoScroll(!autoScroll)}
-              className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                autoScroll
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-              title={autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll'}
-            >
-              <ArrowDownToLine className="w-3.5 h-3.5" />
-              Auto-scroll
-            </button>
-          )}
+          <button
+            onClick={handleAutoScrollClick}
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+              autoScroll
+                ? 'bg-primary-100 text-primary-700'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title={autoScroll ? 'Disable auto-scroll (click to scroll to bottom)' : 'Enable auto-scroll and scroll to bottom'}
+          >
+            <ArrowDownToLine className="w-3.5 h-3.5" />
+            Auto-scroll
+          </button>
         </div>
       </div>
 
-      {/* Events */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {/* Events - scrollable area */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {filteredEvents.length === 0 ? (
           <EmptyState
             title="No events to display"
@@ -126,8 +141,8 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
         )}
       </div>
 
-      {/* Event count */}
-      <div className="px-4 py-2 border-t border-gray-200 text-xs text-gray-500 bg-white">
+      {/* Event count - always visible, never shrinks */}
+      <div className="flex-shrink-0 px-4 py-2 border-t border-gray-200 text-xs text-gray-500 bg-white">
         {filteredEvents.length} of {events.length} events
         {isRunning && <span className="ml-2 text-green-600">● Live</span>}
       </div>
