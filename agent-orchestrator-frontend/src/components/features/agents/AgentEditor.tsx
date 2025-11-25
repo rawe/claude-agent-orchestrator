@@ -4,6 +4,7 @@ import { Modal, Button, Badge, Spinner } from '@/components/common';
 import { Agent, AgentCreate, MCP_SERVERS, SKILLS } from '@/types';
 import { Eye, Code, X, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface AgentEditorProps {
   isOpen: boolean;
@@ -253,7 +254,7 @@ export function AgentEditor({
               <div className="border border-gray-300 rounded-md p-4 min-h-[288px] max-h-[288px] overflow-auto bg-white">
                 {watchedPrompt ? (
                   <div className="markdown-content prose prose-sm max-w-none">
-                    <ReactMarkdown>{watchedPrompt}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{watchedPrompt}</ReactMarkdown>
                   </div>
                 ) : (
                   <p className="text-gray-400 text-sm italic">

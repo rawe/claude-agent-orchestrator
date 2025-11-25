@@ -3,6 +3,7 @@ import { SessionEvent, EventType } from '@/types';
 import { formatTime } from '@/utils/formatters';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface EventCardProps {
   event: SessionEvent;
@@ -111,7 +112,7 @@ export function EventCard({ event, forceExpanded = false }: EventCardProps) {
               {event.content?.map((block, i) => {
                 if (block.type === 'text' && block.text) {
                   return (
-                    <ReactMarkdown key={i}>
+                    <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>
                       {expanded ? block.text : block.text.slice(0, 200) + (block.text.length > 200 ? '...' : '')}
                     </ReactMarkdown>
                   );

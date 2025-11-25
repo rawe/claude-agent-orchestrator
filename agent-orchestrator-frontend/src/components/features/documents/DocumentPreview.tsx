@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Document } from '@/types';
 import { Modal, Badge, CopyButton, Spinner } from '@/components/common';
 import { useDocumentContent } from '@/hooks/useDocuments';
 import { formatAbsoluteTime, formatFileSize } from '@/utils/formatters';
-import { Download, Trash2, Eye, Code } from 'lucide-react';
+import { Download, Trash2, Eye, Code, Maximize2, Minimize2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface DocumentPreviewProps {
   document: Document | null;
@@ -16,6 +17,48 @@ interface DocumentPreviewProps {
 export function DocumentPreview({ document, isOpen, onClose, onDelete }: DocumentPreviewProps) {
   const { content, loading } = useDocumentContent(document?.id || null);
   const [viewMode, setViewMode] = useState<'rendered' | 'raw'>('rendered');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef(0);
+
+  // Handle fullscreen toggle
+  const toggleFullscreen = () => {
+    // Save scroll position before switching
+    if (contentRef.current) {
+      scrollPositionRef.current = contentRef.current.scrollTop;
+    }
+    setIsFullscreen(!isFullscreen);
+  };
+
+  // Restore scroll position after switching modes
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure DOM is ready
+    if (contentRef.current && scrollPositionRef.current > 0) {
+      requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = scrollPositionRef.current;
+        }
+      });
+    }
+  }, [isFullscreen, content]);
+
+  // Handle ESC key to exit fullscreen
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isFullscreen]);
+
+  // Reset fullscreen when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsFullscreen(false);
+    }
+  }, [isOpen]);
 
   if (!document) return null;
 
@@ -59,14 +102,14 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
     if (isMarkdown) {
       if (viewMode === 'raw') {
         return (
-          <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md overflow-auto max-h-[400px]">
+          <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md">
             {content}
           </pre>
         );
       }
       return (
-        <div className="markdown-content prose prose-sm max-w-none overflow-auto max-h-[400px]">
-          <ReactMarkdown>{content}</ReactMarkdown>
+        <div className={`markdown-content prose prose-sm max-w-none ${isFullscreen ? 'px-8' : ''}`}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       );
     }
@@ -76,19 +119,19 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
         const parsed = JSON.parse(content);
         if (viewMode === 'raw') {
           return (
-            <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md overflow-auto max-h-[400px]">
+            <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md">
               {content}
             </pre>
           );
         }
         return (
-          <pre className="whitespace-pre-wrap text-sm font-mono bg-gray-900 text-gray-100 p-4 rounded-md overflow-auto max-h-[400px]">
+          <pre className="whitespace-pre-wrap text-sm font-mono bg-gray-900 text-gray-100 p-4 rounded-md">
             {JSON.stringify(parsed, null, 2)}
           </pre>
         );
       } catch {
         return (
-          <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md overflow-auto max-h-[400px]">
+          <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md">
             {content}
           </pre>
         );
@@ -97,14 +140,94 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
 
     // Plain text
     return (
-      <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md overflow-auto max-h-[400px]">
+      <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-md">
         {content}
       </pre>
     );
   };
 
+  // Fullscreen mode
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        {/* Sticky Header */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500 focus:outline-none"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-semibold text-gray-900">{document.filename}</h3>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {(isMarkdown || isJson) && (
+              <div className="flex rounded-md border border-gray-300 overflow-hidden">
+                <button
+                  onClick={() => setViewMode('rendered')}
+                  className={`flex items-center gap-1 px-3 py-1.5 text-xs ${
+                    viewMode === 'rendered'
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  {isJson ? 'Pretty' : 'Rendered'}
+                </button>
+                <button
+                  onClick={() => setViewMode('raw')}
+                  className={`flex items-center gap-1 px-3 py-1.5 text-xs border-l ${
+                    viewMode === 'raw'
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  Raw
+                </button>
+              </div>
+            )}
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              title="Exit Fullscreen (ESC)"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </button>
+            <a
+              href={document.url}
+              download={document.filename}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              title="Download"
+            >
+              <Download className="w-4 h-4" />
+            </a>
+            <button
+              onClick={onDelete}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div ref={contentRef} className="flex-1 overflow-auto bg-white" style={{ scrollBehavior: 'auto' }}>
+          <div className="max-w-5xl mx-auto py-8">
+            {renderContent()}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Modal mode
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={document.filename} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={document.filename} size="2xl">
       <div className="p-6">
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 mb-4">
@@ -134,20 +257,27 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
               </button>
             </div>
           )}
+          <button
+            onClick={toggleFullscreen}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            title="Fullscreen"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
           <a
             href={document.url}
             download={document.filename}
             className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            title="Download"
           >
             <Download className="w-4 h-4" />
-            Download
           </a>
           <button
             onClick={onDelete}
             className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50"
+            title="Delete"
           >
             <Trash2 className="w-4 h-4" />
-            Delete
           </button>
         </div>
 
@@ -200,7 +330,9 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
         {/* Content Preview */}
         <div>
           <h4 className="text-sm font-medium text-gray-900 mb-2">Content Preview</h4>
-          {renderContent()}
+          <div ref={contentRef} className="overflow-auto max-h-[calc(100vh-32rem)]" style={{ scrollBehavior: 'auto' }}>
+            {renderContent()}
+          </div>
         </div>
       </div>
     </Modal>
