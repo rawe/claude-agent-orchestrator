@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket, useNotification } from '@/contexts';
 import { sessionService } from '@/services';
+import { getEventKey } from '@/utils';
 import type { Session, SessionEvent, WebSocketMessage } from '@/types';
 
 export function useSessions() {
@@ -131,7 +132,17 @@ export function useSessionEvents(sessionId: string | null) {
 
     const handleMessage = (message: WebSocketMessage) => {
       if (message.type === 'event' && message.data?.session_id === sessionId) {
-        setEvents((prev) => [...prev, message.data!]);
+        const newEvent = message.data!;
+        const newEventKey = getEventKey(newEvent);
+
+        setEvents((prev) => {
+          // Check if event already exists to prevent duplicates
+          const exists = prev.some((e) => getEventKey(e) === newEventKey);
+          if (exists) {
+            return prev;
+          }
+          return [...prev, newEvent];
+        });
       }
     };
 

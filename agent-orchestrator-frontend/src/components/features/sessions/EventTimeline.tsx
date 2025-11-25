@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { SessionEvent } from '@/types';
 import { EventCard } from './EventCard';
 import { EmptyState, LoadingState } from '@/components/common';
+import { getEventKey } from '@/utils';
 import { ListFilter, ChevronsUpDown, ArrowDownToLine } from 'lucide-react';
 
 interface EventTimelineProps {
@@ -117,8 +118,8 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
           />
         ) : (
           <>
-            {filteredEvents.map((event, index) => (
-              <EventCard key={event.id || index} event={event} defaultExpanded={allExpanded} />
+            {filteredEvents.map((event) => (
+              <EventCard key={getEventKey(event)} event={event} defaultExpanded={allExpanded} />
             ))}
             <div ref={bottomRef} />
           </>

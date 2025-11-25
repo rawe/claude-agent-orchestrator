@@ -103,3 +103,14 @@ export function formatDuration(ms: number): string {
   const seconds = Math.floor((ms % 60000) / 1000);
   return `${minutes}m ${seconds}s`;
 }
+
+/**
+ * Generate a unique key for a session event
+ * Used for deduplication and React keys
+ */
+export function getEventKey(event: { id?: number; session_id: string; timestamp: string; event_type: string }): string {
+  if (event.id !== undefined) {
+    return `id-${event.id}`;
+  }
+  return `${event.session_id}-${event.timestamp}-${event.event_type}`;
+}
