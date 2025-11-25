@@ -11,6 +11,11 @@ export interface Document {
   checksum?: string;
 }
 
+export interface DocumentMetadata {
+  description?: string;
+  [key: string]: string | undefined;
+}
+
 export interface DocumentUpload {
   file: File;
   tags: string[];

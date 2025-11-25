@@ -99,6 +99,20 @@ export function DocumentTable({
           </span>
         ),
       }),
+      columnHelper.accessor('metadata', {
+        header: 'Description',
+        cell: (info) => {
+          const description = info.getValue()?.description;
+          if (!description) return <span className="text-gray-400 text-xs">—</span>;
+          const truncated = description.length > 50 ? description.slice(0, 50) + '...' : description;
+          return (
+            <span className="text-xs text-gray-600 block max-w-[200px]" title={description}>
+              {truncated}
+            </span>
+          );
+        },
+        enableSorting: false,
+      }),
       columnHelper.accessor('tags', {
         header: 'Tags',
         cell: (info) => {

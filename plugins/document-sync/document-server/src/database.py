@@ -29,7 +29,8 @@ class DocumentDatabase:
                 checksum TEXT NOT NULL,
                 storage_path TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                metadata TEXT
             )
         """)
 
@@ -51,14 +52,18 @@ class DocumentDatabase:
 
     def insert_document(self, metadata: DocumentMetadata):
         """Insert document metadata and tags into database."""
+        import json
         cursor = self.conn.cursor()
+
+        # Serialize metadata dict to JSON string
+        metadata_json = json.dumps(metadata.metadata) if metadata.metadata else None
 
         # Insert into documents table
         cursor.execute("""
             INSERT INTO documents (
                 id, filename, content_type, size_bytes, checksum,
-                storage_path, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                storage_path, created_at, updated_at, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             metadata.id,
             metadata.filename,
@@ -67,7 +72,8 @@ class DocumentDatabase:
             metadata.checksum,
             metadata.storage_path,
             metadata.created_at.isoformat(),
-            metadata.updated_at.isoformat()
+            metadata.updated_at.isoformat(),
+            metadata_json
         ))
 
         # Insert tags
@@ -81,6 +87,7 @@ class DocumentDatabase:
 
     def get_document(self, doc_id: str) -> Optional[DocumentMetadata]:
         """Retrieve document metadata by ID."""
+        import json
         cursor = self.conn.cursor()
 
         # Get document metadata
@@ -94,6 +101,14 @@ class DocumentDatabase:
         cursor.execute("SELECT tag FROM document_tags WHERE document_id = ?", (doc_id,))
         tags = [tag_row['tag'] for tag_row in cursor.fetchall()]
 
+        # Deserialize metadata JSON string to dict
+        metadata_dict = {}
+        if row['metadata']:
+            try:
+                metadata_dict = json.loads(row['metadata'])
+            except json.JSONDecodeError:
+                metadata_dict = {}
+
         # Construct DocumentMetadata
         return DocumentMetadata(
             id=row['id'],
@@ -104,7 +119,8 @@ class DocumentDatabase:
             storage_path=row['storage_path'],
             created_at=datetime.fromisoformat(row['created_at']),
             updated_at=datetime.fromisoformat(row['updated_at']),
-            tags=tags
+            tags=tags,
+            metadata=metadata_dict
         )
 
     def query_documents(
@@ -152,11 +168,20 @@ class DocumentDatabase:
         rows = cursor.fetchall()
 
         # Build DocumentMetadata objects
+        import json
         results = []
         for row in rows:
             # Get tags for this document
             cursor.execute("SELECT tag FROM document_tags WHERE document_id = ?", (row['id'],))
             tags_list = [tag_row['tag'] for tag_row in cursor.fetchall()]
+
+            # Deserialize metadata JSON string to dict
+            metadata_dict = {}
+            if row['metadata']:
+                try:
+                    metadata_dict = json.loads(row['metadata'])
+                except json.JSONDecodeError:
+                    metadata_dict = {}
 
             results.append(DocumentMetadata(
                 id=row['id'],
@@ -167,7 +192,8 @@ class DocumentDatabase:
                 storage_path=row['storage_path'],
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at']),
-                tags=tags_list
+                tags=tags_list,
+                metadata=metadata_dict
             ))
 
         return results

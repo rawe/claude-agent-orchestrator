@@ -316,6 +316,12 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
               <span className="text-sm text-gray-400">No tags</span>
             )}
           </div>
+          {document.metadata?.description && (
+            <div className="col-span-2">
+              <p className="text-xs text-gray-500 mb-1">Description</p>
+              <p className="text-sm text-gray-700">{document.metadata.description}</p>
+            </div>
+          )}
           {document.checksum && (
             <div className="col-span-2">
               <p className="text-xs text-gray-500 mb-1">Checksum (SHA256)</p>
