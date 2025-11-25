@@ -14,7 +14,7 @@ The Agent Orchestrator Skill uses environment variables to configure directory p
 | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | `{project_dir}/.agent-orchestrator/agent-sessions` | Path | Session storage directory |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `{project_dir}/.agent-orchestrator/agents` | Path | Agent definitions directory |
 | `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | `false` | Boolean | Enable session logging |
-| `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED` | `false` | Boolean | Enable observability events |
+| `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED` | `true` | Boolean | Enable observability events |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY_URL` | `http://127.0.0.1:8765` | URL | Observability backend endpoint |
 
 ## Detailed Descriptions
@@ -86,8 +86,8 @@ export AGENT_ORCHESTRATOR_ENABLE_LOGGING="true"
 ### Observability Configuration
 
 #### `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED`
-**Default:** `false` (disabled)
-**Type:** Boolean (`"1"`, `"true"`, `"yes"` = enabled, case-insensitive)
+**Default:** `true` (enabled)
+**Type:** Boolean (`"0"`, `"false"`, `"no"` = disabled, case-insensitive)
 **Purpose:** Enable real-time event streaming to an observability backend. Captures session lifecycle events, tool calls, and assistant messages for monitoring and analysis.
 
 **Events Tracked:**
@@ -99,8 +99,8 @@ export AGENT_ORCHESTRATOR_ENABLE_LOGGING="true"
 
 **Example:**
 ```bash
-# Enable observability
-export AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED="true"
+# Disable observability
+export AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED="false"
 ```
 
 ---

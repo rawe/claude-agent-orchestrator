@@ -238,8 +238,9 @@ def load_config(
     enable_logging = env_logging in ("1", "true", "yes")
 
     # Part H: Parse observability configuration
+    # Default is TRUE (enabled). Only disable if explicitly set to "0", "false", or "no"
     env_observability_enabled = os.environ.get(ENV_OBSERVABILITY_ENABLED, "").lower()
-    observability_enabled = env_observability_enabled in ("1", "true", "yes")
+    observability_enabled = env_observability_enabled not in ("0", "false", "no")
     observability_url = os.environ.get(ENV_OBSERVABILITY_URL, DEFAULT_OBSERVABILITY_URL)
 
     # DEBUG LOGGING - Observability configuration

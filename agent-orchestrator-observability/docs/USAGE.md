@@ -132,7 +132,7 @@ uv run commands/ao-new reviewer --agent security-expert -p "Review for security"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED` | `false` | Enable observability integration |
+| `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED` | `true` | Enable observability integration |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY_URL` | `http://127.0.0.1:8765` | Backend URL |
 
 ### How Framework Sends Events
