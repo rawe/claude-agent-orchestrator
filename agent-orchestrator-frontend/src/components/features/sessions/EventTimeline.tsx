@@ -119,7 +119,7 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
         ) : (
           <>
             {filteredEvents.map((event) => (
-              <EventCard key={getEventKey(event)} event={event} defaultExpanded={allExpanded} />
+              <EventCard key={getEventKey(event)} event={event} forceExpanded={allExpanded} />
             ))}
             <div ref={bottomRef} />
           </>

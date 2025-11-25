@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SessionEvent, EventType } from '@/types';
 import { formatTime } from '@/utils/formatters';
 import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 
 interface EventCardProps {
   event: SessionEvent;
-  defaultExpanded?: boolean;
+  forceExpanded?: boolean;
 }
 
 const eventConfig: Record<EventType, { icon: string; color: string; label: string }> = {
@@ -17,8 +17,13 @@ const eventConfig: Record<EventType, { icon: string; color: string; label: strin
   message: { icon: '💬', color: 'bg-purple-50 border-purple-200', label: 'Message' },
 };
 
-export function EventCard({ event, defaultExpanded = false }: EventCardProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+export function EventCard({ event, forceExpanded = false }: EventCardProps) {
+  const [expanded, setExpanded] = useState(forceExpanded);
+
+  // Sync with parent's force expanded state
+  useEffect(() => {
+    setExpanded(forceExpanded);
+  }, [forceExpanded]);
   const config = eventConfig[event.event_type] || {
     icon: '❓',
     color: 'bg-gray-50 border-gray-200',
