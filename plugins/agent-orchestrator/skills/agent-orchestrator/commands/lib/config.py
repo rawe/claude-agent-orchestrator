@@ -22,6 +22,10 @@ ENV_ENABLE_LOGGING = "AGENT_ORCHESTRATOR_ENABLE_LOGGING"
 ENV_SESSION_MANAGER_URL = "AGENT_ORCHESTRATOR_SESSION_MANAGER_URL"
 DEFAULT_SESSION_MANAGER_URL = "http://127.0.0.1:8765"
 
+# File backup toggle - set to False to disable all file-based session storage
+# When False, no .meta.json or .jsonl files will be created
+FILE_BACKUP_ENABLED = False
+
 
 @dataclass
 class Config:

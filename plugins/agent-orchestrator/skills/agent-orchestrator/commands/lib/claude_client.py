@@ -135,23 +135,28 @@ async def run_claude_session(
     if mcp_servers:
         options.mcp_servers = mcp_servers
 
+    # Import file backup toggle
+    from config import FILE_BACKUP_ENABLED
+
     # Initialize tracking variables
     session_id = None
     result = None
 
-    # Ensure parent directory exists
-    session_file.parent.mkdir(parents=True, exist_ok=True)
+    # Only create files if file backup is enabled
+    if FILE_BACKUP_ENABLED:
+        # Ensure parent directory exists
+        session_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write user message to .jsonl first (before SDK streaming)
-    # This creates a complete conversation history in one file
-    user_message = {
-        "type": "user_message",
-        "content": prompt,
-        "timestamp": datetime.now(UTC).isoformat()
-    }
-    with open(session_file, 'a') as f:
-        json.dump(user_message, f)
-        f.write('\n')
+        # Write user message to .jsonl first (before SDK streaming)
+        # This creates a complete conversation history in one file
+        user_message = {
+            "type": "user_message",
+            "content": prompt,
+            "timestamp": datetime.now(UTC).isoformat()
+        }
+        with open(session_file, 'a') as f:
+            json.dump(user_message, f)
+            f.write('\n')
 
     # Stream session and write to file using ClaudeSDKClient
     try:
@@ -161,12 +166,13 @@ async def run_claude_session(
 
             # Stream messages from client
             async for message in client.receive_response():
-                # Write each message to JSONL file (append mode)
+                # Write each message to JSONL file (append mode) if file backup enabled
                 # Note: SDK messages are dataclasses
-                message_dict = dataclasses.asdict(message)
-                with open(session_file, 'a') as f:
-                    json.dump(message_dict, f)
-                    f.write('\n')
+                if FILE_BACKUP_ENABLED:
+                    message_dict = dataclasses.asdict(message)
+                    with open(session_file, 'a') as f:
+                        json.dump(message_dict, f)
+                        f.write('\n')
 
                 # Extract session_id from FIRST SystemMessage (arrives early!)
                 # SystemMessage with subtype='init' contains session_id in data dict

@@ -109,9 +109,35 @@ curl -X POST http://localhost:8765/sessions/test-phase3/events \
 | All commands handle API errors gracefully | ✓ |
 | Commands still work if session exists only in files (fallback) | ✓ |
 
+## File Backup Toggle
+
+Added `FILE_BACKUP_ENABLED` toggle in `lib/config.py` to completely disable file-based session storage:
+
+```python
+FILE_BACKUP_ENABLED = False  # Set to True to re-enable file backups
+```
+
+When `False`, no `.meta.json` or `.jsonl` files are created. All session data goes only to the API.
+
+**Guarded functions:**
+- `session.py`: `save_session_metadata()`, `update_session_id()`, `update_session_metadata()`
+- `claude_client.py`: session directory creation, `.jsonl` message streaming
+
+## ao-new and ao-resume Migration
+
+Updated to use Session Manager API:
+- `ao-new`: Uses `config.session_manager_url` instead of removed `observability_*` fields
+- `ao-resume`: Fetches session metadata from API via `SessionClient.get_session_by_name()`
+
+## CLI Parameter Cleanup
+
+Removed `--sessions-dir` option from all commands:
+- `ao-new`, `ao-resume`, `ao-status`, `ao-get-result`
+- `ao-list-sessions`, `ao-clean`, `ao-show-config`
+
 ## Notes
 
 - All commands now use API as primary path with file-based fallback
-- `ao-new` and `ao-resume` not migrated yet (Phase 4)
 - File-based imports from `session.py` kept for fallback functionality
 - `httpx` added to dependencies for all migrated commands
+- File backup disabled by default (`FILE_BACKUP_ENABLED = False`)

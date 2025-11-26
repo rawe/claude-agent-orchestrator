@@ -34,7 +34,6 @@ def main(
     prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="Session prompt"),
     agent: Optional[str] = typer.Option(None, "--agent", help="Agent to use"),
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
 ):
     """
     Create a new agent orchestrator session.
@@ -69,7 +68,6 @@ def main(
         "prompt": prompt or "None (will read from stdin)",
         "agent": agent or "None",
         "project_dir": str(project_dir) if project_dir else "None",
-        "sessions_dir": str(sessions_dir) if sessions_dir else "None",
     })
 
     try:
@@ -79,7 +77,6 @@ def main(
         # 2. Load configuration
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
-            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
         )
 
         # 3. Check session doesn't already exist
@@ -169,8 +166,8 @@ def main(
             session_name=session_name,  # For Stage 2 metadata update
             sessions_dir=config.sessions_dir,  # For Stage 2 metadata update
             mcp_servers=mcp_servers,
-            observability_enabled=config.observability_enabled,
-            observability_url=config.observability_url,
+            observability_enabled=True,  # Always enabled - uses session manager
+            observability_url=config.session_manager_url,
             agent_name=agent_name,
         )
 

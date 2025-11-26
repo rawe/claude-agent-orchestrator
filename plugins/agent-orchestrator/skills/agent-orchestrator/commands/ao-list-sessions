@@ -24,7 +24,6 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def main(
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
 ):
     """
     List all sessions with metadata.
@@ -33,7 +32,6 @@ def main(
 
     Examples:
         ao-list-sessions
-        ao-list-sessions --sessions-dir /custom/path
     """
     from config import load_config
     from session import list_all_sessions
@@ -45,15 +43,12 @@ def main(
         "cwd": str(Path.cwd()),
         "argv": sys.argv,
         "project_dir": str(project_dir) if project_dir else "None",
-        "sessions_dir": str(sessions_dir) if sessions_dir else "None",
     })
 
     try:
         # Load configuration with CLI overrides
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
-            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
-            cli_agents_dir=None,
         )
 
         # Try API first

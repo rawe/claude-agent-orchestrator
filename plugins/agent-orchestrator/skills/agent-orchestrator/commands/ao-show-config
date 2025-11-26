@@ -25,7 +25,6 @@ app = typer.Typer(add_completion=False)
 def main(
     session_name: str = typer.Argument(..., help="Name of the session"),
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
 ):
     """
     Display session configuration and context.
@@ -46,8 +45,6 @@ def main(
         # Load configuration with CLI overrides
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
-            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
-            cli_agents_dir=None,
         )
 
         # Check if session exists

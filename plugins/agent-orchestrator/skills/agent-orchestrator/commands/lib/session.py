@@ -137,6 +137,10 @@ def save_session_metadata(
     2. Ensure sessions directory exists
     3. Write to {sessions_dir}/{session_name}.meta.json
     """
+    from config import FILE_BACKUP_ENABLED
+    if not FILE_BACKUP_ENABLED:
+        return
+
     # Ensure sessions directory exists
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,6 +185,10 @@ def update_session_id(
         FileNotFoundError: If metadata file doesn't exist
         json.JSONDecodeError: If invalid JSON in metadata file
     """
+    from config import FILE_BACKUP_ENABLED
+    if not FILE_BACKUP_ENABLED:
+        return
+
     meta_file = sessions_dir / f"{session_name}.meta.json"
 
     # Read existing metadata
@@ -249,6 +257,10 @@ def update_session_metadata(session_name: str, sessions_dir: Path) -> None:
     2. Update last_resumed_at timestamp
     3. Write back to file atomically (using temp file)
     """
+    from config import FILE_BACKUP_ENABLED
+    if not FILE_BACKUP_ENABLED:
+        return
+
     meta_file = sessions_dir / f"{session_name}.meta.json"
 
     # Load existing metadata

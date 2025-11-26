@@ -24,14 +24,12 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def main(
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-    sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
 ):
     """
     Remove all sessions.
 
     Examples:
         ao-clean
-        ao-clean --sessions-dir /custom/path
     """
     from config import load_config
     from session import list_all_sessions
@@ -42,8 +40,6 @@ def main(
         # Load configuration with CLI overrides
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
-            cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
-            cli_agents_dir=None,
         )
 
         deleted_count = 0
