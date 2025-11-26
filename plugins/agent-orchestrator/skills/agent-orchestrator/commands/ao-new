@@ -32,7 +32,12 @@ def main(
     agent: Optional[str] = typer.Option(None, "--agent", help="Agent to use"),
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
-    agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
+    api_url: Optional[str] = typer.Option(
+        None,
+        "--api-url",
+        envvar="AGENT_ORCHESTRATOR_AGENT_API_URL",
+        help="Agent Manager API URL (default: http://localhost:8767)",
+    ),
 ):
     """
     Create a new agent orchestrator session.
@@ -42,13 +47,14 @@ def main(
         ao-new research --agent web-researcher -p "Research AI"
         cat prompt.md | ao-new mysession
     """
+    import os
     from config import load_config
     from session import (
         validate_session_name,
         get_session_status,
         save_session_metadata,
     )
-    from agent import load_agent_config, build_mcp_servers_dict
+    from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import (
         get_prompt_from_args_and_stdin,
@@ -59,6 +65,10 @@ def main(
         debug_log,
     )
 
+    # Set API URL if provided via flag
+    if api_url:
+        os.environ["AGENT_ORCHESTRATOR_AGENT_API_URL"] = api_url
+
     # DEBUG LOGGING - Command entry
     debug_log("COMMAND - ao-new", {
         "cwd": str(Path.cwd()),
@@ -68,7 +78,7 @@ def main(
         "agent": agent or "None",
         "project_dir": str(project_dir) if project_dir else "None",
         "sessions_dir": str(sessions_dir) if sessions_dir else "None",
-        "agents_dir": str(agents_dir) if agents_dir else "None",
+        "api_url": api_url or "None (using default)",
     })
 
     try:
@@ -79,7 +89,6 @@ def main(
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
             cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
-            cli_agents_dir=str(agents_dir) if agents_dir else None,
         )
 
         # 3. Check session doesn't already exist
@@ -93,21 +102,34 @@ def main(
         # 4. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 5. Load agent if specified
+        # 5. Load agent from API if specified
         final_prompt = user_prompt
         mcp_servers = None
         agent_name = None
 
         if agent:
-            agent_config = load_agent_config(agent, config.agents_dir)
-            agent_name = agent_config.name
+            try:
+                agent_data = get_agent_api(agent)
+            except AgentAPIError as e:
+                error_exit(str(e))
+
+            if not agent_data:
+                error_exit(f"Agent not found: {agent}")
+
+            if agent_data.get("status") == "inactive":
+                error_exit(f"Agent '{agent}' is inactive")
+
+            agent_name = agent_data.get("name")
 
             # Prepend system prompt if available
-            if agent_config.system_prompt:
-                final_prompt = f"{agent_config.system_prompt}\n\n---\n\n{user_prompt}"
+            system_prompt = agent_data.get("system_prompt")
+            if system_prompt:
+                final_prompt = f"{system_prompt}\n\n---\n\n{user_prompt}"
 
-            # Build MCP servers dict
-            mcp_servers = build_mcp_servers_dict(agent_config.mcp_config)
+            # Build MCP servers dict from API response
+            mcp_servers_data = agent_data.get("mcp_servers")
+            if mcp_servers_data:
+                mcp_servers = mcp_servers_data
 
         # 6. Ensure directories exist
         ensure_directory_exists(config.sessions_dir)
@@ -136,7 +158,7 @@ def main(
                 session_name=session_name,
                 command_type="new",
                 agent_name=agent_name,
-                mcp_config_path=str(agent_config.mcp_config) if agent and agent_config.mcp_config else None,
+                mcp_config_path=None,  # MCP config now comes from API
                 full_command=full_command,
                 prompt=final_prompt,
                 sessions_dir=config.sessions_dir,

@@ -23,8 +23,10 @@ help:
 	@echo "Individual service commands:"
 	@echo "  make logs-obs       - View observability logs (backend + frontend)"
 	@echo "  make logs-doc       - View document server logs"
+	@echo "  make logs-agent     - View agent manager logs"
 	@echo "  make restart-obs    - Restart observability services"
 	@echo "  make restart-doc    - Restart document server"
+	@echo "  make restart-agent  - Restart agent manager"
 
 # Build all images
 build:
@@ -78,6 +80,9 @@ status:
 health:
 	@echo "Checking service health..."
 	@echo ""
+	@echo "Agent Manager (port 8767):"
+	@curl -s http://localhost:8767/health || echo "  ❌ Not responding"
+	@echo ""
 	@echo "Observability Backend (port 8765):"
 	@curl -s http://localhost:8765/sessions | head -c 100 && echo "  ✅ OK" || echo "  ❌ Not responding"
 	@echo ""
@@ -92,6 +97,12 @@ info:
 	@echo "╔════════════════════════════════════════════════════════════════════════════╗"
 	@echo "║          Agent Orchestrator Framework - Service Information               ║"
 	@echo "╚════════════════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "🤖 AGENT MANAGER"
+	@echo "   URL:         http://localhost:8767"
+	@echo "   Purpose:     CRUD API for agent definitions"
+	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
+	@echo "   Note:        Used by CLI commands and unified frontend"
 	@echo ""
 	@echo "🌐 OBSERVABILITY FRONTEND"
 	@echo "   URL:         http://localhost:5173"
@@ -170,9 +181,15 @@ logs-obs:
 logs-doc:
 	docker-compose logs document-server
 
+logs-agent:
+	docker-compose logs agent-manager
+
 # Individual service restart
 restart-obs:
 	docker-compose restart observability-backend observability-frontend
 
 restart-doc:
 	docker-compose restart document-server
+
+restart-agent:
+	docker-compose restart agent-manager

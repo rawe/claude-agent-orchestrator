@@ -74,7 +74,9 @@ export function AgentTable({
         header: 'Capabilities',
         cell: (info) => {
           const agent = info.row.original;
-          const allCapabilities = [...agent.mcp_servers, ...agent.skills];
+          const mcpServerNames = agent.mcp_servers ? Object.keys(agent.mcp_servers) : [];
+          const skills = agent.skills || [];
+          const allCapabilities = [...mcpServerNames, ...skills];
           const display = allCapabilities.slice(0, 2);
           const remaining = allCapabilities.length - 2;
 

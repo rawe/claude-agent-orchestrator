@@ -6,7 +6,7 @@
 # ]
 # ///
 """
-List all available agent definitions.
+List all available agent definitions from Agent Manager API.
 """
 
 import sys
@@ -16,52 +16,59 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from typing import Optional
-from config import load_config
-from agent import list_all_agents
+from agent_api import list_agents_api, AgentAPIError
 
 app = typer.Typer(add_completion=False)
 
 
 @app.command()
 def main(
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-    agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
+    api_url: Optional[str] = typer.Option(
+        None,
+        "--api-url",
+        envvar="AGENT_ORCHESTRATOR_AGENT_API_URL",
+        help="Agent Manager API URL (default: http://localhost:8767)",
+    ),
 ):
     """
     List all available agent definitions.
 
-    Displays: agent name, description
+    Displays: agent name, description, status
 
     Examples:
         ao-list-agents
-        ao-list-agents --agents-dir /path/to/agents
-        ao-list-agents --project-dir /my/project
+        ao-list-agents --api-url http://localhost:8767
     """
-    # 1. Load configuration
-    config = load_config(
-        cli_project_dir=str(project_dir) if project_dir else None,
-        cli_agents_dir=str(agents_dir) if agents_dir else None,
-    )
+    # Set API URL if provided via flag
+    if api_url:
+        import os
+        os.environ["AGENT_ORCHESTRATOR_AGENT_API_URL"] = api_url
 
-    # 2. Get list of agents (list_all_agents handles missing directory gracefully)
-    agents = list_all_agents(config.agents_dir)
+    try:
+        agents = list_agents_api()
+    except AgentAPIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
-    # 3. Handle empty case
     if not agents:
         print("No agent definitions found")
         return
 
-    # 4. Display agents with bash-compatible formatting
+    # Display agents
     first = True
-    for name, description in agents:
+    for agent in agents:
         if first:
             first = False
         else:
-            # Add separator before subsequent agents
             print("---")
             print()
 
-        print(f"{name}:")
+        name = agent.get("name", "unknown")
+        description = agent.get("description", "")
+        status = agent.get("status", "active")
+
+        status_indicator = "" if status == "active" else " [inactive]"
+        print(f"{name}{status_indicator}:")
         print(description)
         print()
 

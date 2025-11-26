@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner } from '@/components/common';
-import { Agent, AgentCreate, MCP_SERVERS, SKILLS } from '@/types';
+import { MCPJsonEditor } from './MCPJsonEditor';
+import { Agent, AgentCreate, MCPServerConfig, SKILLS } from '@/types';
+import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { Eye, Code, X, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,7 +20,7 @@ interface FormData {
   name: string;
   description: string;
   system_prompt: string;
-  mcp_servers: string[];
+  mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
 }
 
@@ -42,13 +44,14 @@ export function AgentEditor({
     watch,
     setValue,
     reset,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
       name: '',
       description: '',
       system_prompt: '',
-      mcp_servers: [],
+      mcp_servers: null,
       skills: [],
     },
   });
@@ -64,16 +67,16 @@ export function AgentEditor({
       reset({
         name: agent.name,
         description: agent.description,
-        system_prompt: agent.system_prompt,
+        system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
-        skills: agent.skills,
+        skills: agent.skills || [],
       });
     } else {
       reset({
         name: '',
         description: '',
         system_prompt: '',
-        mcp_servers: [],
+        mcp_servers: null,
         skills: [],
       });
     }
@@ -102,16 +105,9 @@ export function AgentEditor({
     return () => clearTimeout(timer);
   }, [watchedName, isEditing, checkNameAvailable]);
 
-  const toggleMcpServer = (name: string) => {
-    const current = watchedMcpServers || [];
-    if (current.includes(name)) {
-      setValue(
-        'mcp_servers',
-        current.filter((s) => s !== name)
-      );
-    } else {
-      setValue('mcp_servers', [...current, name]);
-    }
+  const handleAddTemplate = (templateName: string) => {
+    const updated = addTemplate(watchedMcpServers, templateName);
+    setValue('mcp_servers', updated);
   };
 
   const toggleSkill = (name: string) => {
@@ -129,7 +125,17 @@ export function AgentEditor({
   const onSubmit = async (data: FormData) => {
     setSaving(true);
     try {
-      await onSave(data);
+      // Convert form data to AgentCreate/AgentUpdate format
+      // Always send mcp_servers and skills so clearing them works on update
+      // Empty object {} for mcp_servers means "clear/delete"
+      const createData: AgentCreate = {
+        name: data.name,
+        description: data.description,
+        system_prompt: data.system_prompt || undefined,
+        mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
+        skills: data.skills,                   // empty array clears skills
+      };
+      await onSave(createData);
       onClose();
     } catch (err) {
       console.error('Failed to save agent:', err);
@@ -137,6 +143,9 @@ export function AgentEditor({
       setSaving(false);
     }
   };
+
+  const hasMcpServers = watchedMcpServers && Object.keys(watchedMcpServers).length > 0;
+  const hasSkills = watchedSkills && watchedSkills.length > 0;
 
   return (
     <Modal
@@ -159,10 +168,11 @@ export function AgentEditor({
                   {...register('name', {
                     required: 'Agent name is required',
                     pattern: {
-                      value: /^[a-z0-9-]+$/,
-                      message: 'Only lowercase letters, numbers, and hyphens allowed',
+                      value: /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/,
+                      message: 'Must start with letter/number, then letters, numbers, hyphens, or underscores',
                     },
                     minLength: { value: 2, message: 'Minimum 2 characters' },
+                    maxLength: { value: 60, message: 'Maximum 60 characters' },
                   })}
                   disabled={isEditing}
                   placeholder="my-agent-name"
@@ -210,7 +220,7 @@ export function AgentEditor({
           {/* System Prompt */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="label mb-0">System Prompt *</label>
+              <label className="label mb-0">System Prompt</label>
               <div className="flex rounded-md border border-gray-300 overflow-hidden">
                 <button
                   type="button"
@@ -241,14 +251,10 @@ export function AgentEditor({
 
             {promptTab === 'edit' ? (
               <textarea
-                {...register('system_prompt', {
-                  required: 'System prompt is required',
-                })}
+                {...register('system_prompt')}
                 placeholder="# Agent System Prompt&#10;&#10;Define the agent's behavior, capabilities, and constraints..."
                 rows={12}
-                className={`input font-mono text-sm resize-none ${
-                  errors.system_prompt ? 'border-red-500' : ''
-                }`}
+                className="input font-mono text-sm resize-none"
               />
             ) : (
               <div className="border border-gray-300 rounded-md p-4 min-h-[288px] max-h-[288px] overflow-auto bg-white">
@@ -263,50 +269,42 @@ export function AgentEditor({
                 )}
               </div>
             )}
-            {errors.system_prompt && (
-              <p className="mt-1 text-xs text-red-500">{errors.system_prompt.message}</p>
-            )}
           </div>
 
           {/* Capabilities */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-900">Capabilities</h3>
 
-            {/* MCP Servers */}
+            {/* MCP Servers - JSON Editor */}
             <div>
               <label className="label">MCP Servers</label>
-              <div className="flex flex-wrap gap-2">
-                {MCP_SERVERS.map((server) => (
+
+              {/* Template Quick Add Buttons */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                <span className="text-xs text-gray-500 py-1">Quick add:</span>
+                {TEMPLATE_NAMES.map((name) => (
                   <button
-                    key={server.name}
+                    key={name}
                     type="button"
-                    onClick={() => toggleMcpServer(server.name)}
-                    className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                      watchedMcpServers?.includes(server.name)
-                        ? 'bg-primary-50 border-primary-300 text-primary-700'
-                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                    }`}
+                    onClick={() => handleAddTemplate(name)}
+                    className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200"
                   >
-                    {server.label}
+                    + {name}
                   </button>
                 ))}
               </div>
-              {watchedMcpServers?.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {watchedMcpServers.map((name) => (
-                    <Badge key={name} size="sm" variant="info">
-                      {name}
-                      <button
-                        type="button"
-                        onClick={() => toggleMcpServer(name)}
-                        className="ml-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
+
+              {/* JSON Editor */}
+              <Controller
+                name="mcp_servers"
+                control={control}
+                render={({ field }) => (
+                  <MCPJsonEditor
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </div>
 
             {/* Skills */}
@@ -328,7 +326,7 @@ export function AgentEditor({
                   </button>
                 ))}
               </div>
-              {watchedSkills?.length > 0 && (
+              {hasSkills && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {watchedSkills.map((name) => (
                     <Badge key={name} size="sm" variant="info">
@@ -346,7 +344,7 @@ export function AgentEditor({
               )}
             </div>
 
-            {(watchedMcpServers?.length === 0 && watchedSkills?.length === 0) && (
+            {!hasMcpServers && !hasSkills && (
               <div className="flex items-center gap-2 text-yellow-600 text-sm">
                 <AlertCircle className="w-4 h-4" />
                 <span>Consider adding at least one capability for the agent</span>

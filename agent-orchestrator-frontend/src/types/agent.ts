@@ -1,42 +1,36 @@
 export type AgentStatus = 'active' | 'inactive';
 
+export interface MCPServerConfig {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
 export interface Agent {
   name: string;
   description: string;
-  system_prompt: string;
-  mcp_servers: string[];
-  skills: string[];
+  system_prompt: string | null;
+  mcp_servers: Record<string, MCPServerConfig> | null;
+  skills: string[] | null;
   status: AgentStatus;
   created_at: string;
-  updated_at: string;
+  modified_at: string;
 }
 
 export interface AgentCreate {
   name: string;
   description: string;
-  system_prompt: string;
-  mcp_servers: string[];
-  skills: string[];
+  system_prompt?: string;
+  mcp_servers?: Record<string, MCPServerConfig> | null;
+  skills?: string[];
 }
 
 export interface AgentUpdate {
   description?: string;
   system_prompt?: string;
-  mcp_servers?: string[];
+  mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
 }
-
-// Predefined MCP servers available for selection
-export const MCP_SERVERS = [
-  { name: 'github', label: 'GitHub' },
-  { name: 'filesystem', label: 'Filesystem' },
-  { name: 'postgres', label: 'PostgreSQL' },
-  { name: 'sqlite', label: 'SQLite' },
-  { name: 'slack', label: 'Slack' },
-  { name: 'jira', label: 'Jira' },
-  { name: 'confluence', label: 'Confluence' },
-  { name: 'browser', label: 'Browser' },
-] as const;
 
 // Predefined skills available for selection
 export const SKILLS = [
