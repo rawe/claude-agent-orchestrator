@@ -11,6 +11,9 @@
 Create a new agent orchestrator session.
 
 This command creates a new Claude AI session, optionally with an agent configuration.
+
+Configuration:
+    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
 """
 
 import sys
@@ -32,12 +35,6 @@ def main(
     agent: Optional[str] = typer.Option(None, "--agent", help="Agent to use"),
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
-    api_url: Optional[str] = typer.Option(
-        None,
-        "--api-url",
-        envvar="AGENT_ORCHESTRATOR_AGENT_API_URL",
-        help="Agent Manager API URL (default: http://localhost:8767)",
-    ),
 ):
     """
     Create a new agent orchestrator session.
@@ -47,7 +44,6 @@ def main(
         ao-new research --agent web-researcher -p "Research AI"
         cat prompt.md | ao-new mysession
     """
-    import os
     from config import load_config
     from session import (
         validate_session_name,
@@ -65,10 +61,6 @@ def main(
         debug_log,
     )
 
-    # Set API URL if provided via flag
-    if api_url:
-        os.environ["AGENT_ORCHESTRATOR_AGENT_API_URL"] = api_url
-
     # DEBUG LOGGING - Command entry
     debug_log("COMMAND - ao-new", {
         "cwd": str(Path.cwd()),
@@ -78,7 +70,6 @@ def main(
         "agent": agent or "None",
         "project_dir": str(project_dir) if project_dir else "None",
         "sessions_dir": str(sessions_dir) if sessions_dir else "None",
-        "api_url": api_url or "None (using default)",
     })
 
     try:

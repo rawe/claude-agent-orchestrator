@@ -7,6 +7,9 @@
 # ///
 """
 List all available agent definitions from Agent Manager API.
+
+Configuration:
+    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
 """
 
 import sys
@@ -15,21 +18,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
-from typing import Optional
 from agent_api import list_agents_api, AgentAPIError
 
 app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def main(
-    api_url: Optional[str] = typer.Option(
-        None,
-        "--api-url",
-        envvar="AGENT_ORCHESTRATOR_AGENT_API_URL",
-        help="Agent Manager API URL (default: http://localhost:8767)",
-    ),
-):
+def main():
     """
     List all available agent definitions.
 
@@ -37,13 +32,7 @@ def main(
 
     Examples:
         ao-list-agents
-        ao-list-agents --api-url http://localhost:8767
     """
-    # Set API URL if provided via flag
-    if api_url:
-        import os
-        os.environ["AGENT_ORCHESTRATOR_AGENT_API_URL"] = api_url
-
     try:
         agents = list_agents_api()
     except AgentAPIError as e:

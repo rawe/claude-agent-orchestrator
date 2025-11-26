@@ -11,6 +11,9 @@
 Resume an existing agent orchestrator session.
 
 This command continues a previous session with a new prompt.
+
+Configuration:
+    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
 """
 
 import sys
@@ -30,7 +33,6 @@ def main(
     prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="Continuation prompt"),
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
     sessions_dir: Optional[Path] = typer.Option(None, "--sessions-dir", help="Sessions directory"),
-    agents_dir: Optional[Path] = typer.Option(None, "--agents-dir", help="Agents directory"),
 ):
     """
     Resume an existing agent orchestrator session.
@@ -46,7 +48,7 @@ def main(
         load_session_metadata,
         update_session_metadata,
     )
-    from agent import load_agent_config, build_mcp_servers_dict
+    from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import (
         get_prompt_from_args_and_stdin,
@@ -64,7 +66,6 @@ def main(
         "prompt": prompt or "None (will read from stdin)",
         "project_dir": str(project_dir) if project_dir else "None",
         "sessions_dir": str(sessions_dir) if sessions_dir else "None",
-        "agents_dir": str(agents_dir) if agents_dir else "None",
     })
 
     try:
@@ -75,7 +76,6 @@ def main(
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
             cli_sessions_dir=str(sessions_dir) if sessions_dir else None,
-            cli_agents_dir=str(agents_dir) if agents_dir else None,
         )
 
         # 3. Check session exists
@@ -98,13 +98,6 @@ def main(
                 file=sys.stderr,
             )
 
-        if agents_dir and Path(agents_dir).resolve() != metadata.agents_dir:
-            print(
-                f"Warning: --agents-dir override ignored. "
-                f"Using session metadata value: {metadata.agents_dir}",
-                file=sys.stderr,
-            )
-
         # 6. Extract session_id from metadata
         resume_session_id = metadata.session_id
         if not resume_session_id:
@@ -116,15 +109,21 @@ def main(
         # 7. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 8. Load agent configuration if session has agent
+        # 8. Load agent MCP configuration from API if session has agent
         # NOTE: Do NOT prepend system prompt for resume (only for new sessions)
         mcp_servers = None
-        agent_config = None
 
         if metadata.agent:
-            agent_config = load_agent_config(metadata.agent, metadata.agents_dir)
-            # Build MCP servers dict for SDK
-            mcp_servers = build_mcp_servers_dict(agent_config.mcp_config)
+            try:
+                agent_data = get_agent_api(metadata.agent)
+            except AgentAPIError as e:
+                error_exit(str(e))
+
+            if not agent_data:
+                error_exit(f"Agent not found: {metadata.agent}")
+
+            # Get MCP servers from API response
+            mcp_servers = agent_data.get("mcp_servers")
 
         # 9. Log command (if logging enabled)
         if config.enable_logging:
@@ -139,7 +138,7 @@ def main(
                 session_name=session_name,
                 command_type="resume",
                 agent_name=metadata.agent,
-                mcp_config_path=str(agent_config.mcp_config) if agent_config and agent_config.mcp_config else None,
+                mcp_config_path=None,  # MCP config now comes from API
                 full_command=full_command,
                 prompt=user_prompt,
                 sessions_dir=config.sessions_dir,
