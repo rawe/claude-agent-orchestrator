@@ -7,7 +7,8 @@ interface MCPJsonEditorProps {
   error?: string;
 }
 
-const PLACEHOLDER = `"server-name": { "command": "...", "args": [...], "env": {...} }`;
+const PLACEHOLDER = `"my-server": { "command": "npx", "args": ["@example/mcp"] }
+"http-server": { "type": "http", "url": "http://localhost:9000/mcp" }`;
 
 export function MCPJsonEditor({ value, onChange, error }: MCPJsonEditorProps) {
   const [text, setText] = useState('');
@@ -44,13 +45,23 @@ export function MCPJsonEditor({ value, onChange, error }: MCPJsonEditorProps) {
       // Validate each server config has required fields
       for (const [name, config] of Object.entries(parsed)) {
         const cfg = config as Record<string, unknown>;
-        if (!cfg.command || typeof cfg.command !== 'string') {
-          setParseError(`Server "${name}": missing or invalid "command" field`);
-          return;
-        }
-        if (!cfg.args || !Array.isArray(cfg.args)) {
-          setParseError(`Server "${name}": missing or invalid "args" field`);
-          return;
+
+        // HTTP type: requires url
+        if (cfg.type === 'http') {
+          if (!cfg.url || typeof cfg.url !== 'string') {
+            setParseError(`Server "${name}": HTTP type requires "url" field`);
+            return;
+          }
+        } else {
+          // Stdio type (default): requires command and args
+          if (!cfg.command || typeof cfg.command !== 'string') {
+            setParseError(`Server "${name}": missing or invalid "command" field`);
+            return;
+          }
+          if (!cfg.args || !Array.isArray(cfg.args)) {
+            setParseError(`Server "${name}": missing or invalid "args" field`);
+            return;
+          }
         }
       }
 
@@ -86,7 +97,7 @@ export function MCPJsonEditor({ value, onChange, error }: MCPJsonEditorProps) {
         <p className="text-sm text-red-500">{displayError}</p>
       )}
       <p className="text-xs text-gray-500">
-        Define MCP servers. Each needs "command" (string) and "args" (array). Optional: "env" object.
+        Stdio: "command" + "args". HTTP: "type": "http" + "url".
       </p>
     </div>
   );

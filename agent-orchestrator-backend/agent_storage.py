@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from models import Agent, AgentCreate, AgentUpdate, MCPServerConfig
+from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp
 
 
 def get_agents_dir() -> Path:
@@ -69,12 +69,16 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         if mcp_file.exists():
             with open(mcp_file, encoding="utf-8") as f:
                 mcp_data = json.load(f)
-                # Extract mcpServers dict, convert to MCPServerConfig
+                # Extract mcpServers dict, convert to appropriate type
                 raw_servers = mcp_data.get("mcpServers", {})
                 if raw_servers:
-                    mcp_servers = {
-                        k: MCPServerConfig(**v) for k, v in raw_servers.items()
-                    }
+                    mcp_servers = {}
+                    for k, v in raw_servers.items():
+                        if v.get("type") == "http":
+                            mcp_servers[k] = MCPServerHttp(**v)
+                        else:
+                            # Default to stdio (command-based)
+                            mcp_servers[k] = MCPServerStdio(**v)
 
         # Read optional skills from agent.json
         skills = data.get("skills")

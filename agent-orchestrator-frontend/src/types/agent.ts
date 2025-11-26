@@ -1,10 +1,18 @@
 export type AgentStatus = 'active' | 'inactive';
 
-export interface MCPServerConfig {
+export interface MCPServerStdio {
+  type?: 'stdio';
   command: string;
   args: string[];
   env?: Record<string, string>;
 }
+
+export interface MCPServerHttp {
+  type: 'http';
+  url: string;
+}
+
+export type MCPServerConfig = MCPServerStdio | MCPServerHttp;
 
 export interface Agent {
   name: string;

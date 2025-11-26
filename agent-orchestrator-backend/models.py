@@ -2,17 +2,28 @@
 Pydantic models for Agent Manager API.
 """
 
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel
 
 
-class MCPServerConfig(BaseModel):
-    """MCP server configuration."""
+class MCPServerStdio(BaseModel):
+    """MCP server configuration for stdio transport (command-based)."""
 
+    type: Literal["stdio"] = "stdio"
     command: str
     args: list[str]
     env: Optional[dict[str, str]] = None
+
+
+class MCPServerHttp(BaseModel):
+    """MCP server configuration for HTTP transport."""
+
+    type: Literal["http"]
+    url: str
+
+
+MCPServerConfig = Union[MCPServerStdio, MCPServerHttp]
 
 
 class AgentBase(BaseModel):

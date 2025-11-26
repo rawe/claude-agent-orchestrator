@@ -58,16 +58,19 @@ def _request(method: str, path: str, data: Optional[dict] = None) -> dict | list
 
 def list_agents_api() -> list[dict]:
     """
-    List all agents from API.
+    List all active agents from API.
 
     Returns:
-        List of agent dictionaries
+        List of active agent dictionaries (excludes inactive agents)
 
     Raises:
         AgentAPIError: If API is unavailable or returns error
     """
     result = _request("GET", "/agents")
-    return result if result else []
+    if not result:
+        return []
+    # Filter to active agents only
+    return [a for a in result if a.get("status") == "active"]
 
 
 def get_agent_api(name: str) -> Optional[dict]:

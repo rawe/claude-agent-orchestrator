@@ -54,10 +54,8 @@ def main():
 
         name = agent.get("name", "unknown")
         description = agent.get("description", "")
-        status = agent.get("status", "active")
 
-        status_indicator = "" if status == "active" else " [inactive]"
-        print(f"{name}{status_indicator}:")
+        print(f"{name}:")
         print(description)
         print()
 
