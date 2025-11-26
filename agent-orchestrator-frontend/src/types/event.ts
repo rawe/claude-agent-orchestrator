@@ -29,7 +29,7 @@ export interface SessionEvent {
 }
 
 export interface WebSocketMessage {
-  type: 'init' | 'event' | 'session_updated' | 'session_deleted';
+  type: 'init' | 'event' | 'session_created' | 'session_updated' | 'session_deleted';
   sessions?: import('./session').Session[];
   data?: SessionEvent;
   session?: import('./session').Session;

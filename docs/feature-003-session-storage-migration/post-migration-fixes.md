@@ -31,3 +31,30 @@ Issues discovered and fixed after the Phase 4 migration was completed.
 # - session_stop
 curl http://localhost:8765/sessions/{id}/events
 ```
+
+## Fix 2: Frontend WebSocket Missing session_created Handler
+
+**Date:** 2025-11-26
+
+**Problem:** New sessions created via `POST /sessions` API don't appear in real-time in the unified frontend. Users must switch tabs or refresh to see new sessions.
+
+**Root Cause:** Phase 4 changed session creation from:
+- **Before:** `POST /events` with `event_type: "session_start"` → broadcasts `{"type": "event", "data": {...}}`
+- **After:** `POST /sessions` → broadcasts `{"type": "session_created", "session": {...}}`
+
+The frontend `WebSocketMessage` type and `useSessions` hook only handled `init`, `event`, `session_updated`, and `session_deleted` - not the new `session_created` message type.
+
+**Solution:**
+1. Added `session_created` to `WebSocketMessage` type union in `types/event.ts`
+2. Added handler for `session_created` in `useSessions.ts` that adds new sessions to state
+
+**Files Changed:**
+- `agent-orchestrator-frontend/src/types/event.ts`
+- `agent-orchestrator-frontend/src/hooks/useSessions.ts`
+
+**Verification:**
+```bash
+# Start a new agent session and verify it appears in frontend without refresh
+ao-new math-test -p "Calculate 2+2"
+# Session should appear immediately in the frontend session list
+```

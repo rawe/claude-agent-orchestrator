@@ -32,6 +32,13 @@ export function useSessions() {
     const handleMessage = (message: WebSocketMessage) => {
       if (message.type === 'init' && message.sessions) {
         setSessions(message.sessions);
+      } else if (message.type === 'session_created' && message.session) {
+        // New session created via POST /sessions API
+        setSessions((prev) => {
+          const exists = prev.some((s) => s.session_id === message.session!.session_id);
+          if (exists) return prev;
+          return [message.session!, ...prev];
+        });
       } else if (message.type === 'session_updated' && message.session) {
         setSessions((prev) =>
           prev.map((s) => (s.session_id === message.session!.session_id ? message.session! : s))
