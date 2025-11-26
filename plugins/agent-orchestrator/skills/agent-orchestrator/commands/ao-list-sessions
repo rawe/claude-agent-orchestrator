@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "typer",
+#     "httpx",
 # ]
 # ///
 """
@@ -36,6 +37,7 @@ def main(
     """
     from config import load_config
     from session import list_all_sessions
+    from session_client import SessionClient, SessionClientError
     from utils import debug_log
 
     # DEBUG LOGGING - Command entry
@@ -54,7 +56,21 @@ def main(
             cli_agents_dir=None,
         )
 
-        # Get all sessions (list_all_sessions handles missing directory gracefully)
+        # Try API first
+        try:
+            client = SessionClient(config.session_manager_url)
+            sessions = client.list_sessions()
+            if not sessions:
+                print("No sessions found")
+            else:
+                for s in sessions:
+                    print(f"{s.get('session_name', 'unknown')} (session-id: {s.get('session_id', 'unknown')}, project-dir: {s.get('project_dir', 'unknown')})")
+            return
+        except SessionClientError as e:
+            # API error, fall back to file-based
+            print(f"Warning: API error: {e}", file=sys.stderr)
+
+        # Fallback to file-based
         sessions = list_all_sessions(config.sessions_dir)
 
         # Display results

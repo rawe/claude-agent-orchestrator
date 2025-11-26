@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "typer",
+#     "httpx",
 # ]
 # ///
 """
@@ -34,6 +35,7 @@ def main(
     """
     from config import load_config
     from session import validate_session_name, get_session_status, extract_result
+    from session_client import SessionClient, SessionClientError
 
     try:
         # Validate session name
@@ -46,7 +48,24 @@ def main(
             cli_agents_dir=None,
         )
 
-        # Check session status
+        # Try API first
+        try:
+            client = SessionClient(config.session_manager_url)
+            session = client.get_session_by_name(session_name)
+            if session:
+                status = client.get_status(session['session_id'])
+                if status == "running":
+                    print(f"Error: Session '{session_name}' is still running. Wait for completion or check status with ao-status.", file=sys.stderr)
+                    raise typer.Exit(1)
+                result = client.get_result(session['session_id'])
+                print(result)
+                return
+            # Session not found in API, fall back to file-based
+        except SessionClientError as e:
+            # API error, fall back to file-based
+            print(f"Warning: API error: {e}", file=sys.stderr)
+
+        # Fallback to file-based
         status = get_session_status(session_name, config.sessions_dir)
 
         if status == "not_existent":

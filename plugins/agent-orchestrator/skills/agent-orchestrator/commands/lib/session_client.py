@@ -121,6 +121,14 @@ class SessionClient:
         except SessionNotFoundError:
             return False
 
+    def get_session_by_name(self, session_name: str) -> Optional[Dict[str, Any]]:
+        """Find session by name. Returns None if not found."""
+        sessions = self.list_sessions()
+        for s in sessions:
+            if s.get('session_name') == session_name:
+                return s
+        return None
+
 
 def get_client(base_url: str) -> SessionClient:
     """Get a SessionClient instance."""
