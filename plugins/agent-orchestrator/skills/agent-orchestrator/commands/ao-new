@@ -166,8 +166,7 @@ def main(
             session_name=session_name,  # For Stage 2 metadata update
             sessions_dir=config.sessions_dir,  # For Stage 2 metadata update
             mcp_servers=mcp_servers,
-            observability_enabled=True,  # Always enabled - uses session manager
-            observability_url=config.session_manager_url,
+            session_manager_url=config.session_manager_url,
             agent_name=agent_name,
         )
 
