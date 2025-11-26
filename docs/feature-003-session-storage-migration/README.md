@@ -23,6 +23,12 @@ Migrate Agent Orchestrator from file-based session storage to database-backed st
 | `phase-3-implementation-report.md` | Complete | 2025-11-26 |
 | `phase-4-implementation-report.md` | Complete | 2025-11-26 |
 
+## Post-Migration Fixes
+
+| File | Description |
+|------|-------------|
+| `post-migration-fixes.md` | Bug fixes discovered after migration |
+
 ## Implementation Order
 
 ```

@@ -16,6 +16,55 @@ from datetime import datetime, UTC
 from session_client import SessionClient, SessionClientError
 
 
+# =============================================================================
+# Module-level state for SDK hooks
+# =============================================================================
+_session_client: Optional[SessionClient] = None
+_current_session_id: Optional[str] = None
+_current_session_name: Optional[str] = None
+
+
+def _set_hook_context(
+    client: SessionClient,
+    session_id: str,
+    session_name: Optional[str] = None
+) -> None:
+    """Set the session context for hook functions."""
+    global _session_client, _current_session_id, _current_session_name
+    _session_client = client
+    _current_session_id = session_id
+    _current_session_name = session_name
+
+
+# =============================================================================
+# SDK Hook Functions
+# =============================================================================
+
+async def post_tool_hook(
+    input_data: dict,
+    tool_use_id: Optional[str],
+    context: dict
+) -> dict:
+    """
+    PostToolUse hook - sends post_tool event to session manager.
+    """
+    if _session_client and _current_session_id:
+        try:
+            _session_client.add_event(_current_session_id, {
+                "event_type": "post_tool",
+                "session_id": _current_session_id,
+                "session_name": _current_session_name or _current_session_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "tool_name": input_data.get("tool_name", "unknown"),
+                "tool_input": input_data.get("tool_input", {}),
+                "tool_output": input_data.get("tool_response", ""),
+                "error": input_data.get("error"),
+            })
+        except SessionClientError:
+            pass  # Silent failure - don't block agent execution
+    return {}
+
+
 async def run_claude_session(
     prompt: str,
     session_file: Path,
@@ -82,6 +131,23 @@ async def run_claude_session(
         permission_mode="bypassPermissions",
         setting_sources=["user", "project", "local"],
     )
+
+    # Add programmatic hooks for post_tool events
+    try:
+        from claude_agent_sdk.types import HookMatcher
+
+        options.hooks = {
+            "PostToolUse": [
+                HookMatcher(hooks=[post_tool_hook]),
+            ],
+        }
+    except ImportError as e:
+        # If HookMatcher is not available, continue without hooks
+        import sys
+        print(
+            f"Warning: Could not import HookMatcher for hooks: {e}",
+            file=sys.stderr
+        )
 
     # Add resume session ID if provided
     if resume_session_id:
@@ -155,6 +221,23 @@ async def run_claude_session(
                                         session_id=session_id,
                                         last_resumed_at=datetime.now(UTC).isoformat()
                                     )
+
+                                # Set hook context so post_tool_hook can send events
+                                _set_hook_context(
+                                    session_client,
+                                    session_id,
+                                    session_name
+                                )
+
+                                # Send user message event
+                                session_client.add_event(session_id, {
+                                    "event_type": "message",
+                                    "session_id": session_id,
+                                    "session_name": session_name or session_id,
+                                    "timestamp": datetime.now(UTC).isoformat(),
+                                    "role": "user",
+                                    "content": [{"type": "text", "text": prompt}]
+                                })
                             except SessionClientError as e:
                                 # Don't fail the session if API call fails
                                 import sys
