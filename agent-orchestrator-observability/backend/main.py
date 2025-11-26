@@ -5,8 +5,13 @@ import uvicorn
 import json
 import os
 
-from database import init_db, insert_session, insert_event, get_sessions, get_events, update_session_status, update_session_metadata, delete_session
-from models import Event, SessionMetadataUpdate
+from database import (
+    init_db, insert_session, insert_event, get_sessions, get_events,
+    update_session_status, update_session_metadata, delete_session,
+    create_session, get_session_by_id, get_session_result
+)
+from models import Event, SessionMetadataUpdate, SessionCreate
+from datetime import datetime, timezone
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
@@ -44,7 +49,13 @@ app.add_middleware(
 
 @app.post("/events")
 async def receive_event(event: Event):
-    """Receive events from hook scripts and broadcast to WebSocket clients"""
+    """Receive events from hook scripts and broadcast to WebSocket clients
+
+    DEPRECATION NOTE: The session_start event handling below will be removed
+    once all clients migrate to POST /sessions for session creation.
+    The session_stop handling will also migrate to POST /sessions/{id}/events.
+    Keep backward compatibility during migration.
+    """
 
     # Debug: Log incoming event
     if DEBUG:
@@ -91,6 +102,118 @@ async def receive_event(event: Event):
 async def list_sessions():
     """Get all sessions"""
     return {"sessions": get_sessions()}
+
+
+@app.post("/sessions")
+async def create_session_endpoint(session: SessionCreate):
+    """Create a new session with full metadata"""
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    try:
+        new_session = create_session(
+            session_id=session.session_id,
+            session_name=session.session_name,
+            timestamp=timestamp,
+            project_dir=session.project_dir,
+            agent_name=session.agent_name
+        )
+    except Exception as e:
+        if "UNIQUE constraint failed" in str(e):
+            raise HTTPException(status_code=409, detail="Session already exists")
+        raise
+
+    # Broadcast to WebSocket clients
+    message = json.dumps({"type": "session_created", "session": new_session})
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    return {"ok": True, "session": new_session}
+
+
+@app.get("/sessions/{session_id}")
+async def get_session_endpoint(session_id: str):
+    """Get single session details"""
+    session = get_session_by_id(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session": session}
+
+
+@app.get("/sessions/{session_id}/status")
+async def get_session_status(session_id: str):
+    """Get session status: running, finished, or not_existent"""
+    session = get_session_by_id(session_id)
+    if session is None:
+        return {"status": "not_existent"}
+    return {"status": session["status"]}
+
+
+@app.get("/sessions/{session_id}/result")
+async def get_session_result_endpoint(session_id: str):
+    """Get result text from last assistant message"""
+    session = get_session_by_id(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session["status"] != "finished":
+        raise HTTPException(status_code=400, detail="Session not finished")
+
+    result = get_session_result(session_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No result found")
+
+    return {"result": result}
+
+
+@app.get("/sessions/{session_id}/events")
+async def get_session_events(session_id: str):
+    """Get events for a specific session"""
+    session = get_session_by_id(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"events": get_events(session_id)}
+
+
+@app.post("/sessions/{session_id}/events")
+async def add_session_event(session_id: str, event: Event):
+    """Add event to session (must exist)"""
+    session = get_session_by_id(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Ensure the event's session_id matches the URL
+    if event.session_id != session_id:
+        raise HTTPException(status_code=400, detail="Event session_id must match URL session_id")
+
+    # Insert event
+    insert_event(event)
+
+    # Handle session_stop special case: update status to finished
+    if event.event_type == "session_stop":
+        update_session_status(session_id, "finished")
+
+        # Get updated session and broadcast session_updated
+        updated_session = get_session_by_id(session_id)
+        session_message = json.dumps({"type": "session_updated", "session": updated_session})
+        for ws in connections.copy():
+            try:
+                await ws.send_text(session_message)
+            except:
+                connections.discard(ws)
+
+    # Broadcast event to WebSocket clients
+    message = json.dumps({"type": "event", "data": event.dict()})
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    return {"ok": True}
+
 
 @app.get("/events/{session_id}")
 async def list_events(session_id: str):

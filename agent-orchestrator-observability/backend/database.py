@@ -17,9 +17,16 @@ def init_db():
             status TEXT NOT NULL,
             created_at TEXT NOT NULL,
             project_dir TEXT,
-            agent_name TEXT
+            agent_name TEXT,
+            last_resumed_at TEXT
         )
     """)
+
+    # Add last_resumed_at column if it doesn't exist (migration for existing databases)
+    try:
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_resumed_at TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     # Events table
     conn.execute("""
@@ -205,3 +212,48 @@ def delete_session(session_id: str) -> dict | None:
         "session": True,
         "events_count": events_count
     }
+
+
+def create_session(session_id: str, session_name: str, timestamp: str, project_dir: str = None, agent_name: str = None) -> dict:
+    """Create a new session with full metadata at creation time"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        INSERT INTO sessions (session_id, session_name, status, created_at, project_dir, agent_name)
+        VALUES (?, ?, 'running', ?, ?, ?)
+    """, (session_id, session_name, timestamp, project_dir, agent_name))
+    conn.commit()
+    conn.close()
+    return get_session_by_id(session_id)
+
+
+def get_session_by_id(session_id: str) -> dict | None:
+    """Get a single session by ID"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute("""
+        SELECT * FROM sessions WHERE session_id = ?
+    """, (session_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_session_result(session_id: str) -> str | None:
+    """Extract result from the last assistant message event"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute("""
+        SELECT content FROM events
+        WHERE session_id = ? AND event_type = 'message' AND role = 'assistant'
+        ORDER BY timestamp DESC LIMIT 1
+    """, (session_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row or not row['content']:
+        return None
+
+    content = json.loads(row['content'])
+    if content and len(content) > 0 and 'text' in content[0]:
+        return content[0]['text']
+    return None

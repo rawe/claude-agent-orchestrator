@@ -7,6 +7,14 @@ class SessionMetadataUpdate(BaseModel):
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
 
+
+class SessionCreate(BaseModel):
+    """Model for creating a new session"""
+    session_id: str
+    session_name: str
+    project_dir: Optional[str] = None
+    agent_name: Optional[str] = None
+
 class MessageContent(BaseModel):
     """Content block within a message"""
     type: str  # 'text' (only text supported for now)
