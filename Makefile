@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs info urls open
+.PHONY: help build start stop restart logs clean status health clean-docs info urls open logs-frontend logs-obs logs-doc logs-agent restart-frontend restart-obs restart-doc restart-agent
 
 # Default target
 help:
@@ -15,16 +15,18 @@ help:
 	@echo "  make status         - Show status of all services"
 	@echo "  make health         - Check health of all services"
 	@echo "  make info           - Show service URLs and descriptions"
-	@echo "  make open           - Open Observability Frontend in browser"
+	@echo "  make open           - Open Frontend in browser"
 	@echo "  make clean          - Stop and remove all containers, networks (keeps volumes)"
 	@echo "  make clean-all      - Stop and remove everything including volumes"
 	@echo "  make clean-docs     - Remove ONLY the document storage volume (keeps containers)"
 	@echo ""
 	@echo "Individual service commands:"
-	@echo "  make logs-obs       - View observability logs (backend + frontend)"
+	@echo "  make logs-frontend  - View frontend logs"
+	@echo "  make logs-obs       - View observability logs"
 	@echo "  make logs-doc       - View document server logs"
 	@echo "  make logs-agent     - View agent manager logs"
-	@echo "  make restart-obs    - Restart observability services"
+	@echo "  make restart-frontend - Restart frontend"
+	@echo "  make restart-obs    - Restart observability backend"
 	@echo "  make restart-doc    - Restart document server"
 	@echo "  make restart-agent  - Restart agent manager"
 
@@ -80,6 +82,9 @@ status:
 health:
 	@echo "Checking service health..."
 	@echo ""
+	@echo "Frontend (port 3000):"
+	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:3000 || echo "  ❌ Not responding"
+	@echo ""
 	@echo "Agent Manager (port 8767):"
 	@curl -s http://localhost:8767/health || echo "  ❌ Not responding"
 	@echo ""
@@ -88,9 +93,6 @@ health:
 	@echo ""
 	@echo "Document Server (port 8766):"
 	@curl -s http://localhost:8766/health || echo "  ❌ Not responding"
-	@echo ""
-	@echo "Observability Frontend (port 5173):"
-	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:5173 || echo "  ❌ Not responding"
 
 # Show service information
 info:
@@ -98,49 +100,46 @@ info:
 	@echo "║          Agent Orchestrator Framework - Service Information               ║"
 	@echo "╚════════════════════════════════════════════════════════════════════════════╝"
 	@echo ""
+	@echo "🌐 FRONTEND"
+	@echo "   URL:         http://localhost:3000"
+	@echo "   Purpose:     Unified UI for agent management, sessions, and documents"
+	@echo "   Action:      Open this URL in your browser"
+	@echo ""
 	@echo "🤖 AGENT MANAGER"
 	@echo "   URL:         http://localhost:8767"
 	@echo "   Purpose:     CRUD API for agent definitions"
 	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
-	@echo "   Note:        Used by CLI commands and unified frontend"
-	@echo ""
-	@echo "🌐 OBSERVABILITY FRONTEND"
-	@echo "   URL:         http://localhost:5173"
-	@echo "   Purpose:     Visual UI to monitor agent tasks in real-time"
-	@echo "   Action:      Open this URL in your browser to see agent activity"
 	@echo ""
 	@echo "⚙️  OBSERVABILITY BACKEND"
 	@echo "   URL:         http://localhost:8765"
 	@echo "   Purpose:     WebSocket server receiving agent events"
 	@echo "   Endpoints:   /sessions, /events/{id}, /ws"
-	@echo "   Note:        Used internally by the frontend and observability hooks"
 	@echo ""
 	@echo "📄 DOCUMENT SYNC SERVER"
 	@echo "   URL:         http://localhost:8766"
-	@echo "   Purpose:     Document storage and retrieval for Claude Code plugins"
+	@echo "   Purpose:     Document storage and retrieval"
 	@echo "   Endpoints:   /health, /documents, /upload, /download"
-	@echo "   Note:        Required for the document-sync Claude Code plugin"
 	@echo ""
 	@echo "────────────────────────────────────────────────────────────────────────────"
-	@echo "👉 To open the Observability Frontend in your browser:"
-	@echo "   open http://localhost:5173        (macOS)"
-	@echo "   xdg-open http://localhost:5173    (Linux)"
-	@echo "   start http://localhost:5173       (Windows)"
+	@echo "👉 To open the Frontend in your browser:"
+	@echo "   open http://localhost:3000        (macOS)"
+	@echo "   xdg-open http://localhost:3000    (Linux)"
+	@echo "   start http://localhost:3000       (Windows)"
 
 # Alias for info
 urls: info
 
-# Open Observability Frontend in browser
+# Open Frontend in browser
 open:
-	@echo "Opening Observability Frontend in browser..."
+	@echo "Opening Frontend in browser..."
 	@if command -v open > /dev/null 2>&1; then \
-		open http://localhost:5173; \
+		open http://localhost:3000; \
 	elif command -v xdg-open > /dev/null 2>&1; then \
-		xdg-open http://localhost:5173; \
+		xdg-open http://localhost:3000; \
 	elif command -v start > /dev/null 2>&1; then \
-		start http://localhost:5173; \
+		start http://localhost:3000; \
 	else \
-		echo "Could not detect browser opener. Please manually open: http://localhost:5173"; \
+		echo "Could not detect browser opener. Please manually open: http://localhost:3000"; \
 	fi
 
 # Clean up (stop and remove containers, networks, but keep volumes)
@@ -175,8 +174,11 @@ clean-docs:
 	fi
 
 # Individual service logs
+logs-frontend:
+	docker-compose logs frontend
+
 logs-obs:
-	docker-compose logs observability-backend observability-frontend
+	docker-compose logs observability-backend
 
 logs-doc:
 	docker-compose logs document-server
@@ -185,8 +187,11 @@ logs-agent:
 	docker-compose logs agent-manager
 
 # Individual service restart
+restart-frontend:
+	docker-compose restart frontend
+
 restart-obs:
-	docker-compose restart observability-backend observability-frontend
+	docker-compose restart observability-backend
 
 restart-doc:
 	docker-compose restart document-server

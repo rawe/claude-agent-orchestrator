@@ -1,6 +1,30 @@
 
 services:
   # ============================================================================
+  # UNIFIED FRONTEND (Agent Orchestrator UI)
+  # ============================================================================
+  frontend:
+    container_name: agent-orchestrator-frontend
+    build:
+      context: ./agent-orchestrator-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      # These are baked in at build time via Vite
+      - VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
+      - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
+      - VITE_AGENT_MANAGER_URL=http://localhost:8767
+      - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    depends_on:
+      - agent-manager
+      - observability-backend
+      - document-server
+
+  # ============================================================================
   # AGENT MANAGER BACKEND
   # ============================================================================
   agent-manager:
@@ -55,26 +79,26 @@ services:
       start_period: 10s
 
   # ============================================================================
-  # OBSERVABILITY FRONTEND
+  # OBSERVABILITY FRONTEND (legacy - replaced by unified frontend)
   # ============================================================================
-  observability-frontend:
-    container_name: agent-orchestrator-observability-frontend
-    build:
-      context: ./agent-orchestrator-observability
-      dockerfile: docker/frontend.Dockerfile
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./agent-orchestrator-observability/frontend/src:/app/src
-      - ./agent-orchestrator-observability/frontend/index.html:/app/index.html
-    environment:
-      - VITE_BACKEND_URL=http://localhost:8765
-    networks:
-      - agent-orchestrator-network
-    restart: unless-stopped
-    depends_on:
-      observability-backend:
-        condition: service_healthy
+  # observability-frontend:
+  #   container_name: agent-orchestrator-observability-frontend
+  #   build:
+  #     context: ./agent-orchestrator-observability
+  #     dockerfile: docker/frontend.Dockerfile
+  #   ports:
+  #     - "5173:5173"
+  #   volumes:
+  #     - ./agent-orchestrator-observability/frontend/src:/app/src
+  #     - ./agent-orchestrator-observability/frontend/index.html:/app/index.html
+  #   environment:
+  #     - VITE_BACKEND_URL=http://localhost:8765
+  #   networks:
+  #     - agent-orchestrator-network
+  #   restart: unless-stopped
+  #   depends_on:
+  #     observability-backend:
+  #       condition: service_healthy
 
   # ============================================================================
   # DOCUMENT SYNC SERVER
