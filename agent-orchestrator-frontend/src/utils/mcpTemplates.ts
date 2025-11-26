@@ -8,20 +8,18 @@ import type { MCPServerConfig } from '@/types';
  *
  * To add a new template:
  * 1. Add an entry to MCP_TEMPLATES with a unique key
- * 2. Provide command, args, and optionally env fields
- * 3. The template will appear in the AgentEditor dropdown
+ * 2. For stdio servers: provide command, args, and optionally env
+ * 3. For HTTP servers: provide type: 'http' and url
+ * 4. The template will appear in the AgentEditor dropdown
  */
 export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
   playwright: {
     command: 'npx',
     args: ['@playwright/mcp@latest'],
   },
-  'brave-search': {
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: {
-      BRAVE_API_KEY: '${BRAVE_API_KEY}',
-    },
+  'mcp-atlassian-http': {
+    type: 'http',
+    url: 'http://localhost:9000/mcp',
   },
 };
 
