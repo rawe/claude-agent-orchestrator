@@ -29,6 +29,12 @@ Migrate Agent Orchestrator from file-based session storage to database-backed st
 |------|-------------|
 | `post-migration-fixes.md` | Bug fixes discovered after migration |
 
+## Cleanup
+
+| File | Description |
+|------|-------------|
+| `cleanup.md` | Documentation and config cleanup tasks after migration is stable |
+
 ## Implementation Order
 
 ```
