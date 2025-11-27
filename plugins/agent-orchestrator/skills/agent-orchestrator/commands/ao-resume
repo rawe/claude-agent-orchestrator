@@ -135,6 +135,12 @@ def main(
             if not agent_data:
                 error_exit(f"Agent not found: {session_agent}")
 
+            if agent_data.get("status") == "inactive":
+                error_exit(
+                    f"Agent '{session_agent}' is inactive. "
+                    "Cannot resume session with deactivated agent definition."
+                )
+
             # Get MCP servers from API response
             mcp_servers = agent_data.get("mcp_servers")
 
