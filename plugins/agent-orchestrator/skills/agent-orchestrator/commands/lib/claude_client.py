@@ -221,6 +221,13 @@ async def run_claude_session(
                                         session_id=session_id,
                                         last_resumed_at=datetime.now(UTC).isoformat()
                                     )
+                                    # Send session_start event to notify frontend of running state
+                                    session_client.add_event(session_id, {
+                                        "event_type": "session_start",
+                                        "session_id": session_id,
+                                        "session_name": session_name or session_id,
+                                        "timestamp": datetime.now(UTC).isoformat(),
+                                    })
 
                                 # Set hook context so post_tool_hook can send events
                                 _set_hook_context(
