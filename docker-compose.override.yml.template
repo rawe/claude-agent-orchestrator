@@ -1,0 +1,39 @@
+# Docker Compose Override Template
+#
+# This file allows you to customize Docker Compose settings without modifying
+# the main docker-compose.yml file. Your local overrides won't be committed to git.
+#
+# SETUP:
+#   1. Copy this file: cp docker-compose.override.yml.template docker-compose.override.yml
+#   2. Edit docker-compose.override.yml with your local settings
+#   3. Run: make start (the override file is automatically loaded by Docker Compose)
+#
+# COMMON USE CASES:
+#   - Point agent-manager to a different agent definitions directory
+#   - Change port mappings
+#   - Add environment variables for debugging
+#
+# For simple cases (just changing AGENT_DIR), you can also use a .env file:
+#   echo "AGENT_DIR=/path/to/your/agents" >> .env
+
+services:
+  # Override agent-manager to use a custom agents directory
+  agent-manager:
+    volumes:
+      # Mount your local agents directory to the container
+      # Replace /path/to/your/agents with your actual path
+      - /path/to/your/agents:/data/agents
+
+# Example: Override with additional environment variables
+#  agent-manager:
+#    environment:
+#      - PYTHONUNBUFFERED=1
+#      - AGENT_MANAGER_HOST=0.0.0.0
+#      - AGENT_MANAGER_PORT=8767
+#      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
+#      - DEBUG=true
+
+# Example: Change port mappings
+#  agent-manager:
+#    ports:
+#      - "9767:8767"  # Map to port 9767 on host instead of 8767

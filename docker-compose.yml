@@ -36,7 +36,7 @@ services:
       - "8767:8767"
     volumes:
       - ./agent-orchestrator-backend:/app
-      - ./.agent-orchestrator/agents:/data/agents
+      - ${AGENT_DIR:-./.agent-orchestrator/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
       - AGENT_MANAGER_HOST=0.0.0.0
@@ -64,6 +64,7 @@ services:
       - "8765:8765"
     volumes:
       - ./agent-orchestrator-observability/backend:/app/backend
+      - observability-data:/app/.agent-orchestrator
     environment:
       - PYTHONUNBUFFERED=1
       # Enable verbose debug logging for troubleshooting (set to true to enable)
@@ -146,4 +147,7 @@ networks:
 volumes:
   document-data:
     name: agent-orchestrator-document-data
+    driver: local
+  observability-data:
+    name: agent-orchestrator-observability-data
     driver: local

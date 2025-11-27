@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs info urls open logs-frontend logs-obs logs-doc logs-agent restart-frontend restart-obs restart-doc restart-agent
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-frontend logs-obs logs-doc logs-agent restart-frontend restart-obs restart-doc restart-agent
 
 # Default target
 help:
@@ -16,9 +16,10 @@ help:
 	@echo "  make health         - Check health of all services"
 	@echo "  make info           - Show service URLs and descriptions"
 	@echo "  make open           - Open Frontend in browser"
-	@echo "  make clean          - Stop and remove all containers, networks (keeps volumes)"
-	@echo "  make clean-all      - Stop and remove everything including volumes"
-	@echo "  make clean-docs     - Remove ONLY the document storage volume (keeps containers)"
+	@echo "  make clean          - Stop and remove all containers, networks (keeps data)"
+	@echo "  make clean-all      - Stop and remove everything including data (sessions, documents)"
+	@echo "  make clean-docs     - Remove ONLY the document storage volume"
+	@echo "  make clean-sessions - Remove ONLY the session storage volume"
 	@echo ""
 	@echo "Individual service commands:"
 	@echo "  make logs-frontend  - View frontend logs"
@@ -169,6 +170,20 @@ clean-docs:
 		docker-compose stop document-server; \
 		docker volume rm agent-orchestrator-document-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
 		echo "Document storage cleaned! Restart document-server to create fresh storage."; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+# Clean only session storage volume
+clean-sessions:
+	@echo "Cleaning session storage volume..."
+	@echo "This will delete all session history and events."
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker-compose stop observability-backend; \
+		docker volume rm agent-orchestrator-observability-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
+		echo "Session storage cleaned! Restart observability-backend to create fresh storage."; \
 	else \
 		echo "Cancelled."; \
 	fi
