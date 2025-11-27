@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { SessionEvent } from '@/types';
 import { EventCard } from './EventCard';
 import { EmptyState, LoadingState } from '@/components/common';
@@ -25,7 +25,9 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
   });
   const [allExpanded, setAllExpanded] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevEventsLengthRef = useRef<number>(0);
+  const prevFirstEventIdRef = useRef<string | undefined>(undefined);
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
@@ -42,25 +44,29 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
     });
   }, [events, filters]);
 
-  // Scroll to bottom helper
   const scrollToBottom = () => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   };
 
-  // Auto-scroll to bottom when new events come in (only when autoScroll is enabled AND session is running)
-  useEffect(() => {
-    if (autoScroll && isRunning) {
+  // Detect session change (different events array) or new events added
+  useLayoutEffect(() => {
+    const firstEventId = events[0]?.session_id;
+    const sessionChanged = firstEventId !== prevFirstEventIdRef.current;
+    const eventsAdded = events.length > prevEventsLengthRef.current;
+
+    if (autoScroll && (sessionChanged || eventsAdded)) {
       scrollToBottom();
     }
-  }, [filteredEvents.length, autoScroll, isRunning]);
 
-  // Handle auto-scroll button click: toggle state AND scroll to bottom
+    prevEventsLengthRef.current = events.length;
+    prevFirstEventIdRef.current = firstEventId;
+  }, [events, autoScroll]);
+
   const handleAutoScrollClick = () => {
     const newState = !autoScroll;
     setAutoScroll(newState);
-    // Always scroll to bottom when enabling auto-scroll
     if (newState) {
       scrollToBottom();
     }
@@ -125,19 +131,16 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
       </div>
 
       {/* Events - scrollable area */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {filteredEvents.length === 0 ? (
           <EmptyState
             title="No events to display"
             description={events.length > 0 ? 'Try adjusting your filters' : 'Events will appear here as the session runs'}
           />
         ) : (
-          <>
-            {filteredEvents.map((event) => (
-              <EventCard key={getEventKey(event)} event={event} forceExpanded={allExpanded} />
-            ))}
-            <div ref={bottomRef} />
-          </>
+          filteredEvents.map((event) => (
+            <EventCard key={getEventKey(event)} event={event} forceExpanded={allExpanded} />
+          ))
         )}
       </div>
 
