@@ -22,7 +22,7 @@ services:
     depends_on:
       - agent-manager
       - observability-backend
-      - document-server
+      - context-store
 
   # ============================================================================
   # AGENT MANAGER BACKEND
@@ -102,12 +102,12 @@ services:
   #       condition: service_healthy
 
   # ============================================================================
-  # DOCUMENT SYNC SERVER
+  # CONTEXT STORE
   # ============================================================================
-  document-server:
-    container_name: document-sync-server
+  context-store:
+    container_name: context-store
     build:
-      context: ./plugins/document-sync/document-server
+      context: ./servers/context-store
       dockerfile: Dockerfile
     ports:
       - "8766:8766"

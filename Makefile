@@ -24,11 +24,11 @@ help:
 	@echo "Individual service commands:"
 	@echo "  make logs-frontend  - View frontend logs"
 	@echo "  make logs-obs       - View observability logs"
-	@echo "  make logs-doc       - View document server logs"
+	@echo "  make logs-doc       - View context store logs"
 	@echo "  make logs-agent     - View agent manager logs"
 	@echo "  make restart-frontend - Restart frontend"
 	@echo "  make restart-obs    - Restart observability backend"
-	@echo "  make restart-doc    - Restart document server"
+	@echo "  make restart-doc    - Restart context store"
 	@echo "  make restart-agent  - Restart agent manager"
 
 # Build all images
@@ -92,7 +92,7 @@ health:
 	@echo "Observability Backend (port 8765):"
 	@curl -s http://localhost:8765/sessions | head -c 100 && echo "  ✅ OK" || echo "  ❌ Not responding"
 	@echo ""
-	@echo "Document Server (port 8766):"
+	@echo "Context Store (port 8766):"
 	@curl -s http://localhost:8766/health || echo "  ❌ Not responding"
 
 # Show service information
@@ -116,7 +116,7 @@ info:
 	@echo "   Purpose:     WebSocket server receiving agent events"
 	@echo "   Endpoints:   /sessions, /events/{id}, /ws"
 	@echo ""
-	@echo "📄 DOCUMENT SYNC SERVER"
+	@echo "📄 CONTEXT STORE"
 	@echo "   URL:         http://localhost:8766"
 	@echo "   Purpose:     Document storage and retrieval"
 	@echo "   Endpoints:   /health, /documents, /upload, /download"
@@ -167,9 +167,9 @@ clean-docs:
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose stop document-server; \
+		docker-compose stop context-store; \
 		docker volume rm agent-orchestrator-document-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
-		echo "Document storage cleaned! Restart document-server to create fresh storage."; \
+		echo "Document storage cleaned! Restart context-store to create fresh storage."; \
 	else \
 		echo "Cancelled."; \
 	fi
@@ -196,7 +196,7 @@ logs-obs:
 	docker-compose logs observability-backend
 
 logs-doc:
-	docker-compose logs document-server
+	docker-compose logs context-store
 
 logs-agent:
 	docker-compose logs agent-manager
@@ -209,7 +209,7 @@ restart-obs:
 	docker-compose restart observability-backend
 
 restart-doc:
-	docker-compose restart document-server
+	docker-compose restart context-store
 
 restart-agent:
 	docker-compose restart agent-manager

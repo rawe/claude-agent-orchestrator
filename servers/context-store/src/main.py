@@ -39,7 +39,7 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost
 
 # FastAPI app instance
 app = FastAPI(
-    title="Document Sync Server",
+    title="Context Store",
     version="0.1.0",
     description="FastAPI server for document management and synchronization"
 )
@@ -74,7 +74,7 @@ def get_document_url(document_id: str) -> str:
 @app.get("/health")
 async def health_check():
     """Health check endpoint for container monitoring."""
-    return {"status": "healthy", "service": "document-sync-server"}
+    return {"status": "healthy", "service": "context-store"}
 
 
 @app.post("/documents", response_model=DocumentResponse, status_code=201)

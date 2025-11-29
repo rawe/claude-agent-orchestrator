@@ -1,5 +1,5 @@
 [project]
-name = "document-server"
+name = "context-store"
 version = "0.1.0"
 description = "FastAPI server for document management and synchronization"
 readme = "README.md"
