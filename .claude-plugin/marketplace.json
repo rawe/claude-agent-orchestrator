@@ -14,8 +14,8 @@
       "source": "./plugins/agent-orchestrator"
     },
     {
-      "name": "document-sync",
-      "source": "./plugins/document-sync"
+      "name": "context-store",
+      "source": "./plugins/context-store"
     }
   ]
 }

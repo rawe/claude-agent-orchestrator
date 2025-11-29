@@ -9,7 +9,7 @@ The Agent Orchestrator Framework consists of four main Docker services:
 1. **Unified Frontend** (Port 3000) - React-based UI for agent management, session monitoring, and document management
 2. **Agent Manager** (Port 8767) - FastAPI service for agent CRUD operations
 3. **Observability Backend** (Port 8765) - Python-based WebSocket server for agent session monitoring
-4. **Document Sync Server** (Port 8766) - Python-based document storage and retrieval service
+4. **Context Store Server** (Port 8766) - Python-based document storage and retrieval service
 
 ## Architecture
 
@@ -25,7 +25,7 @@ The Agent Orchestrator Framework consists of four main Docker services:
 │                  │                 │                 │                    │
 │                  ▼                 ▼                 ▼                    │
 │  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐       │
-│  │   Agent Manager   │ │   Observability   │ │  Document Server  │       │
+│  │   Agent Manager   │ │   Observability   │ │  Context Store    │       │
 │  │    (Port 8767)    │ │     Backend       │ │    (Port 8766)    │       │
 │  │                   │ │   (Port 8765)     │ │                   │       │
 │  └─────────┬─────────┘ └───────────────────┘ └─────────┬─────────┘       │
@@ -144,7 +144,7 @@ Run `make help` to see all available commands:
 | `make logs` | View logs from all services |
 | `make logs-f` | Follow logs from all services |
 | `make logs-obs` | View observability logs only |
-| `make logs-doc` | View document server logs only |
+| `make logs-doc` | View context store server logs only |
 
 ### Cleanup
 
@@ -160,7 +160,7 @@ Run `make help` to see all available commands:
 | Command | Description |
 |---------|-------------|
 | `make restart-obs` | Restart observability services |
-| `make restart-doc` | Restart document server |
+| `make restart-doc` | Restart context store server |
 
 ## Service Details
 
@@ -204,13 +204,13 @@ Run `make help` to see all available commands:
 - Source code is mounted as a volume
 - Changes to Python files are reflected in real-time
 
-### Document Sync Server
+### Context Store Server
 
 - **Port:** 8766
 - **Technology:** Python 3.11 + FastAPI
 - **Purpose:** Document storage and retrieval for Claude Code plugins
 - **Health Check:** http://localhost:8766/health
-- **Code Location:** `./document-sync-plugin/document-server`
+- **Code Location:** `./servers/context-store`
 
 **Data Persistence:**
 - Uses a named volume (`agent-orchestrator-document-data`)
@@ -411,7 +411,7 @@ If you encounter permission issues with volumes:
 ```bash
 # Fix ownership (Linux/macOS)
 sudo chown -R $USER:$USER ./agent-orchestrator-observability
-sudo chown -R $USER:$USER ./document-sync-plugin
+sudo chown -R $USER:$USER ./servers/context-store
 ```
 
 ## Data Persistence
@@ -450,9 +450,9 @@ make clean-all       # Clear everything (containers + all data)
 
 ## Integration with Claude Code Plugins
 
-### Document Sync Plugin
+### Context Store Plugin
 
-The document sync plugin requires the document server to be running:
+The context store plugin requires the context store server to be running:
 
 ```bash
 # Start the document server

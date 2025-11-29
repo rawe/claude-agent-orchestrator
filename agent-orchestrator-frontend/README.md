@@ -103,7 +103,7 @@ src/
 This frontend requires the following backend services:
 
 1. **Observability Backend** (port 8765) - Session and event management
-2. **Document Server** (port 8766) - Document storage and retrieval
+2. **Context Store Server** (port 8766) - Document storage and retrieval
 3. **Agent Manager** (port 8767) - Agent definition CRUD (mocked in frontend)
 
 See `docs/BACKEND-TODO.md` for details on missing backend endpoints.

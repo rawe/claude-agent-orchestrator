@@ -1,16 +1,16 @@
-# Document Sync Plugin - User Guide
+# Context Store Plugin - User Guide
 
 ## Overview
 
-The Document Sync Plugin enables Claude Code to store, query, and retrieve documents across different sessions. Documents are stored on a centralized server with tags and metadata for easy organization and discovery.
+The Context Store Plugin enables Claude Code to store, query, and retrieve documents across different sessions. Documents are stored on a centralized server with tags and metadata for easy organization and discovery.
 
 ## Quick Start
 
-### 1. Start the Document Server
+### 1. Start the Context Store Server
 
 **Using Docker (Recommended)**:
 ```bash
-cd document-sync-plugin
+cd plugins/context-store
 docker-compose up -d
 ```
 
@@ -172,22 +172,22 @@ While Claude can handle document operations through natural language, you can al
 
 ```bash
 # Upload
-uv run skills/document-sync/commands/doc-push file.txt --tags "tag1,tag2"
+uv run skills/context-store/commands/doc-push file.txt --tags "tag1,tag2"
 
 # Query
-uv run skills/document-sync/commands/doc-query --tags "tag1"
+uv run skills/context-store/commands/doc-query --tags "tag1"
 
 # Download
-uv run skills/document-sync/commands/doc-pull doc_abc123...
+uv run skills/context-store/commands/doc-pull doc_abc123...
 
 # Delete
-uv run skills/document-sync/commands/doc-delete doc_abc123...
+uv run skills/context-store/commands/doc-delete doc_abc123...
 ```
 
-See `skills/document-sync/README.md` for detailed command documentation.
+See `skills/context-store/README.md` for detailed command documentation.
 
 ## Additional Resources
 
 - **Server Setup**: See `document-server/README.md`
 - **Architecture**: See `docs/goal.md`
-- **Command Reference**: See `skills/document-sync/SKILL.md`
+- **Command Reference**: See `skills/context-store/SKILL.md`

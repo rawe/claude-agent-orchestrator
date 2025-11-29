@@ -6,7 +6,7 @@
 ```json
 {"error": "Network error: Connection refused"}
 ```
-**Fix**: Start document server in the correct folder document-server with: (`docker-compose up -d`)
+**Fix**: Start Context Store server with: `docker-compose up -d` (from project root or `servers/context-store`)
 
 ### File Not Found
 ```json

@@ -1,6 +1,6 @@
-# Document Sync Server
+# Context Store Server
 
-FastAPI server for document management and synchronization. This server provides RESTful API endpoints for uploading, retrieving, querying, and deleting documents with metadata and tag support.
+FastAPI server for storing context documents. This server provides RESTful API endpoints for uploading, retrieving, querying, and deleting documents with metadata and tag support.
 
 ## Prerequisites
 
@@ -70,7 +70,7 @@ curl http://localhost:8766/health
 ```json
 {
   "status": "healthy",
-  "service": "document-sync-server"
+  "service": "context-store-server"
 }
 ```
 
@@ -356,10 +356,10 @@ docker-compose logs document-server
 docker-compose restart document-server
 
 # Monitor resources
-docker stats document-sync-server
+docker stats context-store-server
 
 # Check health
-docker inspect --format='{{json .State.Health}}' document-sync-server
+docker inspect --format='{{json .State.Health}}' context-store-server
 
 # Stop
 docker-compose down        # Keep data

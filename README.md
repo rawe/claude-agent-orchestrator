@@ -109,10 +109,12 @@ agent-orchestrator-framework/
 │   │   │   └── docs/
 │   │   └── README.md
 │   │
-│   └── document-sync/               # Document sync plugin
-│       ├── document-server/         # FastAPI document server
-│       ├── skills/                  # Document sync skill
+│   └── context-store/               # Context store plugin
+│       ├── skills/context-store/    # Context store skill & commands
 │       └── README.md
+│
+├── servers/                         # Backend servers
+│   └── context-store/               # Document storage server (FastAPI)
 │
 ├── agent-orchestrator-observability/ # Real-time observability platform
 │   ├── backend/                     # FastAPI + WebSocket backend
@@ -136,7 +138,7 @@ agent-orchestrator-framework/
 
 2. **Install plugins:**
    - Install `agent-orchestrator` for orchestration capabilities
-   - Install `document-sync` for document management
+   - Install `context-store` for document management
 
 3. **Start orchestrating:**
    ```
@@ -197,6 +199,6 @@ See **[agent-orchestrator-observability/README.md](./agent-orchestrator-observab
 
 - **[Agent Orchestrator Plugin](./plugins/agent-orchestrator/README.md)** - Level 1: Claude Code plugin
 - **[Agent Orchestrator MCP Server](./plugins/agent-orchestrator/mcp-server/README.md)** - Level 2: MCP implementation
-- **[Document Sync Plugin](./plugins/document-sync/README.md)** - Agent overarching document management plugin
+- **[Context Store Plugin](./plugins/context-store/README.md)** - Agent document management plugin
 - **[Observability Platform](./agent-orchestrator-observability/README.md)** - Real-time monitoring
 - **[Technical Architecture](./plugins/agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works

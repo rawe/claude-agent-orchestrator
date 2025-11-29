@@ -1,10 +1,10 @@
-# Document Sync Plugin
+# Context Store Plugin
 
 A document management system that enables Claude Code sessions to store, retrieve, and query documents across different sessions through a centralized server.
 
 ## Overview
 
-The Document Sync Plugin provides a simple interface for Claude Code to:
+The Context Store Plugin provides a simple interface for Claude Code to:
 - **Store documents** with metadata (tags, descriptions) for future reference
 - **Query documents** by name or tags to discover relevant content
 - **Get document metadata** to inspect file info without downloading
@@ -17,13 +17,13 @@ The Document Sync Plugin provides a simple interface for Claude Code to:
 ```
 ┌─────────────────────────┐
 │   Claude Code Session   │
-│  Uses document-sync     │
+│  Uses context-store     │
 │  skill commands         │
 └───────────┬─────────────┘
             │ HTTP Requests
             ▼
 ┌─────────────────────────┐
-│   Document Server       │
+│   Context Store Server  │
 │   (FastAPI)             │
 └───────────┬─────────────┘
             ▼
@@ -35,12 +35,12 @@ The Document Sync Plugin provides a simple interface for Claude Code to:
 
 ### Components
 
-- **Document Server** - FastAPI application with RESTful API, file storage, and SQLite database
+- **Context Store Server** - FastAPI application with RESTful API, file storage, and SQLite database
 - **CLI Commands** - UV-based scripts for document operations: `doc-push`, `doc-query`, `doc-info`, `doc-read`, `doc-pull`, `doc-delete`
 
 ## Quick Start
 
-### 1. Start the Document Server
+### 1. Start the Context Store Server
 
 Using Docker:
 
@@ -59,7 +59,7 @@ Stop the server:
 docker-compose down
 ```
 
-> For local development setup, see the [Document Server README](document-server/README.md)
+> For local development setup, see the [Context Store Server README](../../servers/context-store/README.md)
 
 ### 2. Working with Claude Code
 
@@ -72,7 +72,7 @@ Ask Claude in natural language to manage documents:
 "Download the API specification document"
 ```
 
-Claude will use the document-sync commands automatically. See [USER-GUIDE.md](USER-GUIDE.md) for more examples and workflows.
+Claude will use the context-store commands automatically. See [USER-GUIDE.md](USER-GUIDE.md) for more examples and workflows.
 
 ### 3. Manual Command Usage
 
@@ -80,30 +80,30 @@ You can also run commands directly:
 
 ```bash
 # Upload a document
-uv run skills/document-sync/commands/doc-push file.txt --tags "tag1,tag2"
+uv run skills/context-store/commands/doc-push file.txt --tags "tag1,tag2"
 
 # Query documents
-uv run skills/document-sync/commands/doc-query --tags "tag1"
+uv run skills/context-store/commands/doc-query --tags "tag1"
 
 # Get document metadata
-uv run skills/document-sync/commands/doc-info doc_abc123...
+uv run skills/context-store/commands/doc-info doc_abc123...
 
 # Read text document content
-uv run skills/document-sync/commands/doc-read doc_abc123...
+uv run skills/context-store/commands/doc-read doc_abc123...
 
 # Download a document
-uv run skills/document-sync/commands/doc-pull doc_abc123...
+uv run skills/context-store/commands/doc-pull doc_abc123...
 
 # Delete a document
-uv run skills/document-sync/commands/doc-delete doc_abc123...
+uv run skills/context-store/commands/doc-delete doc_abc123...
 ```
 
 ## Documentation
 
 - **[USER GUIDE](USER-GUIDE.md)** - How to use with Claude Code (start here!)
-- **[Document Server](document-server/README.md)** - Server setup, API, configuration, testing
-- **[CLI Commands](skills/document-sync/README.md)** - Command usage and examples
-- **[Claude Code Skill](skills/document-sync/SKILL.md)** - Documentation for Claude
+- **[Context Store Server](../../servers/context-store/README.md)** - Server setup, API, configuration, testing
+- **[CLI Commands](skills/context-store/README.md)** - Command usage and examples
+- **[Claude Code Skill](skills/context-store/SKILL.md)** - Documentation for Claude
 - **[Architecture Details](docs/goal.md)** - Vision and design decisions
 - **[Implementation Guides](docs/implementation/)** - Block-by-block implementation checklists
 

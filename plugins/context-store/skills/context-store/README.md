@@ -1,12 +1,12 @@
-# Document Sync CLI Commands
+# Context Store CLI Commands
 
-Command-line tools for interacting with the Document Sync Server. These UV-based scripts enable Claude Code sessions to store, retrieve, query, inspect, read, and delete documents with metadata and tags.
+Command-line tools for interacting with the Context Store Server. These UV-based scripts enable Claude Code sessions to store, retrieve, query, inspect, read, and delete documents with metadata and tags.
 
 ## Prerequisites
 
 - **Python 3.11+** - Required for script dependencies
 - **UV package manager** - For running scripts with automatic dependency management
-- **Document Server** - Must be running (see `../../document-server/README.md`)
+- **Context Store Server** - Must be running (see `../../../../servers/context-store/README.md`)
 
 ## Available Commands
 
@@ -228,7 +228,7 @@ uv run doc-delete doc_abc123...
 
 ## Configuration
 
-Commands connect to the document server using environment variables:
+Commands connect to the context store server using environment variables:
 
 ### DOC_SYNC_HOST
 - **Description:** Server hostname or IP address
@@ -355,9 +355,9 @@ All commands output errors to stderr in JSON format and exit with code 1 on fail
 ## Troubleshooting
 
 ### "Connection refused" error
-The document server isn't running. Start it first:
+The context store server isn't running. Start it first:
 ```bash
-cd ../../document-server
+cd ../../../../servers/context-store
 uv run python -m src.main
 ```
 

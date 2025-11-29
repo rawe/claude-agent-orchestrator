@@ -46,5 +46,5 @@ export const SKILLS = [
   { name: 'xlsx', label: 'Excel Handler' },
   { name: 'csv', label: 'CSV Handler' },
   { name: 'image', label: 'Image Handler' },
-  { name: 'document-sync', label: 'Document Sync' },
+  { name: 'context-store', label: 'Context Store' },
 ] as const;

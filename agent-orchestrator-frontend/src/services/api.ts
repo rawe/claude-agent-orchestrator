@@ -9,7 +9,7 @@ export const observabilityApi = axios.create({
   },
 });
 
-// Axios instance for document server
+// Axios instance for context store server
 export const documentApi = axios.create({
   baseURL: DOCUMENT_SERVER_URL,
   headers: {

@@ -1,13 +1,13 @@
 ---
-name: document-sync
-description: Document management system for storing, querying, and retrieving documents across Claude Code sessions. Use this to maintain knowledge bases, share documents between agent. Whenever you encounter a <document id=*> in a session, use this skill to retrieve its content.
+name: context-store
+description: Context Store - Document management system for storing, querying, and retrieving documents across Claude Code sessions. Use this to maintain knowledge bases, share documents between agents. Whenever you encounter a <document id=*> in a session, use this skill to retrieve its content.
 ---
 
-# Document Sync Skill
+# Context Store Skill
 
 ## What & When
 
-**What**: Commands for uploading, downloading, querying, and deleting documents with metadata and tags through a centralized document server.
+**What**: Commands for uploading, downloading, querying, and deleting documents with metadata and tags through the Context Store server.
 
 **When to use**:
 - Store important documents for retrieval in future sessions
