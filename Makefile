@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-frontend logs-obs logs-doc logs-agent restart-frontend restart-obs restart-doc restart-agent
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-frontend logs-runtime logs-doc logs-agent restart-frontend restart-runtime restart-doc restart-agent
 
 # Default target
 help:
@@ -23,11 +23,11 @@ help:
 	@echo ""
 	@echo "Individual service commands:"
 	@echo "  make logs-frontend  - View frontend logs"
-	@echo "  make logs-obs       - View observability logs"
+	@echo "  make logs-runtime   - View agent runtime logs"
 	@echo "  make logs-doc       - View context store logs"
 	@echo "  make logs-agent     - View agent registry logs"
 	@echo "  make restart-frontend - Restart frontend"
-	@echo "  make restart-obs    - Restart observability backend"
+	@echo "  make restart-runtime - Restart agent runtime"
 	@echo "  make restart-doc    - Restart context store"
 	@echo "  make restart-agent  - Restart agent registry"
 
@@ -89,7 +89,7 @@ health:
 	@echo "Agent Registry (port 8767):"
 	@curl -s http://localhost:8767/health || echo "  ❌ Not responding"
 	@echo ""
-	@echo "Observability Backend (port 8765):"
+	@echo "Agent Runtime (port 8765):"
 	@curl -s http://localhost:8765/sessions | head -c 100 && echo "  ✅ OK" || echo "  ❌ Not responding"
 	@echo ""
 	@echo "Context Store (port 8766):"
@@ -111,9 +111,9 @@ info:
 	@echo "   Purpose:     CRUD API for agent definitions"
 	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
 	@echo ""
-	@echo "⚙️  OBSERVABILITY BACKEND"
+	@echo "⚙️  AGENT RUNTIME"
 	@echo "   URL:         http://localhost:8765"
-	@echo "   Purpose:     WebSocket server receiving agent events"
+	@echo "   Purpose:     Session management and real-time observability"
 	@echo "   Endpoints:   /sessions, /events/{id}, /ws"
 	@echo ""
 	@echo "📄 CONTEXT STORE"
@@ -181,9 +181,9 @@ clean-sessions:
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose stop observability-backend; \
-		docker volume rm agent-orchestrator-observability-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
-		echo "Session storage cleaned! Restart observability-backend to create fresh storage."; \
+		docker-compose stop agent-runtime; \
+		docker volume rm agent-orchestrator-runtime-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
+		echo "Session storage cleaned! Restart agent-runtime to create fresh storage."; \
 	else \
 		echo "Cancelled."; \
 	fi
@@ -192,8 +192,8 @@ clean-sessions:
 logs-frontend:
 	docker-compose logs frontend
 
-logs-obs:
-	docker-compose logs observability-backend
+logs-runtime:
+	docker-compose logs agent-runtime
 
 logs-doc:
 	docker-compose logs context-store
@@ -205,8 +205,8 @@ logs-agent:
 restart-frontend:
 	docker-compose restart frontend
 
-restart-obs:
-	docker-compose restart observability-backend
+restart-runtime:
+	docker-compose restart agent-runtime
 
 restart-doc:
 	docker-compose restart context-store

@@ -1,4 +1,4 @@
-import { observabilityApi } from './api';
+import { agentRuntimeApi } from './api';
 import type { Session, SessionMetadataUpdate, SessionEvent } from '@/types';
 
 export const sessionService = {
@@ -6,7 +6,7 @@ export const sessionService = {
    * Get all sessions
    */
   async getSessions(): Promise<Session[]> {
-    const response = await observabilityApi.get<{ sessions: Session[] }>('/sessions');
+    const response = await agentRuntimeApi.get<{ sessions: Session[] }>('/sessions');
     return response.data.sessions;
   },
 
@@ -14,7 +14,7 @@ export const sessionService = {
    * Get events for a specific session
    */
   async getSessionEvents(sessionId: string): Promise<SessionEvent[]> {
-    const response = await observabilityApi.get<{ events: SessionEvent[] }>(`/events/${sessionId}`);
+    const response = await agentRuntimeApi.get<{ events: SessionEvent[] }>(`/events/${sessionId}`);
     return response.data.events;
   },
 
@@ -22,7 +22,7 @@ export const sessionService = {
    * Update session metadata
    */
   async updateSessionMetadata(sessionId: string, metadata: SessionMetadataUpdate): Promise<Session> {
-    const response = await observabilityApi.patch<Session>(
+    const response = await agentRuntimeApi.patch<Session>(
       `/sessions/${sessionId}/metadata`,
       metadata
     );
@@ -33,7 +33,7 @@ export const sessionService = {
    * Delete a session
    */
   async deleteSession(sessionId: string): Promise<void> {
-    await observabilityApi.delete(`/sessions/${sessionId}`);
+    await agentRuntimeApi.delete(`/sessions/${sessionId}`);
   },
 
   /**
@@ -43,7 +43,7 @@ export const sessionService = {
    */
   async stopSession(sessionId: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await observabilityApi.post(`/sessions/${sessionId}/stop`);
+      const response = await agentRuntimeApi.post(`/sessions/${sessionId}/stop`);
       return response.data;
     } catch {
       // Mock response until backend is implemented

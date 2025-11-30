@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { OBSERVABILITY_BACKEND_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL } from '@/utils/constants';
+import { AGENT_RUNTIME_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL } from '@/utils/constants';
 
-// Axios instance for observability backend
-export const observabilityApi = axios.create({
-  baseURL: OBSERVABILITY_BACKEND_URL,
+// Axios instance for agent runtime
+export const agentRuntimeApi = axios.create({
+  baseURL: AGENT_RUNTIME_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -35,6 +35,6 @@ const handleError = (error: unknown) => {
   throw error;
 };
 
-observabilityApi.interceptors.response.use((response) => response, handleError);
+agentRuntimeApi.interceptors.response.use((response) => response, handleError);
 documentApi.interceptors.response.use((response) => response, handleError);
 agentRegistryApi.interceptors.response.use((response) => response, handleError);

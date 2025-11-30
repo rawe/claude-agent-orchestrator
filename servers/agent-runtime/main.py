@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
             pass
 
 app = FastAPI(
-    title="Agent Orchestrator Observability",
+    title="Agent Runtime",
     version="0.1.0",
     lifespan=lifespan
 )

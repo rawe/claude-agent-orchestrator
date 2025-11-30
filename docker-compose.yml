@@ -12,7 +12,7 @@ services:
       - "3000:80"
     environment:
       # These are baked in at build time via Vite
-      - VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
+      - VITE_AGENT_RUNTIME_URL=http://localhost:8765
       - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
       - VITE_AGENT_REGISTRY_URL=http://localhost:8767
       - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
     depends_on:
       - agent-registry
-      - observability-backend
+      - agent-runtime
       - context-store
 
   # ============================================================================
@@ -53,18 +53,18 @@ services:
       start_period: 5s
 
   # ============================================================================
-  # OBSERVABILITY BACKEND
+  # AGENT RUNTIME
   # ============================================================================
-  observability-backend:
-    container_name: agent-orchestrator-observability-backend
+  agent-runtime:
+    container_name: agent-orchestrator-agent-runtime
     build:
-      context: ./agent-orchestrator-observability
-      dockerfile: docker/backend.Dockerfile
+      context: ./servers/agent-runtime
+      dockerfile: Dockerfile
     ports:
       - "8765:8765"
     volumes:
-      - ./agent-orchestrator-observability/backend:/app/backend
-      - observability-data:/app/.agent-orchestrator
+      - ./servers/agent-runtime:/app
+      - runtime-data:/app/.agent-orchestrator
     environment:
       - PYTHONUNBUFFERED=1
       # Enable verbose debug logging for troubleshooting (set to true to enable)
@@ -148,6 +148,6 @@ volumes:
   document-data:
     name: agent-orchestrator-document-data
     driver: local
-  observability-data:
-    name: agent-orchestrator-observability-data
+  runtime-data:
+    name: agent-orchestrator-runtime-data
     driver: local
