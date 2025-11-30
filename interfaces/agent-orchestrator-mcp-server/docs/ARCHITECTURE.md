@@ -103,8 +103,6 @@ Required for Claude Desktop:
 - **AGENT_ORCHESTRATOR_PROJECT_DIR** - Project directory (required for Claude Desktop only)
 
 Optional variables:
-- **AGENT_ORCHESTRATOR_SESSIONS_DIR** - Custom session storage location
-- **AGENT_ORCHESTRATOR_AGENTS_DIR** - Custom agent definitions location
 - **MCP_SERVER_DEBUG** - Enable debug logging to logs/mcp-server.log
 
 ## Technical Details

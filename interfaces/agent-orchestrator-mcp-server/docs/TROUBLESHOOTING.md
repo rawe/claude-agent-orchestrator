@@ -137,9 +137,8 @@ This opens a web interface where you can:
 
 **Solutions:**
 - Check the "Agent Orchestrator MCP Server starting" log entry
-- Verify all required environment variables are set:
-  - `AGENT_ORCHESTRATOR_COMMAND_PATH` (required)
-  - `AGENT_ORCHESTRATOR_PROJECT_DIR` (required for Claude Desktop)
+- `AGENT_ORCHESTRATOR_COMMAND_PATH` is auto-discovered (only set to override)
+- `AGENT_ORCHESTRATOR_PROJECT_DIR` is required for Claude Desktop only
 - Check that `PWD` and `PATH` are what you expect
 - For Claude Desktop, ensure `PATH` includes paths to `uv` and `claude` binaries
 

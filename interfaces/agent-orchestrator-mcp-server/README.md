@@ -102,8 +102,6 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
 - `PATH` - Include `uv` and `claude` binaries (Claude Desktop doesn't inherit shell PATH)
 
 **Optional:**
-- `AGENT_ORCHESTRATOR_SESSIONS_DIR` - Custom session storage location
-- `AGENT_ORCHESTRATOR_AGENTS_DIR` - Custom agent definitions location
 - `MCP_SERVER_DEBUG` - Enable debug logging
 
 **For complete reference, defaults, and examples, see [ENV_VARS.md](./docs/ENV_VARS.md)**

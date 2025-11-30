@@ -123,39 +123,9 @@ agent-orchestrator-framework/
             └── commands/              # doc-* commands
 ```
 
-## Quick Start Guide
+## Quick Start
 
-### For Claude Code Users (Level 1)
-
-1. **Add this repository to Claude Code:**
-   - Your repository URL will point to this marketplace
-   - Claude Code will discover all available plugins
-
-2. **Install plugins:**
-   - Install `orchestrator` for orchestration capabilities
-   - Install `context-store` for document management
-
-3. **Start orchestrating:**
-   ```
-   /agent-orchestrator-init
-   ```
-
-### For Claude Desktop Users (Level 2)
-
-**Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
-
-1. **Clone repository:**
-   ```bash
-   git clone <your-repo-url>
-   ```
-
-2. **Configure MCP server:**
-   See [interfaces/agent-orchestrator-mcp-server/README.md](./interfaces/agent-orchestrator-mcp-server/README.md)
-
-3. **Use from Claude Desktop:**
-   ```
-   List available agent defintions
-   ```
+See **[Getting Started](./docs/GETTING_STARTED.md)** for setup instructions.
 
 ## Core Concepts
 
@@ -203,6 +173,7 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 
 ## Documentation
 
+- **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
 - **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Level 1: Claude Code plugin

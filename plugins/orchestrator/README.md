@@ -1,187 +1,142 @@
-# Agent Orchestrator - Core Framework
+# Orchestrator Plugin
 
-The core Agent Orchestrator Framework (AOF) plugin for Claude Code. Provides Python-based orchestration commands, slash commands, and skills for orchestrating specialized Claude Code agent sessions.
+The core Agent Orchestrator Framework (AOF) plugin for Claude Code. Provides Python-based orchestration commands, slash commands, and skills for managing specialized Claude Code agent sessions.
 
 ## Overview
 
-The Agent Orchestrator is a framework for creating and managing specialized Claude Code agent sessions. It allows you to:
+The Orchestrator plugin enables you to create and manage specialized Claude Code agent sessions. It provides:
 - Launch multiple Claude Code sessions programmatically
 - Configure agents with custom system prompts and MCP server configurations
 - Manage long-running tasks in isolated sessions
 - Extract and process results from completed agents
-- Create reusable agent definitions for common tasks
+- Use predefined agent blueprints for specialized tasks
 
-This is the **core framework** that provides the low-level orchestration functionality.
+## Architecture
+
+The plugin uses a **thin-client architecture** where the `ao-*` commands are HTTP clients that communicate with backend servers:
+
+```
+┌─────────────────┐     HTTP      ┌───────────────────┐
+│  ao-* commands  │ ──────────▶  │  Agent Runtime    │
+│  (thin clients) │              │  (Port 8765)      │
+└─────────────────┘              │  - Sessions       │
+                                 │  - Events         │
+                                 │  - Results        │
+                                 └───────────────────┘
+                                          │
+                                          ▼
+                                 ┌───────────────────┐
+                                 │  Agent Registry   │
+                                 │  (Port 8767)      │
+                                 │  - Blueprints     │
+                                 └───────────────────┘
+```
 
 ## What's Included
 
 ### 1. Core Commands
-**Location**: `skills/agent-orchestrator/commands/`
+**Location**: `skills/orchestrator/commands/`
 
-Python-based `ao-*` commands that handle:
-- Agent session lifecycle management (`ao-new`, `ao-resume`, `ao-status`)
-- Agent definition loading (`ao-list-agents`)
-- MCP server configuration injection
-- Session state persistence
-- Result extraction and formatting (`ao-get-result`)
+Python-based `ao-*` commands (thin HTTP clients):
+- `ao-new` - Create new agent session
+- `ao-resume` - Resume existing session
+- `ao-status` - Check session state
+- `ao-get-result` - Extract result from finished session
+- `ao-list-sessions` - List all sessions
+- `ao-list-agents` - List available agent blueprints
+- `ao-show-config` - Display session configuration
+- `ao-clean` - Remove all sessions
 
 ### 2. Slash Commands
 
 Four slash commands for interacting with the framework:
 
-- **`/agent-orchestrator-init`**: Initialize the agent orchestrator in your conversation
-- **`/agent-orchestrator-create-agent`**: Create new agent definitions
+- **`/agent-orchestrator-init`**: Initialize the orchestrator in your conversation
+- **`/agent-orchestrator-create-agent`**: Create new agent blueprints
 - **`/agent-orchestrator-create-runtime-report`**: Generate runtime analysis reports
-- **`/agent-orchestrator-extract-token-usage`**: Extract token usage statistics from sessions
+- **`/agent-orchestrator-extract-token-usage`**: Extract token usage statistics
 
 ### 3. Skill Documentation
-**Location**: `skills/agent-orchestrator/SKILL.md`
+**Location**: `skills/orchestrator/SKILL.md`
 
 Comprehensive skill definition with usage instructions and examples.
 
 ### 4. Reference Documentation
-**Location**: `skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md`
+**Location**: `skills/orchestrator/references/`
 
-Detailed technical documentation of the framework architecture, including:
-- How agent sessions work
-- Agent definition format
-- MCP server configuration
-- Session directory structure
-- Advanced usage patterns
-
-### 5. Examples
-**Location**: `skills/agent-orchestrator/example/`
-
-Example agent definitions and usage scenarios to help you get started.
+- `AGENT-ORCHESTRATOR.md` - Framework architecture and concepts
+- `ENV_VARS.md` - Environment variable configuration
 
 ## Requirements
 
-- **Python**: Required for running the `ao-*` commands
-- **uv**: Python package and project manager (see [uv documentation](https://docs.astral.sh/uv/))
+- **Python**: ≥3.11 for running the `ao-*` commands
+- **uv**: Python package manager ([uv documentation](https://docs.astral.sh/uv/))
+- **Backend services**: Agent Runtime and Agent Registry must be running
 
-## Installation
+## Quick Start
 
-Install this plugin by adding it to your Claude Code configuration. The plugin will be available in your Claude Code sessions.
+### 1. Start Backend Services
 
-## Usage
+```bash
+# From repository root
+make start-bg
+```
 
-### Level 1: Direct Usage (Command-Line Style)
+### 2. Use the Plugin
 
-Use the slash commands and skills directly:
+Initialize in your conversation:
+```
+/agent-orchestrator-init
+```
 
-1. Initialize in your conversation:
-   ```
-   /agent-orchestrator-init
-   ```
+Use the skill to launch agents:
+```
+Use the orchestrator skill to create a new session called "code-review" and review the changes in src/
+```
 
-2. Use the skill to launch agents:
-   ```
-   Use the agent-orchestrator skill to create a new session called "code-review" and review the changes in src/
-   ```
+### 3. Check Available Agents
 
-3. Create custom agent definitions:
-   ```
-   /agent-orchestrator-create-agent
-   ```
+```bash
+uv run skills/orchestrator/commands/ao-list-agents
+```
 
-### Key Concepts
+## Key Concepts
 
-**Agent Definitions**:
-Agent definitions are markdown files in `.agent-orchestrator/agents/` that define specialized agent configurations. They can include:
+### Agent Blueprints
+Reusable configurations stored in the Agent Registry that define specialized agent behavior:
 - Custom system prompts
-- Specialized instructions
 - MCP server configurations
-- Capability restrictions
+- Capability descriptions
 
-**Sessions**:
-Sessions are stored in `.agent-orchestrator/agent-sessions/` and contain:
-- Unique session ID
-- Agent configuration
-- Execution state
-- Results and metadata
+Managed via the Agent Registry API (port 8767) or the Dashboard UI.
 
-**MCP Configuration**:
-The framework allows you to configure different MCP servers for different agent types, enabling specialized capabilities per agent.
+### Sessions
+Running agent conversations managed by the Agent Runtime:
+- Unique session names for easy reference
+- Persistent conversation history
+- Real-time status and event tracking
 
-## Extensions
+Managed via the Agent Runtime API (port 8765).
 
-For a higher-level, delegation-based interface, install the **agent-orchestrator-subagents** plugin. It provides pre-configured Claude Code subagents that simplify common orchestration tasks.
+### API-Based Architecture
+All state is managed by backend servers:
+- **Agent Registry** (port 8767): Blueprint CRUD operations
+- **Agent Runtime** (port 8765): Session lifecycle, events, results
 
-## Architecture
+The `ao-*` commands are stateless thin clients.
 
-The Agent Orchestrator Framework consists of three layers:
+## Environment Variables
 
-1. **This plugin (Level 1)**: Core framework with direct CLI-style access
-2. **Subagents plugin (Level 2)**: Higher-level delegation-based interface
-3. **MCP Server (Level 3)**: Protocol-level abstraction for any MCP-compatible system
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENT_ORCHESTRATOR_AGENT_API_URL` | `http://localhost:8767` | Agent Registry API URL |
+| `AGENT_ORCHESTRATOR_SESSION_API_URL` | `http://localhost:8765` | Agent Runtime API URL |
 
-See the [main repository README](../README.md) for details on all three usage levels.
+See `skills/orchestrator/references/ENV_VARS.md` for all options.
 
-## Technical Details
+## Related Documentation
 
-### Directory Structure
-
-```
-.agent-orchestrator/
-├── agents/                    # Agent definition directories
-│   └── my-agent/             # Agent folder
-│       ├── agent.json        # Agent configuration
-│       ├── agent.system-prompt.md  # Optional: system prompt
-│       └── agent.mcp.json    # Optional: MCP config
-└── agent-sessions/           # Session data
-    ├── session-name.jsonl    # Session conversation history
-    └── session-name.meta.json # Session metadata
-```
-
-### Agent Definition Format
-
-Agents are organized in directories with multiple files:
-
-**agent.json** (Required):
-```json
-{
-  "name": "code-reviewer",
-  "description": "Reviews code for best practices and improvements"
-}
-```
-
-**agent.system-prompt.md** (Optional):
-```markdown
-You are a code review expert...
-
-Review code for:
-1. Best practices
-2. Security issues
-3. Performance improvements
-```
-
-**agent.mcp.json** (Optional):
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
-    }
-  }
-}
-```
-
-### Command API
-
-The `ao-*` Python commands provide orchestration functionality:
-
-- `ao-new`: Create a new agent session
-- `ao-resume`: Continue an existing session
-- `ao-status`: Check session state (running/finished/not_existent)
-- `ao-get-result`: Extract result from finished session
-- `ao-list-agents`: Show available agent definitions
-- `ao-list-sessions`: Show active sessions
-- `ao-show-config`: Display session configuration
-- `ao-clean`: Remove all sessions
-
-## Related Components
-
-- **[agent-orchestrator-subagents](../agent-orchestrator-subagents/README.md)**: Extension plugin with pre-configured subagents
-- **[agent-orchestrator-mcp-server](../agent-orchestrator-mcp-server/README.md)**: MCP server implementation
-- **[Framework Documentation](skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)**: Technical architecture documentation
+- **[Main README](../../README.md)** - Framework overview
+- **[Architecture](../../docs/agent-runtime/ARCHITECTURE.md)** - System architecture
+- **[MCP Server](../../interfaces/agent-orchestrator-mcp-server/README.md)** - MCP protocol interface
+- **[Dashboard](../../dashboard/README.md)** - Web UI for management

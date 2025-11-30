@@ -36,7 +36,7 @@ services:
       - "8767:8767"
     volumes:
       - ./servers/agent-registry:/app
-      - ${AGENT_DIR:-./.agent-orchestrator/agents}:/data/agents
+      - ${AGENT_DIR:-./config/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
       - AGENT_REGISTRY_HOST=0.0.0.0

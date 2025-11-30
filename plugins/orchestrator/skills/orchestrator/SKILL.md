@@ -7,21 +7,24 @@ description: Use this skill when you need to orchestrate specialized Claude agen
 
 ## What & When
 
-**What**: Commands for managing specialized Claude AI agent sessions with optional agent definitions and MCP server integration.
+**What**: Commands for managing specialized Claude AI agent sessions with optional agent blueprints and MCP server integration.
 
 **When to use**:
 - Delegate tasks to specialized sessions with different MCP configurations
 - Run long-running operations that can be resumed later
-- Use agent definitions for specialized behavior (research, testing, etc.)
+- Use agent blueprints for specialized behavior (research, testing, etc.)
 - Manage multiple concurrent agent conversations
 - Work with persistent sessions using simple names (no session ID management)
 
 **Key Benefits**:
 - Session names instead of session IDs (simpler tracking)
-- Automatic session management and persistence
+- Automatic session management via backend APIs
 - Built-in result extraction (no manual JSON parsing)
-- Optional agent definitions for specialized capabilities
+- Optional agent blueprints for specialized capabilities
 - Sessions can be resumed (even after finished)
+
+**Prerequisites**:
+- Backend services must be running (Agent Runtime and Agent Registry)
 
 ---
 
@@ -79,7 +82,7 @@ uv run commands/ao-clean
 
 ## Command Location
 
-**IMPORTANT**: All commands are located in the `commands/` subdirectory of this skill folder.
+**IMPORTANT**: All commands are located in the `commands/` subdirectory of this skill folder. Don't use `cd` to change directories instead run them with their full path.
 
 Before using commands for the first time:
 1. Locate this skill's root folder (same directory as this SKILL.md)
@@ -160,11 +163,11 @@ uv run commands/ao-clean
 - Sessions operate in `--project-dir` (default: current directory)
 - All file operations within the session are relative to this directory
 
-### Agents vs Sessions
-- **Agent**: Reusable configuration (system prompt + MCP tools)
-- **Session**: Running conversation instance
-- One agent can be used by multiple sessions
-- Sessions can run without agents (general purpose)
+### Blueprints vs Sessions
+- **Blueprint**: Reusable configuration (system prompt + MCP tools) stored in Agent Registry
+- **Session**: Running conversation instance managed by Agent Runtime
+- One blueprint can be used by multiple sessions
+- Sessions can run without blueprints (general purpose)
 
 ---
 
@@ -174,8 +177,8 @@ uv run commands/ao-clean
 2. **Session names** must be unique and valid (no spaces, max 60 chars, alphanumeric + dash/underscore)
 3. **Prompt input**: Use stdin (pipe) OR `-p` flag, not both (stdin takes precedence)
 4. **Get result** only works on `finished` sessions - check status first
-5. **Agent definitions** are read-only - list them with `ao-list-agents` before using `--agent`
-6. **Sessions are persistent** - they survive between command invocations
+5. **Blueprints** - list them with `ao-list-agents` before using `--agent`
+6. **Sessions are persistent** - stored in Agent Runtime database
 7. **Command location** - Always use commands from this skill's `commands/` folder
 8. **Async execution** - Sessions run in Claude Code, commands return immediately after submission
 
@@ -187,12 +190,14 @@ Common errors and solutions:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
+| "Cannot connect to Agent Runtime" | Backend not running | Ask the user to the backend. |
+| "Cannot connect to Agent Registry" | Backend not running | Ask the user to the backend. |
 | "Session already exists" | Creating duplicate session | Use `ao-resume` or choose different name |
 | "Session not found" | Wrong name or doesn't exist | Check `ao-list-sessions` |
 | "Session is not finished" | Getting result from running session | Check `ao-status`, wait for `finished` |
 | "Invalid session name" | Bad characters or too long | Use alphanumeric + dash/underscore, max 60 chars |
 | "No prompt provided" | Missing `-p` and stdin | Provide prompt via stdin or `-p` flag |
-| "Agent not found" | Agent definition missing | Check `ao-list-agents` for available agents |
+| "Agent not found" | Blueprint not in registry | Check `ao-list-agents` for available blueprints |
 
 ---
 
@@ -227,7 +232,5 @@ Common errors and solutions:
 
 ## Additional Resources
 
-- **Example Agents**: See `example/agents/` folder for working examples
-- **Agent Details & Usage**: See `references/EXAMPLE-AGENTS.md`
-- **Architecture & Agent Creation**: See `references/AGENT-ORCHESTRATOR.md`
-- **Environment Variables**: See `references/ENV_VARS.md` for configuration options
+- **Architecture**: See `references/AGENT-ORCHESTRATOR.md`
+- **Environment Variables**: See `references/ENV_VARS.md`
