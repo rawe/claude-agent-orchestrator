@@ -9,9 +9,9 @@ FastAPI server for storing context documents. This server provides RESTful API e
 
 ## Installation
 
-1. Navigate to the document-server directory:
+1. Navigate to the context-store directory:
    ```bash
-   cd document-server
+   cd servers/context-store
    ```
 
 2. Install dependencies using UV:
@@ -402,7 +402,7 @@ If you see "ModuleNotFoundError" or import errors:
    uv sync
    ```
 
-2. Make sure you're running from the `document-server/` directory
+2. Make sure you're running from the `servers/context-store/` directory
 
 3. Run as a module (not as a script):
    ```bash
@@ -417,13 +417,13 @@ If you see "ModuleNotFoundError" or import errors:
 
 If you see "No module named 'src'":
 
-- Verify you're in the `document-server/` directory when running the server
+- Verify you're in the `servers/context-store/` directory when running the server
 - The `src/` directory should be a Python package with `__init__.py`
 
 ## Project Structure
 
 ```
-document-server/
+servers/context-store/
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md

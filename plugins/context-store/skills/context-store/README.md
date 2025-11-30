@@ -374,7 +374,3 @@ uv run doc-push file.txt
 
 ### Commands run slowly the first time
 UV is installing dependencies. Subsequent runs will be fast as dependencies are cached.
-
-## Development
-
-See `../../docs/implementation/03-IMPLEMENTATION-CHECKLIST.md` for implementation details and design decisions.

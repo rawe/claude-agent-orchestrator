@@ -185,10 +185,10 @@ This opens a web interface where you can:
 - `start_agent_session` fails with "Agent not found" error
 
 **Solutions:**
-- Use `list_agent_definitions` to see all available agent definitions
-- Check that the agent definition exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
-- Verify the agent definition name spelling matches exactly
-- Ensure agent definition files have `.md` extension
+- Use `list_agent_definitions` to see all available agent blueprints
+- Check that the agent blueprint exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
+- Verify the agent blueprint name spelling matches exactly
+- Ensure agent blueprint files are properly structured
 
 ### 8. PATH issues (Claude Desktop)
 

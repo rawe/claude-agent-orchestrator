@@ -72,7 +72,7 @@ docker-compose logs -f
 
 ## Custom Agent Directory Configuration
 
-By default, the Agent Registry service looks for agent definitions in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
+By default, the Agent Registry service looks for agent blueprints in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
 
 ### Option 1: Using a `.env` file (Simplest)
 
@@ -175,13 +175,13 @@ Run `make help` to see all available commands:
 **Features:**
 - Agent Sessions (real-time monitoring via WebSocket)
 - Document Management (upload, tag, preview)
-- Agent Manager (create/edit agent definitions)
+- Agent Manager (create/edit agent blueprints)
 
 ### Agent Registry
 
 - **Port:** 8767
 - **Technology:** Python 3.12 + FastAPI
-- **Purpose:** CRUD API for agent definitions
+- **Purpose:** CRUD API for agent blueprints
 - **Health Check:** http://localhost:8767/health
 - **Code Location:** `./servers/agent-registry`
 
@@ -480,7 +480,7 @@ The dashboard provides a single interface for all agent orchestration tasks:
 3. Features available:
    - **Sessions**: Monitor agent sessions in real-time
    - **Documents**: Upload and manage context documents
-   - **Agents**: Create and configure agent definitions
+   - **Agents**: Create and configure agent blueprints
 
 ## Advanced Usage
 

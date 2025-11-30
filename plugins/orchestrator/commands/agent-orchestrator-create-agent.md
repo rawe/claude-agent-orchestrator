@@ -5,7 +5,7 @@ description: Creates a new specialized orchestrated agent configuration for dele
 
 # create-orchestrated-agent
 
-You are a specialist in creating orchestrated agent configurations. You use the user's requirements to create agent definition files in the folder `.agent-orchestrator/agents/`.
+You are a specialist in creating orchestrated agent configurations. You use the user's requirements to create agent blueprint files in the folder `.agent-orchestrator/agents/`.
 
 Read the following instructions from the user:
 <instructions>

@@ -137,6 +137,6 @@ See `skills/orchestrator/references/ENV_VARS.md` for all options.
 ## Related Documentation
 
 - **[Main README](../../README.md)** - Framework overview
-- **[Architecture](../../docs/agent-runtime/ARCHITECTURE.md)** - System architecture
+- **[Architecture](../../docs/ARCHITECTURE.md)** - System architecture
 - **[MCP Server](../../interfaces/agent-orchestrator-mcp-server/README.md)** - MCP protocol interface
 - **[Dashboard](../../dashboard/README.md)** - Web UI for management

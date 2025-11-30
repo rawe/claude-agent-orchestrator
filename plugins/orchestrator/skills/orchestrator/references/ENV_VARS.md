@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Agent Orchestrator Skill uses environment variables to configure directory paths, logging, and observability integration. These variables control where agent definitions, sessions, and logs are stored, and how sessions interact with monitoring systems.
+The Agent Orchestrator Skill uses environment variables to configure directory paths, logging, and observability integration. These variables control where agent blueprints, sessions, and logs are stored, and how sessions interact with monitoring systems.
 
 **Configuration Precedence:** CLI Flags > Environment Variables > Defaults
 
@@ -12,7 +12,7 @@ The Agent Orchestrator Skill uses environment variables to configure directory p
 |----------|---------|------|-------------|
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `$PWD` | Path | Project working directory |
 | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | `{project_dir}/.agent-orchestrator/agent-sessions` | Path | Session storage directory |
-| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `{project_dir}/.agent-orchestrator/agents` | Path | Agent definitions directory |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `{project_dir}/.agent-orchestrator/agents` | Path | Agent blueprints directory |
 | `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | `false` | Boolean | Enable session logging |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED` | `true` | Boolean | Enable observability events |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY_URL` | `http://127.0.0.1:8765` | URL | Observability backend endpoint |
@@ -53,13 +53,13 @@ export AGENT_ORCHESTRATOR_SESSIONS_DIR="/Users/username/.agent-sessions"
 #### `AGENT_ORCHESTRATOR_AGENTS_DIR`
 **Default:** `{project_dir}/.agent-orchestrator/agents`
 **Type:** Absolute or relative path
-**Purpose:** Directory containing agent definition files (agent.md, agent.mcp.json). Use this to share agent configurations across multiple projects.
+**Purpose:** Directory containing agent blueprint files (agent.json, agent.system-prompt.md, agent.mcp.json). Use this to share agent configurations across multiple projects.
 
 **Validation:** Parent directory must be writable (auto-creates if missing).
 
 **Example:**
 ```bash
-# Share agent definitions across projects
+# Share agent blueprints across projects
 export AGENT_ORCHESTRATOR_AGENTS_DIR="/Users/username/.shared-agents"
 ```
 

@@ -60,11 +60,11 @@ uv run commands/ao-list-sessions
 ```
 **Use when**: Need to see available sessions with their IDs and project directories.
 
-### `ao-list-agents` - List available agent definitions
+### `ao-list-agents` - List available agent blueprints
 ```bash
 uv run commands/ao-list-agents
 ```
-**Use when**: Need to see what specialized agent definitions are available.
+**Use when**: Need to see what specialized agent blueprints are available.
 
 ### `ao-show-config` - Display session configuration
 ```bash
@@ -104,7 +104,7 @@ uv run /path/to/skills/orchestrator/commands/ao-new my-session -p "Research topi
 
 ### Common Options
 - `-p "prompt"` or `--prompt "prompt"` - Provide prompt via CLI instead of stdin
-- `--agent <agent-name>` - Use specialized agent definition (only for `ao-new`)
+- `--agent <agent-name>` - Use specialized agent blueprint (only for `ao-new`)
 - `--project-dir <path>` - Override project directory (default: current directory)
 
 ---
