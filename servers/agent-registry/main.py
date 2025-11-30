@@ -1,5 +1,5 @@
 """
-Agent Manager API Service.
+Agent Registry API Service.
 
 Provides HTTP endpoints for agent CRUD operations.
 """
@@ -14,7 +14,7 @@ from models import Agent, AgentCreate, AgentStatusUpdate, AgentUpdate
 from validation import validate_agent_name
 
 app = FastAPI(
-    title="Agent Manager API",
+    title="Agent Registry",
     description="CRUD operations for agent definitions",
     version="0.1.0",
 )
@@ -97,7 +97,7 @@ def update_agent_status(name: str, data: AgentStatusUpdate):
 if __name__ == "__main__":
     import uvicorn
 
-    host = os.environ.get("AGENT_MANAGER_HOST", "0.0.0.0")
-    port = int(os.environ.get("AGENT_MANAGER_PORT", "8767"))
+    host = os.environ.get("AGENT_REGISTRY_HOST", "0.0.0.0")
+    port = int(os.environ.get("AGENT_REGISTRY_PORT", "8767"))
 
     uvicorn.run(app, host=host, port=port)

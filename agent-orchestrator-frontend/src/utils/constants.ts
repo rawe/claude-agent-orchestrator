@@ -1,7 +1,7 @@
 // API URLs from environment variables
 export const OBSERVABILITY_BACKEND_URL = import.meta.env.VITE_OBSERVABILITY_BACKEND_URL || 'http://localhost:8765';
 export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || 'http://localhost:8766';
-export const AGENT_MANAGER_URL = import.meta.env.VITE_AGENT_MANAGER_URL || 'http://localhost:8767';
+export const AGENT_REGISTRY_URL = import.meta.env.VITE_AGENT_REGISTRY_URL || 'http://localhost:8767';
 export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8765/ws';
 
 // Status colors

@@ -1,10 +1,10 @@
-# Agent Manager API
+# Agent Registry
 
 FastAPI service providing HTTP endpoints for agent CRUD operations.
 
 ## Why?
 
-Agent definitions (system prompts, MCP servers, skills) are stored as files. This service provides a unified API that both the **CLI commands** (`ao-list-agents`, `ao-new --agent`) and the **unified frontend** use to manage agents. Single source of truth, no direct file manipulation needed.
+Agent definitions (system prompts, MCP servers, skills) are stored as files. This service provides a unified API that both the **CLI commands** (`ao-list-agents`, `ao-new --agent`) and the **dashboard** use to manage agents. Single source of truth, no direct file manipulation needed.
 
 ## Quick Start
 
@@ -32,8 +32,8 @@ AGENT_ORCHESTRATOR_AGENTS_DIR=/path/to/agents uv run python -m main
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_MANAGER_HOST` | `0.0.0.0` | Server bind address |
-| `AGENT_MANAGER_PORT` | `8767` | Server port |
+| `AGENT_REGISTRY_HOST` | `0.0.0.0` | Server bind address |
+| `AGENT_REGISTRY_PORT` | `8767` | Server port |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `{cwd}/.agent-orchestrator/agents` | Agents storage directory |
 
 ## File Structure

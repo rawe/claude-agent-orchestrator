@@ -62,7 +62,7 @@ Copy `.env.example` to `.env` and configure:
 ```bash
 VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
 VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-VITE_AGENT_MANAGER_URL=http://localhost:8767
+VITE_AGENT_REGISTRY_URL=http://localhost:8767
 VITE_WEBSOCKET_URL=ws://localhost:8765/ws
 ```
 
@@ -104,7 +104,7 @@ This frontend requires the following backend services:
 
 1. **Observability Backend** (port 8765) - Session and event management
 2. **Context Store Server** (port 8766) - Document storage and retrieval
-3. **Agent Manager** (port 8767) - Agent definition CRUD (mocked in frontend)
+3. **Agent Registry** (port 8767) - Agent definition CRUD
 
 See `docs/BACKEND-TODO.md` for details on missing backend endpoints.
 
@@ -122,7 +122,6 @@ See `docs/BACKEND-TODO.md` for details on missing backend endpoints.
 
 ## Notes
 
-- Agent Manager uses mock data - real backend service not yet implemented
 - Some session features (stop) are mocked until backend implements them
 - Desktop-optimized (no mobile responsive design in V1)
 - Light theme only (no dark mode in V1)

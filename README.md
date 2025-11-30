@@ -114,6 +114,7 @@ agent-orchestrator-framework/
 │       └── README.md
 │
 ├── servers/                         # Backend servers
+│   ├── agent-registry/              # Agent CRUD API (FastAPI)
 │   └── context-store/               # Document storage server (FastAPI)
 │
 ├── agent-orchestrator-observability/ # Real-time observability platform

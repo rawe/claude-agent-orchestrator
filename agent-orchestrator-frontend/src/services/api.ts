@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { OBSERVABILITY_BACKEND_URL, DOCUMENT_SERVER_URL, AGENT_MANAGER_URL } from '@/utils/constants';
+import { OBSERVABILITY_BACKEND_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL } from '@/utils/constants';
 
 // Axios instance for observability backend
 export const observabilityApi = axios.create({
@@ -17,9 +17,9 @@ export const documentApi = axios.create({
   },
 });
 
-// Axios instance for agent manager (will be mocked)
-export const agentApi = axios.create({
-  baseURL: AGENT_MANAGER_URL,
+// Axios instance for agent registry
+export const agentRegistryApi = axios.create({
+  baseURL: AGENT_REGISTRY_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -37,4 +37,4 @@ const handleError = (error: unknown) => {
 
 observabilityApi.interceptors.response.use((response) => response, handleError);
 documentApi.interceptors.response.use((response) => response, handleError);
-agentApi.interceptors.response.use((response) => response, handleError);
+agentRegistryApi.interceptors.response.use((response) => response, handleError);

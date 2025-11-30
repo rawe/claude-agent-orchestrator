@@ -9,7 +9,7 @@
 #   3. Run: make start (the override file is automatically loaded by Docker Compose)
 #
 # COMMON USE CASES:
-#   - Point agent-manager to a different agent definitions directory
+#   - Point agent-registry to a different agent definitions directory
 #   - Change port mappings
 #   - Add environment variables for debugging
 #
@@ -17,23 +17,23 @@
 #   echo "AGENT_DIR=/path/to/your/agents" >> .env
 
 services:
-  # Override agent-manager to use a custom agents directory
-  agent-manager:
+  # Override agent-registry to use a custom agents directory
+  agent-registry:
     volumes:
       # Mount your local agents directory to the container
       # Replace /path/to/your/agents with your actual path
       - /path/to/your/agents:/data/agents
 
 # Example: Override with additional environment variables
-#  agent-manager:
+#  agent-registry:
 #    environment:
 #      - PYTHONUNBUFFERED=1
-#      - AGENT_MANAGER_HOST=0.0.0.0
-#      - AGENT_MANAGER_PORT=8767
+#      - AGENT_REGISTRY_HOST=0.0.0.0
+#      - AGENT_REGISTRY_PORT=8767
 #      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
 #      - DEBUG=true
 
 # Example: Change port mappings
-#  agent-manager:
+#  agent-registry:
 #    ports:
 #      - "9767:8767"  # Map to port 9767 on host instead of 8767

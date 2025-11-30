@@ -7,7 +7,7 @@ This guide explains how to use the centralized Docker setup for the Agent Orches
 The Agent Orchestrator Framework consists of four main Docker services:
 
 1. **Unified Frontend** (Port 3000) - React-based UI for agent management, session monitoring, and document management
-2. **Agent Manager** (Port 8767) - FastAPI service for agent CRUD operations
+2. **Agent Registry** (Port 8767) - FastAPI service for agent CRUD operations
 3. **Observability Backend** (Port 8765) - Python-based WebSocket server for agent session monitoring
 4. **Context Store Server** (Port 8766) - Python-based document storage and retrieval service
 
@@ -25,7 +25,7 @@ The Agent Orchestrator Framework consists of four main Docker services:
 │                  │                 │                 │                    │
 │                  ▼                 ▼                 ▼                    │
 │  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐       │
-│  │   Agent Manager   │ │   Observability   │ │  Context Store    │       │
+│  │  Agent Registry   │ │   Observability   │ │  Context Store    │       │
 │  │    (Port 8767)    │ │     Backend       │ │    (Port 8766)    │       │
 │  │                   │ │   (Port 8765)     │ │                   │       │
 │  └─────────┬─────────┘ └───────────────────┘ └─────────┬─────────┘       │
@@ -72,7 +72,7 @@ docker-compose logs -f
 
 ## Custom Agent Directory Configuration
 
-By default, the Agent Manager service looks for agent definitions in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
+By default, the Agent Registry service looks for agent definitions in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
 
 ### Option 1: Using a `.env` file (Simplest)
 
@@ -102,7 +102,7 @@ Edit `docker-compose.override.yml`:
 
 ```yaml
 services:
-  agent-manager:
+  agent-registry:
     volumes:
       - /path/to/your/agents:/data/agents
 ```
@@ -177,19 +177,19 @@ Run `make help` to see all available commands:
 - Document Management (upload, tag, preview)
 - Agent Manager (create/edit agent definitions)
 
-### Agent Manager
+### Agent Registry
 
 - **Port:** 8767
 - **Technology:** Python 3.12 + FastAPI
 - **Purpose:** CRUD API for agent definitions
 - **Health Check:** http://localhost:8767/health
-- **Code Location:** `./agent-orchestrator-backend`
+- **Code Location:** `./servers/agent-registry`
 
 **Environment Variables:**
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_MANAGER_HOST` | `0.0.0.0` | Server bind address |
-| `AGENT_MANAGER_PORT` | `8767` | Server port |
+| `AGENT_REGISTRY_HOST` | `0.0.0.0` | Server bind address |
+| `AGENT_REGISTRY_PORT` | `8767` | Server port |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `/data/agents` | Agents storage directory (in container) |
 
 ### Observability Backend
@@ -310,8 +310,8 @@ docker-compose build --no-cache
 # Build only frontend
 docker-compose build frontend
 
-# Build only agent manager
-docker-compose build agent-manager
+# Build only agent registry
+docker-compose build agent-registry
 
 # Build only observability backend
 docker-compose build observability-backend
@@ -330,7 +330,7 @@ The build process for each service:
 3. Builds production bundle with Vite
 4. Serves via nginx on port 80
 
-**Agent Manager:**
+**Agent Registry:**
 1. Uses `python:3.12-slim` base image
 2. Installs `uv` package manager
 3. Copies `pyproject.toml` and installs dependencies
@@ -357,7 +357,7 @@ Check if ports are already in use:
 ```bash
 # Check if ports are occupied
 lsof -i :3000  # Unified Frontend
-lsof -i :8767  # Agent Manager
+lsof -i :8767  # Agent Registry
 lsof -i :8765  # Observability backend
 lsof -i :8766  # Document server
 ```
@@ -374,7 +374,7 @@ Or manually:
 
 ```bash
 curl http://localhost:3000       # Frontend
-curl http://localhost:8767/health  # Agent Manager
+curl http://localhost:8767/health  # Agent Registry
 curl http://localhost:8765/sessions  # Observability
 curl http://localhost:8766/health  # Document Server
 ```
@@ -517,11 +517,11 @@ You can start specific services:
 # Only document server
 docker-compose up document-server
 
-# Only agent manager
-docker-compose up agent-manager
+# Only agent registry
+docker-compose up agent-registry
 
 # Frontend with all backends
-docker-compose up frontend agent-manager observability-backend document-server
+docker-compose up frontend agent-registry observability-backend context-store
 ```
 
 ## Migration from Subdirectory Compose Files

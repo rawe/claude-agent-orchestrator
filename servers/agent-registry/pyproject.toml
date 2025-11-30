@@ -1,7 +1,7 @@
 [project]
-name = "agent-orchestrator-backend"
+name = "agent-registry"
 version = "0.1.0"
-description = "Agent Manager API Service for agent CRUD operations"
+description = "Agent Registry API Service for agent CRUD operations"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.104.0",

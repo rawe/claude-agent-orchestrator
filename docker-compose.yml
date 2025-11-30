@@ -14,33 +14,33 @@ services:
       # These are baked in at build time via Vite
       - VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
       - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-      - VITE_AGENT_MANAGER_URL=http://localhost:8767
+      - VITE_AGENT_REGISTRY_URL=http://localhost:8767
       - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
     depends_on:
-      - agent-manager
+      - agent-registry
       - observability-backend
       - context-store
 
   # ============================================================================
-  # AGENT MANAGER BACKEND
+  # AGENT REGISTRY
   # ============================================================================
-  agent-manager:
-    container_name: agent-orchestrator-agent-manager
+  agent-registry:
+    container_name: agent-orchestrator-agent-registry
     build:
-      context: ./agent-orchestrator-backend
+      context: ./servers/agent-registry
       dockerfile: Dockerfile
     ports:
       - "8767:8767"
     volumes:
-      - ./agent-orchestrator-backend:/app
+      - ./servers/agent-registry:/app
       - ${AGENT_DIR:-./.agent-orchestrator/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
-      - AGENT_MANAGER_HOST=0.0.0.0
-      - AGENT_MANAGER_PORT=8767
+      - AGENT_REGISTRY_HOST=0.0.0.0
+      - AGENT_REGISTRY_PORT=8767
       - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
     networks:
       - agent-orchestrator-network

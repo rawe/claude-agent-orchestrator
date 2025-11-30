@@ -25,11 +25,11 @@ help:
 	@echo "  make logs-frontend  - View frontend logs"
 	@echo "  make logs-obs       - View observability logs"
 	@echo "  make logs-doc       - View context store logs"
-	@echo "  make logs-agent     - View agent manager logs"
+	@echo "  make logs-agent     - View agent registry logs"
 	@echo "  make restart-frontend - Restart frontend"
 	@echo "  make restart-obs    - Restart observability backend"
 	@echo "  make restart-doc    - Restart context store"
-	@echo "  make restart-agent  - Restart agent manager"
+	@echo "  make restart-agent  - Restart agent registry"
 
 # Build all images
 build:
@@ -86,7 +86,7 @@ health:
 	@echo "Frontend (port 3000):"
 	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:3000 || echo "  ❌ Not responding"
 	@echo ""
-	@echo "Agent Manager (port 8767):"
+	@echo "Agent Registry (port 8767):"
 	@curl -s http://localhost:8767/health || echo "  ❌ Not responding"
 	@echo ""
 	@echo "Observability Backend (port 8765):"
@@ -106,7 +106,7 @@ info:
 	@echo "   Purpose:     Unified UI for agent management, sessions, and documents"
 	@echo "   Action:      Open this URL in your browser"
 	@echo ""
-	@echo "🤖 AGENT MANAGER"
+	@echo "🤖 AGENT REGISTRY"
 	@echo "   URL:         http://localhost:8767"
 	@echo "   Purpose:     CRUD API for agent definitions"
 	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
@@ -199,7 +199,7 @@ logs-doc:
 	docker-compose logs context-store
 
 logs-agent:
-	docker-compose logs agent-manager
+	docker-compose logs agent-registry
 
 # Individual service restart
 restart-frontend:
@@ -212,4 +212,4 @@ restart-doc:
 	docker-compose restart context-store
 
 restart-agent:
-	docker-compose restart agent-manager
+	docker-compose restart agent-registry
