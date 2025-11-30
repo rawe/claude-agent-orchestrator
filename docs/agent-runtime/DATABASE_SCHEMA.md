@@ -1,6 +1,6 @@
 # Database Schema
 
-This document describes the SQLite database schema used by the observability backend.
+SQLite database schema used by the Agent Runtime server.
 
 ## Database Location
 

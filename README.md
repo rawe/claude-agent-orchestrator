@@ -100,8 +100,8 @@ agent-orchestrator-framework/
 ├── docker-compose.yml                 # Container orchestration
 │
 ├── docs/                              # Documentation
-│   └── arch-001-project-structure/    # Architecture documentation
-│       └── ARCHITECTURE.md            # Full architecture reference
+│   ├── ARCHITECTURE.md                # System architecture overview
+│   └── agent-runtime/                 # Agent Runtime server docs
 │
 ├── servers/                           # Backend servers
 │   ├── agent-runtime/                 # Session management + event capture
@@ -150,7 +150,7 @@ agent-orchestrator-framework/
    ```
 
 2. **Configure MCP server:**
-   See [plugins/orchestrator/mcp-server/README.md](./plugins/orchestrator/mcp-server/README.md)
+   See [interfaces/agent-orchestrator-mcp-server/README.md](./interfaces/agent-orchestrator-mcp-server/README.md)
 
 3. **Use from Claude Desktop:**
    ```
@@ -163,7 +163,7 @@ agent-orchestrator-framework/
 Markdown files that define specialized agent configurations with custom system prompts, instructions, and MCP configurations. Stored in `.agent-orchestrator/agents/`.
 
 ### Sessions
-Isolated Claude Code sessions for individual agents. Each session has a unique ID, configuration, and result storage. Stored in `.agent-orchestrator/sessions/`.
+Isolated Claude Code sessions for individual agents. Each session has a unique ID and configuration. Session data is persisted in the Agent Runtime server (SQLite).
 
 ### MCP Configuration
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
@@ -199,11 +199,11 @@ make open
 | Agent Registry | http://localhost:8767 | Blueprint CRUD API |
 | Context Store | http://localhost:8766 | Document storage API |
 
-See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/arch-001-project-structure/ARCHITECTURE.md](./docs/arch-001-project-structure/ARCHITECTURE.md)** for full architecture.
+See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for full architecture.
 
 ## Documentation
 
-- **[Architecture](./docs/arch-001-project-structure/ARCHITECTURE.md)** - Full system architecture and component interactions
+- **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
 - **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Level 1: Claude Code plugin
 - **[MCP Server](./interfaces/agent-orchestrator-mcp-server/README.md)** - Level 2: MCP implementation
