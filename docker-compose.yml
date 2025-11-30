@@ -80,28 +80,6 @@ services:
       start_period: 10s
 
   # ============================================================================
-  # OBSERVABILITY FRONTEND (legacy - replaced by unified frontend)
-  # ============================================================================
-  # observability-frontend:
-  #   container_name: agent-orchestrator-observability-frontend
-  #   build:
-  #     context: ./agent-orchestrator-observability
-  #     dockerfile: docker/frontend.Dockerfile
-  #   ports:
-  #     - "5173:5173"
-  #   volumes:
-  #     - ./agent-orchestrator-observability/frontend/src:/app/src
-  #     - ./agent-orchestrator-observability/frontend/index.html:/app/index.html
-  #   environment:
-  #     - VITE_BACKEND_URL=http://localhost:8765
-  #   networks:
-  #     - agent-orchestrator-network
-  #   restart: unless-stopped
-  #   depends_on:
-  #     observability-backend:
-  #       condition: service_healthy
-
-  # ============================================================================
   # CONTEXT STORE
   # ============================================================================
   context-store:

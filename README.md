@@ -65,7 +65,7 @@ git clone <your-repo-url>
 
 # 2. Configure in Claude Desktop or Claude Code
 # MCP server now auto-discovers commands - minimal setup required!
-# See plugins/orchestrator/mcp-server/README.md
+# See interfaces/agent-orchestrator-mcp-server/README.md
 ```
 
 **Usage Example (from Claude Desktop):**
@@ -74,7 +74,7 @@ List available agents
 Create a new agent session called "code-review" using the code-reviewer agent
 ```
 
-**Documentation:** [plugins/orchestrator/mcp-server/README.md](./plugins/orchestrator/mcp-server/README.md)
+**Documentation:** [interfaces/agent-orchestrator-mcp-server/README.md](./interfaces/agent-orchestrator-mcp-server/README.md)
 
 **Important Limitation:**
 Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 2 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1 integration which operates within a single Claude Code session.
@@ -94,40 +94,33 @@ Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/is
 
 ```
 agent-orchestrator-framework/
-├── plugins/                         # Claude Code plugins
-│   ├── orchestrator/                # Core framework plugin
-│   │   ├── skills/
-│   │   │   └── orchestrator/
-│   │   │       ├── commands/            # Python ao-* commands
-│   │   │       ├── SKILL.md             # Skill definition
-│   │   │       ├── references/          # Technical documentation
-│   │   │       └── example/             # Example agent definitions
-│   │   ├── commands/                # Slash commands
-│   │   ├── mcp-server/              # Level 2: MCP server
-│   │   │   ├── agent-orchestrator-mcp.py
-│   │   │   ├── libs/
-│   │   │   └── docs/
-│   │   └── README.md
-│   │
-│   └── context-store/               # Context store plugin
-│       ├── skills/context-store/    # Context store skill & commands
-│       └── README.md
 │
-├── servers/                         # Backend servers
-│   ├── agent-registry/              # Agent CRUD API (FastAPI)
-│   ├── agent-runtime/               # Agent Runtime server (FastAPI)
-│   └── context-store/               # Document storage server (FastAPI)
+├── README.md                          # This file
+├── Makefile                           # Build, run, deploy commands
+├── docker-compose.yml                 # Container orchestration
 │
-├── agent-orchestrator-observability/ # Real-time observability platform
-│   ├── backend/                     # FastAPI + WebSocket backend
-│   ├── frontend/                    # React-based web UI
-│   ├── hooks/                       # Hook scripts for event capture
-│   ├── docker/                      # Docker setup
-│   └── README.md                    # Full documentation
+├── docs/                              # Documentation
+│   └── arch-001-project-structure/    # Architecture documentation
+│       └── ARCHITECTURE.md            # Full architecture reference
 │
-├── docker-compose.yml               # Multi-service Docker setup
-├── Makefile                         # Convenience commands
-└── README.md                        # This file
+├── servers/                           # Backend servers
+│   ├── agent-runtime/                 # Session management + event capture
+│   ├── agent-registry/                # Blueprint management (CRUD)
+│   └── context-store/                 # Document storage
+│
+├── interfaces/
+│   └── agent-orchestrator-mcp-server/ # MCP protocol interface
+│
+├── dashboard/                         # Web UI (React + Vite)
+│
+└── plugins/                           # Claude Code plugins
+    ├── orchestrator/                  # Agent orchestration commands
+    │   └── skills/orchestrator/
+    │       └── commands/              # ao-* commands
+    │
+    └── context-store/                 # Document management commands
+        └── skills/context-store/
+            └── commands/              # doc-* commands
 ```
 
 ## Quick Start Guide
@@ -179,28 +172,39 @@ Different agents can have different MCP server configurations, enabling speciali
 The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
-## Observability
+## Dashboard & Observability
 
-Monitor your agent orchestration in real-time with the built-in observability platform:
+Monitor your agent orchestration in real-time with the unified Dashboard:
 
 - **Real-time monitoring** of agent sessions and tool calls
 - **WebSocket-based** live updates
 - **Docker support** for one-command deployment
-- **Hook-based integration** with Claude Code events
+- **Agent blueprint management** via web UI
+- **Document management** for context sharing
 
 **Quick Start:**
 ```bash
-cd agent-orchestrator-observability
-docker-compose up -d
-# Open http://localhost:5173
+# Start all services (Dashboard + all backend servers)
+make start-bg
+
+# Open http://localhost:3000
+make open
 ```
 
-See **[agent-orchestrator-observability/README.md](./agent-orchestrator-observability/README.md)** for full documentation.
+**Service URLs:**
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
+| Agent Runtime | http://localhost:8765 | Session management, WebSocket events |
+| Agent Registry | http://localhost:8767 | Blueprint CRUD API |
+| Context Store | http://localhost:8766 | Document storage API |
+
+See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/arch-001-project-structure/ARCHITECTURE.md](./docs/arch-001-project-structure/ARCHITECTURE.md)** for full architecture.
 
 ## Documentation
 
+- **[Architecture](./docs/arch-001-project-structure/ARCHITECTURE.md)** - Full system architecture and component interactions
+- **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
 - **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Level 1: Claude Code plugin
-- **[Orchestrator MCP Server](./plugins/orchestrator/mcp-server/README.md)** - Level 2: MCP implementation
-- **[Context Store Plugin](./plugins/context-store/README.md)** - Agent document management plugin
-- **[Observability Platform](./agent-orchestrator-observability/README.md)** - Real-time monitoring
-- **[Technical Architecture](./plugins/orchestrator/skills/orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works
+- **[MCP Server](./interfaces/agent-orchestrator-mcp-server/README.md)** - Level 2: MCP implementation
+- **[Context Store Plugin](./plugins/context-store/README.md)** - Document management plugin
