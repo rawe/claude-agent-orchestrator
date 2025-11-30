@@ -307,7 +307,7 @@ Add to environment configuration:
 }
 ```
 
-View logs at: `agent-orchestrator-mcp-python/logs/mcp-server.log`
+View logs at: `interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log`
 
 For comprehensive debugging instructions, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 

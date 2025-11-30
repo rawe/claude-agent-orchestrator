@@ -19,7 +19,7 @@ This is the **single source of truth** for all environment variables used by the
 ### `AGENT_ORCHESTRATOR_COMMAND_PATH` (Auto-Discovered)
 
 - Absolute path to the commands directory containing Python scripts
-- Example (local development): `/Users/yourname/projects/agent-orchestrator-cli/commands`
+- Example (local development): `/Users/yourname/projects/claude-agent-orchestrator/plugins/orchestrator/skills/orchestrator/commands`
 - Example (production): `/usr/local/lib/agent-orchestrator/commands`
 - The directory should contain: `ao-new`, `ao-resume`, `ao-list-sessions`, `ao-list-agents`, `ao-clean`
 

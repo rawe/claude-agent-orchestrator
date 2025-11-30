@@ -7,7 +7,7 @@ The Agent Orchestrator MCP server uses UV's inline dependency feature (PEP 723) 
 ## Structure
 
 ```
-agent-orchestrator-mcp-python/
+agent-orchestrator-mcp-server/
 ├── agent-orchestrator-mcp.py    # Main entry point (concise, ~40 lines)
 ├── libs/                        # Modular library files
 │   ├── constants.py            # Constants and configuration values
@@ -28,7 +28,7 @@ The server uses a simplified invocation pattern with UV:
   "command": "uv",
   "args": [
     "run",
-    "/path/to/agent-orchestrator-mcp-python/agent-orchestrator-mcp.py"
+    "/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"
   ]
 }
 ```
@@ -96,9 +96,11 @@ For concrete configuration see: [INTEGRATION_SCENARIOS.md](./INTEGRATION_SCENARI
 
 See [ENV_VARS.md](./ENV_VARS.md) for complete documentation.
 
-Required variables:
-- **AGENT_ORCHESTRATOR_COMMAND_PATH** - Path to CLI commands directory
-- **AGENT_ORCHESTRATOR_PROJECT_DIR** - Project directory (Claude Desktop only)
+Auto-discovered variables:
+- **AGENT_ORCHESTRATOR_COMMAND_PATH** - Path to CLI commands directory (auto-discovered, can be overridden)
+
+Required for Claude Desktop:
+- **AGENT_ORCHESTRATOR_PROJECT_DIR** - Project directory (required for Claude Desktop only)
 
 Optional variables:
 - **AGENT_ORCHESTRATOR_SESSIONS_DIR** - Custom session storage location

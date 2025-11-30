@@ -31,7 +31,7 @@ Or add it to your MCP configuration:
 
 When enabled, all debug logs are written to:
 ```
-agent-orchestrator-mcp-python/logs/mcp-server.log
+interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log
 ```
 
 ## What's Logged
@@ -47,42 +47,42 @@ The logs include:
 
 ### View the entire log file
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log
+cat interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log
 ```
 
 ### View formatted logs
 Each line is JSON, so you can use `jq` for formatting:
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq '.'
+cat interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log | jq '.'
 ```
 
 ### Follow logs in real-time
 ```bash
-tail -f agent-orchestrator-mcp-python/logs/mcp-server.log | jq '.'
+tail -f interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log | jq '.'
 ```
 
 ### Filter by log level
 
 **Show only errors:**
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.level == "ERROR")'
+cat interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.level == "ERROR")'
 ```
 
 **Show errors and warnings:**
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.level == "ERROR" or .level == "WARN")'
+cat interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.level == "ERROR" or .level == "WARN")'
 ```
 
 ### Search for specific operations
 
 **Find all start_agent_session calls:**
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.message | contains("start_agent_session"))'
+cat interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.message | contains("start_agent_session"))'
 ```
 
 **Find all tool invocations:**
 ```bash
-cat agent-orchestrator-mcp-python/logs/mcp-server.log | jq 'select(.message | contains("Tool called"))'
+cat interfaces/agent-orchestrator-mcp-server/logs/mcp-server.log | jq 'select(.message | contains("Tool called"))'
 ```
 
 ## Testing with MCP Inspector
