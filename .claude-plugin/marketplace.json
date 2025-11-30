@@ -10,8 +10,8 @@
   },
   "plugins": [
     {
-      "name": "agent-orchestrator",
-      "source": "./plugins/agent-orchestrator"
+      "name": "orchestrator",
+      "source": "./plugins/orchestrator"
     },
     {
       "name": "context-store",

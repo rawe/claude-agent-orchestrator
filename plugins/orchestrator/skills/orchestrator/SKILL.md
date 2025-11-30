@@ -1,9 +1,9 @@
 ---
-name: agent-orchestrator
+name: orchestrator
 description: Use this skill when you need to orchestrate specialized Claude agents in separate sessions. Perfect for long-running tasks, specialized agents with MCP tools, and resumable workflows.
 ---
 
-# Agent Orchestrator Skill
+# Orchestrator Skill
 
 ## What & When
 
@@ -88,8 +88,8 @@ Before using commands for the first time:
 
 **Example**:
 ```bash
-# If skill is at /path/to/skills/agent-orchestrator
-uv run /path/to/skills/agent-orchestrator/commands/ao-new my-session -p "Research topic X"
+# If skill is at /path/to/skills/orchestrator
+uv run /path/to/skills/orchestrator/commands/ao-new my-session -p "Research topic X"
 ```
 
 ---
