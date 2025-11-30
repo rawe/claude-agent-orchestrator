@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-frontend logs-runtime logs-doc logs-agent restart-frontend restart-runtime restart-doc restart-agent
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent
 
 # Default target
 help:
@@ -15,18 +15,18 @@ help:
 	@echo "  make status         - Show status of all services"
 	@echo "  make health         - Check health of all services"
 	@echo "  make info           - Show service URLs and descriptions"
-	@echo "  make open           - Open Frontend in browser"
+	@echo "  make open           - Open Dashboard in browser"
 	@echo "  make clean          - Stop and remove all containers, networks (keeps data)"
 	@echo "  make clean-all      - Stop and remove everything including data (sessions, documents)"
 	@echo "  make clean-docs     - Remove ONLY the document storage volume"
 	@echo "  make clean-sessions - Remove ONLY the session storage volume"
 	@echo ""
 	@echo "Individual service commands:"
-	@echo "  make logs-frontend  - View frontend logs"
+	@echo "  make logs-dashboard - View dashboard logs"
 	@echo "  make logs-runtime   - View agent runtime logs"
 	@echo "  make logs-doc       - View context store logs"
 	@echo "  make logs-agent     - View agent registry logs"
-	@echo "  make restart-frontend - Restart frontend"
+	@echo "  make restart-dashboard - Restart dashboard"
 	@echo "  make restart-runtime - Restart agent runtime"
 	@echo "  make restart-doc    - Restart context store"
 	@echo "  make restart-agent  - Restart agent registry"
@@ -83,7 +83,7 @@ status:
 health:
 	@echo "Checking service health..."
 	@echo ""
-	@echo "Frontend (port 3000):"
+	@echo "Dashboard (port 3000):"
 	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:3000 || echo "  ❌ Not responding"
 	@echo ""
 	@echo "Agent Registry (port 8767):"
@@ -101,7 +101,7 @@ info:
 	@echo "║          Agent Orchestrator Framework - Service Information               ║"
 	@echo "╚════════════════════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "🌐 FRONTEND"
+	@echo "🌐 DASHBOARD"
 	@echo "   URL:         http://localhost:3000"
 	@echo "   Purpose:     Unified UI for agent management, sessions, and documents"
 	@echo "   Action:      Open this URL in your browser"
@@ -122,7 +122,7 @@ info:
 	@echo "   Endpoints:   /health, /documents, /upload, /download"
 	@echo ""
 	@echo "────────────────────────────────────────────────────────────────────────────"
-	@echo "👉 To open the Frontend in your browser:"
+	@echo "👉 To open the Dashboard in your browser:"
 	@echo "   open http://localhost:3000        (macOS)"
 	@echo "   xdg-open http://localhost:3000    (Linux)"
 	@echo "   start http://localhost:3000       (Windows)"
@@ -130,9 +130,9 @@ info:
 # Alias for info
 urls: info
 
-# Open Frontend in browser
+# Open Dashboard in browser
 open:
-	@echo "Opening Frontend in browser..."
+	@echo "Opening Dashboard in browser..."
 	@if command -v open > /dev/null 2>&1; then \
 		open http://localhost:3000; \
 	elif command -v xdg-open > /dev/null 2>&1; then \
@@ -189,8 +189,8 @@ clean-sessions:
 	fi
 
 # Individual service logs
-logs-frontend:
-	docker-compose logs frontend
+logs-dashboard:
+	docker-compose logs dashboard
 
 logs-runtime:
 	docker-compose logs agent-runtime
@@ -202,8 +202,8 @@ logs-agent:
 	docker-compose logs agent-registry
 
 # Individual service restart
-restart-frontend:
-	docker-compose restart frontend
+restart-dashboard:
+	docker-compose restart dashboard
 
 restart-runtime:
 	docker-compose restart agent-runtime

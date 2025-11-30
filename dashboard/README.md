@@ -1,6 +1,6 @@
-# Agent Orchestrator Frontend
+# Agent Orchestrator Dashboard
 
-A unified React frontend for the Agent Orchestrator Framework, providing real-time monitoring, document management, and agent configuration capabilities.
+A unified React dashboard for the Agent Orchestrator Framework, providing real-time monitoring, document management, and agent configuration capabilities.
 
 ## Features
 
@@ -29,7 +29,7 @@ A unified React frontend for the Agent Orchestrator Framework, providing real-ti
 Run the production build with Docker Compose:
 
 ```bash
-cd agent-orchestrator-frontend
+cd dashboard
 docker-compose up -d
 ```
 
@@ -48,7 +48,7 @@ Prerequisites:
 - npm or yarn
 
 ```bash
-cd agent-orchestrator-frontend
+cd dashboard
 npm install
 npm run dev
 ```
@@ -75,8 +75,8 @@ npm run build
 Or build the Docker image directly:
 
 ```bash
-docker build -t agent-orchestrator-frontend .
-docker run -p 3000:80 agent-orchestrator-frontend
+docker build -t agent-orchestrator-dashboard .
+docker run -p 3000:80 agent-orchestrator-dashboard
 ```
 
 ## Architecture

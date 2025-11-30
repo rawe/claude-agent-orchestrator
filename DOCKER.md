@@ -6,7 +6,7 @@ This guide explains how to use the centralized Docker setup for the Agent Orches
 
 The Agent Orchestrator Framework consists of four main Docker services:
 
-1. **Unified Frontend** (Port 3000) - React-based UI for agent management, session monitoring, and document management
+1. **Dashboard** (Port 3000) - React-based UI for agent management, session monitoring, and document management
 2. **Agent Registry** (Port 8767) - FastAPI service for agent CRUD operations
 3. **Observability Backend** (Port 8765) - Python-based WebSocket server for agent session monitoring
 4. **Context Store Server** (Port 8766) - Python-based document storage and retrieval service
@@ -19,7 +19,7 @@ The Agent Orchestrator Framework consists of four main Docker services:
 │                   (agent-orchestrator-network)                            │
 │                                                                           │
 │  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │                      Unified Frontend (Port 3000)                   │  │
+│  │                         Dashboard (Port 3000)                       │  │
 │  │        Agent Management | Sessions | Documents                      │  │
 │  └───────────────┬─────────────────┬─────────────────┬────────────────┘  │
 │                  │                 │                 │                    │
@@ -164,13 +164,13 @@ Run `make help` to see all available commands:
 
 ## Service Details
 
-### Unified Frontend
+### Dashboard
 
 - **Port:** 3000
 - **Technology:** Node.js 18 + Vite + React + Tailwind CSS
 - **Purpose:** Unified UI for agent management, session monitoring, and document management
 - **URL:** http://localhost:3000
-- **Code Location:** `./agent-orchestrator-frontend`
+- **Code Location:** `./dashboard`
 
 **Features:**
 - Agent Sessions (real-time monitoring via WebSocket)
@@ -307,8 +307,8 @@ docker-compose build --no-cache
 ### Build Individual Services
 
 ```bash
-# Build only frontend
-docker-compose build frontend
+# Build only dashboard
+docker-compose build dashboard
 
 # Build only agent registry
 docker-compose build agent-registry
@@ -324,7 +324,7 @@ docker-compose build document-server
 
 The build process for each service:
 
-**Unified Frontend:**
+**Dashboard:**
 1. Uses `node:18-alpine` base image
 2. Copies `package*.json` and installs dependencies
 3. Builds production bundle with Vite
@@ -356,7 +356,7 @@ Check if ports are already in use:
 
 ```bash
 # Check if ports are occupied
-lsof -i :3000  # Unified Frontend
+lsof -i :3000  # Dashboard
 lsof -i :8767  # Agent Registry
 lsof -i :8765  # Observability backend
 lsof -i :8766  # Document server
@@ -373,7 +373,7 @@ make health
 Or manually:
 
 ```bash
-curl http://localhost:3000       # Frontend
+curl http://localhost:3000       # Dashboard
 curl http://localhost:8767/health  # Agent Registry
 curl http://localhost:8765/sessions  # Observability
 curl http://localhost:8766/health  # Document Server
@@ -464,9 +464,9 @@ curl http://localhost:8766/health
 
 In Claude Code, the plugin will automatically connect to `http://localhost:8766`.
 
-### Unified Frontend
+### Dashboard
 
-The unified frontend provides a single interface for all agent orchestration tasks:
+The dashboard provides a single interface for all agent orchestration tasks:
 
 1. Start all services:
    ```bash
@@ -520,8 +520,8 @@ docker-compose up document-server
 # Only agent registry
 docker-compose up agent-registry
 
-# Frontend with all backends
-docker-compose up frontend agent-registry observability-backend context-store
+# Dashboard with all backends
+docker-compose up dashboard agent-registry observability-backend context-store
 ```
 
 ## Migration from Subdirectory Compose Files
@@ -538,7 +538,7 @@ The centralized setup is **fully compatible** with existing subdirectory compose
 ## Next Steps
 
 1. Start services: `make start-bg`
-2. Open the frontend: http://localhost:3000
+2. Open the dashboard: http://localhost:3000
 3. Check status: `make status`
 4. Check health: `make health`
 5. View logs: `make logs-f`

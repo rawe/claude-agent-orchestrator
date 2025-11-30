@@ -1,12 +1,12 @@
 
 services:
   # ============================================================================
-  # UNIFIED FRONTEND (Agent Orchestrator UI)
+  # DASHBOARD (Agent Orchestrator UI)
   # ============================================================================
-  frontend:
-    container_name: agent-orchestrator-frontend
+  dashboard:
+    container_name: agent-orchestrator-dashboard
     build:
-      context: ./agent-orchestrator-frontend
+      context: ./dashboard
       dockerfile: Dockerfile
     ports:
       - "3000:80"
