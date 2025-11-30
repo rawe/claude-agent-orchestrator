@@ -1,0 +1,64 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+# ]
+# ///
+"""
+List all available agent definitions from Agent Manager API.
+
+Configuration:
+    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+import typer
+from agent_api import list_agents_api, AgentAPIError
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main():
+    """
+    List all available agent definitions.
+
+    Displays: agent name, description, status
+
+    Examples:
+        ao-list-agents
+    """
+    try:
+        agents = list_agents_api()
+    except AgentAPIError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if not agents:
+        print("No agent definitions found")
+        return
+
+    # Display agents
+    first = True
+    for agent in agents:
+        if first:
+            first = False
+        else:
+            print("---")
+            print()
+
+        name = agent.get("name", "unknown")
+        description = agent.get("description", "")
+
+        print(f"{name}:")
+        print(description)
+        print()
+
+
+if __name__ == "__main__":
+    app()

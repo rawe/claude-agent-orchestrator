@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs info urls open
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent
 
 # Default target
 help:
@@ -15,16 +15,21 @@ help:
 	@echo "  make status         - Show status of all services"
 	@echo "  make health         - Check health of all services"
 	@echo "  make info           - Show service URLs and descriptions"
-	@echo "  make open           - Open Observability Frontend in browser"
-	@echo "  make clean          - Stop and remove all containers, networks (keeps volumes)"
-	@echo "  make clean-all      - Stop and remove everything including volumes"
-	@echo "  make clean-docs     - Remove ONLY the document storage volume (keeps containers)"
+	@echo "  make open           - Open Dashboard in browser"
+	@echo "  make clean          - Stop and remove all containers, networks (keeps data)"
+	@echo "  make clean-all      - Stop and remove everything including data (sessions, documents)"
+	@echo "  make clean-docs     - Remove ONLY the document storage volume"
+	@echo "  make clean-sessions - Remove ONLY the session storage volume"
 	@echo ""
 	@echo "Individual service commands:"
-	@echo "  make logs-obs       - View observability logs (backend + frontend)"
-	@echo "  make logs-doc       - View document server logs"
-	@echo "  make restart-obs    - Restart observability services"
-	@echo "  make restart-doc    - Restart document server"
+	@echo "  make logs-dashboard - View dashboard logs"
+	@echo "  make logs-runtime   - View agent runtime logs"
+	@echo "  make logs-doc       - View context store logs"
+	@echo "  make logs-agent     - View agent registry logs"
+	@echo "  make restart-dashboard - Restart dashboard"
+	@echo "  make restart-runtime - Restart agent runtime"
+	@echo "  make restart-doc    - Restart context store"
+	@echo "  make restart-agent  - Restart agent registry"
 
 # Build all images
 build:
@@ -78,14 +83,17 @@ status:
 health:
 	@echo "Checking service health..."
 	@echo ""
-	@echo "Observability Backend (port 8765):"
+	@echo "Dashboard (port 3000):"
+	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:3000 || echo "  ❌ Not responding"
+	@echo ""
+	@echo "Agent Registry (port 8767):"
+	@curl -s http://localhost:8767/health || echo "  ❌ Not responding"
+	@echo ""
+	@echo "Agent Runtime (port 8765):"
 	@curl -s http://localhost:8765/sessions | head -c 100 && echo "  ✅ OK" || echo "  ❌ Not responding"
 	@echo ""
-	@echo "Document Server (port 8766):"
+	@echo "Context Store (port 8766):"
 	@curl -s http://localhost:8766/health || echo "  ❌ Not responding"
-	@echo ""
-	@echo "Observability Frontend (port 5173):"
-	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:5173 || echo "  ❌ Not responding"
 
 # Show service information
 info:
@@ -93,43 +101,46 @@ info:
 	@echo "║          Agent Orchestrator Framework - Service Information               ║"
 	@echo "╚════════════════════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "🌐 OBSERVABILITY FRONTEND"
-	@echo "   URL:         http://localhost:5173"
-	@echo "   Purpose:     Visual UI to monitor agent tasks in real-time"
-	@echo "   Action:      Open this URL in your browser to see agent activity"
+	@echo "🌐 DASHBOARD"
+	@echo "   URL:         http://localhost:3000"
+	@echo "   Purpose:     Unified UI for agent management, sessions, and documents"
+	@echo "   Action:      Open this URL in your browser"
 	@echo ""
-	@echo "⚙️  OBSERVABILITY BACKEND"
+	@echo "🤖 AGENT REGISTRY"
+	@echo "   URL:         http://localhost:8767"
+	@echo "   Purpose:     CRUD API for agent definitions"
+	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
+	@echo ""
+	@echo "⚙️  AGENT RUNTIME"
 	@echo "   URL:         http://localhost:8765"
-	@echo "   Purpose:     WebSocket server receiving agent events"
+	@echo "   Purpose:     Session management and real-time observability"
 	@echo "   Endpoints:   /sessions, /events/{id}, /ws"
-	@echo "   Note:        Used internally by the frontend and observability hooks"
 	@echo ""
-	@echo "📄 DOCUMENT SYNC SERVER"
+	@echo "📄 CONTEXT STORE"
 	@echo "   URL:         http://localhost:8766"
-	@echo "   Purpose:     Document storage and retrieval for Claude Code plugins"
+	@echo "   Purpose:     Document storage and retrieval"
 	@echo "   Endpoints:   /health, /documents, /upload, /download"
-	@echo "   Note:        Required for the document-sync Claude Code plugin"
 	@echo ""
 	@echo "────────────────────────────────────────────────────────────────────────────"
-	@echo "👉 To open the Observability Frontend in your browser:"
-	@echo "   open http://localhost:5173        (macOS)"
-	@echo "   xdg-open http://localhost:5173    (Linux)"
-	@echo "   start http://localhost:5173       (Windows)"
+	@echo "👉 To open the Dashboard in your browser:"
+	@echo "   open http://localhost:3000        (macOS)"
+	@echo "   xdg-open http://localhost:3000    (Linux)"
+	@echo "   start http://localhost:3000       (Windows)"
 
 # Alias for info
 urls: info
 
-# Open Observability Frontend in browser
+# Open Dashboard in browser
 open:
-	@echo "Opening Observability Frontend in browser..."
+	@echo "Opening Dashboard in browser..."
 	@if command -v open > /dev/null 2>&1; then \
-		open http://localhost:5173; \
+		open http://localhost:3000; \
 	elif command -v xdg-open > /dev/null 2>&1; then \
-		xdg-open http://localhost:5173; \
+		xdg-open http://localhost:3000; \
 	elif command -v start > /dev/null 2>&1; then \
-		start http://localhost:5173; \
+		start http://localhost:3000; \
 	else \
-		echo "Could not detect browser opener. Please manually open: http://localhost:5173"; \
+		echo "Could not detect browser opener. Please manually open: http://localhost:3000"; \
 	fi
 
 # Clean up (stop and remove containers, networks, but keep volumes)
@@ -156,23 +167,49 @@ clean-docs:
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose stop document-server; \
+		docker-compose stop context-store; \
 		docker volume rm agent-orchestrator-document-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
-		echo "Document storage cleaned! Restart document-server to create fresh storage."; \
+		echo "Document storage cleaned! Restart context-store to create fresh storage."; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+# Clean only session storage volume
+clean-sessions:
+	@echo "Cleaning session storage volume..."
+	@echo "This will delete all session history and events."
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker-compose stop agent-runtime; \
+		docker volume rm agent-orchestrator-runtime-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
+		echo "Session storage cleaned! Restart agent-runtime to create fresh storage."; \
 	else \
 		echo "Cancelled."; \
 	fi
 
 # Individual service logs
-logs-obs:
-	docker-compose logs observability-backend observability-frontend
+logs-dashboard:
+	docker-compose logs dashboard
+
+logs-runtime:
+	docker-compose logs agent-runtime
 
 logs-doc:
-	docker-compose logs document-server
+	docker-compose logs context-store
+
+logs-agent:
+	docker-compose logs agent-registry
 
 # Individual service restart
-restart-obs:
-	docker-compose restart observability-backend observability-frontend
+restart-dashboard:
+	docker-compose restart dashboard
+
+restart-runtime:
+	docker-compose restart agent-runtime
 
 restart-doc:
-	docker-compose restart document-server
+	docker-compose restart context-store
+
+restart-agent:
+	docker-compose restart agent-registry

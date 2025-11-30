@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "command": "uv",
+      "args": [
+        "run",
+        "${PROJECT_ROOT}/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"
+      ],
+      "env": {
+        "AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED": "true",
+        "AGENT_ORCHESTRATOR_ENABLE_LOGGING": "false",
+        "MCP_SERVER_DEBUG": "false"
+      }
+    }
+  }
+}

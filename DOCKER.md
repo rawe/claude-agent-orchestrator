@@ -4,31 +4,38 @@ This guide explains how to use the centralized Docker setup for the Agent Orches
 
 ## Overview
 
-The Agent Orchestrator Framework consists of three main Docker services:
+The Agent Orchestrator Framework consists of four main Docker services:
 
-1. **Observability Backend** (Port 8765) - Python-based WebSocket server for agent monitoring
-2. **Observability Frontend** (Port 5173) - React-based UI for visualizing agent tasks
-3. **Document Sync Server** (Port 8766) - Python-based document storage and retrieval service
+1. **Dashboard** (Port 3000) - React-based UI for agent management, session monitoring, and document management
+2. **Agent Registry** (Port 8767) - FastAPI service for agent blueprint CRUD operations
+3. **Agent Runtime** (Port 8765) - Python-based WebSocket server for agent session management and observability
+4. **Context Store** (Port 8766) - Python-based document storage and retrieval service
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Network                            │
-│              (agent-orchestrator-network)                    │
-│                                                              │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌───────────┐ │
-│  │  Observability   │  │  Observability   │  │ Document  │ │
-│  │     Backend      │◄─┤     Frontend     │  │  Server   │ │
-│  │   (Port 8765)    │  │   (Port 5173)    │  │ (8766)    │ │
-│  └──────────────────┘  └──────────────────┘  └───────────┘ │
-│          │                                          │        │
-│          │                                          │        │
-│  ┌───────▼────────┐                        ┌────────▼─────┐ │
-│  │  Volume Mount  │                        │ Named Volume │ │
-│  │  (dev code)    │                        │ (persistent) │ │
-│  └────────────────┘                        └──────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         Docker Network                                    │
+│                   (agent-orchestrator-network)                            │
+│                                                                           │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │                         Dashboard (Port 3000)                       │  │
+│  │        Agent Management | Sessions | Documents                      │  │
+│  └───────────────┬─────────────────┬─────────────────┬────────────────┘  │
+│                  │                 │                 │                    │
+│                  ▼                 ▼                 ▼                    │
+│  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐       │
+│  │  Agent Registry   │ │   Agent Runtime   │ │  Context Store    │       │
+│  │    (Port 8767)    │ │    (Port 8765)    │ │    (Port 8766)    │       │
+│  │                   │ │                   │ │                   │       │
+│  └─────────┬─────────┘ └───────────────────┘ └─────────┬─────────┘       │
+│            │                                           │                  │
+│            ▼                                           ▼                  │
+│  ┌───────────────────┐                      ┌───────────────────┐        │
+│  │   Volume Mount    │                      │   Named Volume    │        │
+│  │   (agents dir)    │                      │   (persistent)    │        │
+│  └───────────────────┘                      └───────────────────┘        │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -63,6 +70,57 @@ docker-compose up --build -d
 docker-compose logs -f
 ```
 
+## Custom Agent Directory Configuration
+
+By default, the Agent Registry service looks for agent definitions in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
+
+### Option 1: Using a `.env` file (Simplest)
+
+Create a `.env` file in the project root:
+
+```bash
+# Set your custom agents directory path
+echo "AGENT_DIR=/path/to/your/agents" > .env
+
+# Then start services as usual
+make start-bg
+```
+
+### Option 2: Using `docker-compose.override.yml` (Most Flexible)
+
+For more complex overrides (multiple settings, port changes, etc.):
+
+```bash
+# Copy the template
+cp docker-compose.override.yml.template docker-compose.override.yml
+
+# Edit the file with your settings
+# The override file is automatically loaded by Docker Compose
+```
+
+Edit `docker-compose.override.yml`:
+
+```yaml
+services:
+  agent-registry:
+    volumes:
+      - /path/to/your/agents:/data/agents
+```
+
+### Option 3: Inline Environment Variable (One-off)
+
+For quick testing without modifying any files:
+
+```bash
+AGENT_DIR=/path/to/your/agents make start-bg
+```
+
+Or with docker-compose directly:
+
+```bash
+AGENT_DIR=/path/to/your/agents docker-compose up --build -d
+```
+
 ## Available Commands
 
 Run `make help` to see all available commands:
@@ -85,57 +143,74 @@ Run `make help` to see all available commands:
 |---------|-------------|
 | `make logs` | View logs from all services |
 | `make logs-f` | Follow logs from all services |
-| `make logs-obs` | View observability logs only |
-| `make logs-doc` | View document server logs only |
+| `make logs-runtime` | View agent runtime logs only |
+| `make logs-doc` | View context store server logs only |
 
 ### Cleanup
 
 | Command | Description |
 |---------|-------------|
 | `make clean` | Stop and remove containers (keeps data) |
-| `make clean-all` | Remove everything including volumes |
+| `make clean-all` | Remove everything including data (sessions, documents) |
+| `make clean-docs` | Remove only document storage volume |
+| `make clean-sessions` | Remove only session storage volume |
 
 ### Individual Services
 
 | Command | Description |
 |---------|-------------|
-| `make restart-obs` | Restart observability services |
-| `make restart-doc` | Restart document server |
+| `make restart-runtime` | Restart agent runtime |
+| `make restart-doc` | Restart context store server |
 
 ## Service Details
 
-### Observability Backend
+### Dashboard
+
+- **Port:** 3000
+- **Technology:** Node.js 18 + Vite + React + Tailwind CSS
+- **Purpose:** Unified UI for agent management, session monitoring, and document management
+- **URL:** http://localhost:3000
+- **Code Location:** `./dashboard`
+
+**Features:**
+- Agent Sessions (real-time monitoring via WebSocket)
+- Document Management (upload, tag, preview)
+- Agent Manager (create/edit agent definitions)
+
+### Agent Registry
+
+- **Port:** 8767
+- **Technology:** Python 3.12 + FastAPI
+- **Purpose:** CRUD API for agent definitions
+- **Health Check:** http://localhost:8767/health
+- **Code Location:** `./servers/agent-registry`
+
+**Environment Variables:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENT_REGISTRY_HOST` | `0.0.0.0` | Server bind address |
+| `AGENT_REGISTRY_PORT` | `8767` | Server port |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `/data/agents` | Agents storage directory (in container) |
+
+### Agent Runtime
 
 - **Port:** 8765
-- **Technology:** Python 3.12 + WebSockets
-- **Purpose:** Receives and stores agent task events
-- **Health Check:** http://localhost:8765/health
-- **Code Location:** `./agent-orchestrator-observability/backend`
+- **Technology:** Python 3.12 + FastAPI + WebSockets
+- **Purpose:** Session management, agent spawning, and real-time event capture
+- **Health Check:** http://localhost:8765/sessions
+- **Code Location:** `./servers/agent-runtime`
 
 **Development Mode:**
 - Source code is mounted as a volume
 - Changes to Python files are reflected in real-time
 
-### Observability Frontend
-
-- **Port:** 5173
-- **Technology:** Node.js 18 + Vite + React
-- **Purpose:** Visual interface for monitoring agent tasks
-- **URL:** http://localhost:5173
-- **Code Location:** `./agent-orchestrator-observability/frontend`
-
-**Development Mode:**
-- Source code is mounted as a volume
-- Hot module reloading (HMR) is enabled
-- Changes to React components are reflected immediately
-
-### Document Sync Server
+### Context Store Server
 
 - **Port:** 8766
 - **Technology:** Python 3.11 + FastAPI
 - **Purpose:** Document storage and retrieval for Claude Code plugins
 - **Health Check:** http://localhost:8766/health
-- **Code Location:** `./document-sync-plugin/document-server`
+- **Code Location:** `./servers/context-store`
 
 **Data Persistence:**
 - Uses a named volume (`agent-orchestrator-document-data`)
@@ -153,10 +228,10 @@ The centralized `docker-compose.yml` was designed to minimize redundancy while k
 Instead of duplicating Dockerfile content, the centralized compose file references the existing Dockerfiles in subdirectories:
 
 ```yaml
-observability-backend:
+agent-runtime:
   build:
-    context: ./agent-orchestrator-observability
-    dockerfile: docker/backend.Dockerfile
+    context: ./servers/agent-runtime
+    dockerfile: Dockerfile
 ```
 
 **Benefits:**
@@ -170,7 +245,7 @@ All paths are relative to the project root:
 
 ```yaml
 volumes:
-  - ./agent-orchestrator-observability/backend:/app/backend
+  - ./servers/agent-runtime:/app
 ```
 
 **Benefits:**
@@ -195,18 +270,17 @@ networks:
 
 #### 4. **Standalone Compatibility**
 
-The individual docker-compose files in subdirectories remain functional:
+The individual services can be started independently if needed:
 
 ```bash
-# Still works!
-cd agent-orchestrator-observability
-docker-compose up
+# Start only agent runtime
+docker-compose up agent-runtime
 ```
 
 **Benefits:**
 - Developers can work on individual services
 - No breaking changes to existing workflows
-- Gradual migration path
+- Flexible deployment options
 
 ## Building Services
 
@@ -232,32 +306,44 @@ docker-compose build --no-cache
 ### Build Individual Services
 
 ```bash
-# Build only observability backend
-docker-compose build observability-backend
+# Build only dashboard
+docker-compose build dashboard
 
-# Build only document server
-docker-compose build document-server
+# Build only agent registry
+docker-compose build agent-registry
+
+# Build only agent runtime
+docker-compose build agent-runtime
+
+# Build only context store
+docker-compose build context-store
 ```
 
 ### Build Process
 
 The build process for each service:
 
-**Observability Backend:**
+**Dashboard:**
+1. Uses `node:18-alpine` base image
+2. Copies `package*.json` and installs dependencies
+3. Builds production bundle with Vite
+4. Serves via nginx on port 80
+
+**Agent Registry:**
 1. Uses `python:3.12-slim` base image
 2. Installs `uv` package manager
 3. Copies `pyproject.toml` and installs dependencies
-4. Code is mounted at runtime (development mode)
+4. Runs FastAPI server
 
-**Observability Frontend:**
-1. Uses `node:18-alpine` base image
-2. Copies `package*.json` and installs dependencies
-3. Code is mounted at runtime (development mode)
-4. Runs Vite dev server with HMR
+**Agent Runtime:**
+1. Uses `python:3.12-slim` base image
+2. Installs `uv` package manager
+3. Copies `pyproject.toml` and installs dependencies
+4. Runs FastAPI server with WebSocket support
 
-**Document Server:**
+**Context Store:**
 1. Uses `python:3.11-slim` base image
-2. Installs dependencies from `requirements.txt`
+2. Installs dependencies via `uv`
 3. Copies application code into image
 4. Runs FastAPI server
 
@@ -269,9 +355,10 @@ Check if ports are already in use:
 
 ```bash
 # Check if ports are occupied
-lsof -i :8765  # Observability backend
-lsof -i :5173  # Observability frontend
-lsof -i :8766  # Document server
+lsof -i :3000  # Dashboard
+lsof -i :8767  # Agent Registry
+lsof -i :8765  # Agent Runtime
+lsof -i :8766  # Context Store
 ```
 
 ### Health Checks Failing
@@ -285,9 +372,10 @@ make health
 Or manually:
 
 ```bash
-curl http://localhost:8765/health
-curl http://localhost:8766/health
-curl http://localhost:5173
+curl http://localhost:3000       # Dashboard
+curl http://localhost:8767/health  # Agent Registry
+curl http://localhost:8765/sessions  # Agent Runtime
+curl http://localhost:8766/health  # Context Store
 ```
 
 ### View Service Logs
@@ -297,8 +385,8 @@ curl http://localhost:5173
 make logs-f
 
 # Individual service
-docker-compose logs -f observability-backend
-docker-compose logs -f document-server
+docker-compose logs -f agent-runtime
+docker-compose logs -f context-store
 ```
 
 ### Reset Everything
@@ -321,56 +409,49 @@ If you encounter permission issues with volumes:
 
 ```bash
 # Fix ownership (Linux/macOS)
-sudo chown -R $USER:$USER ./agent-orchestrator-observability
-sudo chown -R $USER:$USER ./document-sync-plugin
+sudo chown -R $USER:$USER ./servers/agent-runtime
+sudo chown -R $USER:$USER ./servers/context-store
 ```
 
 ## Data Persistence
 
-### Document Server Data
+Both the document server and session data use named Docker volumes for persistence. Data survives container restarts and rebuilds.
 
-The document server uses a named volume for persistent storage:
+### Document Server Data
 
 - **Volume Name:** `agent-orchestrator-document-data`
 - **Location in Container:** `/app/data`
 - **Contains:** SQLite database + uploaded files
 
-**Backing up data:**
+### Session Data (Agent Runtime)
+
+- **Volume Name:** `agent-orchestrator-runtime-data`
+- **Location in Container:** `/app/.agent-orchestrator`
+- **Contains:** SQLite database with session history and events
+
+### Backing Up Data
 
 ```bash
-# Create backup
+# Backup documents
 docker run --rm -v agent-orchestrator-document-data:/data -v $(pwd):/backup alpine tar czf /backup/document-data-backup.tar.gz /data
 
-# Restore backup
-docker run --rm -v agent-orchestrator-document-data:/data -v $(pwd):/backup alpine sh -c "cd / && tar xzf /backup/document-data-backup.tar.gz"
+# Backup sessions
+docker run --rm -v agent-orchestrator-runtime-data:/data -v $(pwd):/backup alpine tar czf /backup/session-data-backup.tar.gz /data
 ```
 
-### Observability Data
+### Clearing Data
 
-Currently, the observability backend starts with a fresh database on each run. To enable persistence, uncomment the volume in `docker-compose.yml`:
-
-```yaml
-observability-backend:
-  volumes:
-    - ./agent-orchestrator-observability/backend:/app/backend
-    - observability-data:/app/data  # Uncomment this line
-```
-
-Then add the volume definition:
-
-```yaml
-volumes:
-  document-data:
-    name: agent-orchestrator-document-data
-  observability-data:  # Add this
-    name: agent-orchestrator-observability-data
+```bash
+make clean-docs      # Clear only documents
+make clean-sessions  # Clear only sessions
+make clean-all       # Clear everything (containers + all data)
 ```
 
 ## Integration with Claude Code Plugins
 
-### Document Sync Plugin
+### Context Store Plugin
 
-The document sync plugin requires the document server to be running:
+The context store plugin requires the context store server to be running:
 
 ```bash
 # Start the document server
@@ -382,21 +463,24 @@ curl http://localhost:8766/health
 
 In Claude Code, the plugin will automatically connect to `http://localhost:8766`.
 
-### Observability Plugin
+### Dashboard
 
-The observability plugin is optional but provides valuable insights:
+The dashboard provides a single interface for all agent orchestration tasks:
 
-1. Start the observability services:
+1. Start all services:
    ```bash
    make start-bg
    ```
 
 2. Open the UI:
    ```
-   http://localhost:5173
+   http://localhost:3000
    ```
 
-3. Watch agent tasks in real-time as they execute
+3. Features available:
+   - **Sessions**: Monitor agent sessions in real-time
+   - **Documents**: Upload and manage context documents
+   - **Agents**: Create and configure agent definitions
 
 ## Advanced Usage
 
@@ -405,13 +489,11 @@ The observability plugin is optional but provides valuable insights:
 Create a `.env` file in the project root:
 
 ```env
+# Agent Manager
+AGENT_DIR=/path/to/your/agents
+
 # Observability
 DEBUG_LOGGING=true
-VITE_BACKEND_URL=http://localhost:8765
-
-# Document Server
-LOG_LEVEL=DEBUG
-DOCUMENT_SERVER_PORT=8766
 ```
 
 Docker Compose will automatically load these variables.
@@ -431,31 +513,33 @@ The current setup is optimized for development with volume mounts. For productio
 You can start specific services:
 
 ```bash
-# Only document server
-docker-compose up document-server
+# Only context store
+docker-compose up context-store
 
-# Only observability stack
-docker-compose up observability-backend observability-frontend
+# Only agent registry
+docker-compose up agent-registry
+
+# Dashboard with all backends
+docker-compose up dashboard agent-registry agent-runtime context-store
 ```
 
-## Migration from Subdirectory Compose Files
+## Service Architecture
 
-The centralized setup is **fully compatible** with existing subdirectory compose files:
+The centralized setup manages all services through a unified `docker-compose.yml`:
 
-- Old way still works: `cd agent-orchestrator-observability && docker-compose up`
-- New way is easier: `make start-bg` from project root
-- Both approaches use the same Dockerfiles
-- No code changes needed
+- All services started with: `make start-bg` from project root
+- Individual services can be targeted: `docker-compose up agent-runtime`
+- Single network for inter-service communication
 
-**Recommendation:** Use the centralized setup for running multiple services, and subdirectory compose files for focused development on a single service.
+**Recommendation:** Use the centralized setup for running the full system. For individual service development, you can start just that service with docker-compose.
 
 ## Next Steps
 
 1. Start services: `make start-bg`
-2. Check status: `make status`
-3. Check health: `make health`
-4. View logs: `make logs-f`
-5. Start using your Claude Code plugins!
+2. Open the dashboard: http://localhost:3000
+3. Check status: `make status`
+4. Check health: `make health`
+5. View logs: `make logs-f`
 
 For issues or questions, check the logs first:
 ```bash
@@ -466,11 +550,9 @@ make logs-f
 
 The centralized Docker setup provides:
 
-✅ **Simple:** Single command to start everything
-✅ **Minimal Redundancy:** Reuses existing Dockerfiles
-✅ **Flexible:** Can still use subdirectory compose files
-✅ **Development-Friendly:** Hot reloading for code changes
-✅ **Production-Ready:** Health checks and proper networking
-✅ **Well-Documented:** Clear commands and troubleshooting steps
-
-Enjoy your simplified Docker workflow! 🚀
+- **Simple:** Single command to start everything
+- **Minimal Redundancy:** Reuses existing Dockerfiles
+- **Flexible:** Custom agent directory via `.env` or `docker-compose.override.yml`
+- **Development-Friendly:** Hot reloading for code changes
+- **Production-Ready:** Health checks and proper networking
+- **Well-Documented:** Clear commands and troubleshooting steps

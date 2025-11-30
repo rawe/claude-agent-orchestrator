@@ -23,7 +23,7 @@ AOF provides two distinct usage levels, allowing you to choose the integration a
 
 **Best for:** Direct integration within Claude Code with full control
 
-Install the `agent-orchestrator` plugin to get:
+Install the `orchestrator` plugin to get:
 - Python-based `ao-*` commands for agent orchestration
 - Slash commands for agent management
 - Skills for creating and managing agents
@@ -38,10 +38,10 @@ Install the `agent-orchestrator` plugin to get:
 **Usage Example:**
 ```
 /agent-orchestrator-init
-Use the agent-orchestrator skill to create a new session called "code-review"
+Use the orchestrator skill to create a new session called "code-review"
 ```
 
-**Documentation:** [plugins/agent-orchestrator/README.md](./plugins/agent-orchestrator/README.md)
+**Documentation:** [plugins/orchestrator/README.md](./plugins/orchestrator/README.md)
 
 ---
 
@@ -65,7 +65,7 @@ git clone <your-repo-url>
 
 # 2. Configure in Claude Desktop or Claude Code
 # MCP server now auto-discovers commands - minimal setup required!
-# See plugins/agent-orchestrator/mcp-server/README.md
+# See interfaces/agent-orchestrator-mcp-server/README.md
 ```
 
 **Usage Example (from Claude Desktop):**
@@ -74,7 +74,7 @@ List available agents
 Create a new agent session called "code-review" using the code-reviewer agent
 ```
 
-**Documentation:** [plugins/agent-orchestrator/mcp-server/README.md](./plugins/agent-orchestrator/mcp-server/README.md)
+**Documentation:** [interfaces/agent-orchestrator-mcp-server/README.md](./interfaces/agent-orchestrator-mcp-server/README.md)
 
 **Important Limitation:**
 Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 2 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1 integration which operates within a single Claude Code session.
@@ -94,71 +94,38 @@ Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/is
 
 ```
 agent-orchestrator-framework/
-├── plugins/                         # Claude Code plugins
-│   ├── agent-orchestrator/          # Core framework plugin
-│   │   ├── skills/
-│   │   │   └── agent-orchestrator/
-│   │   │       ├── commands/            # Python ao-* commands
-│   │   │       ├── SKILL.md             # Skill definition
-│   │   │       ├── references/          # Technical documentation
-│   │   │       └── example/             # Example agent definitions
-│   │   ├── commands/                # Slash commands
-│   │   ├── mcp-server/              # Level 2: MCP server
-│   │   │   ├── agent-orchestrator-mcp.py
-│   │   │   ├── libs/
-│   │   │   └── docs/
-│   │   └── README.md
-│   │
-│   └── document-sync/               # Document sync plugin
-│       ├── document-server/         # FastAPI document server
-│       ├── skills/                  # Document sync skill
-│       └── README.md
 │
-├── agent-orchestrator-observability/ # Real-time observability platform
-│   ├── backend/                     # FastAPI + WebSocket backend
-│   ├── frontend/                    # React-based web UI
-│   ├── hooks/                       # Hook scripts for event capture
-│   ├── docker/                      # Docker setup
-│   └── README.md                    # Full documentation
+├── README.md                          # This file
+├── Makefile                           # Build, run, deploy commands
+├── docker-compose.yml                 # Container orchestration
 │
-├── docker-compose.yml               # Multi-service Docker setup
-├── Makefile                         # Convenience commands
-└── README.md                        # This file
+├── docs/                              # Documentation
+│   ├── ARCHITECTURE.md                # System architecture overview
+│   └── agent-runtime/                 # Agent Runtime server docs
+│
+├── servers/                           # Backend servers
+│   ├── agent-runtime/                 # Session management + event capture
+│   ├── agent-registry/                # Blueprint management (CRUD)
+│   └── context-store/                 # Document storage
+│
+├── interfaces/
+│   └── agent-orchestrator-mcp-server/ # MCP protocol interface
+│
+├── dashboard/                         # Web UI (React + Vite)
+│
+└── plugins/                           # Claude Code plugins
+    ├── orchestrator/                  # Agent orchestration commands
+    │   └── skills/orchestrator/
+    │       └── commands/              # ao-* commands
+    │
+    └── context-store/                 # Document management commands
+        └── skills/context-store/
+            └── commands/              # doc-* commands
 ```
 
-## Quick Start Guide
+## Quick Start
 
-### For Claude Code Users (Level 1)
-
-1. **Add this repository to Claude Code:**
-   - Your repository URL will point to this marketplace
-   - Claude Code will discover all available plugins
-
-2. **Install plugins:**
-   - Install `agent-orchestrator` for orchestration capabilities
-   - Install `document-sync` for document management
-
-3. **Start orchestrating:**
-   ```
-   /agent-orchestrator-init
-   ```
-
-### For Claude Desktop Users (Level 2)
-
-**Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
-
-1. **Clone repository:**
-   ```bash
-   git clone <your-repo-url>
-   ```
-
-2. **Configure MCP server:**
-   See [plugins/agent-orchestrator/mcp-server/README.md](./plugins/agent-orchestrator/mcp-server/README.md)
-
-3. **Use from Claude Desktop:**
-   ```
-   List available agent defintions
-   ```
+See **[Getting Started](./docs/GETTING_STARTED.md)** for setup instructions.
 
 ## Core Concepts
 
@@ -166,7 +133,7 @@ agent-orchestrator-framework/
 Markdown files that define specialized agent configurations with custom system prompts, instructions, and MCP configurations. Stored in `.agent-orchestrator/agents/`.
 
 ### Sessions
-Isolated Claude Code sessions for individual agents. Each session has a unique ID, configuration, and result storage. Stored in `.agent-orchestrator/sessions/`.
+Isolated Claude Code sessions for individual agents. Each session has a unique ID and configuration. Session data is persisted in the Agent Runtime server (SQLite).
 
 ### MCP Configuration
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
@@ -175,28 +142,40 @@ Different agents can have different MCP server configurations, enabling speciali
 The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
-## Observability
+## Dashboard & Observability
 
-Monitor your agent orchestration in real-time with the built-in observability platform:
+Monitor your agent orchestration in real-time with the unified Dashboard:
 
 - **Real-time monitoring** of agent sessions and tool calls
 - **WebSocket-based** live updates
 - **Docker support** for one-command deployment
-- **Hook-based integration** with Claude Code events
+- **Agent blueprint management** via web UI
+- **Document management** for context sharing
 
 **Quick Start:**
 ```bash
-cd agent-orchestrator-observability
-docker-compose up -d
-# Open http://localhost:5173
+# Start all services (Dashboard + all backend servers)
+make start-bg
+
+# Open http://localhost:3000
+make open
 ```
 
-See **[agent-orchestrator-observability/README.md](./agent-orchestrator-observability/README.md)** for full documentation.
+**Service URLs:**
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
+| Agent Runtime | http://localhost:8765 | Session management, WebSocket events |
+| Agent Registry | http://localhost:8767 | Blueprint CRUD API |
+| Context Store | http://localhost:8766 | Document storage API |
+
+See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for full architecture.
 
 ## Documentation
 
-- **[Agent Orchestrator Plugin](./plugins/agent-orchestrator/README.md)** - Level 1: Claude Code plugin
-- **[Agent Orchestrator MCP Server](./plugins/agent-orchestrator/mcp-server/README.md)** - Level 2: MCP implementation
-- **[Document Sync Plugin](./plugins/document-sync/README.md)** - Agent overarching document management plugin
-- **[Observability Platform](./agent-orchestrator-observability/README.md)** - Real-time monitoring
-- **[Technical Architecture](./plugins/agent-orchestrator/skills/agent-orchestrator/references/AGENT-ORCHESTRATOR.md)** - Deep dive into how it works
+- **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
+- **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
+- **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
+- **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Level 1: Claude Code plugin
+- **[MCP Server](./interfaces/agent-orchestrator-mcp-server/README.md)** - Level 2: MCP implementation
+- **[Context Store Plugin](./plugins/context-store/README.md)** - Document management plugin

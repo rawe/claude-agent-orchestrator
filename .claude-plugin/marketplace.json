@@ -10,12 +10,12 @@
   },
   "plugins": [
     {
-      "name": "agent-orchestrator",
-      "source": "./plugins/agent-orchestrator"
+      "name": "orchestrator",
+      "source": "./plugins/orchestrator"
     },
     {
-      "name": "document-sync",
-      "source": "./plugins/document-sync"
+      "name": "context-store",
+      "source": "./plugins/context-store"
     }
   ]
 }

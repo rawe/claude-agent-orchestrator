@@ -10,3 +10,6 @@
 - Show the user what files have changed and what the commit message will be
 - Only create a commit after receiving explicit confirmation from the user
 
+## Python info
+* Use python instead of python3 for commands
+* use uv for packages instead of pip or pip3

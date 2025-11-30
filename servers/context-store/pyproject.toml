@@ -1,0 +1,14 @@
+[project]
+name = "context-store"
+version = "0.1.0"
+description = "FastAPI server for document management and synchronization"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.scripts]
+start = "document_server.main:main"

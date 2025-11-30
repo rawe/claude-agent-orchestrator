@@ -77,6 +77,12 @@ $RECYCLE.BIN/
 # Agent Orchestrator
 .agent-orchestrator/
 
+# Docker Compose local overrides (use docker-compose.override.yml.template as starting point)
+docker-compose.override.yml
+
+# Environment variables (local configuration)
+.env
+
 # work in progress
 agent-orchestrator-launcher/
 agent-orchestrator-cli/

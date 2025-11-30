@@ -1,0 +1,76 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "typer",
+#     "httpx",
+# ]
+# ///
+"""
+Remove all agent orchestrator sessions.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+import typer
+from typing import Optional
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
+):
+    """
+    Remove all sessions.
+
+    Examples:
+        ao-clean
+    """
+    from config import load_config
+    from session import list_all_sessions
+    from session_client import SessionClient, SessionClientError
+    import shutil
+
+    try:
+        # Load configuration with CLI overrides
+        config = load_config(
+            cli_project_dir=str(project_dir) if project_dir else None,
+        )
+
+        deleted_count = 0
+        files_existed = config.sessions_dir.exists()
+
+        # Delete from API
+        try:
+            client = SessionClient(config.session_manager_url)
+            sessions = client.list_sessions()
+            for s in sessions:
+                session_id = s.get('session_id')
+                if session_id:
+                    if client.delete_session(session_id):
+                        deleted_count += 1
+        except SessionClientError as e:
+            # API error - continue to file cleanup
+            print(f"Warning: API error: {e}", file=sys.stderr)
+
+        # Also delete backup files if they exist
+        if files_existed:
+            shutil.rmtree(config.sessions_dir)
+
+        if deleted_count > 0 or files_existed:
+            print("All sessions removed")
+        else:
+            print("No sessions to remove")
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()
