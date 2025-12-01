@@ -91,7 +91,7 @@ export function AgentManager() {
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4 p-4 border-b border-gray-200">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Agent Definitions</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Agent Blueprints</h2>
           <p className="text-sm text-gray-500">
             Manage specialized agent configurations for different tasks
           </p>

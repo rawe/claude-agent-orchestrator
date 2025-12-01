@@ -6,7 +6,7 @@
 # ]
 # ///
 """
-List all available agent definitions from Agent Manager API.
+List all available agent blueprints from Agent Manager API.
 
 Configuration:
     AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
@@ -26,12 +26,12 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def main():
     """
-    List all available agent definitions.
+    List all available agent blueprints.
 
     Displays: agent name, description, status
 
     Examples:
-        ao-list-agents
+        ao-list-blueprints
     """
     try:
         agents = list_agents_api()
@@ -40,7 +40,7 @@ def main():
         sys.exit(1)
 
     if not agents:
-        print("No agent definitions found")
+        print("No agent blueprints found")
         return
 
     # Display agents

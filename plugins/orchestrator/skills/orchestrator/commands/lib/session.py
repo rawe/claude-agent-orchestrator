@@ -121,8 +121,8 @@ def save_session_metadata(
     """
     Create .meta.json file for new session.
 
-    STAGE 1 (ao-new): Called without session_id before Claude runs.
-    STAGE 2 (ao-new): session_id added later via update_session_id().
+    STAGE 1 (ao-start): Called without session_id before Claude runs.
+    STAGE 2 (ao-start): session_id added later via update_session_id().
 
     Args:
         session_name: Name of the session

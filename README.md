@@ -12,7 +12,7 @@ The Agent Orchestrator Framework (AOF) enables you to create, manage, and orches
 - Manage multiple concurrent agent sessions
 - Inject different MCP server configurations per agent
 - Extract and process results from completed agents
-- Create reusable agent definitions for common tasks
+- Create reusable agent blueprints for common tasks
 - Support for long-running and background tasks
 
 ## Two Usage Levels
@@ -129,8 +129,8 @@ See **[Getting Started](./docs/GETTING_STARTED.md)** for setup instructions.
 
 ## Core Concepts
 
-### Agent Definitions
-Markdown files that define specialized agent configurations with custom system prompts, instructions, and MCP configurations. Stored in `.agent-orchestrator/agents/`.
+### Agent Blueprints
+Reusable configurations that define specialized agent behavior. Each blueprint can include a custom system prompt, instructions, and MCP server configurations. Managed via the Agent Registry server or stored in `.agent-orchestrator/agents/`.
 
 ### Sessions
 Isolated Claude Code sessions for individual agents. Each session has a unique ID and configuration. Session data is persisted in the Agent Runtime server (SQLite).
@@ -139,7 +139,7 @@ Isolated Claude Code sessions for individual agents. Each session has a unique I
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
 
 ### Orchestration Commands
-The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
+The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
 ## Dashboard & Observability
@@ -170,6 +170,17 @@ make open
 | Context Store | http://localhost:8766 | Document storage API |
 
 See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for full architecture.
+
+## Glossary
+
+| Term | Definition |
+|------|------------|
+| **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Registry. |
+| **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
+| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, spawns agents, and captures events. |
+| **Agent Registry** | Backend server (port 8767) that stores and serves agent blueprints via REST API. |
+| **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
+| **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 
 ## Documentation
 

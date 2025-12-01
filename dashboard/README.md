@@ -17,7 +17,7 @@ A unified React dashboard for the Agent Orchestrator Framework, providing real-t
 - Download functionality
 
 ### Agent Manager
-- Create and edit agent definitions
+- Create and edit agent blueprints
 - System prompt editor with preview
 - MCP server and skill configuration
 - Activate/deactivate agents
@@ -33,7 +33,7 @@ cd dashboard
 docker-compose up -d
 ```
 
-The frontend will be available at `http://localhost:3000`.
+The Dashboard will be available at `http://localhost:3000`.
 
 For development with hot reload:
 
@@ -100,11 +100,11 @@ src/
 
 ## Backend Requirements
 
-This frontend requires the following backend services:
+The Dashboard requires the following backend services:
 
-1. **Observability Backend** (port 8765) - Session and event management
-2. **Context Store Server** (port 8766) - Document storage and retrieval
-3. **Agent Registry** (port 8767) - Agent definition CRUD
+1. **Agent Runtime** (port 8765) - Session and event management
+2. **Context Store** (port 8766) - Document storage and retrieval
+3. **Agent Registry** (port 8767) - Agent blueprint CRUD
 
 See `docs/BACKEND-TODO.md` for details on missing backend endpoints.
 

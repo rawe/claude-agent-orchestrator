@@ -7,7 +7,7 @@
 # ]
 # ///
 """
-Remove all agent orchestrator sessions.
+Delete all agent orchestrator sessions.
 """
 
 import sys
@@ -26,10 +26,10 @@ def main(
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
 ):
     """
-    Remove all sessions.
+    Delete all sessions.
 
     Examples:
-        ao-clean
+        ao-delete-all
     """
     from config import load_config
     from session import list_all_sessions

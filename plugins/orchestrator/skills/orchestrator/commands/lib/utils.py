@@ -79,7 +79,7 @@ def _get_calling_command() -> str:
     Determine which command is running by inspecting the call stack.
 
     Returns:
-        Command name (e.g., "ao-new") or "unknown"
+        Command name (e.g., "ao-start") or "unknown"
     """
     try:
         # Get call stack

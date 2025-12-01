@@ -6,7 +6,7 @@ Detailed API documentation for all MCP tools provided by the Agent Orchestrator 
 
 The Agent Orchestrator MCP Server provides 7 tools for managing orchestrated agent sessions:
 
-1. **list_agent_definitions** - Discover available agent definition blueprints
+1. **list_agent_blueprints** - Discover available agent blueprints
 2. **list_agent_sessions** - View all agent session instances with their IDs and project directories
 3. **start_agent_session** - Create new agent session instances with optional specialization (supports async execution)
 4. **resume_agent_session** - Continue work in existing session instances (supports async execution)
@@ -18,9 +18,9 @@ All tools support optional `project_dir` override for managing multiple projects
 
 ---
 
-## 1. list_agent_definitions
+## 1. list_agent_blueprints
 
-Lists all available agent definitions (blueprints) that can be used to create agent sessions.
+Lists all available agent blueprints that can be used to create agent sessions.
 
 ### Parameters
 
@@ -123,7 +123,7 @@ Start a new agent session instance that immediately begins execution.
 ### Parameters
 
 - `session_name` (required): Unique identifier for this agent session instance (alphanumeric, dash, underscore; max 60 chars)
-- `agent_definition_name` (optional): Name of agent definition (blueprint) to use for this session (optional for generic sessions)
+- `agent_blueprint_name` (optional): Name of agent blueprint to use for this session (optional for generic sessions)
 - `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `prompt` (required): Initial task description or prompt for the agent session
 - `async` (optional): Run in background (default: `false`). When `true`, returns immediately and use `get_agent_session_status` / `get_agent_session_result` to check progress
@@ -133,7 +133,7 @@ Start a new agent session instance that immediately begins execution.
 ```python
 {
   "session_name": "architect",
-  "agent_definition_name": "system-architect",
+  "agent_blueprint_name": "system-architect",
   "prompt": "Design a microservices architecture for an e-commerce platform"
 }
 ```
@@ -143,7 +143,7 @@ Start a new agent session instance that immediately begins execution.
 ```python
 {
   "session_name": "architect",
-  "agent_definition_name": "system-architect",
+  "agent_blueprint_name": "system-architect",
   "prompt": "Design a microservices architecture for an e-commerce platform",
   "async": true
 }
@@ -154,7 +154,7 @@ Start a new agent session instance that immediately begins execution.
 ```python
 {
   "session_name": "architect",
-  "agent_definition_name": "system-architect",
+  "agent_blueprint_name": "system-architect",
   "project_dir": "/absolute/path/to/project",
   "prompt": "Design a microservices architecture for an e-commerce platform"
 }
@@ -360,5 +360,5 @@ The server provides clear, actionable error messages:
 - **Session already exists**: Use `resume_agent_session` or choose a different name
 - **Session does not exist**: Use `start_agent_session` to create it first
 - **Invalid session name**: Check naming rules (alphanumeric, dash, underscore; max 60 chars)
-- **Agent not found**: Use `list_agent_definitions` to see available agent definitions
+- **Agent not found**: Use `list_agent_blueprints` to see available agent blueprints
 - **Script execution failed**: Check that the script path and environment variables are configured correctly

@@ -27,15 +27,15 @@ Commit messages should be:
 
 ### Good Commit Message
 ```
-feat: Implement ao-list-agents command
+feat: Implement ao-list-blueprints command
 
-Add command to list all available agent definitions with bash-compatible
+Add command to list all available agent blueprints with bash-compatible
 output format. Includes alphabetical sorting and empty directory handling.
 ```
 
 ### Bad Commit Message (NEVER DO THIS)
 ```
-feat: Implement ao-list-agents command
+feat: Implement ao-list-blueprints command
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

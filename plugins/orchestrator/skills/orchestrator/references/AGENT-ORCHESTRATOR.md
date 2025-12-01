@@ -57,7 +57,7 @@ Blueprints are managed by the **Agent Registry** and can include:
 Blueprints can be managed via:
 1. **Dashboard UI** at http://localhost:3000
 2. **Agent Registry API** at http://localhost:8767
-3. **ao-list-agents** command to view available blueprints
+3. **ao-list-blueprints** command to view available blueprints
 
 ### Session States
 
@@ -72,14 +72,14 @@ All commands are thin HTTP clients that call the backend APIs.
 
 | Command | Description | API Call |
 |---------|-------------|----------|
-| `ao-new` | Create new session | POST /sessions |
+| `ao-start` | Start new session | POST /sessions |
 | `ao-resume` | Resume existing session | POST /sessions/{id}/resume |
 | `ao-status` | Check session state | GET /sessions/{id}/status |
 | `ao-get-result` | Extract result | GET /sessions/{id}/result |
 | `ao-list-sessions` | List all sessions | GET /sessions |
-| `ao-list-agents` | List blueprints | GET /agents |
+| `ao-list-blueprints` | List blueprints | GET /agents |
 | `ao-show-config` | Show session config | GET /sessions/{id} |
-| `ao-clean` | Delete all sessions | DELETE /sessions |
+| `ao-delete-all` | Delete all sessions | DELETE /sessions |
 
 ## Use Cases
 
@@ -88,16 +88,16 @@ All commands are thin HTTP clients that call the backend APIs.
 Coordinate multiple specialized sessions:
 ```bash
 # List available blueprints
-uv run commands/ao-list-agents
+uv run commands/ao-list-blueprints
 
 # Architecture session
-uv run commands/ao-new architect --agent system-architect -p "Design microservices for e-commerce"
+uv run commands/ao-start architect --agent system-architect -p "Design microservices for e-commerce"
 
 # Development session
-uv run commands/ao-new developer --agent senior-developer -p "Implement the user service"
+uv run commands/ao-start developer --agent senior-developer -p "Implement the user service"
 
 # Review session
-uv run commands/ao-new reviewer --agent security-reviewer -p "Review the implementation"
+uv run commands/ao-start reviewer --agent security-reviewer -p "Review the implementation"
 ```
 
 ### Long-Running Background Tasks
@@ -113,7 +113,7 @@ Delegate time-consuming tasks:
 Resume sessions to continue previous work:
 ```bash
 # Initial work
-uv run commands/ao-new docs --agent documentation-expert -p "Create API documentation"
+uv run commands/ao-start docs --agent documentation-expert -p "Create API documentation"
 
 # Refinement
 uv run commands/ao-resume docs -p "Add authentication examples"

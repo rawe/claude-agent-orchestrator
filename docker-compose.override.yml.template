@@ -9,7 +9,7 @@
 #   3. Run: make start (the override file is automatically loaded by Docker Compose)
 #
 # COMMON USE CASES:
-#   - Point agent-registry to a different agent definitions directory
+#   - Point agent-registry to a different agent blueprints directory
 #   - Change port mappings
 #   - Add environment variables for debugging
 #

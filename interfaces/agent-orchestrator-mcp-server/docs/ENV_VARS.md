@@ -18,7 +18,7 @@ Single source of truth for environment variables used by the Agent Orchestrator 
 - Absolute path to the commands directory containing Python scripts
 - **Auto-discovered** relative to MCP server location - no configuration needed
 - Can be set to override auto-discovery
-- The directory should contain: `ao-new`, `ao-resume`, `ao-list-sessions`, `ao-list-agents`, `ao-clean`
+- The directory should contain: `ao-start`, `ao-resume`, `ao-list-sessions`, `ao-list-blueprints`, `ao-delete-all`
 
 ### `AGENT_ORCHESTRATOR_PROJECT_DIR` (Conditionally Required)
 

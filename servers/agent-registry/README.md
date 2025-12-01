@@ -4,7 +4,7 @@ FastAPI service providing HTTP endpoints for agent CRUD operations.
 
 ## Why?
 
-Agent definitions (system prompts, MCP servers, skills) are stored as files. This service provides a unified API that both the **CLI commands** (`ao-list-agents`, `ao-new --agent`) and the **dashboard** use to manage agents. Single source of truth, no direct file manipulation needed.
+Agent blueprints (system prompts, MCP servers, skills) are stored as files. This service provides a unified API that both the **CLI commands** (`ao-list-blueprints`, `ao-start --agent`) and the **Dashboard** use to manage agents. Single source of truth, no direct file manipulation needed.
 
 ## Quick Start
 

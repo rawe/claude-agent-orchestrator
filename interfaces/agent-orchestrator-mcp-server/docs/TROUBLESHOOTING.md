@@ -105,10 +105,10 @@ This opens a web interface where you can:
 
 ## Common Issues
 
-### 1. start_agent_session fails but list_agent_definitions works
+### 1. start_agent_session fails but list_agent_blueprints works
 
 **Symptoms:**
-- `list_agent_definitions` returns results successfully
+- `list_agent_blueprints` returns results successfully
 - `start_agent_session` fails with execution errors
 
 **Solutions:**
@@ -185,10 +185,10 @@ This opens a web interface where you can:
 - `start_agent_session` fails with "Agent not found" error
 
 **Solutions:**
-- Use `list_agent_definitions` to see all available agent definitions
-- Check that the agent definition exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
-- Verify the agent definition name spelling matches exactly
-- Ensure agent definition files have `.md` extension
+- Use `list_agent_blueprints` to see all available agent blueprints
+- Check that the agent blueprint exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
+- Verify the agent blueprint name spelling matches exactly
+- Ensure agent blueprint files are properly structured
 
 ### 8. PATH issues (Claude Desktop)
 
@@ -248,7 +248,7 @@ If you encounter issues not covered here:
 2. **Check environment variables** are set correctly
 3. **Test commands manually** in terminal:
    ```bash
-   /path/to/commands/ao-list-agents
+   /path/to/commands/ao-list-blueprints
    ```
 4. **Verify file permissions** on command scripts and directories
 5. **Check the GitHub issues** for similar problems

@@ -104,8 +104,6 @@ uv run skills/context-store/commands/doc-delete doc_abc123...
 - **[Context Store Server](../../servers/context-store/README.md)** - Server setup, API, configuration, testing
 - **[CLI Commands](skills/context-store/README.md)** - Command usage and examples
 - **[Claude Code Skill](skills/context-store/SKILL.md)** - Documentation for Claude
-- **[Architecture Details](docs/goal.md)** - Vision and design decisions
-- **[Implementation Guides](docs/implementation/)** - Block-by-block implementation checklists
 
 ## Key Features
 

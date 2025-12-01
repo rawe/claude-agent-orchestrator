@@ -15,7 +15,7 @@ from validation import validate_agent_name
 
 app = FastAPI(
     title="Agent Registry",
-    description="CRUD operations for agent definitions",
+    description="CRUD operations for agent blueprints",
     version="0.1.0",
 )
 

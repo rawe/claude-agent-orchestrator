@@ -14,7 +14,7 @@ from constants import (
     CMD_DELETE_ALL_SESSIONS,
     CMD_GET_RESULT,
     CMD_GET_STATUS,
-    CMD_LIST_DEFINITIONS,
+    CMD_LIST_BLUEPRINTS,
     CMD_LIST_SESSIONS,
     CMD_RESUME_SESSION,
     CMD_START_SESSION,
@@ -33,11 +33,11 @@ T = TypeVar("T")
 
 # Command name mapping from internal command names to Python CLI command files
 COMMAND_NAME_MAP = {
-    CMD_START_SESSION: "ao-new",
+    CMD_START_SESSION: "ao-start",
     CMD_RESUME_SESSION: "ao-resume",
     CMD_LIST_SESSIONS: "ao-list-sessions",
-    CMD_LIST_DEFINITIONS: "ao-list-agents",
-    CMD_DELETE_ALL_SESSIONS: "ao-clean",
+    CMD_LIST_BLUEPRINTS: "ao-list-blueprints",
+    CMD_DELETE_ALL_SESSIONS: "ao-delete-all",
     CMD_GET_STATUS: "ao-status",
     CMD_GET_RESULT: "ao-get-result",
 }
@@ -246,7 +246,7 @@ async def execute_script_async(
 
 def parse_agent_list(output: str) -> List[AgentInfo]:
     """
-    Parse agent list output from the list-agents command
+    Parse agent list output from the list-blueprints command
     Format:
     agent-name:
     description
@@ -256,7 +256,7 @@ def parse_agent_list(output: str) -> List[AgentInfo]:
     next-agent:
     description
     """
-    if output == "No agent definitions found":
+    if output == "No agent blueprints found":
         return []
 
     agents: List[AgentInfo] = []
@@ -307,7 +307,7 @@ def parse_session_list(output: str) -> List[SessionInfo]:
 def format_agents_as_markdown(agents: List[AgentInfo]) -> str:
     """Format agent list as markdown"""
     if not agents:
-        return "No agent definitions found"
+        return "No agent blueprints found"
 
     lines = ["# Available Orchestrated Agents", ""]
 

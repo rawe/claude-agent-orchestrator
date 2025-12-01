@@ -8,9 +8,9 @@
 # ]
 # ///
 """
-Create a new agent orchestrator session.
+Start a new agent orchestrator session.
 
-This command creates a new Claude AI session, optionally with an agent configuration.
+This command starts a new Claude AI session, optionally with an agent configuration.
 
 Configuration:
     AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
@@ -36,12 +36,12 @@ def main(
     project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
 ):
     """
-    Create a new agent orchestrator session.
+    Start a new agent orchestrator session.
 
     Examples:
-        ao-new mysession -p "Write hello world"
-        ao-new research --agent web-researcher -p "Research AI"
-        cat prompt.md | ao-new mysession
+        ao-start mysession -p "Write hello world"
+        ao-start research --agent web-researcher -p "Research AI"
+        cat prompt.md | ao-start mysession
     """
     from config import load_config
     from session import (
@@ -61,7 +61,7 @@ def main(
     )
 
     # DEBUG LOGGING - Command entry
-    debug_log("COMMAND - ao-new", {
+    debug_log("COMMAND - ao-start", {
         "cwd": str(Path.cwd()),
         "argv": sys.argv,
         "session_name": session_name,

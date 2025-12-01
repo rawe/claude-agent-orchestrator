@@ -25,7 +25,7 @@ Dashboard runs on `http://localhost:3000`
 **3. Run agents:**
 
 ```bash
-uv run plugins/orchestrator/commands/ao-new my-session -p "Your prompt"
+uv run plugins/orchestrator/commands/ao-start my-session -p "Your prompt"
 ```
 
 The commands automatically connect to the Agent Runtime at the default URL.
