@@ -31,7 +31,6 @@ app = typer.Typer(add_completion=False)
 def main(
     session_name: str = typer.Argument(..., help="Name of the session"),
     prompt: Optional[str] = typer.Option(None, "-p", "--prompt", help="Continuation prompt"),
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
 ):
     """
     Resume an existing agent orchestrator session.
@@ -40,7 +39,7 @@ def main(
         ao-resume mysession -p "Add error handling"
         cat additional-requirements.md | ao-resume mysession
     """
-    from config import load_config
+    from config import get_session_manager_url
     from session import validate_session_name
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
@@ -57,21 +56,18 @@ def main(
         "argv": sys.argv,
         "session_name": session_name,
         "prompt": prompt or "None (will read from stdin)",
-        "project_dir": str(project_dir) if project_dir else "None",
     })
 
     try:
         # 1. Validate session name
         validate_session_name(session_name)
 
-        # 2. Load configuration
-        config = load_config(
-            cli_project_dir=str(project_dir) if project_dir else None,
-        )
+        # 2. Get session manager URL
+        session_manager_url = get_session_manager_url()
 
         # 3. Check session exists and load metadata via API
         try:
-            client = SessionClient(config.session_manager_url)
+            client = SessionClient(session_manager_url)
             session_data = client.get_session_by_name(session_name)
         except SessionClientError as e:
             error_exit(f"Failed to connect to session manager: {e}")
@@ -84,19 +80,10 @@ def main(
 
         # Use API data
         resume_session_id = session_data.get('session_id')
-        session_project_dir = Path(session_data.get('project_dir', str(config.project_dir)))
+        session_project_dir = Path(session_data.get('project_dir', str(Path.cwd())))
         session_agent = session_data.get('agent_name')
 
-        # 4. Context consistency validation
-        # Warn if CLI overrides differ from session data (but don't fail)
-        if project_dir and Path(project_dir).resolve() != session_project_dir:
-            print(
-                f"Warning: --project-dir override ignored. "
-                f"Using session value: {session_project_dir}",
-                file=sys.stderr,
-            )
-
-        # 5. Validate session_id exists
+        # 4. Validate session_id exists
         if not resume_session_id:
             error_exit(
                 f"Session '{session_name}' has no session_id. "
@@ -128,18 +115,18 @@ def main(
             # Get MCP servers from API response
             mcp_servers = agent_data.get("mcp_servers")
 
-        # 7. Run Claude session with resume (session update happens via API)
+        # 6. Run Claude session with resume (session update happens via API)
         session_id, result = run_session_sync(
             prompt=user_prompt,  # No system prompt prepended!
             project_dir=session_project_dir,
             session_name=session_name,
             mcp_servers=mcp_servers,
             resume_session_id=resume_session_id,  # KEY: Enable resume
-            session_manager_url=config.session_manager_url,
+            session_manager_url=session_manager_url,
             agent_name=session_agent,
         )
 
-        # 8. Print result to stdout
+        # 7. Print result to stdout
         print(result)
 
     except ValueError as e:

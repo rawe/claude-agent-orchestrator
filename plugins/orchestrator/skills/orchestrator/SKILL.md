@@ -105,7 +105,7 @@ uv run /path/to/skills/orchestrator/commands/ao-start my-session -p "Research to
 ### Common Options
 - `-p "prompt"` or `--prompt "prompt"` - Provide prompt via CLI instead of stdin
 - `--agent <agent-name>` - Use specialized agent blueprint (only for `ao-start`)
-- `--project-dir <path>` - Override project directory (default: current directory)
+- `--project-dir <path>` - Override project directory (only for `ao-start`, default: current directory)
 
 ---
 
@@ -160,8 +160,9 @@ uv run commands/ao-delete-all
 - **`finished`** - Session complete, result available
 
 ### Working Directory
-- Sessions operate in `--project-dir` (default: current directory)
+- Sessions operate in the project directory set at creation (default: current directory)
 - All file operations within the session are relative to this directory
+- Use `--project-dir` with `ao-start` to override; other commands retrieve it from the session API
 
 ### Blueprints vs Sessions
 - **Blueprint**: Reusable configuration (system prompt + MCP tools) stored in Agent Registry
@@ -212,7 +213,7 @@ Common errors and solutions:
 
 **Want to start a new agent conversation?** → `ao-start <name>`
 - With specialized agent? → Add `--agent <agent-name>`
-- In specific location? → Add `--project-dir <path>`
+- In specific directory? → Add `--project-dir <path>`
 
 **Want to continue a conversation?** → `ao-resume <name>`
 - Not sure if it exists? → Check with `ao-status <name>` first

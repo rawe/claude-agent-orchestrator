@@ -89,7 +89,6 @@ async def list_tools() -> list[types.Tool]:
 This tool discovers agent blueprints configured in the agent orchestrator system. Agent blueprints are reusable configurations (not running instances) that provide specialized capabilities (e.g., system architecture, code review, documentation writing).
 
 Args:
-  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - response_format ('markdown' | 'json'): Output format (default: 'markdown')
 
 Returns:
@@ -117,10 +116,6 @@ Error Handling:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
-                    },
                     "response_format": {
                         "type": "string",
                         "enum": ["markdown", "json"],
@@ -137,7 +132,6 @@ Error Handling:
 This tool shows all agent session instances that have been created, including their names, session IDs, and the project directory used for each session. These are running or completed instances, not blueprints.
 
 Args:
-  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - response_format ('markdown' | 'json'): Output format (default: 'markdown')
 
 Returns:
@@ -175,10 +169,6 @@ Error Handling:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
-                    },
                     "response_format": {
                         "type": "string",
                         "enum": ["markdown", "json"],
@@ -262,7 +252,6 @@ IMPORTANT: This operation may take significant time to complete as it runs a ful
 
 Args:
   - session_name (string): Name of the existing agent session instance to resume
-  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - prompt (string): Continuation prompt building on previous session context
   - async (boolean, optional): Run in background mode (default: false)
 
@@ -289,10 +278,6 @@ Note: The agent blueprint used during session creation is automatically remember
                         "type": "string",
                         "description": "Name of the existing agent session instance to resume",
                     },
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
-                    },
                     "prompt": {
                         "type": "string",
                         "description": "Continuation prompt building on previous session context",
@@ -314,9 +299,6 @@ This tool permanently deletes all agent session instances, including their conve
 
 WARNING: This is a destructive operation. All session data will be permanently lost.
 
-Args:
-  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-
 Returns:
   Confirmation message indicating sessions were removed or that no sessions existed.
 
@@ -334,12 +316,7 @@ Error Handling:
 Note: This operation is idempotent - running it multiple times has the same effect as running it once.""",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
-                    },
-                },
+                "properties": {},
             },
         ),
         types.Tool(
@@ -355,7 +332,6 @@ Use this tool to poll for completion when using async mode with start_agent_sess
 
 Args:
   - session_name (string): Name of the agent session instance to check
-  - project_dir (string, optional): Project directory path
   - wait_seconds (number, optional): Seconds to wait before checking status (default: 0, max: 300)
 
 Returns:
@@ -378,10 +354,6 @@ Polling Strategy:
                     "session_name": {
                         "type": "string",
                         "description": "Name of the agent session instance to check",
-                    },
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
                     },
                     "wait_seconds": {
                         "type": "integer",
@@ -407,7 +379,6 @@ Workflow:
 
 Args:
   - session_name (string): Name of the completed agent session instance
-  - project_dir (string, optional): Project directory path
 
 Returns:
   The agent's final response/result as text
@@ -422,10 +393,6 @@ Error Handling:
                     "session_name": {
                         "type": "string",
                         "description": "Name of the completed agent session instance",
-                    },
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
                     },
                 },
                 "required": ["session_name"],
@@ -475,7 +442,6 @@ async def handle_list_agent_blueprints(arguments: dict) -> list[types.TextConten
     logger.info(
         "list_agent_blueprints called",
         {
-            "project_dir": params.project_dir,
             "response_format": params.response_format,
         },
     )
@@ -483,10 +449,6 @@ async def handle_list_agent_blueprints(arguments: dict) -> list[types.TextConten
     try:
         # Build command arguments - command name must be first
         args = [CMD_LIST_BLUEPRINTS]
-
-        # Add project_dir if specified (supersedes environment variable)
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
 
         logger.debug("list_agent_blueprints: executing script", {"args": args})
 
@@ -524,7 +486,6 @@ async def handle_list_agent_sessions(arguments: dict) -> list[types.TextContent]
     logger.info(
         "list_agent_sessions called",
         {
-            "project_dir": params.project_dir,
             "response_format": params.response_format,
         },
     )
@@ -532,10 +493,6 @@ async def handle_list_agent_sessions(arguments: dict) -> list[types.TextContent]
     try:
         # Build command arguments - command name must be first
         args = [CMD_LIST_SESSIONS]
-
-        # Add project_dir if specified (supersedes environment variable)
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
 
         logger.debug("list_agent_sessions: executing script", {"args": args})
 
@@ -679,7 +636,6 @@ async def handle_resume_agent_session(arguments: dict) -> list[types.TextContent
         "resume_agent_session called",
         {
             "session_name": params.session_name,
-            "project_dir": params.project_dir,
             "prompt_length": len(params.prompt),
             "async": params.async_,
         },
@@ -688,10 +644,6 @@ async def handle_resume_agent_session(arguments: dict) -> list[types.TextContent
     try:
         # Build command arguments
         args = [CMD_RESUME_SESSION, params.session_name]
-
-        # Add project_dir if specified (supersedes environment variable)
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
 
         # Add prompt
         args.extend(["-p", params.prompt])
@@ -745,15 +697,11 @@ async def handle_delete_all_agent_sessions(arguments: dict) -> list[types.TextCo
     """Handle delete_all_agent_sessions tool call"""
     params = DeleteAllAgentSessionsInput(**arguments)
 
-    logger.info("delete_all_agent_sessions called", {"project_dir": params.project_dir})
+    logger.info("delete_all_agent_sessions called", {})
 
     try:
         # Build command arguments - command name must be first
         args = [CMD_DELETE_ALL_SESSIONS]
-
-        # Add project_dir if specified (supersedes environment variable)
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
 
         logger.debug("delete_all_agent_sessions: executing script", {"args": args})
 
@@ -794,9 +742,6 @@ async def handle_get_agent_session_status(arguments: dict) -> list[types.TextCon
 
         args = [CMD_GET_STATUS, params.session_name]
 
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
-
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
@@ -833,8 +778,6 @@ async def handle_get_agent_session_result(arguments: dict) -> list[types.TextCon
     try:
         # First check status to provide helpful error messages
         status_args = [CMD_GET_STATUS, params.session_name]
-        if params.project_dir:
-            status_args.extend(["--project-dir", params.project_dir])
 
         status_result = await execute_script(config, status_args)
         status = status_result.stdout.strip()
@@ -857,8 +800,6 @@ async def handle_get_agent_session_result(arguments: dict) -> list[types.TextCon
 
         # Session is finished, retrieve result
         args = [CMD_GET_RESULT, params.session_name]
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
 
         result = await execute_script(config, args)
 

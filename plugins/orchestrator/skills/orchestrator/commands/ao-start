@@ -84,7 +84,6 @@ def main(
                 )
         except SessionClientError as e:
             # API error - warn but continue (session will be created)
-            import sys
             print(f"Warning: Could not check session existence: {e}", file=sys.stderr)
 
         # 4. Get prompt (from -p and/or stdin)

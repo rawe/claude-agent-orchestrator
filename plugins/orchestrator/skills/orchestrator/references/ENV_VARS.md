@@ -95,14 +95,16 @@ The following CLI flags override environment variables when specified:
 
 | CLI Flag | Overrides | Available In |
 |----------|-----------|--------------|
-| `--project-dir` | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `ao-start`, `ao-resume`, `ao-show-config`, `ao-status`, `ao-list-sessions`, `ao-delete-all` |
+| `--project-dir` | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `ao-start` |
 
-**Note:** Observability settings (`OBSERVABILITY_ENABLED`, `OBSERVABILITY_URL`) and logging (`ENABLE_LOGGING`) can only be configured via environment variables, not CLI flags.
+**Note:** The `--project-dir` flag is only available in `ao-start` because it sets the working directory for new Claude sessions. Other commands retrieve session information (including project directory) from the API.
+
+Observability settings (`OBSERVABILITY_ENABLED`, `OBSERVABILITY_URL`) and logging (`ENABLE_LOGGING`) can only be configured via environment variables, not CLI flags.
 
 ### Example Usage
 
 ```bash
-# Override project directory for a single command
+# Override project directory when starting a new session
 ao-start mysession --project-dir /path/to/project -p "Build feature"
 ```
 

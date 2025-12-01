@@ -16,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
-from typing import Optional
 
 app = typer.Typer(add_completion=False)
 
@@ -24,7 +23,6 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def main(
     session_name: str = typer.Argument(..., help="Name of the session"),
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
 ):
     """
     Display session configuration and context.
@@ -33,9 +31,8 @@ def main(
 
     Examples:
         ao-show-config mysession
-        ao-show-config mysession --project-dir /my/project
     """
-    from config import load_config
+    from config import get_session_manager_url
     from session import validate_session_name
     from session_client import SessionClient, SessionClientError
 
@@ -43,14 +40,12 @@ def main(
         # Validate session name
         validate_session_name(session_name)
 
-        # Load configuration with CLI overrides
-        config = load_config(
-            cli_project_dir=str(project_dir) if project_dir else None,
-        )
+        # Get session manager URL
+        session_manager_url = get_session_manager_url()
 
         # Get session from API
         try:
-            client = SessionClient(config.session_manager_url)
+            client = SessionClient(session_manager_url)
             session_data = client.get_session_by_name(session_name)
         except SessionClientError as e:
             print(f"Error: Failed to connect to session manager: {e}", file=sys.stderr)

@@ -16,15 +16,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
-from typing import Optional
 
 app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def main(
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-):
+def main():
     """
     List all sessions with metadata.
 
@@ -33,7 +30,7 @@ def main(
     Examples:
         ao-list-sessions
     """
-    from config import load_config
+    from config import get_session_manager_url
     from session_client import SessionClient, SessionClientError
     from utils import debug_log
 
@@ -41,18 +38,15 @@ def main(
     debug_log("COMMAND - ao-list-sessions", {
         "cwd": str(Path.cwd()),
         "argv": sys.argv,
-        "project_dir": str(project_dir) if project_dir else "None",
     })
 
     try:
-        # Load configuration with CLI overrides
-        config = load_config(
-            cli_project_dir=str(project_dir) if project_dir else None,
-        )
+        # Get session manager URL
+        session_manager_url = get_session_manager_url()
 
         # List sessions via API
         try:
-            client = SessionClient(config.session_manager_url)
+            client = SessionClient(session_manager_url)
             sessions = client.list_sessions()
             if not sessions:
                 print("No sessions found")

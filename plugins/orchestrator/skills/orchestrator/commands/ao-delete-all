@@ -16,35 +16,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
-from typing import Optional
 
 app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def main(
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
-):
+def main():
     """
     Delete all sessions.
 
     Examples:
         ao-delete-all
     """
-    from config import load_config
+    from config import get_session_manager_url
     from session_client import SessionClient, SessionClientError
 
     try:
-        # Load configuration with CLI overrides
-        config = load_config(
-            cli_project_dir=str(project_dir) if project_dir else None,
-        )
+        # Get session manager URL
+        session_manager_url = get_session_manager_url()
 
         deleted_count = 0
 
         # Delete all sessions via API
         try:
-            client = SessionClient(config.session_manager_url)
+            client = SessionClient(session_manager_url)
             sessions = client.list_sessions()
             for s in sessions:
                 session_id = s.get('session_id')

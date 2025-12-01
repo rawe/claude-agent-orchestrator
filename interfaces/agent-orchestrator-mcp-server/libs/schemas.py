@@ -29,13 +29,13 @@ class ProjectDirField(BaseModel):
 
 
 # Schema for list_agent_blueprints tool
-class ListAgentBlueprintsInput(ResponseFormatField, ProjectDirField):
+class ListAgentBlueprintsInput(ResponseFormatField):
     """Input schema for list_agent_blueprints tool"""
     pass
 
 
 # Schema for list_agent_sessions tool
-class ListAgentSessionsInput(ResponseFormatField, ProjectDirField):
+class ListAgentSessionsInput(ResponseFormatField):
     """Input schema for list_agent_sessions tool"""
     pass
 
@@ -77,7 +77,7 @@ class StartAgentSessionInput(ProjectDirField):
 
 
 # Schema for resume_agent_session tool
-class ResumeAgentSessionInput(ProjectDirField):
+class ResumeAgentSessionInput(BaseModel):
     """Input schema for resume_agent_session tool"""
     session_name: str = Field(
         min_length=1,
@@ -108,13 +108,13 @@ class ResumeAgentSessionInput(ProjectDirField):
 
 
 # Schema for delete_all_agent_sessions tool
-class DeleteAllAgentSessionsInput(ProjectDirField):
+class DeleteAllAgentSessionsInput(BaseModel):
     """Input schema for delete_all_agent_sessions tool"""
     pass
 
 
 # Schema for get_agent_session_status tool
-class GetAgentSessionStatusInput(ProjectDirField):
+class GetAgentSessionStatusInput(BaseModel):
     """Input schema for get_agent_session_status tool"""
     session_name: str = Field(
         min_length=1,
@@ -139,7 +139,7 @@ class GetAgentSessionStatusInput(ProjectDirField):
 
 
 # Schema for get_agent_session_result tool
-class GetAgentSessionResultInput(ProjectDirField):
+class GetAgentSessionResultInput(BaseModel):
     """Input schema for get_agent_session_result tool"""
     session_name: str = Field(
         min_length=1,

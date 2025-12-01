@@ -24,6 +24,11 @@ ENV_SESSION_MANAGER_URL = "AGENT_ORCHESTRATOR_SESSION_MANAGER_URL"
 DEFAULT_SESSION_MANAGER_URL = "http://127.0.0.1:8765"
 
 
+def get_session_manager_url() -> str:
+    """Get session manager URL from environment or default."""
+    return os.environ.get(ENV_SESSION_MANAGER_URL, DEFAULT_SESSION_MANAGER_URL)
+
+
 @dataclass
 class Config:
     """Configuration for agent orchestrator."""
@@ -127,7 +132,7 @@ def load_config(
     enable_logging = env_logging in ("1", "true", "yes")
 
     # Parse session manager configuration
-    session_manager_url = os.environ.get(ENV_SESSION_MANAGER_URL, DEFAULT_SESSION_MANAGER_URL)
+    session_manager_url = get_session_manager_url()
 
     # DEBUG LOGGING - Session manager configuration
     debug_log("load_config - SESSION_MANAGER", {
