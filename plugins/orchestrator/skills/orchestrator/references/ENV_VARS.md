@@ -144,7 +144,7 @@ ao-new mysession --project-dir /path/to/project -p "Build feature"
 # Override sessions directory to use centralized storage
 ao-list-sessions --sessions-dir /Users/username/.agent-sessions
 
-# Override agents directory to use shared agent definitions
+# Override agents directory to use shared agent blueprints
 ao-new research --agent web-researcher --agents-dir /shared/agents
 ```
 

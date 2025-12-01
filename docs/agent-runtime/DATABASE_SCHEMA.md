@@ -32,7 +32,7 @@ CREATE TABLE sessions (
 | `status` | TEXT | NO | Session status: `running`, `finished`, `error` |
 | `created_at` | TEXT | NO | ISO 8601 timestamp when session was created |
 | `project_dir` | TEXT | YES | Absolute path to the project directory |
-| `agent_name` | TEXT | YES | Name of the agent definition used for this session |
+| `agent_name` | TEXT | YES | Name of the agent blueprint used for this session |
 
 **Indexes:**
 - Primary key index on `session_id`

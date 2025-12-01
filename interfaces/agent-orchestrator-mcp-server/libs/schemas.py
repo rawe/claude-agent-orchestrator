@@ -51,7 +51,7 @@ class StartAgentSessionInput(ProjectDirField):
     agent_definition_name: Optional[str] = Field(
         default=None,
         alias="agent_name",
-        description="Name of agent definition (blueprint) to use for this session (optional for generic sessions)"
+        description="Name of agent blueprint to use for this session (optional for generic sessions)"
     )
     prompt: str = Field(
         min_length=1,

@@ -108,7 +108,7 @@ info:
 	@echo ""
 	@echo "🤖 AGENT REGISTRY"
 	@echo "   URL:         http://localhost:8767"
-	@echo "   Purpose:     CRUD API for agent definitions"
+	@echo "   Purpose:     CRUD API for agent blueprints"
 	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
 	@echo ""
 	@echo "⚙️  AGENT RUNTIME"

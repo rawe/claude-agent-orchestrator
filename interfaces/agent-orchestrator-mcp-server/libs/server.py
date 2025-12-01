@@ -4,7 +4,7 @@ Agent Orchestrator MCP Server
 
 This MCP server provides tools to orchestrate specialized Claude Code agents
 through the agent-orchestrator Python commands. It enables:
-- Listing available agent definitions
+- Listing available agent blueprints
 - Managing agent sessions (create, resume, list, clean)
 - Executing long-running tasks in specialized agent contexts
 """
@@ -84,9 +84,9 @@ async def list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="list_agent_definitions",
-            description="""List all available agent definitions (blueprints) that can be used to create agent sessions.
+            description="""List all available agent blueprints that can be used to create agent sessions.
 
-This tool discovers agent definitions configured in the agent orchestrator system. Agent definitions are blueprints (not running instances) that provide specialized capabilities (e.g., system architecture, code review, documentation writing).
+This tool discovers agent blueprints configured in the agent orchestrator system. Agent blueprints are reusable configurations (not running instances) that provide specialized capabilities (e.g., system architecture, code review, documentation writing).
 
 Args:
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
@@ -108,11 +108,11 @@ Returns:
 
 Examples:
   - Use when: "What agents are available?" -> Check available agent blueprints
-  - Use when: "Show me the agent definitions" -> List all agent definition capabilities
+  - Use when: "Show me the agent blueprints" -> List all agent blueprint capabilities
   - Don't use when: You want to see running sessions (use list_agent_sessions instead)
 
 Error Handling:
-  - Returns "No agent definitions found" if no agents are configured
+  - Returns "No agent blueprints found" if no agents are configured
   - Returns error message if script execution fails""",
             inputSchema={
                 "type": "object",
@@ -192,13 +192,13 @@ Error Handling:
             name="start_agent_session",
             description="""Start a new agent session instance that immediately begins execution.
 
-This tool creates a new agent session instance that runs in a separate Claude Code context. Sessions can be generic (no agent definition) or specialized (with an agent definition blueprint). The agent session will execute the provided prompt and return the result.
+This tool creates a new agent session instance that runs in a separate Claude Code context. Sessions can be generic (no agent blueprint) or specialized (using an agent blueprint). The agent session will execute the provided prompt and return the result.
 
 IMPORTANT: This operation may take significant time to complete as it runs a full Claude Code session. The agent will process the prompt and may use multiple tool calls to complete the task.
 
 Args:
   - session_name (string): Unique identifier for the agent session instance (alphanumeric, dash, underscore; max 60 chars)
-  - agent_definition_name (string, optional): Name of agent definition (blueprint) to use for this session (optional for generic sessions)
+  - agent_definition_name (string, optional): Name of agent blueprint to use for this session (optional for generic sessions)
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - prompt (string): Initial task description or prompt for the agent session
   - async (boolean, optional): Run in background mode (default: false)
@@ -213,16 +213,16 @@ Returns:
   The result/output from the completed agent session. This is the agent's final response after processing the prompt and completing all necessary tasks.
 
 Examples:
-  - Use when: "Create an architecture design" -> Start session with system-architect agent definition
-  - Use when: "Analyze this codebase" -> Start generic session or use code-reviewer agent definition
+  - Use when: "Create an architecture design" -> Start session with system-architect agent blueprint
+  - Use when: "Analyze this codebase" -> Start generic session or use code-reviewer agent blueprint
   - Don't use when: Session already exists (use resume_agent_session instead)
-  - Don't use when: You just want to list available agent definitions (use list_agent_definitions instead)
+  - Don't use when: You just want to list available agent blueprints (use list_agent_definitions instead)
 
 Error Handling:
   - "Session already exists" -> Use resume_agent_session or choose different name
   - "Session name too long" -> Use shorter name (max 60 characters)
   - "Invalid characters" -> Only use alphanumeric, dash, underscore
-  - "Agent not found" -> Check available agent definitions with list_agent_definitions
+  - "Agent not found" -> Check available agent blueprints with list_agent_definitions
   - "No prompt provided" -> Provide a prompt argument""",
             inputSchema={
                 "type": "object",
@@ -233,7 +233,7 @@ Error Handling:
                     },
                     "agent_definition_name": {
                         "type": "string",
-                        "description": "Name of agent definition (blueprint) to use for this session (optional for generic sessions)",
+                        "description": "Name of agent blueprint to use for this session (optional for generic sessions)",
                     },
                     "project_dir": {
                         "type": "string",
@@ -256,7 +256,7 @@ Error Handling:
             name="resume_agent_session",
             description="""Resume an existing agent session instance with a new prompt to continue work.
 
-This tool continues an existing agent session instance, allowing you to build upon previous work. The agent session remembers all context from previous interactions. Any agent definition from session creation is automatically maintained.
+This tool continues an existing agent session instance, allowing you to build upon previous work. The agent session remembers all context from previous interactions. Any agent blueprint from session creation is automatically maintained.
 
 IMPORTANT: This operation may take significant time to complete as it runs a full Claude Code session. The agent will process the new prompt in the context of all previous interactions.
 
@@ -281,7 +281,7 @@ Error Handling:
   - "Session name invalid" -> Check session name format
   - "No prompt provided" -> Provide a prompt argument
 
-Note: The agent definition used during session creation is automatically remembered and applied when resuming.""",
+Note: The agent blueprint used during session creation is automatically remembered and applied when resuming.""",
             inputSchema={
                 "type": "object",
                 "properties": {

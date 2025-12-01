@@ -96,7 +96,7 @@ def load_agent_config(agent_name: str, agents_dir: Path) -> AgentConfig:
 
 def list_all_agents(agents_dir: Path) -> list[tuple[str, str]]:
     """
-    List all available agent definitions.
+    List all available agent blueprints.
 
     Args:
         agents_dir: Directory containing agent subdirectories

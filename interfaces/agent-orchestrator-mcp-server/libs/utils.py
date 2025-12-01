@@ -256,7 +256,7 @@ def parse_agent_list(output: str) -> List[AgentInfo]:
     next-agent:
     description
     """
-    if output == "No agent definitions found":
+    if output == "No agent blueprints found":
         return []
 
     agents: List[AgentInfo] = []
@@ -307,7 +307,7 @@ def parse_session_list(output: str) -> List[SessionInfo]:
 def format_agents_as_markdown(agents: List[AgentInfo]) -> str:
     """Format agent list as markdown"""
     if not agents:
-        return "No agent definitions found"
+        return "No agent blueprints found"
 
     lines = ["# Available Orchestrated Agents", ""]
 

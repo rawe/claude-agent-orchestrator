@@ -14,7 +14,7 @@ class ResponseFormat(str, Enum):
 
 
 class AgentInfo(BaseModel):
-    """Information about an agent definition"""
+    """Information about an agent blueprint"""
     name: str = Field(description="Agent name/identifier")
     description: str = Field(description="Agent capabilities description")
 

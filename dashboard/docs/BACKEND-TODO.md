@@ -88,7 +88,7 @@ This is an **entirely new service** that needs to be created.
 ### 2.2 Required Endpoints
 
 #### GET /agents
-List all agent definitions
+List all agent blueprints
 
 **Response:**
 ```json
@@ -107,12 +107,12 @@ List all agent definitions
 ```
 
 #### GET /agents/{name}
-Get single agent definition
+Get single agent blueprint
 
 **Response:** Same as single item from list
 
 #### POST /agents
-Create new agent definition
+Create new agent blueprint
 
 **Request:**
 ```json
@@ -159,7 +159,7 @@ Update existing agent
 **Response:** Full agent object
 
 #### DELETE /agents/{name}
-Delete agent definition
+Delete agent blueprint
 
 **Response:**
 ```json
@@ -194,7 +194,7 @@ Activate or deactivate agent
 - Con: Need to handle file locking, concurrent access
 
 **Option B: SQLite Database**
-- New database for agent definitions
+- New database for agent blueprints
 - Pro: Better querying, transactions
 - Con: Duplication of source of truth with file system
 

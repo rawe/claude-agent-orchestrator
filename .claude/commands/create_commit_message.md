@@ -29,7 +29,7 @@ Commit messages should be:
 ```
 feat: Implement ao-list-agents command
 
-Add command to list all available agent definitions with bash-compatible
+Add command to list all available agent blueprints with bash-compatible
 output format. Includes alphabetical sorting and empty directory handling.
 ```
 
