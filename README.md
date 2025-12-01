@@ -25,7 +25,11 @@ cd claude-agent-orchestrator
 make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Agent Registry (:8767), Context Store (:8766)
 ```
 
-**Requirements:** Docker (Desktop or Engine + Compose V2), Python ≥3.10, [uv](https://docs.astral.sh/uv/), Claude Code CLI
+**Requirements:** 
+
+* Claude Code CLI
+* Docker (Desktop or Engine + Compose V2)
+* Python ≥3.10, [uv](https://docs.astral.sh/uv/) (only for integration option 1)
 
 ## Two Integration Options
 
@@ -37,7 +41,7 @@ make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Agent Regist
 - Slash commands for agent management
 - Skills for creating and managing agents
 
-**Setup:** Add this repository as a plugin source in Claude Code settings, activate `orchestrator` plugin, restart.
+**Setup:** Add this repository as a marketplace in Claude Code `/plugin` settings (use the path to the checked out repo), activate `orchestrator` plugin, restart.
 
 **Usage:**
 ```
