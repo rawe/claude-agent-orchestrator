@@ -39,9 +39,9 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 ### Plugins (Claude Code Skills)
 
 **Orchestrator Skill** (`plugins/orchestrator/skills/orchestrator/`)
-- `ao-new`, `ao-resume` - Start/resume agent sessions
+- `ao-start`, `ao-resume` - Start/resume agent sessions
 - `ao-list-sessions`, `ao-status`, `ao-get-result` - Session management
-- `ao-list-agents`, `ao-show-config`, `ao-clean` - Utilities
+- `ao-list-blueprints`, `ao-show-config`, `ao-delete-all` - Utilities
 
 **Context Store Skill** (`plugins/context-store/skills/context-store/`)
 - `doc-push`, `doc-pull` - Sync documents to/from server

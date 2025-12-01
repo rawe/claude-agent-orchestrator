@@ -96,7 +96,7 @@ def main(
             if status == "not_existent":
                 error_exit(
                     f"Session '{session_name}' does not exist. "
-                    "Use 'ao-new' command to create it"
+                    "Use 'ao-start' command to create it"
                 )
             metadata = load_session_metadata(session_name, config.sessions_dir)
             resume_session_id = metadata.session_id

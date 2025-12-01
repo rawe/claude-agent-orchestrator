@@ -31,7 +31,7 @@ def main():
     Displays: agent name, description, status
 
     Examples:
-        ao-list-agents
+        ao-list-blueprints
     """
     try:
         agents = list_agents_api()

@@ -248,7 +248,7 @@ If you encounter issues not covered here:
 2. **Check environment variables** are set correctly
 3. **Test commands manually** in terminal:
    ```bash
-   /path/to/commands/ao-list-agents
+   /path/to/commands/ao-list-blueprints
    ```
 4. **Verify file permissions** on command scripts and directories
 5. **Check the GitHub issues** for similar problems

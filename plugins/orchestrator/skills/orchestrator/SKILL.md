@@ -30,9 +30,9 @@ description: Use this skill when you need to orchestrate specialized Claude agen
 
 ## Quick Reference
 
-### `ao-new` - Create new session
+### `ao-start` - Start new session
 ```bash
-uv run commands/ao-new <session-name>
+uv run commands/ao-start <session-name>
 ```
 **Use when**: Starting a new Claude agent session. Reads prompt from stdin or `-p` flag.
 
@@ -60,9 +60,9 @@ uv run commands/ao-list-sessions
 ```
 **Use when**: Need to see available sessions with their IDs and project directories.
 
-### `ao-list-agents` - List available agent blueprints
+### `ao-list-blueprints` - List available agent blueprints
 ```bash
-uv run commands/ao-list-agents
+uv run commands/ao-list-blueprints
 ```
 **Use when**: Need to see what specialized agent blueprints are available.
 
@@ -72,9 +72,9 @@ uv run commands/ao-show-config <session-name>
 ```
 **Use when**: Need to see session metadata (project dir, agent used, timestamps, etc.).
 
-### `ao-clean` - Remove all sessions
+### `ao-delete-all` - Delete all sessions
 ```bash
-uv run commands/ao-clean
+uv run commands/ao-delete-all
 ```
 **Use when**: Need to delete all session data. **Use with caution.**
 
@@ -92,7 +92,7 @@ Before using commands for the first time:
 **Example**:
 ```bash
 # If skill is at /path/to/skills/orchestrator
-uv run /path/to/skills/orchestrator/commands/ao-new my-session -p "Research topic X"
+uv run /path/to/skills/orchestrator/commands/ao-start my-session -p "Research topic X"
 ```
 
 ---
@@ -104,7 +104,7 @@ uv run /path/to/skills/orchestrator/commands/ao-new my-session -p "Research topi
 
 ### Common Options
 - `-p "prompt"` or `--prompt "prompt"` - Provide prompt via CLI instead of stdin
-- `--agent <agent-name>` - Use specialized agent blueprint (only for `ao-new`)
+- `--agent <agent-name>` - Use specialized agent blueprint (only for `ao-start`)
 - `--project-dir <path>` - Override project directory (default: current directory)
 
 ---
@@ -113,8 +113,8 @@ uv run /path/to/skills/orchestrator/commands/ao-new my-session -p "Research topi
 
 ### Basic Session Workflow
 ```bash
-# Create new session
-echo "Analyze this codebase structure" | uv run commands/ao-new analysis
+# Start new session
+echo "Analyze this codebase structure" | uv run commands/ao-start analysis
 
 # Check status
 uv run commands/ao-status analysis  # Output: finished
@@ -128,11 +128,11 @@ echo "Now focus on security patterns" | uv run commands/ao-resume analysis
 
 ### Using Specialized Agents
 ```bash
-# List available agents
-uv run commands/ao-list-agents
+# List available blueprints
+uv run commands/ao-list-blueprints
 
-# Create session with specific agent
-uv run commands/ao-new research-task --agent web-researcher -p "Research Claude AI capabilities"
+# Start session with specific agent blueprint
+uv run commands/ao-start research-task --agent web-researcher -p "Research Claude AI capabilities"
 
 # View agent configuration
 uv run commands/ao-show-config research-task
@@ -146,8 +146,8 @@ uv run commands/ao-list-sessions
 # Check specific session
 uv run commands/ao-status my-session
 
-# Clean up all sessions
-uv run commands/ao-clean
+# Delete all sessions
+uv run commands/ao-delete-all
 ```
 
 ---
@@ -177,7 +177,7 @@ uv run commands/ao-clean
 2. **Session names** must be unique and valid (no spaces, max 60 chars, alphanumeric + dash/underscore)
 3. **Prompt input**: Use stdin (pipe) OR `-p` flag, not both (stdin takes precedence)
 4. **Get result** only works on `finished` sessions - check status first
-5. **Blueprints** - list them with `ao-list-agents` before using `--agent`
+5. **Blueprints** - list them with `ao-list-blueprints` before using `--agent`
 6. **Sessions are persistent** - stored in Agent Runtime database
 7. **Command location** - Always use commands from this skill's `commands/` folder
 8. **Async execution** - Sessions run in Claude Code, commands return immediately after submission
@@ -197,7 +197,7 @@ Common errors and solutions:
 | "Session is not finished" | Getting result from running session | Check `ao-status`, wait for `finished` |
 | "Invalid session name" | Bad characters or too long | Use alphanumeric + dash/underscore, max 60 chars |
 | "No prompt provided" | Missing `-p` and stdin | Provide prompt via stdin or `-p` flag |
-| "Agent not found" | Blueprint not in registry | Check `ao-list-agents` for available blueprints |
+| "Agent not found" | Blueprint not in registry | Check `ao-list-blueprints` for available blueprints |
 
 ---
 
@@ -210,7 +210,7 @@ Common errors and solutions:
 
 ## Quick Decision Tree
 
-**Want to start a new agent conversation?** → `ao-new <name>`
+**Want to start a new agent conversation?** → `ao-start <name>`
 - With specialized agent? → Add `--agent <agent-name>`
 - In specific location? → Add `--project-dir <path>`
 
@@ -222,11 +222,11 @@ Common errors and solutions:
 
 **Want to see what exists?**
 - Sessions → `ao-list-sessions`
-- Agents → `ao-list-agents`
+- Blueprints → `ao-list-blueprints`
 
 **Want session details?** → `ao-show-config <name>`
 
-**Want to clean up?** → `ao-clean` (removes all sessions)
+**Want to delete all?** → `ao-delete-all` (removes all sessions)
 
 ---
 

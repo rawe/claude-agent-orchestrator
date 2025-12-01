@@ -129,9 +129,9 @@ The following CLI flags override environment variables when specified:
 
 | CLI Flag | Overrides | Available In |
 |----------|-----------|--------------|
-| `--project-dir` | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `ao-new`, `ao-resume`, `ao-show-config`, `ao-status`, `ao-clean` |
-| `--sessions-dir` | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | `ao-new`, `ao-resume`, `ao-show-config`, `ao-list-sessions`, `ao-status`, `ao-get-result`, `ao-clean` |
-| `--agents-dir` | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `ao-new`, `ao-resume`, `ao-list-agents` |
+| `--project-dir` | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `ao-start`, `ao-resume`, `ao-show-config`, `ao-status`, `ao-delete-all` |
+| `--sessions-dir` | `AGENT_ORCHESTRATOR_SESSIONS_DIR` | `ao-start`, `ao-resume`, `ao-show-config`, `ao-list-sessions`, `ao-status`, `ao-get-result`, `ao-delete-all` |
+| `--agents-dir` | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `ao-start`, `ao-resume`, `ao-list-blueprints` |
 
 **Note:** Observability settings (`OBSERVABILITY_ENABLED`, `OBSERVABILITY_URL`) and logging (`ENABLE_LOGGING`) can only be configured via environment variables, not CLI flags.
 
@@ -139,13 +139,13 @@ The following CLI flags override environment variables when specified:
 
 ```bash
 # Override project directory for a single command
-ao-new mysession --project-dir /path/to/project -p "Build feature"
+ao-start mysession --project-dir /path/to/project -p "Build feature"
 
 # Override sessions directory to use centralized storage
 ao-list-sessions --sessions-dir /Users/username/.agent-sessions
 
 # Override agents directory to use shared agent blueprints
-ao-new research --agent web-researcher --agents-dir /shared/agents
+ao-start research --agent web-researcher --agents-dir /shared/agents
 ```
 
 ---
@@ -163,7 +163,7 @@ export AGENT_ORCHESTRATOR_PROJECT_DIR="/home/user/project-a"
 export AGENT_ORCHESTRATOR_SESSIONS_DIR="/home/user/.sessions"
 
 # Command with CLI override
-ao-new test --project-dir /home/user/project-b -p "Hello"
+ao-start test --project-dir /home/user/project-b -p "Hello"
 
 # Resolution:
 # project_dir  = /home/user/project-b   (CLI flag wins)

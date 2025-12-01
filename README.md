@@ -139,7 +139,7 @@ Isolated Claude Code sessions for individual agents. Each session has a unique I
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
 
 ### Orchestration Commands
-The Python-based `ao-*` commands (`ao-new`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
+The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
 ## Dashboard & Observability

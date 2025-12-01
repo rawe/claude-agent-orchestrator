@@ -33,11 +33,11 @@ T = TypeVar("T")
 
 # Command name mapping from internal command names to Python CLI command files
 COMMAND_NAME_MAP = {
-    CMD_START_SESSION: "ao-new",
+    CMD_START_SESSION: "ao-start",
     CMD_RESUME_SESSION: "ao-resume",
     CMD_LIST_SESSIONS: "ao-list-sessions",
-    CMD_LIST_BLUEPRINTS: "ao-list-agents",
-    CMD_DELETE_ALL_SESSIONS: "ao-clean",
+    CMD_LIST_BLUEPRINTS: "ao-list-blueprints",
+    CMD_DELETE_ALL_SESSIONS: "ao-delete-all",
     CMD_GET_STATUS: "ao-status",
     CMD_GET_RESULT: "ao-get-result",
 }
@@ -246,7 +246,7 @@ async def execute_script_async(
 
 def parse_agent_list(output: str) -> List[AgentInfo]:
     """
-    Parse agent list output from the list-agents command
+    Parse agent list output from the list-blueprints command
     Format:
     agent-name:
     description

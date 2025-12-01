@@ -38,14 +38,14 @@ The plugin uses a **thin-client architecture** where the `ao-*` commands are HTT
 **Location**: `skills/orchestrator/commands/`
 
 Python-based `ao-*` commands (thin HTTP clients):
-- `ao-new` - Create new agent session
+- `ao-start` - Start new agent session
 - `ao-resume` - Resume existing session
 - `ao-status` - Check session state
 - `ao-get-result` - Extract result from finished session
 - `ao-list-sessions` - List all sessions
-- `ao-list-agents` - List available agent blueprints
+- `ao-list-blueprints` - List available agent blueprints
 - `ao-show-config` - Display session configuration
-- `ao-clean` - Remove all sessions
+- `ao-delete-all` - Delete all sessions
 
 ### 2. Slash Commands
 
@@ -94,10 +94,10 @@ Use the skill to launch agents:
 Use the orchestrator skill to create a new session called "code-review" and review the changes in src/
 ```
 
-### 3. Check Available Agents
+### 3. Check Available Blueprints
 
 ```bash
-uv run skills/orchestrator/commands/ao-list-agents
+uv run skills/orchestrator/commands/ao-list-blueprints
 ```
 
 ## Key Concepts
