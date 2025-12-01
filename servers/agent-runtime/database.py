@@ -81,7 +81,7 @@ def update_session_status(session_id: str, status: str):
     conn.commit()
     conn.close()
 
-def update_session_metadata(session_id: str, session_name: str = None, project_dir: str = None, agent_name: str = None):
+def update_session_metadata(session_id: str, session_name: str = None, project_dir: str = None, agent_name: str = None, last_resumed_at: str = None):
     """Update session metadata fields"""
     conn = sqlite3.connect(DB_PATH)
 
@@ -99,6 +99,10 @@ def update_session_metadata(session_id: str, session_name: str = None, project_d
     if agent_name is not None:
         updates.append("agent_name = ?")
         params.append(agent_name)
+
+    if last_resumed_at is not None:
+        updates.append("last_resumed_at = ?")
+        params.append(last_resumed_at)
 
     if not updates:
         conn.close()

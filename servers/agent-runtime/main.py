@@ -234,7 +234,8 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
         session_id=session_id,
         session_name=metadata.session_name,
         project_dir=metadata.project_dir,
-        agent_name=metadata.agent_name
+        agent_name=metadata.agent_name,
+        last_resumed_at=metadata.last_resumed_at
     )
 
     # Broadcast update to WebSocket clients

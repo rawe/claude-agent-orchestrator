@@ -6,6 +6,7 @@ class SessionMetadataUpdate(BaseModel):
     session_name: Optional[str] = None
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
+    last_resumed_at: Optional[str] = None
 
 
 class SessionCreate(BaseModel):
