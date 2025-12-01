@@ -37,7 +37,7 @@ def main(
         ao-status mysession
     """
     from config import load_config
-    from session import validate_session_name, get_session_status
+    from session import validate_session_name
     from session_client import SessionClient, SessionClientError
 
     try:
@@ -49,22 +49,18 @@ def main(
             cli_project_dir=str(project_dir) if project_dir else None,
         )
 
-        # Try API first
+        # Get session status via API
         try:
             client = SessionClient(config.session_manager_url)
             session = client.get_session_by_name(session_name)
             if session:
                 status = client.get_status(session['session_id'])
                 print(status)
-                return
-            # Session not found in API, fall back to file-based
+            else:
+                print("not_existent")
         except SessionClientError as e:
-            # API error, fall back to file-based
-            print(f"Warning: API error: {e}", file=sys.stderr)
-
-        # Fallback to file-based
-        status = get_session_status(session_name, config.sessions_dir)
-        print(status)
+            print(f"Error: Failed to connect to session manager: {e}", file=sys.stderr)
+            raise typer.Exit(1)
 
     except ValueError as e:
         # Session validation errors

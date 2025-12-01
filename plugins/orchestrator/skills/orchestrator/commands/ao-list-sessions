@@ -34,7 +34,6 @@ def main(
         ao-list-sessions
     """
     from config import load_config
-    from session import list_all_sessions
     from session_client import SessionClient, SessionClientError
     from utils import debug_log
 
@@ -51,7 +50,7 @@ def main(
             cli_project_dir=str(project_dir) if project_dir else None,
         )
 
-        # Try API first
+        # List sessions via API
         try:
             client = SessionClient(config.session_manager_url)
             sessions = client.list_sessions()
@@ -60,20 +59,9 @@ def main(
             else:
                 for s in sessions:
                     print(f"{s.get('session_name', 'unknown')} (session-id: {s.get('session_id', 'unknown')}, project-dir: {s.get('project_dir', 'unknown')})")
-            return
         except SessionClientError as e:
-            # API error, fall back to file-based
-            print(f"Warning: API error: {e}", file=sys.stderr)
-
-        # Fallback to file-based
-        sessions = list_all_sessions(config.sessions_dir)
-
-        # Display results
-        if not sessions:
-            print("No sessions found")
-        else:
-            for session_name, session_id, project_dir_path in sessions:
-                print(f"{session_name} (session-id: {session_id}, project-dir: {project_dir_path})")
+            print(f"Error: Failed to connect to session manager: {e}", file=sys.stderr)
+            raise typer.Exit(1)
 
     except Exception as e:
         # Handle errors

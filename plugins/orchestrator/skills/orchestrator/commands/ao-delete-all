@@ -32,9 +32,7 @@ def main(
         ao-delete-all
     """
     from config import load_config
-    from session import list_all_sessions
     from session_client import SessionClient, SessionClientError
-    import shutil
 
     try:
         # Load configuration with CLI overrides
@@ -43,9 +41,8 @@ def main(
         )
 
         deleted_count = 0
-        files_existed = config.sessions_dir.exists()
 
-        # Delete from API
+        # Delete all sessions via API
         try:
             client = SessionClient(config.session_manager_url)
             sessions = client.list_sessions()
@@ -55,15 +52,11 @@ def main(
                     if client.delete_session(session_id):
                         deleted_count += 1
         except SessionClientError as e:
-            # API error - continue to file cleanup
-            print(f"Warning: API error: {e}", file=sys.stderr)
+            print(f"Error: Failed to connect to session manager: {e}", file=sys.stderr)
+            raise typer.Exit(1)
 
-        # Also delete backup files if they exist
-        if files_existed:
-            shutil.rmtree(config.sessions_dir)
-
-        if deleted_count > 0 or files_existed:
-            print("All sessions removed")
+        if deleted_count > 0:
+            print(f"Removed {deleted_count} session(s)")
         else:
             print("No sessions to remove")
 

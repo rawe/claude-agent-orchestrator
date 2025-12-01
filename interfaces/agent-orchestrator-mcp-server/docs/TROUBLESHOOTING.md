@@ -186,9 +186,9 @@ This opens a web interface where you can:
 
 **Solutions:**
 - Use `list_agent_blueprints` to see all available agent blueprints
-- Check that the agent blueprint exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
 - Verify the agent blueprint name spelling matches exactly
-- Ensure agent blueprint files are properly structured
+- Ensure agent blueprint is registered via the Agent Registry API
+- Check that the Agent Registry service is running
 
 ### 8. PATH issues (Claude Desktop)
 

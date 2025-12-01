@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "typer",
+#     "httpx",
 # ]
 # ///
 """
@@ -10,7 +11,6 @@ Display session configuration and context.
 """
 
 import sys
-import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
@@ -29,14 +29,15 @@ def main(
     """
     Display session configuration and context.
 
-    Shows: agent used, directories, session metadata
+    Shows: agent used, project directory, session metadata
 
     Examples:
         ao-show-config mysession
         ao-show-config mysession --project-dir /my/project
     """
     from config import load_config
-    from session import validate_session_name, load_session_metadata
+    from session import validate_session_name
+    from session_client import SessionClient, SessionClientError
 
     try:
         # Validate session name
@@ -47,37 +48,29 @@ def main(
             cli_project_dir=str(project_dir) if project_dir else None,
         )
 
-        # Check if session exists
-        meta_file = config.sessions_dir / f"{session_name}.meta.json"
-        if not meta_file.exists():
+        # Get session from API
+        try:
+            client = SessionClient(config.session_manager_url)
+            session_data = client.get_session_by_name(session_name)
+        except SessionClientError as e:
+            print(f"Error: Failed to connect to session manager: {e}", file=sys.stderr)
+            raise typer.Exit(1)
+
+        if not session_data:
             print(f"Error: Session '{session_name}' does not exist", file=sys.stderr)
             raise typer.Exit(1)
 
-        # Load session metadata
-        metadata = load_session_metadata(session_name, config.sessions_dir)
-
-        # Display configuration matching bash format
+        # Display configuration
         print(f"Configuration for session '{session_name}':")
-        print(f"  Session file:    {config.sessions_dir}/{session_name}.jsonl")
-        print(f"  Project dir:     {metadata.project_dir} (from meta.json)")
-        print(f"  Agents dir:      {metadata.agents_dir} (from meta.json)")
-        print(f"  Sessions dir:    {config.sessions_dir} (current)")
-        print(f"  Agent:           {metadata.agent if metadata.agent else 'none'}")
-        print(f"  Created:         {metadata.created_at.isoformat()}Z")
-        print(f"  Last resumed:    {metadata.last_resumed_at.isoformat()}Z")
-        print(f"  Schema version:  {metadata.schema_version}")
+        print(f"  Session ID:      {session_data.get('session_id', 'unknown')}")
+        print(f"  Project dir:     {session_data.get('project_dir', 'unknown')}")
+        print(f"  Agent:           {session_data.get('agent_name') or 'none'}")
+        print(f"  Created:         {session_data.get('created_at', 'unknown')}")
+        print(f"  Last resumed:    {session_data.get('last_resumed_at', 'unknown')}")
 
     except ValueError as e:
         # Session validation errors
         print(f"Error: {e}", file=sys.stderr)
-        raise typer.Exit(1)
-    except FileNotFoundError as e:
-        # Session metadata not found
-        print(f"Error: {e}", file=sys.stderr)
-        raise typer.Exit(1)
-    except (json.JSONDecodeError, KeyError) as e:
-        # JSON parsing errors
-        print(f"Error: Invalid session metadata: {e}", file=sys.stderr)
         raise typer.Exit(1)
     except Exception as e:
         # Unexpected errors

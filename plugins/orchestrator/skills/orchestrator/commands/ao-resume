@@ -41,19 +41,12 @@ def main(
         cat additional-requirements.md | ao-resume mysession
     """
     from config import load_config
-    from session import (
-        validate_session_name,
-        get_session_status,
-        load_session_metadata,
-        update_session_metadata,
-    )
+    from session import validate_session_name
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import (
         get_prompt_from_args_and_stdin,
-        log_command,
-        log_result,
         error_exit,
         debug_log,
     )
@@ -76,32 +69,23 @@ def main(
             cli_project_dir=str(project_dir) if project_dir else None,
         )
 
-        # 3. Check session exists and load metadata - try API first
-        session_data = None
+        # 3. Check session exists and load metadata via API
         try:
             client = SessionClient(config.session_manager_url)
             session_data = client.get_session_by_name(session_name)
         except SessionClientError as e:
-            # API error, will try file fallback
-            print(f"Warning: API error: {e}", file=sys.stderr)
+            error_exit(f"Failed to connect to session manager: {e}")
 
-        if session_data:
-            # Use API data
-            resume_session_id = session_data.get('session_id')
-            session_project_dir = Path(session_data.get('project_dir', str(config.project_dir)))
-            session_agent = session_data.get('agent_name')
-        else:
-            # Fallback to file-based
-            status = get_session_status(session_name, config.sessions_dir)
-            if status == "not_existent":
-                error_exit(
-                    f"Session '{session_name}' does not exist. "
-                    "Use 'ao-start' command to create it"
-                )
-            metadata = load_session_metadata(session_name, config.sessions_dir)
-            resume_session_id = metadata.session_id
-            session_project_dir = metadata.project_dir
-            session_agent = metadata.agent
+        if not session_data:
+            error_exit(
+                f"Session '{session_name}' does not exist. "
+                "Use 'ao-start' command to create it"
+            )
+
+        # Use API data
+        resume_session_id = session_data.get('session_id')
+        session_project_dir = Path(session_data.get('project_dir', str(config.project_dir)))
+        session_agent = session_data.get('agent_name')
 
         # 4. Context consistency validation
         # Warn if CLI overrides differ from session data (but don't fail)
@@ -144,51 +128,18 @@ def main(
             # Get MCP servers from API response
             mcp_servers = agent_data.get("mcp_servers")
 
-        # 7. Log command (if logging enabled)
-        if config.enable_logging:
-            # Build command string for logging (similar to bash)
-            mcp_info = f"with MCP servers: {list(mcp_servers.keys())}" if mcp_servers else "no MCP"
-            full_command = (
-                f"cd {session_project_dir} && "
-                f"query(prompt=<prompt>, cwd={session_project_dir}, "
-                f"permission_mode=bypassPermissions, resume={resume_session_id}, {mcp_info})"
-            )
-            log_command(
-                session_name=session_name,
-                command_type="resume",
-                agent_name=session_agent,
-                mcp_config_path=None,  # MCP config now comes from API
-                full_command=full_command,
-                prompt=user_prompt,
-                sessions_dir=config.sessions_dir,
-                project_dir=config.project_dir,
-                agents_dir=config.agents_dir,
-                enable_logging=config.enable_logging,
-            )
-
-        # 8. Run Claude session with resume
-        session_file = config.sessions_dir / f"{session_name}.jsonl"
-
+        # 7. Run Claude session with resume (session update happens via API)
         session_id, result = run_session_sync(
             prompt=user_prompt,  # No system prompt prepended!
-            session_file=session_file,
             project_dir=session_project_dir,
             session_name=session_name,
-            sessions_dir=config.sessions_dir,
             mcp_servers=mcp_servers,
             resume_session_id=resume_session_id,  # KEY: Enable resume
             session_manager_url=config.session_manager_url,
             agent_name=session_agent,
         )
 
-        # 11. Update session metadata timestamp
-        update_session_metadata(session_name, config.sessions_dir)
-
-        # 12. Log result (if logging enabled)
-        if config.enable_logging:
-            log_result(session_name, result, config.sessions_dir, config.enable_logging)
-
-        # 13. Print result to stdout
+        # 8. Print result to stdout
         print(result)
 
     except ValueError as e:
