@@ -25,7 +25,7 @@ from constants import (
     CMD_DELETE_ALL_SESSIONS,
     CMD_GET_RESULT,
     CMD_GET_STATUS,
-    CMD_LIST_DEFINITIONS,
+    CMD_LIST_BLUEPRINTS,
     CMD_LIST_SESSIONS,
     CMD_RESUME_SESSION,
     CMD_START_SESSION,
@@ -36,7 +36,7 @@ from schemas import (
     DeleteAllAgentSessionsInput,
     GetAgentSessionResultInput,
     GetAgentSessionStatusInput,
-    ListAgentDefinitionsInput,
+    ListAgentBlueprintsInput,
     ListAgentSessionsInput,
     ResumeAgentSessionInput,
     StartAgentSessionInput,
@@ -83,7 +83,7 @@ async def list_tools() -> list[types.Tool]:
     """List available tools"""
     return [
         types.Tool(
-            name="list_agent_definitions",
+            name="list_agent_blueprints",
             description="""List all available agent blueprints that can be used to create agent sessions.
 
 This tool discovers agent blueprints configured in the agent orchestrator system. Agent blueprints are reusable configurations (not running instances) that provide specialized capabilities (e.g., system architecture, code review, documentation writing).
@@ -167,7 +167,7 @@ Project Directory values:
 Examples:
   - Use when: "What sessions exist?" -> See all created session instances
   - Use when: "Show me my agent sessions" -> List all session instances with their IDs and project directories
-  - Don't use when: You want to see available agent blueprints (use list_agent_definitions instead)
+  - Don't use when: You want to see available agent blueprints (use list_agent_blueprints instead)
 
 Error Handling:
   - Returns "No sessions found" if no sessions exist
@@ -198,7 +198,7 @@ IMPORTANT: This operation may take significant time to complete as it runs a ful
 
 Args:
   - session_name (string): Unique identifier for the agent session instance (alphanumeric, dash, underscore; max 60 chars)
-  - agent_definition_name (string, optional): Name of agent blueprint to use for this session (optional for generic sessions)
+  - agent_blueprint_name (string, optional): Name of agent blueprint to use for this session (optional for generic sessions)
   - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
   - prompt (string): Initial task description or prompt for the agent session
   - async (boolean, optional): Run in background mode (default: false)
@@ -216,13 +216,13 @@ Examples:
   - Use when: "Create an architecture design" -> Start session with system-architect agent blueprint
   - Use when: "Analyze this codebase" -> Start generic session or use code-reviewer agent blueprint
   - Don't use when: Session already exists (use resume_agent_session instead)
-  - Don't use when: You just want to list available agent blueprints (use list_agent_definitions instead)
+  - Don't use when: You just want to list available agent blueprints (use list_agent_blueprints instead)
 
 Error Handling:
   - "Session already exists" -> Use resume_agent_session or choose different name
   - "Session name too long" -> Use shorter name (max 60 characters)
   - "Invalid characters" -> Only use alphanumeric, dash, underscore
-  - "Agent not found" -> Check available agent blueprints with list_agent_definitions
+  - "Agent not found" -> Check available agent blueprints with list_agent_blueprints
   - "No prompt provided" -> Provide a prompt argument""",
             inputSchema={
                 "type": "object",
@@ -231,7 +231,7 @@ Error Handling:
                         "type": "string",
                         "description": "Unique identifier for this agent session instance",
                     },
-                    "agent_definition_name": {
+                    "agent_blueprint_name": {
                         "type": "string",
                         "description": "Name of agent blueprint to use for this session (optional for generic sessions)",
                     },
@@ -441,8 +441,8 @@ async def call_tool(
     """Handle tool calls"""
 
     try:
-        if name == "list_agent_definitions":
-            return await handle_list_agent_definitions(arguments)
+        if name == "list_agent_blueprints":
+            return await handle_list_agent_blueprints(arguments)
         elif name == "list_agent_sessions":
             return await handle_list_agent_sessions(arguments)
         elif name == "start_agent_session":
@@ -468,12 +468,12 @@ async def call_tool(
         return [types.TextContent(type="text", text=error_msg)]
 
 
-async def handle_list_agent_definitions(arguments: dict) -> list[types.TextContent]:
-    """Handle list_agent_definitions tool call"""
-    params = ListAgentDefinitionsInput(**arguments)
+async def handle_list_agent_blueprints(arguments: dict) -> list[types.TextContent]:
+    """Handle list_agent_blueprints tool call"""
+    params = ListAgentBlueprintsInput(**arguments)
 
     logger.info(
-        "list_agent_definitions called",
+        "list_agent_blueprints called",
         {
             "project_dir": params.project_dir,
             "response_format": params.response_format,
@@ -482,13 +482,13 @@ async def handle_list_agent_definitions(arguments: dict) -> list[types.TextConte
 
     try:
         # Build command arguments - command name must be first
-        args = [CMD_LIST_DEFINITIONS]
+        args = [CMD_LIST_BLUEPRINTS]
 
         # Add project_dir if specified (supersedes environment variable)
         if params.project_dir:
             args.extend(["--project-dir", params.project_dir])
 
-        logger.debug("list_agent_definitions: executing script", {"args": args})
+        logger.debug("list_agent_blueprints: executing script", {"args": args})
 
         # Execute list-agents command
         result = await execute_script(config, args)
@@ -574,7 +574,7 @@ async def handle_start_agent_session(arguments: dict) -> list[types.TextContent]
         "start_agent_session called",
         {
             "session_name": params.session_name,
-            "agent_definition_name": params.agent_definition_name,
+            "agent_blueprint_name": params.agent_blueprint_name,
             "project_dir": params.project_dir,
             "prompt_length": len(params.prompt),
             "async": params.async_,
@@ -590,8 +590,8 @@ async def handle_start_agent_session(arguments: dict) -> list[types.TextContent]
             args.extend(["--project-dir", params.project_dir])
 
         # Add agent if specified
-        if params.agent_definition_name:
-            args.extend(["--agent", params.agent_definition_name])
+        if params.agent_blueprint_name:
+            args.extend(["--agent", params.agent_blueprint_name])
 
         # Add prompt
         args.extend(["-p", params.prompt])

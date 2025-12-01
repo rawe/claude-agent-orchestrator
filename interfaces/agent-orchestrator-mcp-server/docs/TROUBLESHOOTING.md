@@ -105,10 +105,10 @@ This opens a web interface where you can:
 
 ## Common Issues
 
-### 1. start_agent_session fails but list_agent_definitions works
+### 1. start_agent_session fails but list_agent_blueprints works
 
 **Symptoms:**
-- `list_agent_definitions` returns results successfully
+- `list_agent_blueprints` returns results successfully
 - `start_agent_session` fails with execution errors
 
 **Solutions:**
@@ -185,7 +185,7 @@ This opens a web interface where you can:
 - `start_agent_session` fails with "Agent not found" error
 
 **Solutions:**
-- Use `list_agent_definitions` to see all available agent blueprints
+- Use `list_agent_blueprints` to see all available agent blueprints
 - Check that the agent blueprint exists in `AGENT_ORCHESTRATOR_AGENTS_DIR`
 - Verify the agent blueprint name spelling matches exactly
 - Ensure agent blueprint files are properly structured

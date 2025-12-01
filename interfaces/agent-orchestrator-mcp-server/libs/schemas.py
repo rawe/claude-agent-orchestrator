@@ -28,9 +28,9 @@ class ProjectDirField(BaseModel):
     )
 
 
-# Schema for list_agent_definitions tool
-class ListAgentDefinitionsInput(ResponseFormatField, ProjectDirField):
-    """Input schema for list_agent_definitions tool"""
+# Schema for list_agent_blueprints tool
+class ListAgentBlueprintsInput(ResponseFormatField, ProjectDirField):
+    """Input schema for list_agent_blueprints tool"""
     pass
 
 
@@ -48,7 +48,7 @@ class StartAgentSessionInput(ProjectDirField):
         max_length=MAX_SESSION_NAME_LENGTH,
         description="Unique name for the agent session (alphanumeric, dash, underscore only)"
     )
-    agent_definition_name: Optional[str] = Field(
+    agent_blueprint_name: Optional[str] = Field(
         default=None,
         alias="agent_name",
         description="Name of agent blueprint to use for this session (optional for generic sessions)"

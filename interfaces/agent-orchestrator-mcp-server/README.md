@@ -112,7 +112,7 @@ The server provides 7 MCP tools for managing orchestrated agent sessions:
 
 | Tool | Description |
 |------|-------------|
-| `list_agent_definitions` | Discover available agent blueprints |
+| `list_agent_blueprints` | Discover available agent blueprints |
 | `list_agent_sessions` | View all agent session instances with their IDs and project directories |
 | `start_agent_session` | Create new agent session instances (supports async execution) |
 | `resume_agent_session` | Continue work in existing session instances (supports async execution) |
@@ -157,7 +157,7 @@ Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `
 - **Session already exists**: Use `resume_agent_session` or different name
 - **Session does not exist**: Use `start_agent_session` first
 - **Invalid session name**: Check naming rules
-- **Agent not found**: Use `list_agent_definitions` to see available agent blueprints
+- **Agent not found**: Use `list_agent_blueprints` to see available agent blueprints
 - **Command path error**: Verify `AGENT_ORCHESTRATOR_COMMAND_PATH` is correct
 
 ## Testing
