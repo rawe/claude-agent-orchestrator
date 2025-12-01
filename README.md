@@ -15,27 +15,31 @@ The Agent Orchestrator Framework (AOF) enables you to create, manage, and orches
 - Create reusable agent blueprints for common tasks
 - Support for long-running and background tasks
 
-## Two Usage Levels
+## Prerequisites
 
-AOF provides two distinct usage levels, allowing you to choose the integration approach that best fits your needs:
+Both integration options require the backend services running. The plugins and MCP server are thin HTTP clients.
 
-### Level 1: Claude Code Plugin
+```bash
+git clone <your-repo-url>
+cd claude-agent-orchestrator
+make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Agent Registry (:8767), Context Store (:8766)
+```
+
+**Requirements:** Docker (Desktop or Engine + Compose V2), Python ≥3.10, [uv](https://docs.astral.sh/uv/), Claude Code CLI
+
+## Two Integration Options
+
+### Option 1: Claude Code Plugin
 
 **Best for:** Direct integration within Claude Code with full control
 
-Install the `orchestrator` plugin to get:
 - Python-based `ao-*` commands for agent orchestration
 - Slash commands for agent management
 - Skills for creating and managing agents
-- Complete control over agent lifecycle
 
-**Quick Start:**
-```bash
-# Install the plugin by adding this repo to Claude Code
-# The plugin provides the core framework
-```
+**Setup:** Add this repository as a plugin source in Claude Code settings, activate `orchestrator` plugin, restart.
 
-**Usage Example:**
+**Usage:**
 ```
 /agent-orchestrator-init
 Use the orchestrator skill to create a new session called "code-review"
@@ -45,27 +49,27 @@ Use the orchestrator skill to create a new session called "code-review"
 
 ---
 
-### Level 2: MCP Server (Alternative for Claude Desktop)
+### Option 2: MCP Server
 
-**Best for:** Integration with AI assistants that only support MCP protocol (like Claude Desktop)
+**Best for:** Claude Desktop or other MCP-compatible clients
 
-Use the standalone MCP server implementation to get:
-- **No Claude Code plugin required!**
-- Works with Claude Desktop, Claude Code, or any MCP-compatible system
-- 5 MCP tools for agent orchestration
-- Python implementation with automatic dependency management
-- Works with the same Python commands as Level 1
+- 7 MCP tools for agent orchestration
+- Works with Claude Desktop, Claude Code, or any MCP system
 
-**Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)
-
-**Quick Start:**
-```bash
-# 1. Clone this repository
-git clone <your-repo-url>
-
-# 2. Configure in Claude Desktop or Claude Code
-# MCP server now auto-discovers commands - minimal setup required!
-# See interfaces/agent-orchestrator-mcp-server/README.md
+**Setup:** Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "command": "uv",
+      "args": ["run", "/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"],
+      "env": {
+        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
 ```
 
 **Usage Example (from Claude Desktop):**
@@ -76,19 +80,18 @@ Create a new agent session called "code-review" using the code-reviewer agent
 
 **Documentation:** [interfaces/agent-orchestrator-mcp-server/README.md](./interfaces/agent-orchestrator-mcp-server/README.md)
 
-**Important Limitation:**
-Due to a [known bug in Claude Code](https://github.com/anthropics/claude-code/issues/3426#issuecomment-3522720980), **stdio MCP servers do not work when using the `-p` parameter (headless mode)**. Since the Agent Orchestrator Framework launches agents using headless Claude Code sessions, stdio-based MCP servers configured in Claude Desktop will not be accessible to orchestrated agents in Level 2 integration. This affects the `protocolVersion` field handling in initialization requests and causes 30-second timeouts during tool discovery. As a workaround, consider using SSE (Server-Sent Events) transport for MCP servers, or use Level 1 integration which operates within a single Claude Code session.
+**Limitation:** Due to a [known Claude Code bug](https://github.com/anthropics/claude-code/issues/3426), stdio MCP servers don't work in headless mode (`-p`). Orchestrated agents won't have access to stdio-based MCP servers. Use SSE transport or Option 1 as workaround.
 
 ---
 
-## Which Level Should You Use?
+## Which Option Should You Use?
 
-| Usage Level | Use When... | Installation | Integration |
-|-------------|-------------|--------------|-------------|
-| **Level 1** | You want direct control within Claude Code | Install plugins | Claude Code only |
-| **Level 2** | You need to use with Claude Desktop or other MCP-only AI assistants | Configure MCP server | Any MCP system |
+| Option | Use When... | Integration |
+|--------|-------------|-------------|
+| **Option 1: Plugin** | You work within Claude Code | Claude Code only |
+| **Option 2: MCP** | You use Claude Desktop or other MCP clients | Any MCP system |
 
-**Can you use multiple levels?** Yes! Level 2 (MCP) can be used independently or alongside Level 1 plugins.
+Both options can be used together.
 
 ## Repository Structure
 
@@ -187,6 +190,6 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 - **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
-- **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Level 1: Claude Code plugin
-- **[MCP Server](./interfaces/agent-orchestrator-mcp-server/README.md)** - Level 2: MCP implementation
+- **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Option 1: Claude Code plugin
+- **[MCP Server](./interfaces/agent-orchestrator-mcp-server/README.md)** - Option 2: MCP implementation
 - **[Context Store Plugin](./plugins/context-store/README.md)** - Document management plugin
