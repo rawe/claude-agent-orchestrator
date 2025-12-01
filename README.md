@@ -29,7 +29,7 @@ make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Agent Regist
 
 * Claude Code CLI
 * Docker (Desktop or Engine + Compose V2)
-* Python ≥3.10, [uv](https://docs.astral.sh/uv/) (only for integration option 1)
+* Python ≥3.10, [uv](https://docs.astral.sh/uv/)
 
 ## Two Integration Options
 
