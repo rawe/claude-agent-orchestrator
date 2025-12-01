@@ -14,7 +14,7 @@ The Agent Orchestrator MCP Server provides 7 tools for managing orchestrated age
 6. **get_agent_session_status** - Check the status of a running or completed session instance
 7. **get_agent_session_result** - Retrieve the result from a completed session instance
 
-All tools support optional `project_dir` override for managing multiple projects.
+**Note:** Only `start_agent_session` supports the optional `project_dir` parameter for managing multiple projects.
 
 ---
 
@@ -24,22 +24,12 @@ Lists all available agent blueprints that can be used to create agent sessions.
 
 ### Parameters
 
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
 
 ### Example
 
 ```python
 {
-  "response_format": "json"
-}
-```
-
-### Example with project_dir override
-
-```python
-{
-  "project_dir": "/absolute/path/to/project",
   "response_format": "json"
 }
 ```
@@ -74,22 +64,12 @@ Lists all agent session instances (running, completed, or initializing).
 
 ### Parameters
 
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `response_format` (optional): `"markdown"` or `"json"` (default: `"markdown"`)
 
 ### Example
 
 ```python
 {
-  "response_format": "json"
-}
-```
-
-### Example with project_dir override
-
-```python
-{
-  "project_dir": "/absolute/path/to/project",
   "response_format": "json"
 }
 ```
@@ -175,7 +155,6 @@ Resume an existing agent session instance with a new prompt to continue work.
 ### Parameters
 
 - `session_name` (required): Name of the existing agent session instance to resume
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `prompt` (required): Continuation prompt building on previous session context
 - `async` (optional): Run in background (default: `false`). When `true`, returns immediately and use `get_agent_session_status` / `get_agent_session_result` to check progress
 
@@ -198,16 +177,6 @@ Resume an existing agent session instance with a new prompt to continue work.
 }
 ```
 
-### Example with project_dir override
-
-```python
-{
-  "session_name": "architect",
-  "project_dir": "/absolute/path/to/project",
-  "prompt": "Add security considerations to the architecture design"
-}
-```
-
 ### Response
 
 **Synchronous mode (`async: false` or omitted)**: The agent's result after processing the new prompt.
@@ -222,20 +191,12 @@ Permanently delete all agent session instances and their associated data.
 
 ### Parameters
 
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
+None.
 
 ### Example
 
 ```python
 {}
-```
-
-### Example with project_dir override
-
-```python
-{
-  "project_dir": "/absolute/path/to/project"
-}
 ```
 
 ### Response
@@ -251,7 +212,6 @@ Check the current status of an agent session instance (running, finished, or not
 ### Parameters
 
 - `session_name` (required): Name of the agent session instance to check
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 - `wait_seconds` (optional): Wait before checking status (0-300 seconds). Useful for polling with a delay.
 
 ### Example
@@ -268,15 +228,6 @@ Check the current status of an agent session instance (running, finished, or not
 {
   "session_name": "architect",
   "wait_seconds": 5
-}
-```
-
-### Example with project_dir override
-
-```python
-{
-  "session_name": "architect",
-  "project_dir": "/absolute/path/to/project"
 }
 ```
 
@@ -318,22 +269,12 @@ Retrieve the final output/result from a completed agent session instance. Used w
 ### Parameters
 
 - `session_name` (required): Name of the completed agent session instance
-- `project_dir` (optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
 
 ### Example
 
 ```python
 {
   "session_name": "architect"
-}
-```
-
-### Example with project_dir override
-
-```python
-{
-  "session_name": "architect",
-  "project_dir": "/absolute/path/to/project"
 }
 ```
 
