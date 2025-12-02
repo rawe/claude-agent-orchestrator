@@ -190,7 +190,7 @@ CORS_ORIGINS=*
 ## Project Structure
 
 ```
-context-store-browser-extension/
+bug-spotter-browser-extension/
 ├── manifest.json          # Extension manifest (MV3)
 ├── background.js          # Service worker - API communication
 ├── content.js             # Content script - coordinates selection
@@ -201,10 +201,11 @@ context-store-browser-extension/
 │   ├── popup.css          # Styles (light/dark mode support)
 │   └── popup.js           # Popup logic and state management
 ├── icons/
-│   ├── icon.svg           # Source SVG icon
-│   └── icon*.png          # Generated PNG icons (16/32/48/128)
-├── generate-icons.sh      # Icon generation script
-├── create-placeholder-icons.js  # Node.js icon generator
+│   ├── icon.svg           # Source SVG icon (edit this to change the icon)
+│   ├── icon16.png         # Toolbar icon
+│   ├── icon32.png         # Toolbar icon (retina)
+│   ├── icon48.png         # Extension management page
+│   └── icon128.png        # Chrome Web Store / details page
 └── README.md
 ```
 
@@ -304,6 +305,45 @@ metadata: {
 | Firefox | 109+ | ✅ Fully supported |
 | Edge | 88+ | ✅ Fully supported |
 | Safari | - | ❌ Not tested |
+
+## Icon Generation
+
+The extension icons are generated from the source SVG file (`icons/icon.svg`). To regenerate the PNG icons after modifying the SVG:
+
+### Prerequisites
+
+Install `librsvg` via Homebrew (macOS):
+
+```bash
+brew install librsvg
+```
+
+### Generate Icons
+
+From the `icons/` directory, run:
+
+```bash
+cd icons/
+rsvg-convert -w 16 -h 16 icon.svg -o icon16.png
+rsvg-convert -w 32 -h 32 icon.svg -o icon32.png
+rsvg-convert -w 48 -h 48 icon.svg -o icon48.png
+rsvg-convert -w 128 -h 128 icon.svg -o icon128.png
+```
+
+Or as a one-liner:
+
+```bash
+for size in 16 32 48 128; do rsvg-convert -w $size -h $size icon.svg -o icon${size}.png; done
+```
+
+### Icon Design
+
+The icon features:
+- **Indigo circular background** (#6366f1) matching the UI theme
+- **Stylized bug** with body, head, eyes, antennae, and legs
+- **Subtle crosshair overlay** representing "spotting" bugs
+
+To modify the icon, edit `icons/icon.svg` and regenerate the PNGs.
 
 ## License
 
