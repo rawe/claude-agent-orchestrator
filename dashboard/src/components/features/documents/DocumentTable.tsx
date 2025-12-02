@@ -21,6 +21,7 @@ interface DocumentTableProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   selectedTags: string[];
+  semanticResultIds?: string[] | null;
 }
 
 const columnHelper = createColumnHelper<Document>();
@@ -33,6 +34,7 @@ export function DocumentTable({
   searchQuery,
   onSearchChange,
   selectedTags,
+  semanticResultIds,
 }: DocumentTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'created_at', desc: true },
@@ -40,6 +42,11 @@ export function DocumentTable({
 
   const filteredData = useMemo(() => {
     let filtered = documents;
+
+    // Filter by semantic search results first (if active)
+    if (semanticResultIds !== null && semanticResultIds !== undefined) {
+      filtered = filtered.filter((doc) => semanticResultIds.includes(doc.id));
+    }
 
     // Filter by search query (filename)
     if (searchQuery) {
@@ -57,7 +64,7 @@ export function DocumentTable({
     }
 
     return filtered;
-  }, [documents, searchQuery, selectedTags]);
+  }, [documents, searchQuery, selectedTags, semanticResultIds]);
 
   const columns = useMemo(
     () => [
@@ -242,7 +249,7 @@ export function DocumentTable({
             icon={<FileText className="w-12 h-12" />}
             title="No documents found"
             description={
-              searchQuery || selectedTags.length > 0
+              semanticResultIds !== null || searchQuery || selectedTags.length > 0
                 ? 'Try adjusting your search or filters'
                 : 'Upload your first document to get started'
             }
