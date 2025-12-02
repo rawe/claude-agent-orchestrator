@@ -270,16 +270,27 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def read_document(self, document_id: str) -> str:
+    def read_document(
+        self,
+        document_id: str,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None
+    ) -> tuple[str, Optional[int], Optional[str]]:
         """Read text document content directly without downloading to file.
 
         This method only supports text files. For binary files, use pull_document().
+        Supports partial content retrieval via offset and limit parameters.
 
         Args:
             document_id: ID of the document to read
+            offset: Starting character position (0-indexed)
+            limit: Number of characters to return
 
         Returns:
-            String content of the document (UTF-8 decoded)
+            Tuple of (content, total_chars, char_range):
+                - content: String content of the document (UTF-8 decoded)
+                - total_chars: Total characters in document (only for partial reads)
+                - char_range: Character range returned, e.g., "0-1000" (only for partial reads)
 
         Raises:
             Exception: On network or HTTP errors, including:
@@ -288,8 +299,16 @@ class DocumentClient:
                 - Error if file cannot be decoded as UTF-8
         """
         try:
+            # Build query params for partial read
+            params = {}
+            if offset is not None:
+                params["offset"] = offset
+            if limit is not None:
+                params["limit"] = limit
+
             response = httpx.get(
                 f"{self.base_url}/documents/{document_id}",
+                params=params if params else None,
                 timeout=30.0
             )
             response.raise_for_status()
@@ -304,9 +323,16 @@ class DocumentClient:
                     f"Use doc-pull to download binary files."
                 )
 
+            # Extract partial read headers if present
+            total_chars = response.headers.get("x-total-chars")
+            char_range = response.headers.get("x-char-range")
+
+            total_chars = int(total_chars) if total_chars else None
+
             # Decode content to UTF-8 string
             try:
-                return response.content.decode("utf-8")
+                content = response.content.decode("utf-8")
+                return content, total_chars, char_range
             except UnicodeDecodeError:
                 raise Exception(
                     "File is not valid UTF-8 text. Use doc-pull to download."

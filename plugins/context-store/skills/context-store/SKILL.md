@@ -49,10 +49,12 @@ uv run <skill-root>/commands/doc-info <document-id>
 
 ### `doc-read` - Read Text Documents
 ```bash
-uv run <skill-root>/commands/doc-read <document-id>
+uv run <skill-root>/commands/doc-read <document-id> [--offset INT] [--limit INT]
 # Example: uv run <skill-root>/commands/doc-read doc_abc123
+# Partial: uv run <skill-root>/commands/doc-read doc_abc123 --offset 2000 --limit 1000
 ```
 **Use when**: Output text document content directly to stdout (text files only).
+**Partial reads**: Use `--offset` and `--limit` to retrieve specific sections (useful with semantic search results).
 
 ### `doc-pull` - Download Documents
 ```bash
@@ -127,6 +129,8 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 **Check metadata?** → `doc-info <doc-id>` (metadata only)
 
 **Read text file?** → `doc-read <doc-id>` (text files to stdout)
+
+**Read section?** → `doc-read <doc-id> --offset 2000 --limit 1000` (partial read)
 
 **Download document?** → `doc-pull <doc-id>` (ID from query)
 
