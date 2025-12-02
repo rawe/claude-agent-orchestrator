@@ -16,7 +16,8 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 │   ├── orchestrator/             # Claude Code plugin - with orchestrator skill: ao-* commands
 │   └── context-store/            # Claude Code plugin - with context-store skill: doc-* commands
 └── interfaces/
-    └── agent-orchestrator-mcp-server/  # MCP server interface
+    ├── agent-orchestrator-mcp-server/  # MCP server for agent orchestration
+    └── context-store-mcp-server/       # MCP server for document management
 ```
 
 ## Components
@@ -71,23 +72,29 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 │         SERVERS                     │   │   Context Store :8766           │
 │  ┌──────────────────────────────┐   │   │   - Document storage            │
 │  │  Agent Runtime :8765         │   │   │   - Tag-based queries           │
-│  │  - Session management        │   │   └───────────────┬─────────────────┘
-│  │  - Event tracking            │   │                   │
-│  │  - SQLite persistence        │   │                   │ HTTP
-│  │  - WebSocket broadcast       │◄──┼─────────┐         │
-│  └──────────────────────────────┘   │         │         │
-│                                     │         │ WS      │
-│  ┌──────────────────────────────┐   │         │         │
-│  │  Agent Registry :8767        │   │   ┌─────┴─────────┴─────┐
-│  │  - Agent blueprints          │   │   │      Dashboard      │
-│  │  - CRUD API                  │   │   │   - Session monitor │
-│  └──────────────────────────────┘   │   │   - Document viewer │
-└─────────────────────────────────────┘   └─────────────────────┘
+│  │  - Session management        │   │   │   - Semantic search             │
+│  │  - Event tracking            │   │   └───────────────┬─────────────────┘
+│  │  - SQLite persistence        │   │                   ▲
+│  │  - WebSocket broadcast       │◄──┼───────────┐       │ HTTP
+│  └──────────────────────────────┘   │           │       │
+│                                     │           │ WS    │
+│  ┌──────────────────────────────┐   │           │       │
+│  │  Agent Registry :8767        │◄──┼─────┐     │       │
+│  │  - Agent blueprints          │   │     │     │       │
+│  │  - CRUD API                  │   │     │HTTP │       │
+│  └──────────────────────────────┘   │     │     │       │
+└─────────────────────────────────────┘     │     │       │
+                                      ┌─────┴─────┴───────┴─────┐
+                                      │      Dashboard          │
+                                      │   - Session monitor     │
+                                      │   - Document viewer     │
+                                      │   - Blueprint mgmt      │
+                                      └─────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│  MCP Server (interfaces/)           │
-│  - Wraps ao-* as MCP tools          │──► External MCP Clients
-│  - Subprocess execution             │
+│  MCP Servers (interfaces/)          │
+│  - agent-orchestrator-mcp: ao-*     │──► External MCP Clients
+│  - context-store-mcp: doc-*         │
 └─────────────────────────────────────┘
 ```
 
@@ -99,8 +106,10 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 | ao-* commands | Agent Registry | HTTP | Get agent blueprints |
 | doc-* commands | Context Store | HTTP | Document operations |
 | Dashboard | Agent Runtime | WebSocket | Real-time session updates |
+| Dashboard | Agent Registry | HTTP | Blueprint management |
 | Dashboard | Context Store | HTTP | Document listing/viewing |
-| MCP Server | ao-* commands | Subprocess | Expose as MCP tools |
+| Agent Orchestrator MCP | ao-* commands | Subprocess | Expose as MCP tools |
+| Context Store MCP | doc-* commands | Subprocess | Expose as MCP tools |
 
 ## Key Environment Variables
 

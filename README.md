@@ -57,7 +57,7 @@ Use the orchestrator skill to create a new session called "code-review"
 
 **Best for:** Claude Desktop or other MCP-compatible clients
 
-- 7 MCP tools for agent orchestration
+- 7 MCP tools for agent orchestration + 7 MCP tools for document management
 - Works with Claude Desktop, Claude Code, or any MCP system
 
 **Setup:** Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -69,6 +69,13 @@ Use the orchestrator skill to create a new session called "code-review"
       "args": ["run", "/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"],
       "env": {
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    },
+    "context-store": {
+      "command": "uv",
+      "args": ["run", "/path/to/interfaces/context-store-mcp-server/context-store-mcp.py"],
+      "env": {
         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
       }
     }
@@ -116,7 +123,8 @@ agent-orchestrator-framework/
 │   └── context-store/                 # Document storage
 │
 ├── interfaces/
-│   └── agent-orchestrator-mcp-server/ # MCP protocol interface
+│   ├── agent-orchestrator-mcp-server/ # MCP interface for agent orchestration
+│   └── context-store-mcp-server/      # MCP interface for document management
 │
 ├── dashboard/                         # Web UI (React + Vite)
 │
@@ -195,5 +203,6 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
 - **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Option 1: Claude Code plugin
-- **[MCP Server](./interfaces/agent-orchestrator-mcp-server/README.md)** - Option 2: MCP implementation
+- **[Agent Orchestrator MCP](./interfaces/agent-orchestrator-mcp-server/README.md)** - Option 2: MCP server for agent orchestration
+- **[Context Store MCP](./interfaces/context-store-mcp-server/README.md)** - MCP server for document management
 - **[Context Store Plugin](./plugins/context-store/README.md)** - Document management plugin
