@@ -9,9 +9,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 // DOM Elements
 const elements = {
   serverStatus: document.getElementById('server-status'),
-  statusText: document.querySelector('.status-text'),
-  pageUrl: document.getElementById('page-url'),
-  pageTitle: document.getElementById('page-title'),
+  pageDomain: document.getElementById('page-domain'),
   noElementSelected: document.getElementById('no-element-selected'),
   elementSelected: document.getElementById('element-selected'),
   selectElementBtn: document.getElementById('select-element-btn'),
@@ -30,11 +28,11 @@ const elements = {
   tagsList: document.getElementById('tags-list'),
   comment: document.getElementById('comment'),
   pushBtn: document.getElementById('push-btn'),
-  noElementWarning: document.getElementById('no-element-warning'),
   result: document.getElementById('result'),
   settingsBtn: document.getElementById('settings-btn'),
   settingsPanel: document.getElementById('settings-panel'),
   serverUrl: document.getElementById('server-url'),
+  connectionStatus: document.getElementById('connection-status'),
   saveSettings: document.getElementById('save-settings'),
   cancelSettings: document.getElementById('cancel-settings')
 };
@@ -83,11 +81,14 @@ async function init() {
     return;
   }
 
-  // Update page info
-  elements.pageUrl.textContent = currentTab.url;
-  elements.pageUrl.title = currentTab.url;
-  elements.pageTitle.textContent = currentTab.title || 'Untitled';
-  elements.pageTitle.title = currentTab.title || 'Untitled';
+  // Update page domain in header
+  try {
+    const url = new URL(currentTab.url);
+    elements.pageDomain.textContent = url.hostname;
+    elements.pageDomain.title = currentTab.url;
+  } catch {
+    elements.pageDomain.textContent = '-';
+  }
 
   // Check server status
   await checkServerStatus();
@@ -103,7 +104,12 @@ async function init() {
 
   // Add default tags
   addTag('bug-report');
-  addTag(new URL(currentTab.url).hostname);
+  try {
+    const url = new URL(currentTab.url);
+    addTag(url.hostname);
+  } catch {
+    // Ignore invalid URLs
+  }
 
   // Listen for element selection messages from content script
   browserAPI.runtime.onMessage.addListener((message) => {
@@ -148,27 +154,40 @@ async function refreshPageInfo() {
  */
 async function checkServerStatus() {
   elements.serverStatus.className = 'status-indicator checking';
-  elements.statusText.textContent = 'Checking...';
+  updateConnectionStatus('checking', 'Checking...');
 
   try {
     const response = await browserAPI.runtime.sendMessage({ type: 'CHECK_SERVER' });
 
     if (response.healthy) {
       elements.serverStatus.className = 'status-indicator connected';
-      elements.statusText.textContent = 'Connected';
+      updateConnectionStatus('connected', 'Connected');
       serverConnected = true;
     } else {
       elements.serverStatus.className = 'status-indicator disconnected';
-      elements.statusText.textContent = 'Disconnected';
+      updateConnectionStatus('disconnected', 'Disconnected');
       serverConnected = false;
     }
   } catch {
     elements.serverStatus.className = 'status-indicator disconnected';
-    elements.statusText.textContent = 'Error';
+    updateConnectionStatus('disconnected', 'Error');
     serverConnected = false;
   }
 
   updatePushButton();
+}
+
+/**
+ * Update connection status in settings panel
+ */
+function updateConnectionStatus(status, label) {
+  if (elements.connectionStatus) {
+    elements.connectionStatus.className = `connection-status ${status}`;
+    const labelEl = elements.connectionStatus.querySelector('.status-label');
+    if (labelEl) {
+      labelEl.textContent = label;
+    }
+  }
 }
 
 /**
@@ -339,16 +358,6 @@ async function copySelector() {
 function updatePushButton() {
   const canPush = serverConnected && selectedElementData !== null;
   elements.pushBtn.disabled = !canPush;
-
-  if (!selectedElementData) {
-    elements.noElementWarning.classList.remove('hidden');
-    elements.noElementWarning.textContent = 'Select an element to enable submission';
-  } else if (!serverConnected) {
-    elements.noElementWarning.classList.remove('hidden');
-    elements.noElementWarning.textContent = 'Server not connected';
-  } else {
-    elements.noElementWarning.classList.add('hidden');
-  }
 }
 
 /**
