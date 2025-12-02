@@ -42,6 +42,7 @@ services:
       - AGENT_REGISTRY_HOST=0.0.0.0
       - AGENT_REGISTRY_PORT=8767
       - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
+      - CORS_ORIGINS=*
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -69,6 +70,7 @@ services:
       - PYTHONUNBUFFERED=1
       # Enable verbose debug logging for troubleshooting (set to true to enable)
       - DEBUG_LOGGING=false
+      - CORS_ORIGINS=*
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -101,6 +103,8 @@ services:
       # Examples: "http://192.168.1.100:8766", "https://docs.example.com"
       - DOCUMENT_SERVER_PUBLIC_URL=http://localhost:8766
       - LOG_LEVEL=INFO
+      # CORS - allow all origins for browser extension support
+      - CORS_ORIGINS=*
       # Semantic search settings (optional, disabled by default)
       - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
