@@ -33,12 +33,20 @@ uv run <skill-root>/commands/doc-push <file> [--tags TEXT] [--description TEXT]
 ```
 **Use when**: Store a document for future reference.
 
-### `doc-query` - Search Documents
+### `doc-query` - Search by Tags/Name
 ```bash
 uv run <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT]
 # Example: uv run <skill-root>/commands/doc-query --tags "api,v2"
 ```
 **Use when**: Find documents by tags (AND logic) or name patterns.
+
+### `doc-search` - Semantic Search
+```bash
+uv run <skill-root>/commands/doc-search "<query>" [--limit INT]
+# Example: uv run <skill-root>/commands/doc-search "how to configure authentication"
+```
+**Use when**: Find documents by meaning using natural language queries.
+**Note**: Requires semantic search enabled on server. Returns section offsets for partial reads.
 
 ### `doc-info` - Get Document Metadata
 ```bash
@@ -96,6 +104,16 @@ uv run <skill-root>/commands/doc-push api-spec.md --tags "api,mvp"
 uv run <skill-root>/commands/doc-query --tags "mvp"
 ```
 
+### Semantic Search + Partial Read
+```bash
+# Search by meaning
+uv run <skill-root>/commands/doc-search "how to authenticate users"
+# Returns: {"results": [{"document_id": "doc_abc", "sections": [{"offset": 2000, "limit": 1000}]}]}
+
+# Read only the relevant section
+uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
+```
+
 ---
 
 ## Key Concepts
@@ -124,7 +142,9 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 
 **Store document?** → `doc-push <file> --tags "tag1,tag2"`
 
-**Find documents?** → `doc-query --tags "tag1,tag2"` (AND logic)
+**Find by tags?** → `doc-query --tags "tag1,tag2"` (AND logic)
+
+**Find by meaning?** → `doc-search "your question"` (semantic search)
 
 **Check metadata?** → `doc-info <doc-id>` (metadata only)
 
