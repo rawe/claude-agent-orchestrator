@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug Spotter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Bug Spotter</h1>
+      <div id="server-status" class="status-indicator">
+        <span class="status-dot"></span>
+        <span class="status-text">Checking...</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- Page Info Section -->
+      <section class="section">
+        <h2>Page</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <label>URL</label>
+            <span id="page-url" class="info-value truncate">-</span>
+          </div>
+          <div class="info-item">
+            <label>Title</label>
+            <span id="page-title" class="info-value truncate">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Element Selection Section -->
+      <section class="section">
+        <h2>Element Selection</h2>
+        <div id="no-element-selected" class="element-prompt">
+          <p>No element selected. Click the button below to select an element on the page.</p>
+          <button id="select-element-btn" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Select Element
+          </button>
+        </div>
+
+        <div id="element-selected" class="element-info hidden">
+          <div class="selector-display">
+            <label>CSS Selector</label>
+            <div class="selector-value">
+              <code id="element-selector">-</code>
+              <button id="copy-selector-btn" class="btn-icon-small" title="Copy selector">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+            <div id="selector-valid" class="selector-status valid">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Selector is unique
+            </div>
+            <div id="selector-invalid" class="selector-status invalid hidden">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              Selector may not be unique
+            </div>
+          </div>
+
+          <div class="element-meta">
+            <span class="element-tag" id="element-tag">-</span>
+          </div>
+
+          <div class="element-actions">
+            <button id="reselect-btn" class="btn btn-small btn-secondary">Re-select</button>
+            <button id="clear-element-btn" class="btn btn-small btn-secondary">Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Options Section -->
+      <section class="section">
+        <h2>Include in Report</h2>
+        <div class="options">
+          <label class="checkbox-label">
+            <input type="checkbox" id="include-html">
+            <span>Element HTML content</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="include-console" checked>
+            <span>Console logs <span id="console-count-badge" class="badge">0</span></span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="include-metadata" checked>
+            <span>System metadata</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Tags Section -->
+      <section class="section">
+        <h2>Tags</h2>
+        <div class="tags-container">
+          <input type="text" id="tags-input" placeholder="Add tag and press Enter">
+          <div id="tags-list" class="tags-list"></div>
+        </div>
+      </section>
+
+      <!-- Comment Section -->
+      <section class="section">
+        <h2>Description</h2>
+        <textarea id="comment" placeholder="Describe the issue or what you're reporting..." rows="3"></textarea>
+      </section>
+
+      <!-- Action Buttons -->
+      <div class="actions">
+        <button id="push-btn" class="btn btn-primary" disabled>
+          <span class="btn-text">Submit Report</span>
+          <span class="btn-loading">Pushing...</span>
+        </button>
+        <p id="no-element-warning" class="warning-text">Select an element to enable submission</p>
+      </div>
+
+      <!-- Result Message -->
+      <div id="result" class="result hidden"></div>
+    </main>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="settings-panel hidden">
+      <h2>Settings</h2>
+      <div class="setting-item">
+        <label for="server-url">Server URL</label>
+        <input type="text" id="server-url" placeholder="http://localhost:8766">
+      </div>
+      <div class="setting-actions">
+        <button id="save-settings" class="btn btn-small">Save</button>
+        <button id="cancel-settings" class="btn btn-small btn-secondary">Cancel</button>
+      </div>
+    </div>
+
+    <footer>
+      <button id="settings-btn" class="btn-icon" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+      <span class="version">v1.0.0</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
