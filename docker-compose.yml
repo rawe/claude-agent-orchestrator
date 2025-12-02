@@ -42,6 +42,7 @@ services:
       - AGENT_REGISTRY_HOST=0.0.0.0
       - AGENT_REGISTRY_PORT=8767
       - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
+      - CORS_ORIGINS=*
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -69,6 +70,7 @@ services:
       - PYTHONUNBUFFERED=1
       # Enable verbose debug logging for troubleshooting (set to true to enable)
       - DEBUG_LOGGING=false
+      - CORS_ORIGINS=*
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -101,6 +103,16 @@ services:
       # Examples: "http://192.168.1.100:8766", "https://docs.example.com"
       - DOCUMENT_SERVER_PUBLIC_URL=http://localhost:8766
       - LOG_LEVEL=INFO
+      # CORS - allow all origins for browser extension support
+      - CORS_ORIGINS=*
+      # Semantic search settings (optional, disabled by default)
+      - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-context-store-vectors}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -110,6 +122,33 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # ============================================================================
+  # ELASTICSEARCH (for semantic search)
+  # ============================================================================
+  elasticsearch:
+    container_name: context-store-elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 # ==============================================================================
 # NETWORKS
@@ -128,4 +167,7 @@ volumes:
     driver: local
   runtime-data:
     name: agent-orchestrator-runtime-data
+    driver: local
+  es-data:
+    name: context-store-es-data
     driver: local

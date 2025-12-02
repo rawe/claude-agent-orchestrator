@@ -33,12 +33,20 @@ uv run <skill-root>/commands/doc-push <file> [--tags TEXT] [--description TEXT]
 ```
 **Use when**: Store a document for future reference.
 
-### `doc-query` - Search Documents
+### `doc-query` - Search by Tags/Name
 ```bash
 uv run <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT]
 # Example: uv run <skill-root>/commands/doc-query --tags "api,v2"
 ```
 **Use when**: Find documents by tags (AND logic) or name patterns.
+
+### `doc-search` - Semantic Search
+```bash
+uv run <skill-root>/commands/doc-search "<query>" [--limit INT]
+# Example: uv run <skill-root>/commands/doc-search "how to configure authentication"
+```
+**Use when**: Find documents by meaning using natural language queries.
+**Note**: Requires semantic search enabled on server. Returns section offsets for partial reads.
 
 ### `doc-info` - Get Document Metadata
 ```bash
@@ -49,10 +57,12 @@ uv run <skill-root>/commands/doc-info <document-id>
 
 ### `doc-read` - Read Text Documents
 ```bash
-uv run <skill-root>/commands/doc-read <document-id>
+uv run <skill-root>/commands/doc-read <document-id> [--offset INT] [--limit INT]
 # Example: uv run <skill-root>/commands/doc-read doc_abc123
+# Partial: uv run <skill-root>/commands/doc-read doc_abc123 --offset 2000 --limit 1000
 ```
 **Use when**: Output text document content directly to stdout (text files only).
+**Partial reads**: Use `--offset` and `--limit` to retrieve specific sections (useful with semantic search results).
 
 ### `doc-pull` - Download Documents
 ```bash
@@ -94,6 +104,16 @@ uv run <skill-root>/commands/doc-push api-spec.md --tags "api,mvp"
 uv run <skill-root>/commands/doc-query --tags "mvp"
 ```
 
+### Semantic Search + Partial Read
+```bash
+# Search by meaning
+uv run <skill-root>/commands/doc-search "how to authenticate users"
+# Returns: {"results": [{"document_id": "doc_abc", "sections": [{"offset": 2000, "limit": 1000}]}]}
+
+# Read only the relevant section
+uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
+```
+
 ---
 
 ## Key Concepts
@@ -122,11 +142,15 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 
 **Store document?** → `doc-push <file> --tags "tag1,tag2"`
 
-**Find documents?** → `doc-query --tags "tag1,tag2"` (AND logic)
+**Find by tags?** → `doc-query --tags "tag1,tag2"` (AND logic)
+
+**Find by meaning?** → `doc-search "your question"` (semantic search)
 
 **Check metadata?** → `doc-info <doc-id>` (metadata only)
 
 **Read text file?** → `doc-read <doc-id>` (text files to stdout)
+
+**Read section?** → `doc-read <doc-id> --offset 2000 --limit 1000` (partial read)
 
 **Download document?** → `doc-pull <doc-id>` (ID from query)
 

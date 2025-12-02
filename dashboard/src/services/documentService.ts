@@ -1,6 +1,22 @@
 import { documentApi } from './api';
 import type { Document, DocumentTag, DocumentQuery } from '@/types';
 
+export interface SemanticSearchResult {
+  document_id: string;
+  filename: string;
+  document_url: string;
+  sections: Array<{
+    score: number;
+    offset: number;
+    limit: number;
+  }>;
+}
+
+export interface SemanticSearchResponse {
+  query: string;
+  results: SemanticSearchResult[];
+}
+
 export const documentService = {
   /**
    * Get all documents with optional filtering
@@ -112,5 +128,18 @@ export const documentService = {
     // For now, just return the existing document
     console.warn('Update document endpoint not implemented');
     return this.getDocumentMetadata(id);
+  },
+
+  /**
+   * Semantic search - find documents by natural language query
+   * Returns document IDs of matching documents
+   */
+  async semanticSearch(query: string, limit = 20): Promise<SemanticSearchResponse> {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    params.append('limit', limit.toString());
+
+    const response = await documentApi.get<SemanticSearchResponse>('/search', { params });
+    return response.data;
   },
 };

@@ -9,8 +9,8 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml ./
 
-# Install dependencies using UV
-RUN uv pip install --system -e .
+# Install dependencies using UV (including semantic search extras)
+RUN uv pip install --system -e ".[semantic]"
 
 # Copy application code
 COPY . .

@@ -25,14 +25,29 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def main(
     document_id: str = typer.Argument(..., help="Document ID to read content from"),
+    offset: int = typer.Option(None, "--offset", "-o", help="Starting character position (0-indexed)"),
+    limit: int = typer.Option(None, "--limit", "-l", help="Number of characters to return"),
 ):
-    """Read text document content directly to stdout (text files only)."""
+    """Read text document content directly to stdout (text files only).
+
+    Supports partial reads with --offset and --limit for retrieving specific sections.
+    Useful for reading only relevant portions from semantic search results.
+    """
     try:
         # Create client and read document
         config = Config()
         client = DocumentClient(config)
 
-        content = client.read_document(document_id)
+        content, total_chars, char_range = client.read_document(
+            document_id,
+            offset=offset,
+            limit=limit
+        )
+
+        # If partial read, output metadata to stderr
+        if total_chars is not None:
+            meta = {"total_chars": total_chars, "range": char_range}
+            print(json.dumps(meta), file=sys.stderr)
 
         # Output raw content to stdout (no JSON wrapper)
         print(content, end="")

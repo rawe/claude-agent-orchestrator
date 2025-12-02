@@ -1,0 +1,26 @@
+# Development docker-compose for semantic search dependencies
+# Start with: docker compose up -d
+
+services:
+  elasticsearch:
+    container_name: context-store-elasticsearch-dev
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  es-data:
+    name: context-store-es-data-dev
+    driver: local

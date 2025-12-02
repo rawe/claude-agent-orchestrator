@@ -17,7 +17,8 @@ help:
 	@echo "  make info           - Show service URLs and descriptions"
 	@echo "  make open           - Open Dashboard in browser"
 	@echo "  make clean          - Stop and remove all containers, networks (keeps data)"
-	@echo "  make clean-all      - Stop and remove everything including data (sessions, documents)"
+	@echo "  make clean-all      - Stop and remove everything including all data volumes"
+	@echo "                        (sessions, documents, elasticsearch index)"
 	@echo "  make clean-docs     - Remove ONLY the document storage volume"
 	@echo "  make clean-sessions - Remove ONLY the session storage volume"
 	@echo ""
@@ -149,8 +150,12 @@ clean:
 	docker-compose down
 
 # Clean up everything including volumes
+# This removes: sessions, documents, and elasticsearch semantic search index
 clean-all:
 	@echo "Cleaning up everything including volumes..."
+	@echo "  - Session data (agent-orchestrator-runtime-data)"
+	@echo "  - Document storage (agent-orchestrator-document-data)"
+	@echo "  - Elasticsearch index (context-store-es-data)"
 	@read -p "This will delete all persistent data. Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \

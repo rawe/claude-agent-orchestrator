@@ -300,7 +300,7 @@ export function AgentEditor({
                 control={control}
                 render={({ field }) => (
                   <MCPJsonEditor
-                    value={field.value}
+                    value={field.value ?? null}
                     onChange={field.onChange}
                   />
                 )}

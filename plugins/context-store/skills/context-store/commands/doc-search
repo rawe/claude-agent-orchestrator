@@ -1,0 +1,67 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Semantic search for documents in the context store."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+
+import httpx
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    query: str = typer.Argument(..., help="Natural language search query"),
+    limit: int = typer.Option(10, "--limit", "-l", help="Maximum documents to return"),
+):
+    """Semantic search across documents by meaning.
+
+    Returns documents ranked by similarity with section offsets.
+    Use doc-read with --offset/--limit to retrieve matching sections.
+    """
+    try:
+        config = Config()
+
+        response = httpx.get(
+            f"{config.base_url}/search",
+            params={"q": query, "limit": limit},
+            timeout=30.0
+        )
+        response.raise_for_status()
+        result = response.json()
+
+        print(json.dumps(result, indent=2))
+
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            error = {"error": "Semantic search is not enabled on the server"}
+        else:
+            error = {"error": f"HTTP error {e.response.status_code}: {e.response.text}"}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+    except httpx.RequestError as e:
+        error = {"error": f"Network error: {str(e)}"}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+    except Exception as e:
+        error = {"error": str(e)}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()
