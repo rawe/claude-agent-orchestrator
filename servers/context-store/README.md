@@ -2,6 +2,8 @@
 
 FastAPI server for storing context documents. This server provides RESTful API endpoints for uploading, retrieving, querying, and deleting documents with metadata and tag support.
 
+The server also supports **semantic search** (optional) using embeddings to find documents by meaning rather than exact keyword matches.
+
 ## Prerequisites
 
 - **Python 3.11+** - Required for modern type hints and async support
@@ -177,31 +179,115 @@ curl http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2/metadata
 
 **Use Case**: Check document metadata (file size, MIME type, tags, timestamps) before downloading. The `url` field provides a direct link to retrieve the document content. Useful for filtering or validating documents without transferring the full file content.
 
+### GET /search
+
+Semantic search across indexed documents. Only available when semantic search is enabled.
+
+- **Query parameters**:
+  - `q` (required): Natural language search query
+  - `limit` (default: 10): Maximum number of documents to return (1-100)
+- **Response**: 200 OK with `SearchResponse`
+
+**Example**:
+```bash
+curl "http://localhost:8766/search?q=how%20to%20configure%20authentication&limit=5"
+```
+
+**Success Response**:
+```json
+{
+  "query": "how to configure authentication",
+  "results": [
+    {
+      "document_id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+      "filename": "auth-guide.md",
+      "document_url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+      "sections": [
+        { "score": 0.92, "offset": 2000, "limit": 1000 },
+        { "score": 0.85, "offset": 5000, "limit": 1000 }
+      ]
+    }
+  ]
+}
+```
+
+**Response Fields**:
+- `document_id`: Unique identifier of the matching document
+- `filename`: Original filename
+- `document_url`: Direct URL to retrieve the document
+- `sections`: List of matching sections with:
+  - `score`: Similarity score (0-1, higher is more relevant)
+  - `offset`: Character position where the matching section starts
+  - `limit`: Number of characters in the section
+
+**Error Response** (404 if semantic search is disabled):
+```json
+{
+  "detail": "Semantic search is not enabled"
+}
+```
+
+**Workflow**: Use the `offset` and `limit` from search results to retrieve only the relevant section:
+```bash
+# Get the matching section directly
+curl "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2?offset=2000&limit=1000"
+```
+
 ### GET /documents/{document_id}
 
 Download a document by ID. Returns the file content with appropriate headers.
 
 - **Path parameter**: `document_id` - The document's unique identifier
-- **Success Response**: 200 OK with file content (binary/text based on MIME type)
+- **Query parameters** (optional, for text content types only):
+  - `offset`: Starting character position (0-indexed)
+  - `limit`: Number of characters to return
+- **Success Response**:
+  - 200 OK with full file content (when no offset/limit)
+  - 206 Partial Content with partial content (when offset/limit provided)
 - **Headers**:
   - `Content-Type`: The document's MIME type
   - `Content-Disposition`: Includes the original filename
+  - `X-Total-Chars`: Total characters in document (partial content only)
+  - `X-Char-Range`: Character range returned, e.g., "2000-3000" (partial content only)
 
-**Example**:
+**Examples**:
 ```bash
-# Download and save to file
+# Download full document
 curl http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2 -o downloaded_file.md
 
 # View content directly
 curl http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2
+
+# Get partial content (first 500 characters)
+curl "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2?offset=0&limit=500"
+
+# Get a specific section (characters 2000-3000)
+curl "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2?offset=2000&limit=1000"
 ```
 
 **Success Response**: The actual file content is returned (e.g., markdown text, binary data, etc.)
+
+**Partial Content Response** (206):
+```
+HTTP/1.1 206 Partial Content
+X-Total-Chars: 5000
+X-Char-Range: 2000-3000
+Content-Type: text/markdown
+
+[partial document content here]
+```
 
 **Error Response** (404 if not found):
 ```json
 {
   "detail": "Document not found"
+}
+```
+
+**Error Response** (400 if partial read on binary content):
+```json
+{
+  "detail": "Partial content retrieval is only supported for text content types"
 }
 ```
 
@@ -339,6 +425,103 @@ Configure the server using environment variables:
   DOCUMENT_SERVER_DB=/var/db/documents.db uv run python -m src.main
   ```
 
+## Semantic Search (Optional)
+
+The context store supports semantic search using vector embeddings. This feature allows you to search documents by meaning rather than exact keyword matches.
+
+### Requirements
+
+1. **Ollama** - Local LLM server for generating embeddings
+2. **Elasticsearch** - Vector database for storing and searching embeddings
+
+### Setting Up Ollama
+
+Ollama must be installed and running on your machine with the embedding model pulled.
+
+1. **Install Ollama** (if not already installed):
+   ```bash
+   # macOS
+   brew install ollama
+
+   # Linux
+   curl -fsSL https://ollama.com/install.sh | sh
+   ```
+
+2. **Start Ollama**:
+   ```bash
+   ollama serve
+   ```
+
+3. **Pull the embedding model**:
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+
+4. **Verify it's working**:
+   ```bash
+   curl http://localhost:11434/api/tags
+   ```
+   You should see `nomic-embed-text` in the list of models.
+
+### Elasticsearch Setup
+
+Elasticsearch is handled automatically via Docker Compose. When you start the full stack with `docker-compose up`, Elasticsearch will be started as a service.
+
+For local development without the full stack, you can start only Elasticsearch:
+```bash
+cd servers/context-store
+docker compose up -d
+```
+
+### Enabling Semantic Search
+
+Set the environment variable to enable semantic search:
+
+```bash
+# Local development
+SEMANTIC_SEARCH_ENABLED=true uv run python -m src.main
+
+# Docker (set in .env file or pass to docker-compose)
+SEMANTIC_SEARCH_ENABLED=true docker-compose up -d
+```
+
+### Semantic Search Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SEMANTIC_SEARCH_ENABLED` | Enable/disable semantic search | `false` |
+| `OLLAMA_BASE_URL` | Ollama API base URL | `http://localhost:11434` (local) or `http://host.docker.internal:11434` (Docker) |
+| `OLLAMA_EMBEDDING_MODEL` | Embedding model name | `nomic-embed-text` |
+| `ELASTICSEARCH_URL` | Elasticsearch URL | `http://localhost:9200` (local) or `http://elasticsearch:9200` (Docker) |
+| `ELASTICSEARCH_INDEX` | Index name for vectors | `context-store-vectors` |
+| `CHUNK_SIZE` | Characters per chunk | `1000` |
+| `CHUNK_OVERLAP` | Overlap between chunks | `200` |
+
+### How It Works
+
+1. **Document Upload**: When a text document is uploaded and semantic search is enabled, it is:
+   - Split into overlapping chunks (default: 1000 chars with 200 char overlap)
+   - Each chunk is embedded using Ollama's embedding model
+   - Embeddings are stored in Elasticsearch with character offsets
+
+2. **Search**: When you search:
+   - Your query is embedded using the same model
+   - Elasticsearch finds the most similar chunks
+   - Results are aggregated by document and include section offsets
+
+3. **Retrieval**: Use the `offset` and `limit` from search results to fetch only the relevant section of a document.
+
+### Docker Network Considerations
+
+When running in Docker:
+- **Ollama**: Runs on your host machine (not in Docker). The context-store container accesses it via `host.docker.internal:11434`
+- **Elasticsearch**: Runs as a Docker service. The context-store container accesses it via `elasticsearch:9200` (Docker DNS)
+
+If you're running Ollama on a different host or port, set `OLLAMA_BASE_URL` accordingly:
+```bash
+OLLAMA_BASE_URL=http://192.168.1.100:11434 docker-compose up -d
+```
+
 ## Docker Operations
 
 ### Docker Commands
@@ -427,16 +610,22 @@ servers/context-store/
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md
+├── docker-compose.yml     # Local Elasticsearch for development
 ├── .venv/
-├── document-data/         # Created at runtime
+├── document-data/         # Created at runtime (gitignored)
 │   ├── files/
 │   └── documents.db
 ├── src/
 │   ├── main.py
 │   ├── models.py
 │   ├── storage.py
-│   └── database.py
-└── test_*.py
+│   ├── database.py
+│   └── semantic/          # Semantic search module (optional)
+│       ├── __init__.py
+│       ├── config.py      # Configuration settings
+│       ├── indexer.py     # Chunking and embedding
+│       └── search.py      # Query and retrieval
+└── tests/
 ```
 
 ## Testing

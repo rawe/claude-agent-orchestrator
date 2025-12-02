@@ -50,3 +50,24 @@ class DeleteResponse(BaseModel):
     success: bool
     message: str
     document_id: str
+
+
+class SectionInfo(BaseModel):
+    """Information about a matching section in a document."""
+    score: float
+    offset: int
+    limit: int
+
+
+class SearchResultItem(BaseModel):
+    """A single document result from semantic search."""
+    document_id: str
+    filename: str
+    document_url: str
+    sections: list[SectionInfo]
+
+
+class SearchResponse(BaseModel):
+    """Response model for semantic search."""
+    query: str
+    results: list[SearchResultItem]

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Form, Response
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -7,9 +7,13 @@ import uvicorn
 import os
 import json
 
-from .models import DocumentMetadata, DocumentResponse, DocumentQueryParams, DeleteResponse
+from .models import (
+    DocumentMetadata, DocumentResponse, DocumentQueryParams, DeleteResponse,
+    SearchResponse, SearchResultItem, SectionInfo
+)
 from .storage import DocumentStorage
 from .database import DocumentDatabase
+from .semantic.config import config as semantic_config
 
 # Configuration
 DEFAULT_HOST = "0.0.0.0"
@@ -77,6 +81,45 @@ async def health_check():
     return {"status": "healthy", "service": "context-store"}
 
 
+@app.get("/search", response_model=SearchResponse)
+async def search_documents_endpoint(
+    q: str = Query(..., description="Natural language search query"),
+    limit: int = Query(10, description="Maximum documents to return", ge=1, le=100)
+):
+    """
+    Semantic search across indexed documents.
+
+    Only available when SEMANTIC_SEARCH_ENABLED=true.
+    Returns documents ranked by semantic similarity to the query.
+    """
+    if not semantic_config.enabled:
+        raise HTTPException(
+            status_code=404,
+            detail="Semantic search is not enabled"
+        )
+
+    from .semantic.search import search_documents
+
+    # Perform semantic search
+    results = search_documents(q, limit=limit)
+
+    # Enrich results with document metadata
+    enriched_results = []
+    for result in results:
+        doc_metadata = db.get_document(result["document_id"])
+        if doc_metadata:
+            enriched_results.append(
+                SearchResultItem(
+                    document_id=result["document_id"],
+                    filename=doc_metadata.filename,
+                    document_url=get_document_url(result["document_id"]),
+                    sections=[SectionInfo(**s) for s in result["sections"]]
+                )
+            )
+
+    return SearchResponse(query=q, results=enriched_results)
+
+
 @app.post("/documents", response_model=DocumentResponse, status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
@@ -111,6 +154,12 @@ async def upload_document(
 
     # Insert into database
     db.insert_document(doc_metadata)
+
+    # Index for semantic search if enabled (only for text content)
+    if semantic_config.enabled and doc_metadata.content_type.startswith("text/"):
+        from .semantic.indexer import index_document
+        text_content = content.decode("utf-8", errors="ignore")
+        index_document(doc_metadata.id, text_content)
 
     # Return response
     response = DocumentResponse(
@@ -154,8 +203,19 @@ async def get_document_metadata(document_id: str):
 
 
 @app.get("/documents/{document_id}")
-async def get_document(document_id: str):
-    """Retrieve a specific document by ID and stream the file."""
+async def get_document(
+    document_id: str,
+    offset: Optional[int] = Query(None, description="Starting character position (0-indexed)"),
+    limit: Optional[int] = Query(None, description="Number of characters to return")
+):
+    """
+    Retrieve a specific document by ID.
+
+    For text content types, supports partial retrieval with offset and limit parameters.
+    Returns 206 Partial Content with X-Total-Chars and X-Char-Range headers.
+
+    For binary content types, offset/limit parameters are not supported (returns 400).
+    """
     # Get metadata from database
     doc_metadata = db.get_document(document_id)
 
@@ -168,7 +228,50 @@ async def get_document(document_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Return file as response
+    # Check if partial content is requested
+    partial_requested = offset is not None or limit is not None
+
+    if partial_requested:
+        # Only allow partial reads for text content types
+        if not doc_metadata.content_type.startswith("text/"):
+            raise HTTPException(
+                status_code=400,
+                detail="Partial content retrieval is only supported for text content types"
+            )
+
+        # Read file content
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        total_chars = len(content)
+
+        # Apply offset and limit
+        start = offset if offset is not None else 0
+        if start < 0:
+            start = 0
+        if start > total_chars:
+            start = total_chars
+
+        if limit is not None:
+            end = min(start + limit, total_chars)
+        else:
+            end = total_chars
+
+        partial_content = content[start:end]
+
+        # Return partial content with 206 status and headers
+        return Response(
+            content=partial_content,
+            status_code=206,
+            media_type=doc_metadata.content_type,
+            headers={
+                "X-Total-Chars": str(total_chars),
+                "X-Char-Range": f"{start}-{end}",
+                "Content-Disposition": f'inline; filename="{doc_metadata.filename}"'
+            }
+        )
+
+    # Return full file as response (original behavior)
     return FileResponse(
         path=file_path,
         media_type=doc_metadata.content_type,
@@ -221,6 +324,11 @@ async def delete_document(document_id: str):
 
     # Delete from storage
     storage_deleted = storage.delete_document(document_id)
+
+    # Delete from semantic search index if enabled
+    if semantic_config.enabled:
+        from .semantic.indexer import delete_document_index
+        delete_document_index(document_id)
 
     return DeleteResponse(
         success=True,

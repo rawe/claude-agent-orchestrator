@@ -10,5 +10,11 @@ dependencies = [
     "python-multipart>=0.0.6",
 ]
 
+[project.optional-dependencies]
+semantic = [
+    "langchain-ollama",
+    "langchain-elasticsearch",
+]
+
 [project.scripts]
 start = "document_server.main:main"
