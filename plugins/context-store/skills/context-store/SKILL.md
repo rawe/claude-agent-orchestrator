@@ -35,18 +35,22 @@ uv run <skill-root>/commands/doc-push <file> [--tags TEXT] [--description TEXT]
 
 ### `doc-query` - Search by Tags/Name
 ```bash
-uv run <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT]
+uv run <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT] [--include-relations]
 # Example: uv run <skill-root>/commands/doc-query --tags "api,v2"
+# With relations: uv run <skill-root>/commands/doc-query --tags "api" --include-relations
 ```
 **Use when**: Find documents by tags (AND logic) or name patterns.
+**Option**: `--include-relations` adds relations to each document in response.
 
 ### `doc-search` - Semantic Search
 ```bash
-uv run <skill-root>/commands/doc-search "<query>" [--limit INT]
+uv run <skill-root>/commands/doc-search "<query>" [--limit INT] [--include-relations]
 # Example: uv run <skill-root>/commands/doc-search "how to configure authentication"
+# With relations: uv run <skill-root>/commands/doc-search "auth" --include-relations
 ```
 **Use when**: Find documents by meaning using natural language queries.
 **Note**: Requires semantic search enabled on server. Returns section offsets for partial reads.
+**Option**: `--include-relations` adds relations to each result.
 
 ### `doc-info` - Get Document Metadata & Relations
 ```bash
@@ -180,9 +184,9 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 
 **Store document?** → `doc-push <file> --tags "tag1,tag2"`
 
-**Find by tags?** → `doc-query --tags "tag1,tag2"` (AND logic)
+**Find by tags?** → `doc-query --tags "tag1,tag2"` (AND logic, add `--include-relations` for links)
 
-**Find by meaning?** → `doc-search "your question"` (semantic search)
+**Find by meaning?** → `doc-search "your question"` (add `--include-relations` for links)
 
 **Check metadata?** → `doc-info <doc-id>` (metadata + relations)
 

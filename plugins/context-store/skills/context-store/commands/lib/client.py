@@ -141,7 +141,8 @@ class DocumentClient:
         self,
         name: Optional[str] = None,
         tags: Optional[list[str]] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        include_relations: bool = False
     ) -> list[dict]:
         """Query documents from the server.
 
@@ -149,6 +150,7 @@ class DocumentClient:
             name: Filter by filename pattern
             tags: Filter by tags (AND logic - document must have all tags)
             limit: Maximum number of results to return
+            include_relations: Include document relations in response
 
         Returns:
             List of document metadata dictionaries
@@ -166,6 +168,9 @@ class DocumentClient:
 
         if limit:
             params["limit"] = limit
+
+        if include_relations:
+            params["include_relations"] = "true"
 
         try:
             response = httpx.get(

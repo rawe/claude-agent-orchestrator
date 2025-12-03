@@ -27,6 +27,7 @@ def main(
     name: str = typer.Option(None, "--name", help="Filter by filename pattern"),
     tags: str = typer.Option(None, "--tags", help="Comma-separated list of tags (AND logic)"),
     limit: int = typer.Option(None, "--limit", help="Maximum number of results"),
+    include_relations: bool = typer.Option(False, "--include-relations", help="Include document relations in response"),
 ):
     """Query documents from the document sync server."""
     try:
@@ -42,7 +43,8 @@ def main(
         results = client.query_documents(
             name=name,
             tags=parsed_tags,
-            limit=limit
+            limit=limit,
+            include_relations=include_relations
         )
 
         # Output results as JSON array

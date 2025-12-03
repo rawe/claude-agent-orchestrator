@@ -60,11 +60,13 @@ class DocQueryInput(BaseModel):
     name: Optional[str] = None
     tags: Optional[str] = None
     limit: Optional[int] = None
+    include_relations: bool = False
 
 
 class DocSearchInput(BaseModel):
     query: str
     limit: Optional[int] = None
+    include_relations: bool = False
 
 
 class DocInfoInput(BaseModel):
@@ -193,14 +195,16 @@ Args:
     name: Filename pattern to filter by (partial match supported)
     tags: Comma-separated tags to filter by (AND logic - all must match)
     limit: Maximum number of results to return
+    include_relations: Include document relations in response
 
 Returns:
     JSON array of matching documents with metadata (id, filename, tags, size, dates)
+    When include_relations=True, each document includes a relations object
 
 Examples:
     doc_query(tags="api,v2")           # Find docs with BOTH tags
     doc_query(name="spec")             # Find docs with "spec" in filename
-    doc_query(tags="config", limit=5)  # First 5 config documents""",
+    doc_query(include_relations=True)  # List all with relations""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -216,6 +220,10 @@ Examples:
                         "type": "integer",
                         "description": "Maximum number of results",
                     },
+                    "include_relations": {
+                        "type": "boolean",
+                        "description": "Include document relations in response",
+                    },
                 },
             },
         ),
@@ -230,16 +238,18 @@ you don't know exact tags/names but know what content you're looking for.
 Args:
     query (required): Natural language search query
     limit: Maximum number of documents to return (default 10)
+    include_relations: Include document relations in response
 
 Returns:
     JSON with search results including:
     - document_id: ID for retrieval
     - filename: Document name
     - sections: Array of relevant sections with scores and character offsets
+    - relations: (when include_relations=True) Document relations by type
 
 Example:
     doc_search(query="how to authenticate API requests")
-    doc_search(query="database connection configuration", limit=5)
+    doc_search(query="database config", include_relations=True)
 
 Note: Requires semantic search to be enabled on the Context Store server.""",
             inputSchema={
@@ -252,6 +262,10 @@ Note: Requires semantic search to be enabled on the Context Store server.""",
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of results",
+                    },
+                    "include_relations": {
+                        "type": "boolean",
+                        "description": "Include document relations in response",
                     },
                 },
                 "required": ["query"],
@@ -471,6 +485,8 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 args.extend(["--tags", params.tags])
             if params.limit:
                 args.extend(["--limit", str(params.limit)])
+            if params.include_relations:
+                args.append("--include-relations")
             stdout, stderr, code = await run_command("doc-query", args)
             return make_response(stdout, stderr, code)
 
@@ -479,6 +495,8 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             args = [params.query]
             if params.limit:
                 args.extend(["--limit", str(params.limit)])
+            if params.include_relations:
+                args.append("--include-relations")
             stdout, stderr, code = await run_command("doc-search", args)
             return make_response(stdout, stderr, code)
 

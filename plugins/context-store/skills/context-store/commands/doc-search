@@ -27,6 +27,7 @@ app = typer.Typer(add_completion=False)
 def main(
     query: str = typer.Argument(..., help="Natural language search query"),
     limit: int = typer.Option(10, "--limit", "-l", help="Maximum documents to return"),
+    include_relations: bool = typer.Option(False, "--include-relations", help="Include document relations in response"),
 ):
     """Semantic search across documents by meaning.
 
@@ -36,9 +37,13 @@ def main(
     try:
         config = Config()
 
+        params = {"q": query, "limit": limit}
+        if include_relations:
+            params["include_relations"] = "true"
+
         response = httpx.get(
             f"{config.base_url}/search",
-            params={"q": query, "limit": limit},
+            params=params,
             timeout=30.0
         )
         response.raise_for_status()
