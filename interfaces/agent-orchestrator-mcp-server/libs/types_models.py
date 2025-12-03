@@ -4,7 +4,7 @@ Type definitions for Agent Orchestrator MCP Server
 
 from enum import Enum
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResponseFormat(str, Enum):
@@ -21,30 +21,27 @@ class AgentInfo(BaseModel):
 
 class SessionInfo(BaseModel):
     """Information about an agent session"""
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str = Field(description="Session name")
     sessionId: str = Field(description="Session ID or status", alias="session_id")
     projectDir: str = Field(description="Project directory path", alias="project_dir")
 
-    class Config:
-        populate_by_name = True
-
 
 class ServerConfig(BaseModel):
     """Server configuration"""
-    commandPath: str = Field(description="Path to commands directory", alias="command_path")
+    model_config = ConfigDict(populate_by_name=True)
 
-    class Config:
-        populate_by_name = True
+    commandPath: str = Field(description="Path to commands directory", alias="command_path")
 
 
 class ScriptExecutionResult(BaseModel):
     """Result of script execution"""
+    model_config = ConfigDict(populate_by_name=True)
+
     stdout: str = Field(default="", description="Standard output")
     stderr: str = Field(default="", description="Standard error")
     exitCode: int = Field(description="Exit code", alias="exit_code")
-
-    class Config:
-        populate_by_name = True
 
 
 class AsyncExecutionResult(BaseModel):

@@ -66,8 +66,122 @@ Claude Code will use the orchestrator skill to create a new agent session.
 
 ---
 
-## Use Case 2: MCP Server
+## Use Case 2: MCP Server (HTTP Mode)
 
-*(Coming soon)* - Use with Claude Desktop or other MCP-compatible clients.
+Use the orchestrator with Claude Desktop or other MCP-compatible clients via HTTP.
 
-See [interfaces/agent-orchestrator-mcp-server/README.md](../interfaces/agent-orchestrator-mcp-server/README.md) for current MCP setup.
+### Setup
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/your-org/claude-agent-orchestrator.git
+cd claude-agent-orchestrator
+```
+
+**2. Configure environment variables:**
+```bash
+cp .env.template .env
+```
+
+Edit `.env` and set the project directory for your agents:
+```bash
+# Required: Set the default project directory for agent sessions
+AGENT_ORCHESTRATOR_PROJECT_DIR=/path/to/your/project
+
+# Optional: Customize port (default: 9500)
+# AGENT_ORCHESTRATOR_MCP_PORT=9500
+```
+
+> **Important:** In HTTP mode, the MCP server runs standalone, so `AGENT_ORCHESTRATOR_PROJECT_DIR` must be set to tell agents which project to work in.
+
+**3. Start the backend services:**
+```bash
+make start-bg
+```
+
+This starts in the background:
+- Agent Runtime (port 8765) - Session tracking
+- Agent Registry (port 8767) - Agent blueprints
+- Context Store (port 8766) - Document storage
+- Dashboard (port 3000) - Web UI
+
+**4. Open the dashboard:**
+```bash
+make open
+```
+
+Verify the dashboard is running at http://localhost:3000
+
+**5. Start the MCP server (HTTP mode):**
+```bash
+make start-ao-mcp
+```
+
+This starts the Agent Orchestrator MCP server at `http://localhost:9500/mcp`
+
+**6. Configure your MCP client:**
+
+**Option A: Claude Desktop**
+
+Add to your Claude Desktop config file:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "type": "http",
+      "url": "http://localhost:9500/mcp"
+    }
+  }
+}
+```
+
+**Option B: Other MCP clients**
+
+Use the provided config file:
+```
+interfaces/agent-orchestrator-mcp-server/.mcp-agent-orchestrator-http.json
+```
+
+Or configure your client to connect to: `http://localhost:9500/mcp`
+
+**7. Restart your MCP client** (e.g., Claude Desktop) to pick up the new configuration.
+
+### Usage
+
+In Claude Desktop, you can now use the orchestrator tools:
+
+```
+List available agent blueprints
+```
+
+```
+Start a new agent session called "my-task" to analyze the codebase
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_agent_blueprints` | List available agent configurations |
+| `list_agent_sessions` | List all agent sessions |
+| `start_agent_session` | Start a new agent session |
+| `resume_agent_session` | Continue an existing session |
+| `get_agent_session_status` | Check session status |
+| `get_agent_session_result` | Get result from completed session |
+| `delete_all_agent_sessions` | Clean up all sessions |
+
+### Stopping the Server
+
+```bash
+make stop-ao-mcp
+```
+
+### Verify
+
+- Dashboard at http://localhost:3000 shows active sessions
+- MCP server endpoint: http://localhost:9500/mcp
+
+See [interfaces/agent-orchestrator-mcp-server/README.md](../interfaces/agent-orchestrator-mcp-server/README.md) for detailed MCP server documentation.

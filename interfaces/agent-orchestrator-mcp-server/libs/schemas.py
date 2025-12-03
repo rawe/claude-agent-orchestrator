@@ -4,7 +4,7 @@ Pydantic validation schemas for Agent Orchestrator MCP Server
 
 import re
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from constants import MAX_SESSION_NAME_LENGTH, SESSION_NAME_PATTERN
 from types_models import ResponseFormat
@@ -63,6 +63,8 @@ class StartAgentSessionInput(ProjectDirField):
         description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_session_status to poll for completion."
     )
 
+    model_config = ConfigDict(populate_by_name=True)
+
     @field_validator("session_name")
     @classmethod
     def validate_session_name(cls, v: str) -> str:
@@ -71,9 +73,6 @@ class StartAgentSessionInput(ProjectDirField):
         if len(v) > MAX_SESSION_NAME_LENGTH:
             raise ValueError(f"Session name must not exceed {MAX_SESSION_NAME_LENGTH} characters")
         return v
-
-    class Config:
-        populate_by_name = True
 
 
 # Schema for resume_agent_session tool
@@ -94,6 +93,8 @@ class ResumeAgentSessionInput(BaseModel):
         description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info. Use get_agent_session_status to poll for completion."
     )
 
+    model_config = ConfigDict(populate_by_name=True)
+
     @field_validator("session_name")
     @classmethod
     def validate_session_name(cls, v: str) -> str:
@@ -102,9 +103,6 @@ class ResumeAgentSessionInput(BaseModel):
         if len(v) > MAX_SESSION_NAME_LENGTH:
             raise ValueError(f"Session name must not exceed {MAX_SESSION_NAME_LENGTH} characters")
         return v
-
-    class Config:
-        populate_by_name = True
 
 
 # Schema for delete_all_agent_sessions tool

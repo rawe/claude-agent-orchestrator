@@ -7,6 +7,8 @@ through the agent-orchestrator Python commands. It enables:
 - Listing available agent blueprints
 - Managing agent sessions (create, resume, list, clean)
 - Executing long-running tasks in specialized agent contexts
+
+Supports both stdio and HTTP transports via FastMCP.
 """
 
 import asyncio
@@ -14,12 +16,10 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Literal, Optional
 
-import mcp.server.stdio
-import mcp.types as types
-from mcp.server.lowlevel import Server
-from mcp.server.models import InitializationOptions
-from pydantic import ValidationError
+from fastmcp import FastMCP
+from pydantic import Field
 
 from constants import (
     CMD_DELETE_ALL_SESSIONS,
@@ -30,17 +30,9 @@ from constants import (
     CMD_RESUME_SESSION,
     CMD_START_SESSION,
     ENV_COMMAND_PATH,
+    MAX_SESSION_NAME_LENGTH,
 )
 from logger import logger
-from schemas import (
-    DeleteAllAgentSessionsInput,
-    GetAgentSessionResultInput,
-    GetAgentSessionStatusInput,
-    ListAgentBlueprintsInput,
-    ListAgentSessionsInput,
-    ResumeAgentSessionInput,
-    StartAgentSessionInput,
-)
 from types_models import ResponseFormat, ServerConfig
 from utils import (
     execute_script,
@@ -71,812 +63,465 @@ def get_server_config() -> ServerConfig:
     return ServerConfig(commandPath=Path(normalized_path).resolve().as_posix())
 
 
-# Create MCP server instance
-server = Server("agent-orchestrator-mcp-server")
-
 # Get server configuration
 config = get_server_config()
 
+# Create FastMCP server instance
+mcp = FastMCP(
+    "agent-orchestrator-mcp-server",
+    instructions="""Agent Orchestrator MCP Server - Orchestrate specialized Claude Code agents.
 
-@server.list_tools()
-async def list_tools() -> list[types.Tool]:
-    """List available tools"""
-    return [
-        types.Tool(
-            name="list_agent_blueprints",
-            description="""List all available agent blueprints that can be used to create agent sessions.
-
-This tool discovers agent blueprints configured in the agent orchestrator system. Agent blueprints are reusable configurations (not running instances) that provide specialized capabilities (e.g., system architecture, code review, documentation writing).
-
-Args:
-  - response_format ('markdown' | 'json'): Output format (default: 'markdown')
-
-Returns:
-  For JSON format: Structured data with schema:
-  {
-    "total": number,           // Total number of agents found
-    "agents": [
-      {
-        "name": string,        // Agent name/identifier (e.g., "system-architect")
-        "description": string  // Description of agent's capabilities
-      }
-    ]
-  }
-
-  For Markdown format: Human-readable formatted list with agent names and descriptions
-
-Examples:
-  - Use when: "What agents are available?" -> Check available agent blueprints
-  - Use when: "Show me the agent blueprints" -> List all agent blueprint capabilities
-  - Don't use when: You want to see running sessions (use list_agent_sessions instead)
-
-Error Handling:
-  - Returns "No agent blueprints found" if no agents are configured
-  - Returns error message if script execution fails""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "response_format": {
-                        "type": "string",
-                        "enum": ["markdown", "json"],
-                        "default": "markdown",
-                        "description": "Output format: 'markdown' for human-readable or 'json' for machine-readable",
-                    },
-                },
-            },
-        ),
-        types.Tool(
-            name="list_agent_sessions",
-            description="""List all agent session instances (running, completed, or initializing).
-
-This tool shows all agent session instances that have been created, including their names, session IDs, and the project directory used for each session. These are running or completed instances, not blueprints.
-
-Args:
-  - response_format ('markdown' | 'json'): Output format (default: 'markdown')
-
-Returns:
-  For JSON format: Structured data with schema:
-  {
-    "total": number,              // Total number of sessions
-    "sessions": [
-      {
-        "name": string,           // Session name (e.g., "architect")
-        "session_id": string,     // Session ID or status ("initializing", "unknown")
-        "project_dir": string     // Project directory path used for this session
-      }
-    ]
-  }
-
-  For Markdown format: Human-readable formatted list with session names, IDs, and project directories
-
-Session ID values:
-  - UUID string: Normal session ID (e.g., "3db5dca9-6829-4cb7-a645-c64dbd98244d")
-  - "initializing": Session file exists but hasn't started yet
-  - "unknown": Session ID couldn't be extracted
-
-Project Directory values:
-  - Absolute path: The project directory used when the session was created
-  - "unknown": Project directory couldn't be extracted (legacy sessions)
-
-Examples:
-  - Use when: "What sessions exist?" -> See all created session instances
-  - Use when: "Show me my agent sessions" -> List all session instances with their IDs and project directories
-  - Don't use when: You want to see available agent blueprints (use list_agent_blueprints instead)
-
-Error Handling:
-  - Returns "No sessions found" if no sessions exist
-  - Returns error message if script execution fails""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "response_format": {
-                        "type": "string",
-                        "enum": ["markdown", "json"],
-                        "default": "markdown",
-                        "description": "Output format: 'markdown' for human-readable or 'json' for machine-readable",
-                    },
-                },
-            },
-        ),
-        types.Tool(
-            name="start_agent_session",
-            description="""Start a new agent session instance that immediately begins execution.
-
-This tool creates a new agent session instance that runs in a separate Claude Code context. Sessions can be generic (no agent blueprint) or specialized (using an agent blueprint). The agent session will execute the provided prompt and return the result.
-
-IMPORTANT: This operation may take significant time to complete as it runs a full Claude Code session. The agent will process the prompt and may use multiple tool calls to complete the task.
-
-Args:
-  - session_name (string): Unique identifier for the agent session instance (alphanumeric, dash, underscore; max 60 chars)
-  - agent_blueprint_name (string, optional): Name of agent blueprint to use for this session (optional for generic sessions)
-  - project_dir (string, optional): Project directory path (must be absolute path). Only set when instructed to set a project dir!
-  - prompt (string): Initial task description or prompt for the agent session
-  - async (boolean, optional): Run in background mode (default: false)
-
-Session naming rules:
-  - Must be unique (cannot already exist)
-  - 1-60 characters
-  - Only alphanumeric, dash (-), and underscore (_) allowed
-  - Use descriptive names (e.g., "architect", "reviewer", "dev-agent")
-
-Returns:
-  The result/output from the completed agent session. This is the agent's final response after processing the prompt and completing all necessary tasks.
-
-Examples:
-  - Use when: "Create an architecture design" -> Start session with system-architect agent blueprint
-  - Use when: "Analyze this codebase" -> Start generic session or use code-reviewer agent blueprint
-  - Don't use when: Session already exists (use resume_agent_session instead)
-  - Don't use when: You just want to list available agent blueprints (use list_agent_blueprints instead)
-
-Error Handling:
-  - "Session already exists" -> Use resume_agent_session or choose different name
-  - "Session name too long" -> Use shorter name (max 60 characters)
-  - "Invalid characters" -> Only use alphanumeric, dash, underscore
-  - "Agent not found" -> Check available agent blueprints with list_agent_blueprints
-  - "No prompt provided" -> Provide a prompt argument""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_name": {
-                        "type": "string",
-                        "description": "Unique identifier for this agent session instance",
-                    },
-                    "agent_blueprint_name": {
-                        "type": "string",
-                        "description": "Name of agent blueprint to use for this session (optional for generic sessions)",
-                    },
-                    "project_dir": {
-                        "type": "string",
-                        "description": "Optional project directory path (must be absolute path). Only set when instructed to set a project dir!",
-                    },
-                    "prompt": {
-                        "type": "string",
-                        "description": "Initial prompt or task description for the agent session",
-                    },
-                    "async": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Run agent in background (fire-and-forget mode). When true, returns immediately with session info.",
-                    },
-                },
-                "required": ["session_name", "prompt"],
-            },
-        ),
-        types.Tool(
-            name="resume_agent_session",
-            description="""Resume an existing agent session instance with a new prompt to continue work.
-
-This tool continues an existing agent session instance, allowing you to build upon previous work. The agent session remembers all context from previous interactions. Any agent blueprint from session creation is automatically maintained.
-
-IMPORTANT: This operation may take significant time to complete as it runs a full Claude Code session. The agent will process the new prompt in the context of all previous interactions.
-
-Args:
-  - session_name (string): Name of the existing agent session instance to resume
-  - prompt (string): Continuation prompt building on previous session context
-  - async (boolean, optional): Run in background mode (default: false)
-
-Returns:
-  The result/output from the resumed agent session. This is the agent's response after processing the new prompt in context of previous interactions.
-
-Examples:
-  - Use when: "Continue the architecture work" -> Resume existing architect session instance
-  - Use when: "Add security considerations" -> Resume session to build on previous work
-  - Use when: "Review the changes made" -> Resume to get status or make adjustments
-  - Don't use when: Session doesn't exist (use start_agent_session to create it)
-  - Don't use when: Starting fresh work (use start_agent_session for new sessions)
-
-Error Handling:
-  - "Session does not exist" -> Use start_agent_session to create a new session
-  - "Session name invalid" -> Check session name format
-  - "No prompt provided" -> Provide a prompt argument
-
-Note: The agent blueprint used during session creation is automatically remembered and applied when resuming.""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_name": {
-                        "type": "string",
-                        "description": "Name of the existing agent session instance to resume",
-                    },
-                    "prompt": {
-                        "type": "string",
-                        "description": "Continuation prompt building on previous session context",
-                    },
-                    "async": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Run agent in background (fire-and-forget mode). When true, returns immediately with session info.",
-                    },
-                },
-                "required": ["session_name", "prompt"],
-            },
-        ),
-        types.Tool(
-            name="delete_all_agent_sessions",
-            description="""Permanently delete all agent session instances and their associated data.
-
-This tool permanently deletes all agent session instances, including their conversation history and metadata. This operation cannot be undone.
-
-WARNING: This is a destructive operation. All session data will be permanently lost.
-
-Returns:
-  Confirmation message indicating sessions were removed or that no sessions existed.
-
-Examples:
-  - Use when: "Clear all sessions" -> Remove all session data
-  - Use when: "Start fresh" -> Delete all existing sessions
-  - Use when: "Clean up old sessions" -> Remove all sessions to free up space
-  - Don't use when: You only want to remove specific sessions (currently not supported)
-  - Don't use when: You might want to resume sessions later
-
-Error Handling:
-  - "No sessions to remove" -> No sessions exist (safe to ignore)
-  - Returns error message if script execution fails
-
-Note: This operation is idempotent - running it multiple times has the same effect as running it once.""",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        types.Tool(
-            name="get_agent_session_status",
-            description="""Check the current status of an agent session instance (running, finished, or not_existent).
-
-Returns one of three statuses:
-- "running": Session instance is currently executing or initializing
-- "finished": Session instance completed successfully with a result
-- "not_existent": Session instance does not exist
-
-Use this tool to poll for completion when using async mode with start_agent_session or resume_agent_session.
-
-Args:
-  - session_name (string): Name of the agent session instance to check
-  - wait_seconds (number, optional): Seconds to wait before checking status (default: 0, max: 300)
-
-Returns:
-  JSON object with status field: {"status": "running"|"finished"|"not_existent"}
-
-Examples:
-  - Poll until finished: Keep calling until status="finished"
-  - Poll with interval: Use wait_seconds=10 to wait 10 seconds before checking (reduces token usage)
-  - Check before resume: Verify session exists before resuming
-  - Monitor background execution: Track progress of async agents
-
-Polling Strategy:
-  - Short tasks: Poll every 2-5 seconds (wait_seconds=2-5)
-  - Long tasks: Poll every 10-30 seconds (wait_seconds=10-30)
-  - Very long tasks: Poll every 60+ seconds (wait_seconds=60+)
-  - Using wait_seconds reduces token usage by spacing out status checks""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_name": {
-                        "type": "string",
-                        "description": "Name of the agent session instance to check",
-                    },
-                    "wait_seconds": {
-                        "type": "integer",
-                        "default": 0,
-                        "minimum": 0,
-                        "maximum": 300,
-                        "description": "Number of seconds to wait before checking status",
-                    },
-                },
-                "required": ["session_name"],
-            },
-        ),
-        types.Tool(
-            name="get_agent_session_result",
-            description="""Retrieve the final output/result from a completed agent session instance.
-
-This tool extracts the result from a session instance that has finished executing. It will fail with an error if the session is still running or does not exist.
-
-Workflow:
-  1. Start agent session with async=true
-  2. Poll with get_agent_session_status until status="finished"
-  3. Call get_agent_session_result to retrieve the final output
-
-Args:
-  - session_name (string): Name of the completed agent session instance
-
-Returns:
-  The agent's final response/result as text
-
-Error Handling:
-  - "Session still running" -> Poll get_agent_session_status until finished
-  - "Session not found" -> Verify session name is correct
-  - "No result found" -> Session may have failed, check status""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_name": {
-                        "type": "string",
-                        "description": "Name of the completed agent session instance",
-                    },
-                },
-                "required": ["session_name"],
-            },
-        ),
-    ]
+Use this server to:
+- List available agent blueprints (reusable configurations)
+- Start new agent sessions with specific tasks
+- Resume existing sessions to continue work
+- Monitor session status and retrieve results
+- Clean up sessions when done
+""",
+)
 
 
-@server.call_tool()
-async def call_tool(
-    name: str, arguments: dict
-) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-    """Handle tool calls"""
+@mcp.tool()
+async def list_agent_blueprints(
+    response_format: Literal["markdown", "json"] = Field(
+        default="markdown",
+        description="Output format: 'markdown' for human-readable or 'json' for machine-readable",
+    ),
+) -> str:
+    """List all available agent blueprints that can be used to create agent sessions.
+
+    This tool discovers agent blueprints configured in the agent orchestrator system.
+    Agent blueprints are reusable configurations (not running instances) that provide
+    specialized capabilities (e.g., system architecture, code review, documentation writing).
+
+    Returns:
+      For JSON format: Structured data with total count and agent details
+      For Markdown format: Human-readable formatted list with agent names and descriptions
+
+    Examples:
+      - Use when: "What agents are available?" -> Check available agent blueprints
+      - Use when: "Show me the agent blueprints" -> List all agent blueprint capabilities
+      - Don't use when: You want to see running sessions (use list_agent_sessions instead)
+    """
+    logger.info("list_agent_blueprints called", {"response_format": response_format})
 
     try:
-        if name == "list_agent_blueprints":
-            return await handle_list_agent_blueprints(arguments)
-        elif name == "list_agent_sessions":
-            return await handle_list_agent_sessions(arguments)
-        elif name == "start_agent_session":
-            return await handle_start_agent_session(arguments)
-        elif name == "resume_agent_session":
-            return await handle_resume_agent_session(arguments)
-        elif name == "delete_all_agent_sessions":
-            return await handle_delete_all_agent_sessions(arguments)
-        elif name == "get_agent_session_status":
-            return await handle_get_agent_session_status(arguments)
-        elif name == "get_agent_session_result":
-            return await handle_get_agent_session_result(arguments)
-        else:
-            return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
-
-    except ValidationError as e:
-        error_msg = f"Validation error: {e}"
-        logger.error(f"{name}: validation error", {"error": str(e)})
-        return [types.TextContent(type="text", text=error_msg)]
-    except Exception as e:
-        error_msg = f"Error: {str(e)}"
-        logger.error(f"{name}: exception", {"error": str(e)})
-        return [types.TextContent(type="text", text=error_msg)]
-
-
-async def handle_list_agent_blueprints(arguments: dict) -> list[types.TextContent]:
-    """Handle list_agent_blueprints tool call"""
-    params = ListAgentBlueprintsInput(**arguments)
-
-    logger.info(
-        "list_agent_blueprints called",
-        {
-            "response_format": params.response_format,
-        },
-    )
-
-    try:
-        # Build command arguments - command name must be first
         args = [CMD_LIST_BLUEPRINTS]
-
-        logger.debug("list_agent_blueprints: executing script", {"args": args})
-
-        # Execute list-agents command
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            error_msg = handle_script_error(result)
-            return [types.TextContent(type="text", text=error_msg)]
+            return handle_script_error(result)
 
-        # Parse the agent list
         agents = parse_agent_list(result.stdout)
-
-        # Format based on requested format
+        fmt = ResponseFormat.JSON if response_format == "json" else ResponseFormat.MARKDOWN
         formatted_response = format_tool_response(
-            agents,
-            params.response_format,
-            format_agents_as_markdown,
-            format_agents_as_json,
+            agents, fmt, format_agents_as_markdown, format_agents_as_json
         )
-
-        # Check character limit
-        text, truncated = truncate_response(formatted_response)
-
-        return [types.TextContent(type="text", text=text)]
+        text, _ = truncate_response(formatted_response)
+        return text
 
     except Exception as error:
-        return [types.TextContent(type="text", text=f"Error: {str(error)}")]
+        return f"Error: {str(error)}"
 
 
-async def handle_list_agent_sessions(arguments: dict) -> list[types.TextContent]:
-    """Handle list_agent_sessions tool call"""
-    params = ListAgentSessionsInput(**arguments)
+@mcp.tool()
+async def list_agent_sessions(
+    response_format: Literal["markdown", "json"] = Field(
+        default="markdown",
+        description="Output format: 'markdown' for human-readable or 'json' for machine-readable",
+    ),
+) -> str:
+    """List all agent session instances (running, completed, or initializing).
 
-    logger.info(
-        "list_agent_sessions called",
-        {
-            "response_format": params.response_format,
-        },
-    )
+    This tool shows all agent session instances that have been created, including
+    their names, session IDs, and the project directory used for each session.
+    These are running or completed instances, not blueprints.
+
+    Returns:
+      For JSON format: Structured data with session details
+      For Markdown format: Human-readable formatted list
+
+    Session ID values:
+      - UUID string: Normal session ID
+      - "initializing": Session file exists but hasn't started yet
+      - "unknown": Session ID couldn't be extracted
+
+    Examples:
+      - Use when: "What sessions exist?" -> See all created session instances
+      - Don't use when: You want to see available blueprints (use list_agent_blueprints)
+    """
+    logger.info("list_agent_sessions called", {"response_format": response_format})
 
     try:
-        # Build command arguments - command name must be first
         args = [CMD_LIST_SESSIONS]
-
-        logger.debug("list_agent_sessions: executing script", {"args": args})
-
-        # Execute list command
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            error_msg = handle_script_error(result)
-            return [types.TextContent(type="text", text=error_msg)]
+            return handle_script_error(result)
 
-        # Parse the session list
         sessions = parse_session_list(result.stdout)
-
-        # Format based on requested format
+        fmt = ResponseFormat.JSON if response_format == "json" else ResponseFormat.MARKDOWN
         formatted_response = format_tool_response(
-            sessions,
-            params.response_format,
-            format_sessions_as_markdown,
-            format_sessions_as_json,
+            sessions, fmt, format_sessions_as_markdown, format_sessions_as_json
         )
-
-        # Check character limit
-        text, truncated = truncate_response(formatted_response)
-
-        return [types.TextContent(type="text", text=text)]
+        text, _ = truncate_response(formatted_response)
+        return text
 
     except Exception as error:
-        return [types.TextContent(type="text", text=f"Error: {str(error)}")]
+        return f"Error: {str(error)}"
 
 
-async def handle_start_agent_session(arguments: dict) -> list[types.TextContent]:
-    """Handle start_agent_session tool call"""
-    params = StartAgentSessionInput(**arguments)
+@mcp.tool()
+async def start_agent_session(
+    session_name: str = Field(
+        description="Unique identifier for this agent session instance (alphanumeric, dash, underscore; max 60 chars)",
+        min_length=1,
+        max_length=MAX_SESSION_NAME_LENGTH,
+    ),
+    prompt: str = Field(
+        description="Initial prompt or task description for the agent session",
+        min_length=1,
+    ),
+    agent_blueprint_name: Optional[str] = Field(
+        default=None,
+        description="Name of agent blueprint to use for this session (optional for generic sessions)",
+    ),
+    project_dir: Optional[str] = Field(
+        default=None,
+        description="Optional project directory path (must be absolute path). Only set when instructed!",
+    ),
+    async_mode: bool = Field(
+        default=False,
+        description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info.",
+    ),
+) -> str:
+    """Start a new agent session instance that immediately begins execution.
 
+    This tool creates a new agent session instance that runs in a separate Claude Code context.
+    Sessions can be generic (no agent blueprint) or specialized (using an agent blueprint).
+    The agent session will execute the provided prompt and return the result.
+
+    IMPORTANT: This operation may take significant time to complete as it runs a full
+    Claude Code session. The agent will process the prompt and may use multiple tool
+    calls to complete the task.
+
+    Session naming rules:
+      - Must be unique (cannot already exist)
+      - 1-60 characters
+      - Only alphanumeric, dash (-), and underscore (_) allowed
+
+    Returns:
+      The result/output from the completed agent session, or session info if async_mode=True.
+
+    Examples:
+      - Use when: "Create an architecture design" -> Start session with system-architect blueprint
+      - Don't use when: Session already exists (use resume_agent_session instead)
+    """
     logger.info(
         "start_agent_session called",
         {
-            "session_name": params.session_name,
-            "agent_blueprint_name": params.agent_blueprint_name,
-            "project_dir": params.project_dir,
-            "prompt_length": len(params.prompt),
-            "async": params.async_,
+            "session_name": session_name,
+            "agent_blueprint_name": agent_blueprint_name,
+            "project_dir": project_dir,
+            "prompt_length": len(prompt),
+            "async_mode": async_mode,
         },
     )
 
     try:
-        # Build command arguments
-        args = [CMD_START_SESSION, params.session_name]
+        args = [CMD_START_SESSION, session_name]
 
-        # Add project_dir if specified (supersedes environment variable)
-        if params.project_dir:
-            args.extend(["--project-dir", params.project_dir])
+        if project_dir:
+            args.extend(["--project-dir", project_dir])
 
-        # Add agent if specified
-        if params.agent_blueprint_name:
-            args.extend(["--agent", params.agent_blueprint_name])
+        if agent_blueprint_name:
+            args.extend(["--agent", agent_blueprint_name])
 
-        # Add prompt
-        args.extend(["-p", params.prompt])
+        args.extend(["-p", prompt])
 
-        logger.debug("start_agent_session: executing script", {"args": args, "async": params.async_})
-
-        # Check if async mode requested
-        if params.async_:
-            logger.info("start_agent_session: using async execution (fire-and-forget mode)")
-
-            # Execute in background (detached mode)
+        if async_mode:
+            logger.info("start_agent_session: using async execution")
             async_result = await execute_script_async(config, args)
-
-            logger.info(
-                "start_agent_session: async process spawned",
-                {"session_name": async_result.session_name},
+            return json.dumps(
+                {
+                    "session_name": async_result.session_name,
+                    "status": async_result.status,
+                    "message": async_result.message,
+                },
+                indent=2,
             )
 
-            return [
-                types.TextContent(
-                    type="text",
-                    text=json.dumps(
-                        {
-                            "session_name": async_result.session_name,
-                            "status": async_result.status,
-                            "message": async_result.message,
-                        },
-                        indent=2,
-                    ),
-                )
-            ]
-
-        # Original blocking behavior (async=false or undefined)
-        logger.info("start_agent_session: using synchronous execution (blocking mode)")
+        logger.info("start_agent_session: using synchronous execution")
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            logger.error(
-                "start_agent_session: script failed",
-                {
-                    "exitCode": result.exitCode,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                },
-            )
+            return handle_script_error(result)
 
-            error_msg = handle_script_error(result)
-            return [types.TextContent(type="text", text=error_msg)]
-
-        logger.info(
-            "start_agent_session: script succeeded",
-            {
-                "stdoutLength": len(result.stdout),
-                "stderrLength": len(result.stderr),
-            },
-        )
-
-        # Check character limit
         text, truncated = truncate_response(result.stdout)
-
         if truncated:
-            logger.warn(
-                "start_agent_session: response truncated",
-                {
-                    "originalLength": len(result.stdout),
-                    "truncatedLength": len(text),
-                },
-            )
-
-        return [types.TextContent(type="text", text=text)]
+            logger.warn("start_agent_session: response truncated")
+        return text
 
     except Exception as error:
-        logger.error(
-            "start_agent_session: exception",
-            {"error": str(error)},
-        )
-        return [types.TextContent(type="text", text=f"Error: {str(error)}")]
+        logger.error("start_agent_session: exception", {"error": str(error)})
+        return f"Error: {str(error)}"
 
 
-async def handle_resume_agent_session(arguments: dict) -> list[types.TextContent]:
-    """Handle resume_agent_session tool call"""
-    params = ResumeAgentSessionInput(**arguments)
+@mcp.tool()
+async def resume_agent_session(
+    session_name: str = Field(
+        description="Name of the existing agent session instance to resume",
+        min_length=1,
+        max_length=MAX_SESSION_NAME_LENGTH,
+    ),
+    prompt: str = Field(
+        description="Continuation prompt building on previous session context",
+        min_length=1,
+    ),
+    async_mode: bool = Field(
+        default=False,
+        description="Run agent in background (fire-and-forget mode). When true, returns immediately.",
+    ),
+) -> str:
+    """Resume an existing agent session instance with a new prompt to continue work.
 
+    This tool continues an existing agent session instance, allowing you to build upon
+    previous work. The agent session remembers all context from previous interactions.
+    Any agent blueprint from session creation is automatically maintained.
+
+    IMPORTANT: This operation may take significant time to complete as it runs a full
+    Claude Code session.
+
+    Returns:
+      The result/output from the resumed agent session.
+
+    Examples:
+      - Use when: "Continue the architecture work" -> Resume existing architect session
+      - Don't use when: Session doesn't exist (use start_agent_session to create it)
+    """
     logger.info(
         "resume_agent_session called",
         {
-            "session_name": params.session_name,
-            "prompt_length": len(params.prompt),
-            "async": params.async_,
+            "session_name": session_name,
+            "prompt_length": len(prompt),
+            "async_mode": async_mode,
         },
     )
 
     try:
-        # Build command arguments
-        args = [CMD_RESUME_SESSION, params.session_name]
+        args = [CMD_RESUME_SESSION, session_name]
+        args.extend(["-p", prompt])
 
-        # Add prompt
-        args.extend(["-p", params.prompt])
-
-        logger.debug("resume_agent_session: executing script", {"args": args, "async": params.async_})
-
-        # Check if async mode requested
-        if params.async_:
-            logger.info("resume_agent_session: using async execution (fire-and-forget mode)")
-
-            # Execute in background (detached mode)
+        if async_mode:
+            logger.info("resume_agent_session: using async execution")
             async_result = await execute_script_async(config, args)
-
-            logger.info(
-                "resume_agent_session: async process spawned",
-                {"session_name": async_result.session_name},
+            return json.dumps(
+                {
+                    "session_name": async_result.session_name,
+                    "status": async_result.status,
+                    "message": async_result.message,
+                },
+                indent=2,
             )
 
-            return [
-                types.TextContent(
-                    type="text",
-                    text=json.dumps(
-                        {
-                            "session_name": async_result.session_name,
-                            "status": async_result.status,
-                            "message": async_result.message,
-                        },
-                        indent=2,
-                    ),
-                )
-            ]
-
-        # Original blocking behavior (async=false or undefined)
-        logger.info("resume_agent_session: using synchronous execution (blocking mode)")
+        logger.info("resume_agent_session: using synchronous execution")
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            error_msg = handle_script_error(result)
-            return [types.TextContent(type="text", text=error_msg)]
+            return handle_script_error(result)
 
-        # Check character limit
-        text, truncated = truncate_response(result.stdout)
-
-        return [types.TextContent(type="text", text=text)]
+        text, _ = truncate_response(result.stdout)
+        return text
 
     except Exception as error:
-        return [types.TextContent(type="text", text=f"Error: {str(error)}")]
+        return f"Error: {str(error)}"
 
 
-async def handle_delete_all_agent_sessions(arguments: dict) -> list[types.TextContent]:
-    """Handle delete_all_agent_sessions tool call"""
-    params = DeleteAllAgentSessionsInput(**arguments)
+@mcp.tool()
+async def delete_all_agent_sessions() -> str:
+    """Permanently delete all agent session instances and their associated data.
 
-    logger.info("delete_all_agent_sessions called", {})
+    WARNING: This is a destructive operation. All session data will be permanently lost.
+    This operation cannot be undone.
+
+    Returns:
+      Confirmation message indicating sessions were removed or that no sessions existed.
+
+    Examples:
+      - Use when: "Clear all sessions" -> Remove all session data
+      - Use when: "Start fresh" -> Delete all existing sessions
+      - Don't use when: You might want to resume sessions later
+    """
+    logger.info("delete_all_agent_sessions called")
 
     try:
-        # Build command arguments - command name must be first
         args = [CMD_DELETE_ALL_SESSIONS]
-
-        logger.debug("delete_all_agent_sessions: executing script", {"args": args})
-
-        # Execute clean command
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            error_msg = handle_script_error(result)
-            return [types.TextContent(type="text", text=error_msg)]
+            return handle_script_error(result)
 
-        return [types.TextContent(type="text", text=result.stdout)]
+        return result.stdout
 
     except Exception as error:
-        return [types.TextContent(type="text", text=f"Error: {str(error)}")]
+        return f"Error: {str(error)}"
 
 
-async def handle_get_agent_session_status(arguments: dict) -> list[types.TextContent]:
-    """Handle get_agent_session_status tool call"""
-    params = GetAgentSessionStatusInput(**arguments)
+@mcp.tool()
+async def get_agent_session_status(
+    session_name: str = Field(
+        description="Name of the agent session instance to check",
+        min_length=1,
+        max_length=MAX_SESSION_NAME_LENGTH,
+    ),
+    wait_seconds: int = Field(
+        default=0,
+        ge=0,
+        le=300,
+        description="Seconds to wait before checking status (default: 0, max: 300). Reduces token usage for polling.",
+    ),
+) -> str:
+    """Check the current status of an agent session instance.
 
+    Returns one of three statuses:
+    - "running": Session instance is currently executing or initializing
+    - "finished": Session instance completed successfully with a result
+    - "not_existent": Session instance does not exist
+
+    Use this tool to poll for completion when using async_mode with start_agent_session
+    or resume_agent_session.
+
+    Polling Strategy:
+      - Short tasks: Poll every 2-5 seconds (wait_seconds=2-5)
+      - Long tasks: Poll every 10-30 seconds (wait_seconds=10-30)
+      - Very long tasks: Poll every 60+ seconds (wait_seconds=60+)
+
+    Returns:
+      JSON object with status field: {"status": "running"|"finished"|"not_existent"}
+    """
     logger.info(
         "get_agent_session_status called",
-        {
-            "session_name": params.session_name,
-            "wait_seconds": params.wait_seconds,
-        },
+        {"session_name": session_name, "wait_seconds": wait_seconds},
     )
 
     try:
-        # Wait if wait_seconds is specified and > 0
-        if params.wait_seconds and params.wait_seconds > 0:
-            logger.debug(
-                "get_agent_session_status: waiting before status check",
-                {"wait_seconds": params.wait_seconds},
-            )
-            await asyncio.sleep(params.wait_seconds)
-            logger.debug("get_agent_session_status: wait completed, checking status now")
+        if wait_seconds > 0:
+            logger.debug(f"Waiting {wait_seconds} seconds before status check")
+            await asyncio.sleep(wait_seconds)
 
-        args = [CMD_GET_STATUS, params.session_name]
-
+        args = [CMD_GET_STATUS, session_name]
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            # Handle error - likely means session not found or other issue
-            return [
-                types.TextContent(
-                    type="text",
-                    text=json.dumps({"status": "not_existent"}, indent=2),
-                )
-            ]
+            return json.dumps({"status": "not_existent"}, indent=2)
 
-        # Parse status from stdout (should be one of: running, finished, not_existent)
         status = result.stdout.strip()
-
-        return [types.TextContent(type="text", text=json.dumps({"status": status}, indent=2))]
+        return json.dumps({"status": status}, indent=2)
 
     except Exception as error:
-        # Handle exceptions
         logger.error("get_agent_session_status: exception", {"error": str(error)})
-        return [
-            types.TextContent(
-                type="text",
-                text=json.dumps({"status": "not_existent"}, indent=2),
-            )
-        ]
+        return json.dumps({"status": "not_existent"}, indent=2)
 
 
-async def handle_get_agent_session_result(arguments: dict) -> list[types.TextContent]:
-    """Handle get_agent_session_result tool call"""
-    params = GetAgentSessionResultInput(**arguments)
+@mcp.tool()
+async def get_agent_session_result(
+    session_name: str = Field(
+        description="Name of the completed agent session instance",
+        min_length=1,
+        max_length=MAX_SESSION_NAME_LENGTH,
+    ),
+) -> str:
+    """Retrieve the final output/result from a completed agent session instance.
 
-    logger.info("get_agent_session_result called", {"session_name": params.session_name})
+    This tool extracts the result from a session instance that has finished executing.
+    It will fail with an error if the session is still running or does not exist.
+
+    Workflow:
+      1. Start agent session with async_mode=True
+      2. Poll with get_agent_session_status until status="finished"
+      3. Call get_agent_session_result to retrieve the final output
+
+    Returns:
+      The agent's final response/result as text.
+
+    Error Handling:
+      - "Session still running" -> Poll get_agent_session_status until finished
+      - "Session not found" -> Verify session name is correct
+    """
+    logger.info("get_agent_session_result called", {"session_name": session_name})
 
     try:
-        # First check status to provide helpful error messages
-        status_args = [CMD_GET_STATUS, params.session_name]
-
+        # First check status
+        status_args = [CMD_GET_STATUS, session_name]
         status_result = await execute_script(config, status_args)
         status = status_result.stdout.strip()
 
         if status == "not_existent":
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Error: Session '{params.session_name}' does not exist. Please check the session name.",
-                )
-            ]
+            return f"Error: Session '{session_name}' does not exist. Please check the session name."
 
         if status == "running":
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Error: Session '{params.session_name}' is still running. Use get_agent_session_status to poll until status is 'finished'.",
-                )
-            ]
+            return f"Error: Session '{session_name}' is still running. Use get_agent_session_status to poll until status is 'finished'."
 
         # Session is finished, retrieve result
-        args = [CMD_GET_RESULT, params.session_name]
-
+        args = [CMD_GET_RESULT, session_name]
         result = await execute_script(config, args)
 
         if result.exitCode != 0:
-            logger.error(
-                "get_agent_session_result: script failed",
-                {
-                    "exitCode": result.exitCode,
-                    "stderr": result.stderr,
-                },
-            )
+            return f"Error retrieving result: {result.stderr or 'Unknown error'}"
 
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Error retrieving result: {result.stderr or 'Unknown error'}",
-                )
-            ]
-
-        # Check character limit
         text, truncated = truncate_response(result.stdout)
-
         if truncated:
-            logger.warn(
-                "get_agent_session_result: response truncated",
-                {
-                    "originalLength": len(result.stdout),
-                    "truncatedLength": len(text),
-                },
-            )
-
-        return [types.TextContent(type="text", text=text)]
+            logger.warn("get_agent_session_result: response truncated")
+        return text
 
     except Exception as error:
         logger.error("get_agent_session_result: exception", {"error": str(error)})
-        return [types.TextContent(type="text", text=f"Error: {str(error)}")]
+        return f"Error: {str(error)}"
 
 
-async def main():
-    """Main function to run the MCP server"""
+def run_server(
+    transport: Literal["stdio", "streamable-http", "sse"] = "stdio",
+    host: str = "127.0.0.1",
+    port: int = 8080,
+):
+    """Run the MCP server with the specified transport.
+
+    Args:
+        transport: Transport type - "stdio", "streamable-http", or "sse"
+        host: Host to bind to (for HTTP transports)
+        port: Port to bind to (for HTTP transports)
+    """
     logger.info(
         "Agent Orchestrator MCP Server starting",
         {
+            "transport": transport,
+            "host": host if transport != "stdio" else None,
+            "port": port if transport != "stdio" else None,
             "commandPath": config.commandPath,
-            "cwd": os.getcwd(),
-            "pythonVersion": sys.version,
-            "env": {
-                "AGENT_ORCHESTRATOR_COMMAND_PATH": os.environ.get("AGENT_ORCHESTRATOR_COMMAND_PATH"),
-                "AGENT_ORCHESTRATOR_PROJECT_DIR": os.environ.get("AGENT_ORCHESTRATOR_PROJECT_DIR"),
-                "PATH": os.environ.get("PATH"),
-            },
         },
     )
 
     print("Agent Orchestrator MCP Server", file=sys.stderr)
     print(f"Commands path: {config.commandPath}", file=sys.stderr)
-    print("", file=sys.stderr)
+    print(f"Transport: {transport}", file=sys.stderr)
 
-    # Run server with stdio transport
-    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        logger.info("Agent Orchestrator MCP server connected and running")
-        print("Agent Orchestrator MCP server running via stdio", file=sys.stderr)
+    if transport == "stdio":
+        print("Running via stdio", file=sys.stderr)
+        mcp.run(transport="stdio")
+    elif transport == "streamable-http":
+        print(f"Running via HTTP at http://{host}:{port}/mcp", file=sys.stderr)
+        mcp.run(transport="streamable-http", host=host, port=port)
+    elif transport == "sse":
+        print(f"Running via SSE at http://{host}:{port}/sse", file=sys.stderr)
+        mcp.run(transport="sse", host=host, port=port)
+    else:
+        raise ValueError(f"Unknown transport: {transport}")
 
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options(),
-        )
+
+async def main():
+    """Main function for stdio transport (backward compatibility)"""
+    run_server(transport="stdio")
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Server stopped by user")
-        print("\nServer stopped", file=sys.stderr)
-    except Exception as error:
-        logger.error("Server error", {"error": str(error)})
-        print(f"Server error: {error}", file=sys.stderr)
-        sys.exit(1)
+    run_server()
