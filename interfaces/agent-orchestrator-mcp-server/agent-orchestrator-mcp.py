@@ -5,6 +5,8 @@
 #   "mcp>=1.7.0",
 #   "fastmcp>=2.0.0",
 #   "pydantic>=2.0.0",
+#   "fastapi>=0.115.0",
+#   "uvicorn>=0.32.0",
 # ]
 # ///
 """
@@ -21,6 +23,10 @@ Usage:
     uv run agent-orchestrator-mcp.py --http-mode
     uv run agent-orchestrator-mcp.py --http-mode --port 9000
     uv run agent-orchestrator-mcp.py --http-mode --host 0.0.0.0 --port 8080
+
+    # API mode (MCP + REST API with OpenAPI docs)
+    uv run agent-orchestrator-mcp.py --api-mode
+    uv run agent-orchestrator-mcp.py --api-mode --port 9000
 
 Environment Variables:
     AGENT_ORCHESTRATOR_COMMAND_PATH - Optional: Path to commands directory (auto-discovered if not set)
@@ -64,6 +70,10 @@ Examples:
   # Run in HTTP mode, accessible from network
   uv run agent-orchestrator-mcp.py --http-mode --host 0.0.0.0 --port 8080
 
+  # Run in API mode (MCP + REST API with OpenAPI docs)
+  uv run agent-orchestrator-mcp.py --api-mode
+  uv run agent-orchestrator-mcp.py --api-mode --port 9000
+
   # Run in SSE mode (legacy, for backward compatibility)
   uv run agent-orchestrator-mcp.py --sse-mode --port 8080
         """,
@@ -73,6 +83,12 @@ Examples:
         "--http-mode",
         action="store_true",
         help="Run as HTTP server using Streamable HTTP transport (recommended for network access)",
+    )
+
+    parser.add_argument(
+        "--api-mode",
+        action="store_true",
+        help="Run as combined MCP + REST API server with OpenAPI documentation at /api/docs",
     )
 
     parser.add_argument(
@@ -106,14 +122,17 @@ def main():
     from server import run_server
 
     # Determine transport mode
-    if args.http_mode and args.sse_mode:
-        print("Error: Cannot use both --http-mode and --sse-mode", file=sys.stderr)
+    mode_count = sum([args.http_mode, args.sse_mode, args.api_mode])
+    if mode_count > 1:
+        print("Error: Cannot use multiple modes (--http-mode, --sse-mode, --api-mode)", file=sys.stderr)
         sys.exit(1)
 
     if args.http_mode:
         transport = "streamable-http"
     elif args.sse_mode:
         transport = "sse"
+    elif args.api_mode:
+        transport = "api"
     else:
         transport = "stdio"
 

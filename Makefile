@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-cs-mcp stop-cs-mcp
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-ao-api stop-ao-api start-cs-mcp stop-cs-mcp
 
 # Default target
 help:
@@ -40,6 +40,8 @@ help:
 	@echo "MCP servers (HTTP mode):"
 	@echo "  make start-ao-mcp   - Start Agent Orchestrator MCP server (HTTP)"
 	@echo "  make stop-ao-mcp    - Stop Agent Orchestrator MCP server"
+	@echo "  make start-ao-api   - Start Agent Orchestrator API server (REST + MCP)"
+	@echo "  make stop-ao-api    - Stop Agent Orchestrator API server"
 	@echo "  make start-cs-mcp   - Start Context Store MCP server (HTTP)"
 	@echo "  make stop-cs-mcp    - Stop Context Store MCP server"
 
@@ -294,6 +296,55 @@ stop-ao-mcp:
 	else \
 		echo "No PID file found. Trying to find and kill process..."; \
 		pkill -f "agent-orchestrator-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
+	fi
+
+# Agent Orchestrator API server (REST + MCP combined)
+# Provides both MCP protocol at /mcp and REST API at /api with OpenAPI docs
+API_SERVER_PID_FILE := .agent-orchestrator-api-server.pid
+
+start-ao-api:
+	@echo "Starting Agent Orchestrator API server (REST + MCP)..."
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a; \
+	fi; \
+	PORT=$${AGENT_ORCHESTRATOR_MCP_PORT:-9500}; \
+	HOST=$${AGENT_ORCHESTRATOR_MCP_HOST:-127.0.0.1}; \
+	if [ -f $(API_SERVER_PID_FILE) ] && kill -0 $$(cat $(API_SERVER_PID_FILE)) 2>/dev/null; then \
+		echo "API server already running (PID: $$(cat $(API_SERVER_PID_FILE)))"; \
+		exit 1; \
+	fi; \
+	echo "Configuration:"; \
+	echo "  Host: $$HOST"; \
+	echo "  Port: $$PORT"; \
+	echo "  Project Dir: $${AGENT_ORCHESTRATOR_PROJECT_DIR:-<not set, uses tool parameter>}"; \
+	echo ""; \
+	AGENT_ORCHESTRATOR_PROJECT_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR}" \
+	uv run $(MCP_SERVER_SCRIPT) --api-mode --host $$HOST --port $$PORT & \
+	echo $$! > $(API_SERVER_PID_FILE); \
+	sleep 2; \
+	echo ""; \
+	echo "API server started (PID: $$(cat $(API_SERVER_PID_FILE)))"; \
+	echo ""; \
+	echo "Endpoints:"; \
+	echo "  MCP Protocol:  http://$$HOST:$$PORT/mcp"; \
+	echo "  REST API:      http://$$HOST:$$PORT/api"; \
+	echo "  API Docs:      http://$$HOST:$$PORT/api/docs"; \
+	echo "  ReDoc:         http://$$HOST:$$PORT/api/redoc"
+
+stop-ao-api:
+	@echo "Stopping Agent Orchestrator API server..."
+	@if [ -f $(API_SERVER_PID_FILE) ]; then \
+		PID=$$(cat $(API_SERVER_PID_FILE)); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID; \
+			echo "Server stopped (PID: $$PID)"; \
+		else \
+			echo "Server not running (stale PID file)"; \
+		fi; \
+		rm -f $(API_SERVER_PID_FILE); \
+	else \
+		echo "No PID file found. Trying to find and kill process..."; \
+		pkill -f "agent-orchestrator-mcp.py --api-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
 	fi
 
 # Context Store MCP server (HTTP mode)

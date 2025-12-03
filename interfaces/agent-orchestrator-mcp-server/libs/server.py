@@ -11,42 +11,29 @@ through the agent-orchestrator Python commands. It enables:
 Supports both stdio and HTTP transports via FastMCP.
 """
 
-import asyncio
-import json
 import os
 import sys
 from pathlib import Path
 from typing import Literal, Optional
 
+import uvicorn
+from fastapi import FastAPI
 from fastmcp import FastMCP
 from pydantic import Field
 
-from constants import (
-    CMD_DELETE_ALL_SESSIONS,
-    CMD_GET_RESULT,
-    CMD_GET_STATUS,
-    CMD_LIST_BLUEPRINTS,
-    CMD_LIST_SESSIONS,
-    CMD_RESUME_SESSION,
-    CMD_START_SESSION,
-    ENV_COMMAND_PATH,
-    MAX_SESSION_NAME_LENGTH,
+from constants import ENV_COMMAND_PATH, MAX_SESSION_NAME_LENGTH
+from core_functions import (
+    delete_all_agent_sessions_impl,
+    get_agent_session_result_impl,
+    get_agent_session_status_impl,
+    list_agent_blueprints_impl,
+    list_agent_sessions_impl,
+    resume_agent_session_impl,
+    start_agent_session_impl,
 )
 from logger import logger
-from types_models import ResponseFormat, ServerConfig
-from utils import (
-    execute_script,
-    execute_script_async,
-    format_agents_as_json,
-    format_agents_as_markdown,
-    format_sessions_as_json,
-    format_sessions_as_markdown,
-    format_tool_response,
-    handle_script_error,
-    parse_agent_list,
-    parse_session_list,
-    truncate_response,
-)
+from rest_api import create_api_router
+from types_models import ServerConfig
 
 
 def get_server_config() -> ServerConfig:
@@ -103,25 +90,7 @@ async def list_agent_blueprints(
       - Use when: "Show me the agent blueprints" -> List all agent blueprint capabilities
       - Don't use when: You want to see running sessions (use list_agent_sessions instead)
     """
-    logger.info("list_agent_blueprints called", {"response_format": response_format})
-
-    try:
-        args = [CMD_LIST_BLUEPRINTS]
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return handle_script_error(result)
-
-        agents = parse_agent_list(result.stdout)
-        fmt = ResponseFormat.JSON if response_format == "json" else ResponseFormat.MARKDOWN
-        formatted_response = format_tool_response(
-            agents, fmt, format_agents_as_markdown, format_agents_as_json
-        )
-        text, _ = truncate_response(formatted_response)
-        return text
-
-    except Exception as error:
-        return f"Error: {str(error)}"
+    return await list_agent_blueprints_impl(config, response_format)
 
 
 @mcp.tool()
@@ -150,25 +119,7 @@ async def list_agent_sessions(
       - Use when: "What sessions exist?" -> See all created session instances
       - Don't use when: You want to see available blueprints (use list_agent_blueprints)
     """
-    logger.info("list_agent_sessions called", {"response_format": response_format})
-
-    try:
-        args = [CMD_LIST_SESSIONS]
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return handle_script_error(result)
-
-        sessions = parse_session_list(result.stdout)
-        fmt = ResponseFormat.JSON if response_format == "json" else ResponseFormat.MARKDOWN
-        formatted_response = format_tool_response(
-            sessions, fmt, format_sessions_as_markdown, format_sessions_as_json
-        )
-        text, _ = truncate_response(formatted_response)
-        return text
-
-    except Exception as error:
-        return f"Error: {str(error)}"
+    return await list_agent_sessions_impl(config, response_format)
 
 
 @mcp.tool()
@@ -217,54 +168,9 @@ async def start_agent_session(
       - Use when: "Create an architecture design" -> Start session with system-architect blueprint
       - Don't use when: Session already exists (use resume_agent_session instead)
     """
-    logger.info(
-        "start_agent_session called",
-        {
-            "session_name": session_name,
-            "agent_blueprint_name": agent_blueprint_name,
-            "project_dir": project_dir,
-            "prompt_length": len(prompt),
-            "async_mode": async_mode,
-        },
+    return await start_agent_session_impl(
+        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode
     )
-
-    try:
-        args = [CMD_START_SESSION, session_name]
-
-        if project_dir:
-            args.extend(["--project-dir", project_dir])
-
-        if agent_blueprint_name:
-            args.extend(["--agent", agent_blueprint_name])
-
-        args.extend(["-p", prompt])
-
-        if async_mode:
-            logger.info("start_agent_session: using async execution")
-            async_result = await execute_script_async(config, args)
-            return json.dumps(
-                {
-                    "session_name": async_result.session_name,
-                    "status": async_result.status,
-                    "message": async_result.message,
-                },
-                indent=2,
-            )
-
-        logger.info("start_agent_session: using synchronous execution")
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return handle_script_error(result)
-
-        text, truncated = truncate_response(result.stdout)
-        if truncated:
-            logger.warn("start_agent_session: response truncated")
-        return text
-
-    except Exception as error:
-        logger.error("start_agent_session: exception", {"error": str(error)})
-        return f"Error: {str(error)}"
 
 
 @mcp.tool()
@@ -299,42 +205,7 @@ async def resume_agent_session(
       - Use when: "Continue the architecture work" -> Resume existing architect session
       - Don't use when: Session doesn't exist (use start_agent_session to create it)
     """
-    logger.info(
-        "resume_agent_session called",
-        {
-            "session_name": session_name,
-            "prompt_length": len(prompt),
-            "async_mode": async_mode,
-        },
-    )
-
-    try:
-        args = [CMD_RESUME_SESSION, session_name]
-        args.extend(["-p", prompt])
-
-        if async_mode:
-            logger.info("resume_agent_session: using async execution")
-            async_result = await execute_script_async(config, args)
-            return json.dumps(
-                {
-                    "session_name": async_result.session_name,
-                    "status": async_result.status,
-                    "message": async_result.message,
-                },
-                indent=2,
-            )
-
-        logger.info("resume_agent_session: using synchronous execution")
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return handle_script_error(result)
-
-        text, _ = truncate_response(result.stdout)
-        return text
-
-    except Exception as error:
-        return f"Error: {str(error)}"
+    return await resume_agent_session_impl(config, session_name, prompt, async_mode)
 
 
 @mcp.tool()
@@ -352,19 +223,7 @@ async def delete_all_agent_sessions() -> str:
       - Use when: "Start fresh" -> Delete all existing sessions
       - Don't use when: You might want to resume sessions later
     """
-    logger.info("delete_all_agent_sessions called")
-
-    try:
-        args = [CMD_DELETE_ALL_SESSIONS]
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return handle_script_error(result)
-
-        return result.stdout
-
-    except Exception as error:
-        return f"Error: {str(error)}"
+    return await delete_all_agent_sessions_impl(config)
 
 
 @mcp.tool()
@@ -399,28 +258,7 @@ async def get_agent_session_status(
     Returns:
       JSON object with status field: {"status": "running"|"finished"|"not_existent"}
     """
-    logger.info(
-        "get_agent_session_status called",
-        {"session_name": session_name, "wait_seconds": wait_seconds},
-    )
-
-    try:
-        if wait_seconds > 0:
-            logger.debug(f"Waiting {wait_seconds} seconds before status check")
-            await asyncio.sleep(wait_seconds)
-
-        args = [CMD_GET_STATUS, session_name]
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return json.dumps({"status": "not_existent"}, indent=2)
-
-        status = result.stdout.strip()
-        return json.dumps({"status": status}, indent=2)
-
-    except Exception as error:
-        logger.error("get_agent_session_status: exception", {"error": str(error)})
-        return json.dumps({"status": "not_existent"}, indent=2)
+    return await get_agent_session_status_impl(config, session_name, wait_seconds)
 
 
 @mcp.tool()
@@ -448,46 +286,89 @@ async def get_agent_session_result(
       - "Session still running" -> Poll get_agent_session_status until finished
       - "Session not found" -> Verify session name is correct
     """
-    logger.info("get_agent_session_result called", {"session_name": session_name})
+    return await get_agent_session_result_impl(config, session_name)
 
-    try:
-        # First check status
-        status_args = [CMD_GET_STATUS, session_name]
-        status_result = await execute_script(config, status_args)
-        status = status_result.stdout.strip()
 
-        if status == "not_existent":
-            return f"Error: Session '{session_name}' does not exist. Please check the session name."
+def create_combined_app(host: str = "127.0.0.1", port: int = 8080) -> FastAPI:
+    """Create a FastAPI application with both MCP and REST API endpoints.
 
-        if status == "running":
-            return f"Error: Session '{session_name}' is still running. Use get_agent_session_status to poll until status is 'finished'."
+    Args:
+        host: Host address (for display purposes)
+        port: Port number (for display purposes)
 
-        # Session is finished, retrieve result
-        args = [CMD_GET_RESULT, session_name]
-        result = await execute_script(config, args)
+    Returns:
+        FastAPI application with:
+        - /mcp - MCP protocol endpoint
+        - /api/* - REST API endpoints
+        - /api/docs - OpenAPI Swagger documentation
+        - /api/redoc - ReDoc documentation
+    """
+    # Get the MCP ASGI app with proper path
+    mcp_app = mcp.http_app(path="/")
 
-        if result.exitCode != 0:
-            return f"Error retrieving result: {result.stderr or 'Unknown error'}"
+    # Create FastAPI app with documentation
+    # Use MCP app's lifespan for proper session management
+    app = FastAPI(
+        title="Agent Orchestrator API",
+        description="""
+REST API for the Agent Orchestrator MCP Server.
 
-        text, truncated = truncate_response(result.stdout)
-        if truncated:
-            logger.warn("get_agent_session_result: response truncated")
-        return text
+This API provides a RESTful interface to orchestrate specialized Claude Code agents.
+The same functionality is also available via the MCP protocol at `/mcp`.
 
-    except Exception as error:
-        logger.error("get_agent_session_result: exception", {"error": str(error)})
-        return f"Error: {str(error)}"
+## Features
+
+- **Blueprints**: List available agent blueprint configurations
+- **Sessions**: Create, resume, monitor, and manage agent sessions
+- **Async Support**: Run long-running tasks in background mode
+
+## MCP Protocol
+
+For MCP clients (Claude Desktop, Claude CLI), use the `/mcp` endpoint.
+        """,
+        version="1.0.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
+        lifespan=mcp_app.lifespan,
+    )
+
+    # Create REST API router with core functions (not MCP tool wrappers)
+    # These are the actual async functions that do the work
+    core_functions = {
+        "list_agent_blueprints": lambda response_format="json": list_agent_blueprints_impl(config, response_format),
+        "list_agent_sessions": lambda response_format="json": list_agent_sessions_impl(config, response_format),
+        "start_agent_session": lambda session_name, prompt, agent_blueprint_name=None, project_dir=None, async_mode=False: start_agent_session_impl(config, session_name, prompt, agent_blueprint_name, project_dir, async_mode),
+        "resume_agent_session": lambda session_name, prompt, async_mode=False: resume_agent_session_impl(config, session_name, prompt, async_mode),
+        "get_agent_session_status": lambda session_name, wait_seconds=0: get_agent_session_status_impl(config, session_name, wait_seconds),
+        "get_agent_session_result": lambda session_name: get_agent_session_result_impl(config, session_name),
+        "delete_all_agent_sessions": lambda: delete_all_agent_sessions_impl(config),
+    }
+    api_router = create_api_router(core_functions)
+    app.include_router(api_router)
+
+    # Mount MCP app at /mcp path
+    app.mount("/mcp", mcp_app)
+
+    # Add root redirect to docs
+    @app.get("/", include_in_schema=False)
+    async def root():
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(url="/api/docs")
+
+    return app
 
 
 def run_server(
-    transport: Literal["stdio", "streamable-http", "sse"] = "stdio",
+    transport: Literal["stdio", "streamable-http", "sse", "api"] = "stdio",
     host: str = "127.0.0.1",
     port: int = 8080,
 ):
     """Run the MCP server with the specified transport.
 
     Args:
-        transport: Transport type - "stdio", "streamable-http", or "sse"
+        transport: Transport type - "stdio", "streamable-http", "sse", or "api"
         host: Host to bind to (for HTTP transports)
         port: Port to bind to (for HTTP transports)
     """
@@ -514,6 +395,14 @@ def run_server(
     elif transport == "sse":
         print(f"Running via SSE at http://{host}:{port}/sse", file=sys.stderr)
         mcp.run(transport="sse", host=host, port=port)
+    elif transport == "api":
+        print(f"Running combined MCP + REST API server", file=sys.stderr)
+        print(f"  MCP endpoint:  http://{host}:{port}/mcp", file=sys.stderr)
+        print(f"  REST API:      http://{host}:{port}/api", file=sys.stderr)
+        print(f"  API Docs:      http://{host}:{port}/api/docs", file=sys.stderr)
+        print(f"  ReDoc:         http://{host}:{port}/api/redoc", file=sys.stderr)
+        app = create_combined_app(host, port)
+        uvicorn.run(app, host=host, port=port)
     else:
         raise ValueError(f"Unknown transport: {transport}")
 

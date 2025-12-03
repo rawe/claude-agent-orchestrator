@@ -124,18 +124,54 @@ All tools support optional `project_dir` parameter for managing multiple project
 
 **For detailed API documentation, parameters, and examples, see [TOOLS_REFERENCE.md](./docs/TOOLS_REFERENCE.md)**
 
+## HTTP & API Mode
+
+The server supports multiple transport modes beyond the default stdio:
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| stdio | `uv run agent-orchestrator-mcp.py` | Default, for Claude Desktop/CLI |
+| HTTP | `--http-mode` | MCP protocol over HTTP |
+| SSE | `--sse-mode` | Legacy SSE transport |
+| **API** | `--api-mode` | REST API + MCP combined with OpenAPI docs |
+
+**API Mode** provides both MCP protocol and a REST API with automatic OpenAPI documentation:
+
+```bash
+# Using Make (from project root)
+make start-ao-api
+
+# Direct command
+uv run agent-orchestrator-mcp.py --api-mode --port 9500
+```
+
+When running in API mode:
+- `/mcp` - MCP protocol endpoint
+- `/api/*` - REST API endpoints
+- `/api/docs` - Swagger UI documentation
+- `/api/redoc` - ReDoc documentation
+
+**For complete API mode documentation, client examples, and integration guide, see [API-MODE.md](./docs/API-MODE.md)**
+
 ## Project Structure
 
 ```
 agent-orchestrator-mcp-server/
-├── agent-orchestrator-mcp.py    # Main entry point (~40 lines)
+├── agent-orchestrator-mcp.py    # Main entry point with CLI args
 ├── libs/                        # Modular library code
 │   ├── constants.py            # Constants and configuration
+│   ├── core_functions.py       # Core async functions (shared by MCP & REST)
 │   ├── logger.py               # Debug logging
+│   ├── rest_api.py             # FastAPI REST endpoints
 │   ├── schemas.py              # Input validation
-│   ├── server.py               # MCP server logic
+│   ├── server.py               # MCP server & combined app logic
 │   ├── types_models.py         # Type definitions
 │   └── utils.py                # Utility functions
+├── docs/                        # Documentation
+│   ├── API-MODE.md             # REST API mode guide
+│   ├── ENV_VARS.md             # Environment variables reference
+│   ├── TOOLS_REFERENCE.md      # MCP tools documentation
+│   └── TROUBLESHOOTING.md      # Debugging guide
 ├── logs/                        # Debug logs (when MCP_SERVER_DEBUG=true)
 └── README.md
 ```
