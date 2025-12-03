@@ -93,6 +93,18 @@ class DocDeleteInput(BaseModel):
     document_id: str
 
 
+class DocLinkInput(BaseModel):
+    types: bool = False
+    create_from: Optional[str] = None
+    create_to: Optional[str] = None
+    update_id: Optional[str] = None
+    remove_id: Optional[str] = None
+    relation_type: Optional[str] = None
+    from_note: Optional[str] = None
+    to_note: Optional[str] = None
+    note: Optional[str] = None
+
+
 # --- Command Execution ---
 
 async def run_command(command: str, args: list[str]) -> tuple[str, str, int]:
@@ -247,16 +259,17 @@ Note: Requires semantic search to be enabled on the Context Store server.""",
         ),
         types.Tool(
             name="doc_info",
-            description="""Get metadata for a specific document without downloading content.
+            description="""Get metadata and relations for a specific document without downloading content.
 
-Retrieves document metadata (size, type, tags, dates) without transferring
-the file content. Use this to check document details before deciding to read/pull.
+Retrieves document metadata (size, type, tags, dates) and relations without transferring
+the file content. Use this to check document details and see linked documents.
 
 Args:
     document_id (required): The document ID (e.g., "doc_abc123...")
 
 Returns:
-    JSON with document metadata: id, filename, content_type, size_bytes, tags, created_at, updated_at""",
+    JSON with document metadata: id, filename, content_type, size_bytes, tags, created_at, updated_at
+    Plus relations object with parent/child/related document links""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -345,6 +358,7 @@ Example:
 
 Permanently removes the document and its metadata. This action cannot be undone.
 Also removes the document from semantic search index if enabled.
+Note: Deleting a parent document cascades to delete all child documents.
 
 Args:
     document_id (required): The document ID to delete
@@ -360,6 +374,74 @@ Returns:
                     },
                 },
                 "required": ["document_id"],
+            },
+        ),
+        types.Tool(
+            name="doc_link",
+            description="""Manage document relations (parent-child or peer links).
+
+Create, update, or remove bidirectional relations between documents.
+Use --types first to discover available relation types.
+
+Actions (mutually exclusive):
+    types=True: List available relation types
+    create_from + create_to + relation_type: Create a relation
+    update_id + note: Update a relation's note
+    remove_id: Remove a relation (both directions)
+
+Args:
+    types: Set True to list available relation types
+    create_from: Source document ID for creating relation
+    create_to: Target document ID for creating relation
+    relation_type: Type from --types (required for create)
+    from_note: Note from source document's perspective
+    to_note: Note from target document's perspective
+    update_id: Relation ID to update
+    remove_id: Relation ID to remove
+    note: New note text (for update)
+
+Returns:
+    JSON with operation result""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "types": {
+                        "type": "boolean",
+                        "description": "List available relation types",
+                    },
+                    "create_from": {
+                        "type": "string",
+                        "description": "Source document ID for creating relation",
+                    },
+                    "create_to": {
+                        "type": "string",
+                        "description": "Target document ID for creating relation",
+                    },
+                    "relation_type": {
+                        "type": "string",
+                        "description": "Relation type from types list (required for create)",
+                    },
+                    "from_note": {
+                        "type": "string",
+                        "description": "Note from source document's perspective",
+                    },
+                    "to_note": {
+                        "type": "string",
+                        "description": "Note from target document's perspective",
+                    },
+                    "update_id": {
+                        "type": "string",
+                        "description": "Relation ID to update",
+                    },
+                    "remove_id": {
+                        "type": "string",
+                        "description": "Relation ID to remove",
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "New note text (for update)",
+                    },
+                },
             },
         ),
     ]
@@ -424,6 +506,28 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         elif name == "doc_delete":
             params = DocDeleteInput(**arguments)
             stdout, stderr, code = await run_command("doc-delete", [params.document_id])
+            return make_response(stdout, stderr, code)
+
+        elif name == "doc_link":
+            params = DocLinkInput(**arguments)
+            args = []
+            if params.types:
+                args.append("--types")
+            elif params.create_from and params.create_to:
+                args.extend(["--create", params.create_from, params.create_to])
+                if params.relation_type:
+                    args.extend(["--type", params.relation_type])
+                if params.from_note:
+                    args.extend(["--from-note", params.from_note])
+                if params.to_note:
+                    args.extend(["--to-note", params.to_note])
+            elif params.update_id:
+                args.extend(["--update", params.update_id])
+                if params.note:
+                    args.extend(["--note", params.note])
+            elif params.remove_id:
+                args.extend(["--remove", params.remove_id])
+            stdout, stderr, code = await run_command("doc-link", args)
             return make_response(stdout, stderr, code)
 
         else:
