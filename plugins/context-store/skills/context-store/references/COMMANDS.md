@@ -101,11 +101,25 @@ uv run commands/doc-info doc_abc123...
   "updated_at": "2025-11-23T00:00:00",
   "tags": ["api", "v2"],
   "metadata": {"description": "API specification"},
-  "url": "http://localhost:8766/documents/doc_abc123..."
+  "url": "http://localhost:8766/documents/doc_abc123...",
+  "relations": {
+    "parent": [
+      {
+        "id": "rel_abc123",
+        "related_document_id": "doc_child1",
+        "note": "Database layer docs",
+        "created_at": "2025-12-03T10:00:00"
+      }
+    ],
+    "child": [],
+    "related": []
+  }
 }
 ```
 
-**Use Case**: View document metadata without downloading the file. The `url` field provides a direct link to retrieve the document. Useful to provide this url to a user if you don't want to download the file yourself.
+**Use Case**: View document metadata without downloading the file. The `url` field provides a direct link to retrieve the document. The `relations` field shows all document relationships grouped by type.
+
+**If no relations exist**: `"relations": {}`
 
 **Error Output** (stderr):
 ```json
@@ -214,6 +228,140 @@ uv run commands/doc-delete doc_abc123...
 ```
 
 **Warning**: Permanent deletion - cannot be undone.
+
+---
+
+## doc-link
+
+```bash
+uv run commands/doc-link <action-flag> [arguments] [options]
+```
+
+**Actions** (mutually exclusive):
+- `--types` - List available relation types
+- `--create <from-doc-id> <to-doc-id>` - Create relation between documents
+- `--update <relation-id>` - Update a relation's note
+- `--remove <relation-id>` - Remove a relation (both directions)
+
+### List Relation Types
+
+```bash
+uv run commands/doc-link --types
+```
+
+**Output**:
+```json
+[
+  {
+    "name": "parent-child",
+    "description": "Hierarchical relation where parent owns children. Cascade delete enabled.",
+    "from_type": "parent",
+    "to_type": "child"
+  },
+  {
+    "name": "related",
+    "description": "Peer relation between related documents. No cascade delete.",
+    "from_type": "related",
+    "to_type": "related"
+  }
+]
+```
+
+### Create Relation
+
+```bash
+uv run commands/doc-link --create <from-doc-id> <to-doc-id> [options]
+```
+
+**Options**:
+- `--type TEXT` or `-t TEXT` - Relation type: `parent-child` or `related` (required)
+- `--from-note TEXT` - Note from source document's perspective
+- `--to-note TEXT` - Note from target document's perspective
+
+**Examples**:
+```bash
+# Create parent-child relation
+uv run commands/doc-link --create doc_parent doc_child --type parent-child --from-note "Child module"
+
+# Create peer relation
+uv run commands/doc-link --create doc_a doc_b --type related --from-note "See also" --to-note "Related doc"
+```
+
+**Output**:
+```json
+{
+  "success": true,
+  "message": "Relation created",
+  "from_relation": {
+    "id": "rel_abc123",
+    "document_id": "doc_parent",
+    "related_document_id": "doc_child",
+    "relation_type": "parent",
+    "note": "Child module"
+  },
+  "to_relation": {
+    "id": "rel_def456",
+    "document_id": "doc_child",
+    "related_document_id": "doc_parent",
+    "relation_type": "child",
+    "note": null
+  }
+}
+```
+
+### Update Relation Note
+
+```bash
+uv run commands/doc-link --update <relation-id> --note "New note text"
+```
+
+**Options**: `--note TEXT` or `-n TEXT` - New note text (required)
+
+**Example**:
+```bash
+uv run commands/doc-link --update rel_abc123 --note "Updated: Core database module"
+```
+
+**Output**:
+```json
+{
+  "id": "rel_abc123",
+  "document_id": "doc_parent",
+  "related_document_id": "doc_child",
+  "relation_type": "parent",
+  "note": "Updated: Core database module",
+  "updated_at": "2025-12-03T10:30:00"
+}
+```
+
+### Remove Relation
+
+```bash
+uv run commands/doc-link --remove <relation-id>
+```
+
+**Example**:
+```bash
+uv run commands/doc-link --remove rel_abc123
+```
+
+**Output**:
+```json
+{
+  "success": true,
+  "message": "Relation removed",
+  "deleted_relation_ids": ["rel_abc123", "rel_def456"]
+}
+```
+
+**Note**: Removes both sides of the bidirectional relation.
+
+**Error Output** (stderr):
+```json
+{"error": "Relation not found: 123"}
+{"error": "Document not found"}
+{"error": "Relation already exists"}
+```
 
 ---
 

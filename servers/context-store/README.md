@@ -353,6 +353,8 @@ The context store supports **bidirectional relations** between documents. Relati
 | `parent-child` | `parent` | `child` | Yes (children deleted with parent) |
 | `related` | `related` | `related` | No (only relation removed) |
 
+**Note**: Relation IDs are **strings** in the API (e.g., `"1"`, `"42"`), allowing for future flexibility.
+
 ### GET /relations/definitions
 
 List all available relation definitions.
@@ -413,7 +415,7 @@ curl -X POST http://localhost:8766/relations \
   "success": true,
   "message": "Relation created",
   "from_relation": {
-    "id": 1,
+    "id": "1",
     "document_id": "doc_architecture",
     "related_document_id": "doc_database_design",
     "relation_type": "parent",
@@ -422,7 +424,7 @@ curl -X POST http://localhost:8766/relations \
     "updated_at": "2025-12-03T10:00:00"
   },
   "to_relation": {
-    "id": 2,
+    "id": "2",
     "document_id": "doc_database_design",
     "related_document_id": "doc_architecture",
     "relation_type": "child",
@@ -457,7 +459,7 @@ curl http://localhost:8766/documents/doc_architecture/relations
   "relations": {
     "parent": [
       {
-        "id": 1,
+        "id": "1",
         "document_id": "doc_architecture",
         "related_document_id": "doc_database_design",
         "relation_type": "parent",
@@ -466,7 +468,7 @@ curl http://localhost:8766/documents/doc_architecture/relations
         "updated_at": "2025-12-03T10:00:00"
       },
       {
-        "id": 3,
+        "id": "3",
         "document_id": "doc_architecture",
         "related_document_id": "doc_api_design",
         "relation_type": "parent",
@@ -505,7 +507,7 @@ curl -X PATCH http://localhost:8766/relations/1 \
 **Success Response**:
 ```json
 {
-  "id": 1,
+  "id": "1",
   "document_id": "doc_architecture",
   "related_document_id": "doc_database_design",
   "relation_type": "parent",
@@ -539,7 +541,7 @@ curl -X DELETE http://localhost:8766/relations/1
 {
   "success": true,
   "message": "Relation removed",
-  "deleted_relation_ids": [1, 2]
+  "deleted_relation_ids": ["1", "2"]
 }
 ```
 

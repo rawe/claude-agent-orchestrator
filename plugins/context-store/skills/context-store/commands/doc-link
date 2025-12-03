@@ -1,0 +1,159 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Manage document relations in the context store."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+from typing import Optional
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+from client import DocumentClient
+
+app = typer.Typer(add_completion=False)
+
+
+def output_json(data: dict) -> None:
+    """Print data as formatted JSON."""
+    print(json.dumps(data, indent=2, default=str))
+
+
+def output_error(message: str) -> None:
+    """Print error as JSON to stderr and exit."""
+    print(json.dumps({"error": message}), file=sys.stderr)
+    raise typer.Exit(1)
+
+
+@app.command()
+def main(
+    # Action flags (mutually exclusive)
+    types: bool = typer.Option(
+        False, "--types",
+        help="List available relation types"
+    ),
+    create: Optional[str] = typer.Option(
+        None, "--create",
+        help="Create relation: source document ID"
+    ),
+    update: Optional[str] = typer.Option(
+        None, "--update",
+        help="Update relation note: relation ID"
+    ),
+    remove: Optional[str] = typer.Option(
+        None, "--remove",
+        help="Remove relation: relation ID"
+    ),
+    # Target document for --create
+    to_document: Optional[str] = typer.Argument(
+        None,
+        help="Target document ID (required for --create)"
+    ),
+    # Options for --create
+    relation_type: Optional[str] = typer.Option(
+        None, "--type", "-t",
+        help="Relation type from --types (required for --create)"
+    ),
+    from_note: Optional[str] = typer.Option(
+        None, "--from-note",
+        help="Note from source document's perspective"
+    ),
+    to_note: Optional[str] = typer.Option(
+        None, "--to-note",
+        help="Note from target document's perspective"
+    ),
+    # Options for --update
+    note: Optional[str] = typer.Option(
+        None, "--note", "-n",
+        help="Note text (for --update)"
+    ),
+):
+    """Manage document relations.
+
+    Actions (mutually exclusive):
+      --types           List available relation types
+      --create <from>   Create relation from source document
+      --update <id>     Update a relation's note
+      --remove <id>     Remove a relation (both directions)
+
+    Examples:
+      doc-link --types
+      doc-link --create <from-doc> <to-doc> --type <type>
+      doc-link --create <from-doc> <to-doc> --type <type> --from-note "Note" --to-note "Note"
+      doc-link --update <relation-id> --note "Updated note"
+      doc-link --remove <relation-id>
+    """
+    try:
+        config = Config()
+        client = DocumentClient(config)
+
+        # Count action flags to ensure mutual exclusivity
+        actions = [types, create is not None, update is not None, remove is not None]
+        action_count = sum(actions)
+
+        if action_count == 0:
+            output_error("No action specified. Use --types, --create, --update, or --remove")
+        if action_count > 1:
+            output_error("Multiple actions specified. Use only one of --types, --create, --update, or --remove")
+
+        # Handle --types
+        if types:
+            result = client.get_relation_definitions()
+            output_json(result)
+            return
+
+        # Handle --create
+        if create is not None:
+            if not to_document:
+                output_error("--create requires a target document ID as argument")
+            if not relation_type:
+                output_error("--create requires --type option (e.g., --type parent-child or --type related)")
+
+            result = client.create_relation(
+                from_document_id=create,
+                to_document_id=to_document,
+                definition=relation_type,
+                from_note=from_note,
+                to_note=to_note
+            )
+            output_json({
+                "success": True,
+                "message": "Relation created",
+                **result
+            })
+            return
+
+        # Handle --update
+        if update is not None:
+            if note is None:
+                output_error("--update requires --note option")
+
+            result = client.update_relation(update, note)
+            output_json(result)
+            return
+
+        # Handle --remove
+        if remove is not None:
+            result = client.delete_relation(remove)
+            output_json({
+                "success": True,
+                "message": "Relation removed",
+                **result
+            })
+            return
+
+    except Exception as e:
+        output_error(str(e))
+
+
+if __name__ == "__main__":
+    app()

@@ -48,12 +48,13 @@ uv run <skill-root>/commands/doc-search "<query>" [--limit INT]
 **Use when**: Find documents by meaning using natural language queries.
 **Note**: Requires semantic search enabled on server. Returns section offsets for partial reads.
 
-### `doc-info` - Get Document Metadata
+### `doc-info` - Get Document Metadata & Relations
 ```bash
 uv run <skill-root>/commands/doc-info <document-id>
 # Example: uv run <skill-root>/commands/doc-info doc_abc123
 ```
-**Use when**: View metadata for a specific document without downloading it.
+**Use when**: View metadata and relations for a specific document without downloading it.
+**Output**: Includes `relations` field with parent/child/related document links.
 
 ### `doc-read` - Read Text Documents
 ```bash
@@ -77,6 +78,19 @@ uv run <skill-root>/commands/doc-delete <document-id>
 # Example: uv run <skill-root>/commands/doc-delete doc_abc123
 ```
 **Use when**: Permanently remove a document.
+
+### `doc-link` - Manage Document Relations
+```bash
+uv run <skill-root>/commands/doc-link --types                     # List relation types
+uv run <skill-root>/commands/doc-link --create <from> <to> [opts] # Create relation
+uv run <skill-root>/commands/doc-link --update <id> --note "..."  # Update note
+uv run <skill-root>/commands/doc-link --remove <id>               # Remove relation
+```
+**Use when**: Link documents together in parent-child or peer relationships.
+**Options for --create**:
+- `--type` - Required: `parent-child` (hierarchical) or `related` (peer)
+- `--from-note` - Note from source perspective
+- `--to-note` - Note from target perspective
 
 ---
 
@@ -114,6 +128,18 @@ uv run <skill-root>/commands/doc-search "how to authenticate users"
 uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
 ```
 
+### Link Related Documents
+```bash
+# Create hierarchical relationship (parent owns children)
+uv run <skill-root>/commands/doc-link --create doc_architecture doc_api --type parent-child --from-note "API spec"
+
+# Create peer relationship
+uv run <skill-root>/commands/doc-link --create doc_api doc_models --type related --from-note "Data models"
+
+# View document with its relations
+uv run <skill-root>/commands/doc-info doc_architecture
+```
+
 ---
 
 ## Key Concepts
@@ -126,6 +152,15 @@ uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
 ### Output Format
 All commands output JSON. Save document IDs from upload for later retrieval/deletion.
 
+### Document Relations
+**Relation Types**:
+- **parent-child**: Hierarchical ownership. Deleting parent cascades to children.
+- **related**: Peer relationship. No cascade delete.
+
+**Bidirectional**: Relations are stored from both perspectives. Creating a parent-child link adds:
+- `parent` relation on the parent document
+- `child` relation on the child document
+
 ---
 
 ## Notes for AI Assistants
@@ -135,6 +170,9 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 3. **Check server running** - Handle connection errors gracefully
 4. **Parse JSON output** - All commands return JSON
 5. **Tags are lowercase** - Use consistent tag naming (`python` not `Python`)
+6. **Relations in doc-info** - Use `doc-info` to see document relations without a separate call
+7. **Relation IDs** - Save relation IDs from create output for update/remove operations
+8. **Cascade delete** - Deleting a parent document also deletes its children
 
 ---
 
@@ -146,7 +184,7 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 
 **Find by meaning?** → `doc-search "your question"` (semantic search)
 
-**Check metadata?** → `doc-info <doc-id>` (metadata only)
+**Check metadata?** → `doc-info <doc-id>` (metadata + relations)
 
 **Read text file?** → `doc-read <doc-id>` (text files to stdout)
 
@@ -157,6 +195,14 @@ All commands output JSON. Save document IDs from upload for later retrieval/dele
 **Remove document?** → `doc-delete <doc-id>` (permanent)
 
 **List all?** → `doc-query` (no args)
+
+**Link documents?** → `doc-link --create <from> <to> --type parent-child`
+
+**List relation types?** → `doc-link --types`
+
+**Update link note?** → `doc-link --update <id> --note "text"`
+
+**Remove link?** → `doc-link --remove <id>` (removes both directions)
 
 ---
 

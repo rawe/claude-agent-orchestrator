@@ -177,7 +177,7 @@ class RelationCreateRequest(BaseModel):
 
 class RelationResponse(BaseModel):
     """Single relation from a document's perspective."""
-    id: int
+    id: str                              # String externally, int internally
     document_id: str
     related_document_id: str
     relation_type: str                   # DB value: "parent", "child", "related"
@@ -209,7 +209,7 @@ class RelationDeleteResponse(BaseModel):
     """Response after deleting a relation."""
     success: bool
     message: str
-    deleted_relation_ids: list[int]  # Both sides of bidirectional relation
+    deleted_relation_ids: list[str]  # Both sides of bidirectional relation (string externally)
 
 
 class DeleteResponseWithCascade(BaseModel):

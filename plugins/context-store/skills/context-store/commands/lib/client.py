@@ -344,3 +344,157 @@ class DocumentClient:
             raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
+
+    # =====================
+    # Document Relations API
+    # =====================
+
+    def get_relation_definitions(self) -> list[dict]:
+        """Get available relation definitions.
+
+        Returns:
+            List of relation definitions with name, description, from_type, to_type
+
+        Raises:
+            Exception: On network or HTTP errors
+        """
+        try:
+            response = httpx.get(
+                f"{self.base_url}/relations/definitions",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def get_document_relations(self, document_id: str) -> dict:
+        """Get all relations for a document.
+
+        Args:
+            document_id: ID of the document to get relations for
+
+        Returns:
+            Dictionary with 'relations' key containing grouped relations by type
+
+        Raises:
+            Exception: On network or HTTP errors, including 404 if not found
+        """
+        try:
+            response = httpx.get(
+                f"{self.base_url}/documents/{document_id}/relations",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Document not found: {document_id}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def create_relation(
+        self,
+        from_document_id: str,
+        to_document_id: str,
+        definition: str,
+        from_note: Optional[str] = None,
+        to_note: Optional[str] = None
+    ) -> dict:
+        """Create a bidirectional relation between documents.
+
+        Args:
+            from_document_id: Source document ID
+            to_document_id: Target document ID
+            definition: Relation type - 'parent-child' or 'related' (required)
+            from_note: Note from source document's perspective
+            to_note: Note from target document's perspective
+
+        Returns:
+            Dictionary with created relation details (from_relation, to_relation)
+
+        Raises:
+            Exception: On network or HTTP errors
+        """
+        payload = {
+            "definition": definition,
+            "from_document_id": from_document_id,
+            "to_document_id": to_document_id,
+            "from_note": from_note,
+            "to_note": to_note
+        }
+        try:
+            response = httpx.post(
+                f"{self.base_url}/relations",
+                json=payload,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Document not found")
+            if e.response.status_code == 400:
+                raise Exception(f"Invalid relation: {e.response.text}")
+            if e.response.status_code == 409:
+                raise Exception(f"Relation already exists")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def update_relation(self, relation_id: str, note: Optional[str]) -> dict:
+        """Update a relation's note.
+
+        Args:
+            relation_id: ID of the relation to update (string)
+            note: New note text (can be None to clear)
+
+        Returns:
+            Updated relation details
+
+        Raises:
+            Exception: On network or HTTP errors, including 404 if not found
+        """
+        try:
+            response = httpx.patch(
+                f"{self.base_url}/relations/{relation_id}",
+                json={"note": note},
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Relation not found: {relation_id}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def delete_relation(self, relation_id: str) -> dict:
+        """Delete a relation (removes both sides of bidirectional relation).
+
+        Args:
+            relation_id: ID of the relation to delete (string)
+
+        Returns:
+            Dictionary with success status and deleted relation IDs
+
+        Raises:
+            Exception: On network or HTTP errors, including 404 if not found
+        """
+        try:
+            response = httpx.delete(
+                f"{self.base_url}/relations/{relation_id}",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Relation not found: {relation_id}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")

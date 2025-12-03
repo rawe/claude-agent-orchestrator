@@ -317,6 +317,19 @@ async def list_documents(
 
 # ==================== Relation Endpoints ====================
 
+def _relation_dict_to_response(rel: dict) -> RelationResponse:
+    """Convert database relation dict to response model with string ID."""
+    return RelationResponse(
+        id=str(rel["id"]),  # Convert int to str for external API
+        document_id=rel["document_id"],
+        related_document_id=rel["related_document_id"],
+        relation_type=rel["relation_type"],
+        note=rel["note"],
+        created_at=rel["created_at"],
+        updated_at=rel["updated_at"]
+    )
+
+
 @app.get("/relations/definitions", response_model=list[RelationDefinitionResponse])
 async def list_relation_definitions():
     """List all available relation definitions."""
@@ -389,8 +402,8 @@ async def create_relation(request: RelationCreateRequest):
     return RelationCreateResponse(
         success=True,
         message="Relation created",
-        from_relation=RelationResponse(**from_relation),
-        to_relation=RelationResponse(**to_relation)
+        from_relation=_relation_dict_to_response(from_relation),
+        to_relation=_relation_dict_to_response(to_relation)
     )
 
 
@@ -410,7 +423,7 @@ async def get_document_relations(document_id: str):
         rel_type = rel["relation_type"]
         if rel_type not in grouped:
             grouped[rel_type] = []
-        grouped[rel_type].append(RelationResponse(**rel))
+        grouped[rel_type].append(_relation_dict_to_response(rel))
 
     return DocumentRelationsResponse(
         document_id=document_id,
@@ -419,35 +432,47 @@ async def get_document_relations(document_id: str):
 
 
 @app.patch("/relations/{relation_id}", response_model=RelationResponse)
-async def update_relation_note(relation_id: int, request: RelationUpdateRequest):
+async def update_relation_note(relation_id: str, request: RelationUpdateRequest):
     """Update the note for an existing relation."""
+    # Convert string ID to int for internal use
+    try:
+        internal_id = int(relation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid relation ID format")
+
     # Check if relation exists
-    relation = db.get_relation(relation_id)
+    relation = db.get_relation(internal_id)
     if not relation:
         raise HTTPException(status_code=404, detail="Relation not found")
 
     # Update the note
-    db.update_relation_note(relation_id, request.note)
+    db.update_relation_note(internal_id, request.note)
 
     # Return updated relation
-    updated = db.get_relation(relation_id)
-    return RelationResponse(**updated)
+    updated = db.get_relation(internal_id)
+    return _relation_dict_to_response(updated)
 
 
 @app.delete("/relations/{relation_id}", response_model=RelationDeleteResponse)
-async def delete_relation(relation_id: int):
+async def delete_relation(relation_id: str):
     """
     Delete a relation and its bidirectional counterpart.
 
     This removes the relation only, NOT the documents.
     Both relation rows (the relation and its inverse) are deleted.
     """
+    # Convert string ID to int for internal use
+    try:
+        internal_id = int(relation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid relation ID format")
+
     # Get the relation being deleted
-    relation = db.get_relation(relation_id)
+    relation = db.get_relation(internal_id)
     if not relation:
         raise HTTPException(status_code=404, detail="Relation not found")
 
-    deleted_ids = [relation_id]
+    deleted_ids = [str(internal_id)]  # Store as strings for response
 
     # Find and delete the counterpart relation
     inverse_type = RelationDefinitions.get_inverse_type(relation["relation_type"])
@@ -459,10 +484,10 @@ async def delete_relation(relation_id: int):
         )
         if counterpart:
             db.delete_relation(counterpart["id"])
-            deleted_ids.append(counterpart["id"])
+            deleted_ids.append(str(counterpart["id"]))  # Convert to string
 
     # Delete the original relation
-    db.delete_relation(relation_id)
+    db.delete_relation(internal_id)
 
     return RelationDeleteResponse(
         success=True,

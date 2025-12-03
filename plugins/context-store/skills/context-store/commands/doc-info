@@ -26,7 +26,10 @@ app = typer.Typer(add_completion=False)
 def main(
     document_id: str = typer.Argument(..., help="Document ID to retrieve metadata for"),
 ):
-    """Retrieve metadata for a document without downloading the file."""
+    """Retrieve metadata for a document without downloading the file.
+
+    Output includes document relations when available.
+    """
     try:
         # Create client and get document info
         config = Config()
@@ -34,8 +37,16 @@ def main(
 
         result = client.get_document_info(document_id)
 
+        # Get relations and add to output
+        try:
+            relations_response = client.get_document_relations(document_id)
+            result["relations"] = relations_response.get("relations", {})
+        except Exception:
+            # Graceful fallback if relations endpoint fails
+            result["relations"] = {}
+
         # Output metadata as JSON
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result, indent=2, default=str))
 
     except Exception as e:
         # Output error as JSON to stderr
