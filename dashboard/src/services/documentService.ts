@@ -1,5 +1,5 @@
 import { documentApi } from './api';
-import type { Document, DocumentTag, DocumentQuery } from '@/types';
+import type { Document, DocumentTag, DocumentQuery, DocumentRelationsResponse } from '@/types';
 
 export interface SemanticSearchResult {
   document_id: string;
@@ -140,6 +140,15 @@ export const documentService = {
     params.append('limit', limit.toString());
 
     const response = await documentApi.get<SemanticSearchResponse>('/search', { params });
+    return response.data;
+  },
+
+  /**
+   * Get document relations
+   * Returns all relations for a document grouped by relation type
+   */
+  async getDocumentRelations(id: string): Promise<DocumentRelationsResponse> {
+    const response = await documentApi.get<DocumentRelationsResponse>(`/documents/${id}/relations`);
     return response.data;
   },
 };

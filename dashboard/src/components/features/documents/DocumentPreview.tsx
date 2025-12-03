@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Document } from '@/types';
+import { Document, DocumentRelation } from '@/types';
 import { Modal, Badge, CopyButton, Spinner } from '@/components/common';
 import { useDocumentContent } from '@/hooks/useDocuments';
+import { documentService } from '@/services/documentService';
 import { formatAbsoluteTime, formatFileSize } from '@/utils/formatters';
-import { Download, Trash2, Eye, Code, Maximize2, Minimize2, X } from 'lucide-react';
+import { Download, Trash2, Eye, Code, Maximize2, Minimize2, X, Link2, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -20,6 +21,51 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
   const [isFullscreen, setIsFullscreen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef(0);
+  const [relations, setRelations] = useState<Record<string, DocumentRelation[]>>({});
+  const [relationsLoading, setRelationsLoading] = useState(false);
+  const [relatedDocs, setRelatedDocs] = useState<Record<string, Document>>({});
+
+  // Fetch relations when document changes
+  useEffect(() => {
+    if (document?.id && isOpen) {
+      setRelationsLoading(true);
+      setRelatedDocs({});
+      documentService.getDocumentRelations(document.id)
+        .then(async (response) => {
+          setRelations(response.relations);
+
+          // Collect unique related document IDs
+          const relatedIds = new Set<string>();
+          Object.values(response.relations).forEach(items => {
+            items.forEach(rel => relatedIds.add(rel.related_document_id));
+          });
+
+          // Fetch metadata for each related document
+          const docsMap: Record<string, Document> = {};
+          await Promise.all(
+            Array.from(relatedIds).map(async (id) => {
+              try {
+                const doc = await documentService.getDocumentMetadata(id);
+                docsMap[id] = doc;
+              } catch (e) {
+                console.error(`Failed to fetch metadata for ${id}:`, e);
+              }
+            })
+          );
+          setRelatedDocs(docsMap);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch relations:', error);
+          setRelations({});
+        })
+        .finally(() => {
+          setRelationsLoading(false);
+        });
+    } else {
+      setRelations({});
+      setRelatedDocs({});
+    }
+  }, [document?.id, isOpen]);
 
   // Handle fullscreen toggle
   const toggleFullscreen = () => {
@@ -61,6 +107,27 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
   }, [isOpen]);
 
   if (!document) return null;
+
+  const hasRelations = Object.keys(relations).length > 0 &&
+    Object.values(relations).some(arr => arr.length > 0);
+
+  const getRelationIcon = (type: string) => {
+    switch (type) {
+      case 'parent': return <ArrowUp className="w-3.5 h-3.5 text-blue-500" />;
+      case 'child': return <ArrowDown className="w-3.5 h-3.5 text-green-500" />;
+      case 'related': return <ArrowLeftRight className="w-3.5 h-3.5 text-purple-500" />;
+      default: return <Link2 className="w-3.5 h-3.5 text-gray-500" />;
+    }
+  };
+
+  const getRelationLabel = (type: string) => {
+    switch (type) {
+      case 'parent': return 'Parent of';
+      case 'child': return 'Child of';
+      case 'related': return 'Related to';
+      default: return type;
+    }
+  };
 
   const isMarkdown = document.content_type.includes('markdown') || document.filename.endsWith('.md');
   const isJson = document.content_type.includes('json') || document.filename.endsWith('.json');
@@ -330,6 +397,83 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
                 <CopyButton text={document.checksum} />
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Relations */}
+        <div className="mb-6">
+          <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
+            <Link2 className="w-4 h-4" />
+            Relations
+          </h4>
+          {relationsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Spinner size="sm" />
+              Loading relations...
+            </div>
+          ) : hasRelations ? (
+            <div className="space-y-3">
+              {Object.entries(relations).map(([type, items]) => (
+                items.length > 0 && (
+                  <div key={type} className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      {getRelationIcon(type)}
+                      <span className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+                        {getRelationLabel(type)}
+                      </span>
+                      <span className="text-xs text-gray-400">({items.length})</span>
+                    </div>
+                    <div className="space-y-2">
+                      {items.map((rel) => {
+                        const relatedDoc = relatedDocs[rel.related_document_id];
+                        const description = relatedDoc?.metadata?.description;
+                        const truncatedDesc = description && description.length > 80
+                          ? description.slice(0, 80) + '...'
+                          : description;
+
+                        return (
+                          <div key={rel.id} className="bg-gray-50 rounded p-2 hover:bg-gray-100 transition-colors">
+                            {/* Primary: Filename */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900 truncate flex-1">
+                                {relatedDoc?.filename || 'Loading...'}
+                              </span>
+                            </div>
+
+                            {/* Secondary: Description with tooltip */}
+                            {description && (
+                              <p
+                                className="text-xs text-gray-500 mt-1 truncate cursor-help"
+                                title={description}
+                              >
+                                {truncatedDesc}
+                              </p>
+                            )}
+
+                            {/* Relation note if different from description */}
+                            {rel.note && rel.note !== description && (
+                              <p className="text-xs text-blue-600 mt-1 italic">
+                                Note: {rel.note}
+                              </p>
+                            )}
+
+                            {/* Tertiary: Document ID */}
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="font-mono text-[10px] text-gray-400 truncate">
+                                {rel.related_document_id}
+                              </span>
+                              <CopyButton text={rel.related_document_id} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No relations</p>
           )}
         </div>
 

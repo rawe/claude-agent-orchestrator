@@ -33,3 +33,18 @@ export interface DocumentQuery {
   limit?: number;
   offset?: number;
 }
+
+export interface DocumentRelation {
+  id: string;
+  document_id: string;
+  related_document_id: string;
+  relation_type: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentRelationsResponse {
+  document_id: string;
+  relations: Record<string, DocumentRelation[]>;
+}
