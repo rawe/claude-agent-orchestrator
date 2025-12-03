@@ -3,6 +3,7 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #   "mcp>=1.7.0",
+#   "fastmcp>=2.0.0",
 #   "pydantic>=2.0.0",
 # ]
 # ///
@@ -13,22 +14,28 @@ Provides MCP tools to interact with the Context Store document management system
 Documents can be stored, queried, searched semantically, and retrieved.
 
 Usage:
+    # stdio mode (default, for Claude Desktop/CLI)
     uv run context-store-mcp.py
+
+    # HTTP mode (for network access)
+    uv run context-store-mcp.py --http-mode
+    uv run context-store-mcp.py --http-mode --port 9501
+    uv run context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 
 Environment Variables:
     CONTEXT_STORE_COMMAND_PATH - Optional: Path to commands directory (auto-discovered if not set)
 """
 
+import argparse
 import asyncio
 import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
-import mcp.server.stdio
-import mcp.types as types
-from mcp.server.lowlevel import Server
-from pydantic import BaseModel, field_validator
+from fastmcp import FastMCP
+from pydantic import Field, field_validator
 
 # Auto-discover commands directory if not set
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -38,73 +45,6 @@ if "CONTEXT_STORE_COMMAND_PATH" not in os.environ:
     os.environ["CONTEXT_STORE_COMMAND_PATH"] = str(COMMANDS_DIR)
 
 COMMAND_PATH = Path(os.environ["CONTEXT_STORE_COMMAND_PATH"])
-
-
-# --- Pydantic Schemas ---
-
-class DocPushInput(BaseModel):
-    file_path: str
-    name: Optional[str] = None
-    tags: Optional[str] = None
-    description: Optional[str] = None
-
-    @field_validator("file_path")
-    @classmethod
-    def validate_absolute_path(cls, v: str) -> str:
-        if not Path(v).is_absolute():
-            raise ValueError("file_path must be an absolute path")
-        return v
-
-
-class DocQueryInput(BaseModel):
-    name: Optional[str] = None
-    tags: Optional[str] = None
-    limit: Optional[int] = None
-    include_relations: bool = False
-
-
-class DocSearchInput(BaseModel):
-    query: str
-    limit: Optional[int] = None
-    include_relations: bool = False
-
-
-class DocInfoInput(BaseModel):
-    document_id: str
-
-
-class DocReadInput(BaseModel):
-    document_id: str
-    offset: Optional[int] = None
-    limit: Optional[int] = None
-
-
-class DocPullInput(BaseModel):
-    document_id: str
-    output_path: str
-
-    @field_validator("output_path")
-    @classmethod
-    def validate_absolute_path(cls, v: str) -> str:
-        if not Path(v).is_absolute():
-            raise ValueError("output_path must be an absolute path")
-        return v
-
-
-class DocDeleteInput(BaseModel):
-    document_id: str
-
-
-class DocLinkInput(BaseModel):
-    types: bool = False
-    create_from: Optional[str] = None
-    create_to: Optional[str] = None
-    update_id: Optional[str] = None
-    remove_id: Optional[str] = None
-    relation_type: Optional[str] = None
-    from_note: Optional[str] = None
-    to_note: Optional[str] = None
-    note: Optional[str] = None
 
 
 # --- Command Execution ---
@@ -123,448 +63,452 @@ async def run_command(command: str, args: list[str]) -> tuple[str, str, int]:
     return stdout.decode(), stderr.decode(), process.returncode or 0
 
 
-def make_response(stdout: str, stderr: str, exit_code: int) -> list[types.TextContent]:
-    """Create MCP response from command output."""
+def format_response(stdout: str, stderr: str, exit_code: int) -> str:
+    """Format command output as response string."""
     if exit_code != 0:
-        return [types.TextContent(type="text", text=f"Error: {stderr or stdout}")]
-    return [types.TextContent(type="text", text=stdout)]
+        return f"Error: {stderr or stdout}"
+    return stdout
 
 
-# --- MCP Server ---
+# --- FastMCP Server ---
 
-server = Server("context-store-mcp-server")
+mcp = FastMCP(
+    "context-store-mcp-server",
+    instructions="""Context Store MCP Server - Document management system.
+
+Use this server to:
+- Store documents with metadata and tags
+- Query documents by name or tags
+- Semantic search for documents by meaning
+- Read document content (full or partial)
+- Download documents to local filesystem
+- Manage document relations (parent-child, peer links)
+""",
+)
 
 
-@server.list_tools()
-async def list_tools() -> list[types.Tool]:
-    return [
-        types.Tool(
-            name="doc_push",
-            description="""Upload a document to the Context Store.
+@mcp.tool()
+async def doc_push(
+    file_path: str = Field(
+        description="Absolute path to the file to upload",
+    ),
+    name: Optional[str] = Field(
+        default=None,
+        description="Custom document name (optional, defaults to filename)",
+    ),
+    tags: Optional[str] = Field(
+        default=None,
+        description="Comma-separated tags for categorization",
+    ),
+    description: Optional[str] = Field(
+        default=None,
+        description="Human-readable description of the document",
+    ),
+) -> str:
+    """Upload a document to the Context Store.
 
-Stores a file with optional metadata (name, tags, description) for later retrieval.
-Tags enable filtering documents by category. Use comma-separated values for multiple tags.
+    Stores a file with optional metadata (name, tags, description) for later retrieval.
+    Tags enable filtering documents by category. Use comma-separated values for multiple tags.
 
-Args:
-    file_path (required): Absolute path to the file to upload
-    name: Custom document name (defaults to filename)
-    tags: Comma-separated tags for categorization (e.g., "api,v2,internal")
-    description: Human-readable description of the document
+    Returns:
+        JSON with document metadata including id, filename, tags, url
 
-Returns:
-    JSON with document metadata including:
-    - id: Unique document identifier for retrieval
-    - filename: Stored document name
-    - tags: Array of assigned tags
-    - url: Direct URL to access the document
+    Example:
+        doc_push(file_path="/home/user/api-spec.yaml", tags="api,openapi", description="API specification v2")
+    """
+    if not Path(file_path).is_absolute():
+        return "Error: file_path must be an absolute path"
 
-Example:
-    doc_push(file_path="/home/user/api-spec.yaml", tags="api,openapi", description="API specification v2")""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Absolute path to the file to upload",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Custom document name (optional, defaults to filename)",
-                    },
-                    "tags": {
-                        "type": "string",
-                        "description": "Comma-separated tags for categorization",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Human-readable description of the document",
-                    },
-                },
-                "required": ["file_path"],
-            },
-        ),
-        types.Tool(
-            name="doc_query",
-            description="""Query documents in the Context Store by name pattern and/or tags.
+    args = [file_path]
+    if name:
+        args.extend(["--name", name])
+    if tags:
+        args.extend(["--tags", tags])
+    if description:
+        args.extend(["--description", description])
 
-Searches for documents matching the specified criteria. Multiple tags use AND logic
-(all tags must match). Use this for structured filtering when you know the document
-metadata.
+    stdout, stderr, code = await run_command("doc-push", args)
+    return format_response(stdout, stderr, code)
 
-Args:
-    name: Filename pattern to filter by (partial match supported)
-    tags: Comma-separated tags to filter by (AND logic - all must match)
-    limit: Maximum number of results to return
-    include_relations: Include document relations in response
 
-Returns:
-    JSON array of matching documents with metadata (id, filename, tags, size, dates)
-    When include_relations=True, each document includes a relations object
+@mcp.tool()
+async def doc_query(
+    name: Optional[str] = Field(
+        default=None,
+        description="Filename pattern to filter by",
+    ),
+    tags: Optional[str] = Field(
+        default=None,
+        description="Comma-separated tags (AND logic)",
+    ),
+    limit: Optional[int] = Field(
+        default=None,
+        description="Maximum number of results",
+    ),
+    include_relations: bool = Field(
+        default=False,
+        description="Include document relations in response",
+    ),
+) -> str:
+    """Query documents in the Context Store by name pattern and/or tags.
 
+    Searches for documents matching the specified criteria. Multiple tags use AND logic
+    (all tags must match). Use this for structured filtering when you know the document
+    metadata.
+
+    Returns:
+        JSON array of matching documents with metadata (id, filename, tags, size, dates)
+
+    Examples:
+        doc_query(tags="api,v2")           # Find docs with BOTH tags
+        doc_query(name="spec")             # Find docs with "spec" in filename
+        doc_query(include_relations=True)  # List all with relations
+    """
+    args = []
+    if name:
+        args.extend(["--name", name])
+    if tags:
+        args.extend(["--tags", tags])
+    if limit:
+        args.extend(["--limit", str(limit)])
+    if include_relations:
+        args.append("--include-relations")
+
+    stdout, stderr, code = await run_command("doc-query", args)
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_search(
+    query: str = Field(
+        description="Natural language search query",
+    ),
+    limit: Optional[int] = Field(
+        default=None,
+        description="Maximum number of results",
+    ),
+    include_relations: bool = Field(
+        default=False,
+        description="Include document relations in response",
+    ),
+) -> str:
+    """Semantic search for documents by natural language query.
+
+    Uses AI embeddings to find documents by meaning, not just keywords. Returns
+    relevant sections with character offsets for partial reading. Use this when
+    you don't know exact tags/names but know what content you're looking for.
+
+    Returns:
+        JSON with search results including document_id, filename, sections with scores
+
+    Example:
+        doc_search(query="how to authenticate API requests")
+
+    Note: Requires semantic search to be enabled on the Context Store server.
+    """
+    args = [query]
+    if limit:
+        args.extend(["--limit", str(limit)])
+    if include_relations:
+        args.append("--include-relations")
+
+    stdout, stderr, code = await run_command("doc-search", args)
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_info(
+    document_id: str = Field(
+        description="The document ID",
+    ),
+) -> str:
+    """Get metadata and relations for a specific document without downloading content.
+
+    Retrieves document metadata (size, type, tags, dates) and relations without transferring
+    the file content. Use this to check document details and see linked documents.
+
+    Returns:
+        JSON with document metadata: id, filename, content_type, size_bytes, tags, created_at, updated_at
+        Plus relations object with parent/child/related document links
+    """
+    stdout, stderr, code = await run_command("doc-info", [document_id])
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_read(
+    document_id: str = Field(
+        description="The document ID",
+    ),
+    offset: Optional[int] = Field(
+        default=None,
+        description="Starting character position",
+    ),
+    limit: Optional[int] = Field(
+        default=None,
+        description="Number of characters to read",
+    ),
+) -> str:
+    """Read text content of a document directly to output.
+
+    Streams document content for text-based files. Supports partial reads using
+    offset and limit parameters - useful for large documents or when you only need
+    a specific section (e.g., from semantic search results).
+
+    Returns:
+        Raw text content of the document (or partial content if offset/limit specified)
+
+    Examples:
+        doc_read(document_id="doc_abc123")                         # Full document
+        doc_read(document_id="doc_abc123", offset=2000, limit=500) # Characters 2000-2500
+
+    Note: Only works with text-based files (text/*, application/json, etc.)
+    """
+    args = [document_id]
+    if offset is not None:
+        args.extend(["--offset", str(offset)])
+    if limit is not None:
+        args.extend(["--limit", str(limit)])
+
+    stdout, stderr, code = await run_command("doc-read", args)
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_pull(
+    document_id: str = Field(
+        description="The document ID",
+    ),
+    output_path: str = Field(
+        description="Absolute path where to save the file",
+    ),
+) -> str:
+    """Download a document to the local filesystem.
+
+    Saves the document to the specified path. Use this when you need the actual
+    file on disk (e.g., for processing, editing, or binary files).
+
+    Returns:
+        JSON with download result: file_path, size_bytes
+
+    Example:
+        doc_pull(document_id="doc_abc123", output_path="/home/user/downloads/spec.yaml")
+    """
+    if not Path(output_path).is_absolute():
+        return "Error: output_path must be an absolute path"
+
+    args = [document_id, "-o", output_path]
+    stdout, stderr, code = await run_command("doc-pull", args)
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_delete(
+    document_id: str = Field(
+        description="The document ID to delete",
+    ),
+) -> str:
+    """Delete a document from the Context Store.
+
+    Permanently removes the document and its metadata. This action cannot be undone.
+    Also removes the document from semantic search index if enabled.
+    Note: Deleting a parent document cascades to delete all child documents.
+
+    Returns:
+        JSON confirmation with success status and deleted document ID
+    """
+    stdout, stderr, code = await run_command("doc-delete", [document_id])
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_link(
+    types: bool = Field(
+        default=False,
+        description="List available relation types",
+    ),
+    create_from: Optional[str] = Field(
+        default=None,
+        description="Source document ID for creating relation",
+    ),
+    create_to: Optional[str] = Field(
+        default=None,
+        description="Target document ID for creating relation",
+    ),
+    relation_type: Optional[str] = Field(
+        default=None,
+        description="Relation type from types list (required for create)",
+    ),
+    from_note: Optional[str] = Field(
+        default=None,
+        description="Note from source document's perspective",
+    ),
+    to_note: Optional[str] = Field(
+        default=None,
+        description="Note from target document's perspective",
+    ),
+    update_id: Optional[str] = Field(
+        default=None,
+        description="Relation ID to update",
+    ),
+    remove_id: Optional[str] = Field(
+        default=None,
+        description="Relation ID to remove",
+    ),
+    note: Optional[str] = Field(
+        default=None,
+        description="New note text (for update)",
+    ),
+) -> str:
+    """Manage document relations (parent-child or peer links).
+
+    Create, update, or remove bidirectional relations between documents.
+    Use types=True first to discover available relation types.
+
+    Actions (mutually exclusive):
+        types=True: List available relation types
+        create_from + create_to + relation_type: Create a relation
+        update_id + note: Update a relation's note
+        remove_id: Remove a relation (both directions)
+
+    Returns:
+        JSON with operation result
+    """
+    args = []
+    if types:
+        args.append("--types")
+    elif create_from and create_to:
+        args.extend(["--create", create_from, create_to])
+        if relation_type:
+            args.extend(["--type", relation_type])
+        if from_note:
+            args.extend(["--from-note", from_note])
+        if to_note:
+            args.extend(["--to-note", to_note])
+    elif update_id:
+        args.extend(["--update", update_id])
+        if note:
+            args.extend(["--note", note])
+    elif remove_id:
+        args.extend(["--remove", remove_id])
+
+    stdout, stderr, code = await run_command("doc-link", args)
+    return format_response(stdout, stderr, code)
+
+
+# --- Server Runner ---
+
+def run_server(
+    transport: Literal["stdio", "streamable-http", "sse"] = "stdio",
+    host: str = "127.0.0.1",
+    port: int = 9501,
+):
+    """Run the MCP server with the specified transport.
+
+    Args:
+        transport: Transport type - "stdio", "streamable-http", or "sse"
+        host: Host to bind to (for HTTP transports)
+        port: Port to bind to (for HTTP transports)
+    """
+    print("Context Store MCP Server", file=sys.stderr)
+    print(f"Commands path: {COMMAND_PATH}", file=sys.stderr)
+    print(f"Transport: {transport}", file=sys.stderr)
+
+    if transport == "stdio":
+        print("Running via stdio", file=sys.stderr)
+        mcp.run(transport="stdio")
+    elif transport == "streamable-http":
+        print(f"Running via HTTP at http://{host}:{port}/mcp", file=sys.stderr)
+        mcp.run(transport="streamable-http", host=host, port=port)
+    elif transport == "sse":
+        print(f"Running via SSE at http://{host}:{port}/sse", file=sys.stderr)
+        mcp.run(transport="sse", host=host, port=port)
+    else:
+        raise ValueError(f"Unknown transport: {transport}")
+
+
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Context Store MCP Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
 Examples:
-    doc_query(tags="api,v2")           # Find docs with BOTH tags
-    doc_query(name="spec")             # Find docs with "spec" in filename
-    doc_query(include_relations=True)  # List all with relations""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Filename pattern to filter by",
-                    },
-                    "tags": {
-                        "type": "string",
-                        "description": "Comma-separated tags (AND logic)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of results",
-                    },
-                    "include_relations": {
-                        "type": "boolean",
-                        "description": "Include document relations in response",
-                    },
-                },
-            },
-        ),
-        types.Tool(
-            name="doc_search",
-            description="""Semantic search for documents by natural language query.
+  # Run in stdio mode (default, for Claude Desktop/CLI)
+  uv run context-store-mcp.py
 
-Uses AI embeddings to find documents by meaning, not just keywords. Returns
-relevant sections with character offsets for partial reading. Use this when
-you don't know exact tags/names but know what content you're looking for.
+  # Run in HTTP mode on default port 9501
+  uv run context-store-mcp.py --http-mode
 
-Args:
-    query (required): Natural language search query
-    limit: Maximum number of documents to return (default 10)
-    include_relations: Include document relations in response
+  # Run in HTTP mode on custom port
+  uv run context-store-mcp.py --http-mode --port 9502
 
-Returns:
-    JSON with search results including:
-    - document_id: ID for retrieval
-    - filename: Document name
-    - sections: Array of relevant sections with scores and character offsets
-    - relations: (when include_relations=True) Document relations by type
+  # Run in HTTP mode, accessible from network
+  uv run context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 
-Example:
-    doc_search(query="how to authenticate API requests")
-    doc_search(query="database config", include_relations=True)
+  # Run in SSE mode (legacy, for backward compatibility)
+  uv run context-store-mcp.py --sse-mode --port 9501
+        """,
+    )
 
-Note: Requires semantic search to be enabled on the Context Store server.""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Natural language search query",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of results",
-                    },
-                    "include_relations": {
-                        "type": "boolean",
-                        "description": "Include document relations in response",
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-        types.Tool(
-            name="doc_info",
-            description="""Get metadata and relations for a specific document without downloading content.
+    parser.add_argument(
+        "--http-mode",
+        action="store_true",
+        help="Run as HTTP server using Streamable HTTP transport (recommended for network access)",
+    )
 
-Retrieves document metadata (size, type, tags, dates) and relations without transferring
-the file content. Use this to check document details and see linked documents.
+    parser.add_argument(
+        "--sse-mode",
+        action="store_true",
+        help="Run as HTTP server using SSE transport (legacy, for backward compatibility)",
+    )
 
-Args:
-    document_id (required): The document ID (e.g., "doc_abc123...")
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host to bind to in HTTP/SSE mode (default: 127.0.0.1)",
+    )
 
-Returns:
-    JSON with document metadata: id, filename, content_type, size_bytes, tags, created_at, updated_at
-    Plus relations object with parent/child/related document links""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "document_id": {
-                        "type": "string",
-                        "description": "The document ID",
-                    },
-                },
-                "required": ["document_id"],
-            },
-        ),
-        types.Tool(
-            name="doc_read",
-            description="""Read text content of a document directly to output.
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=9501,
+        help="Port to bind to in HTTP/SSE mode (default: 9501)",
+    )
 
-Streams document content for text-based files. Supports partial reads using
-offset and limit parameters - useful for large documents or when you only need
-a specific section (e.g., from semantic search results).
-
-Args:
-    document_id (required): The document ID
-    offset: Starting character position (0-indexed)
-    limit: Number of characters to read from offset
-
-Returns:
-    Raw text content of the document (or partial content if offset/limit specified)
-
-Examples:
-    doc_read(document_id="doc_abc123")                    # Full document
-    doc_read(document_id="doc_abc123", offset=2000, limit=500)  # Characters 2000-2500
-
-Note: Only works with text-based files (text/*, application/json, etc.)""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "document_id": {
-                        "type": "string",
-                        "description": "The document ID",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "description": "Starting character position",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Number of characters to read",
-                    },
-                },
-                "required": ["document_id"],
-            },
-        ),
-        types.Tool(
-            name="doc_pull",
-            description="""Download a document to the local filesystem.
-
-Saves the document to the specified path. Use this when you need the actual
-file on disk (e.g., for processing, editing, or binary files).
-
-Args:
-    document_id (required): The document ID
-    output_path (required): Absolute path where to save the file
-
-Returns:
-    JSON with download result: file_path, size_bytes
-
-Example:
-    doc_pull(document_id="doc_abc123", output_path="/home/user/downloads/spec.yaml")""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "document_id": {
-                        "type": "string",
-                        "description": "The document ID",
-                    },
-                    "output_path": {
-                        "type": "string",
-                        "description": "Absolute path where to save the file",
-                    },
-                },
-                "required": ["document_id", "output_path"],
-            },
-        ),
-        types.Tool(
-            name="doc_delete",
-            description="""Delete a document from the Context Store.
-
-Permanently removes the document and its metadata. This action cannot be undone.
-Also removes the document from semantic search index if enabled.
-Note: Deleting a parent document cascades to delete all child documents.
-
-Args:
-    document_id (required): The document ID to delete
-
-Returns:
-    JSON confirmation with success status and deleted document ID""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "document_id": {
-                        "type": "string",
-                        "description": "The document ID to delete",
-                    },
-                },
-                "required": ["document_id"],
-            },
-        ),
-        types.Tool(
-            name="doc_link",
-            description="""Manage document relations (parent-child or peer links).
-
-Create, update, or remove bidirectional relations between documents.
-Use --types first to discover available relation types.
-
-Actions (mutually exclusive):
-    types=True: List available relation types
-    create_from + create_to + relation_type: Create a relation
-    update_id + note: Update a relation's note
-    remove_id: Remove a relation (both directions)
-
-Args:
-    types: Set True to list available relation types
-    create_from: Source document ID for creating relation
-    create_to: Target document ID for creating relation
-    relation_type: Type from --types (required for create)
-    from_note: Note from source document's perspective
-    to_note: Note from target document's perspective
-    update_id: Relation ID to update
-    remove_id: Relation ID to remove
-    note: New note text (for update)
-
-Returns:
-    JSON with operation result""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "types": {
-                        "type": "boolean",
-                        "description": "List available relation types",
-                    },
-                    "create_from": {
-                        "type": "string",
-                        "description": "Source document ID for creating relation",
-                    },
-                    "create_to": {
-                        "type": "string",
-                        "description": "Target document ID for creating relation",
-                    },
-                    "relation_type": {
-                        "type": "string",
-                        "description": "Relation type from types list (required for create)",
-                    },
-                    "from_note": {
-                        "type": "string",
-                        "description": "Note from source document's perspective",
-                    },
-                    "to_note": {
-                        "type": "string",
-                        "description": "Note from target document's perspective",
-                    },
-                    "update_id": {
-                        "type": "string",
-                        "description": "Relation ID to update",
-                    },
-                    "remove_id": {
-                        "type": "string",
-                        "description": "Relation ID to remove",
-                    },
-                    "note": {
-                        "type": "string",
-                        "description": "New note text (for update)",
-                    },
-                },
-            },
-        ),
-    ]
+    return parser.parse_args()
 
 
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+def main():
+    """Main entry point"""
+    args = parse_args()
+
+    # Determine transport mode
+    if args.http_mode and args.sse_mode:
+        print("Error: Cannot use both --http-mode and --sse-mode", file=sys.stderr)
+        sys.exit(1)
+
+    if args.http_mode:
+        transport = "streamable-http"
+    elif args.sse_mode:
+        transport = "sse"
+    else:
+        transport = "stdio"
+
+    # Run the server
     try:
-        if name == "doc_push":
-            params = DocPushInput(**arguments)
-            args = [params.file_path]
-            if params.name:
-                args.extend(["--name", params.name])
-            if params.tags:
-                args.extend(["--tags", params.tags])
-            if params.description:
-                args.extend(["--description", params.description])
-            stdout, stderr, code = await run_command("doc-push", args)
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_query":
-            params = DocQueryInput(**arguments)
-            args = []
-            if params.name:
-                args.extend(["--name", params.name])
-            if params.tags:
-                args.extend(["--tags", params.tags])
-            if params.limit:
-                args.extend(["--limit", str(params.limit)])
-            if params.include_relations:
-                args.append("--include-relations")
-            stdout, stderr, code = await run_command("doc-query", args)
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_search":
-            params = DocSearchInput(**arguments)
-            args = [params.query]
-            if params.limit:
-                args.extend(["--limit", str(params.limit)])
-            if params.include_relations:
-                args.append("--include-relations")
-            stdout, stderr, code = await run_command("doc-search", args)
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_info":
-            params = DocInfoInput(**arguments)
-            stdout, stderr, code = await run_command("doc-info", [params.document_id])
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_read":
-            params = DocReadInput(**arguments)
-            args = [params.document_id]
-            if params.offset is not None:
-                args.extend(["--offset", str(params.offset)])
-            if params.limit is not None:
-                args.extend(["--limit", str(params.limit)])
-            stdout, stderr, code = await run_command("doc-read", args)
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_pull":
-            params = DocPullInput(**arguments)
-            args = [params.document_id, "-o", params.output_path]
-            stdout, stderr, code = await run_command("doc-pull", args)
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_delete":
-            params = DocDeleteInput(**arguments)
-            stdout, stderr, code = await run_command("doc-delete", [params.document_id])
-            return make_response(stdout, stderr, code)
-
-        elif name == "doc_link":
-            params = DocLinkInput(**arguments)
-            args = []
-            if params.types:
-                args.append("--types")
-            elif params.create_from and params.create_to:
-                args.extend(["--create", params.create_from, params.create_to])
-                if params.relation_type:
-                    args.extend(["--type", params.relation_type])
-                if params.from_note:
-                    args.extend(["--from-note", params.from_note])
-                if params.to_note:
-                    args.extend(["--to-note", params.to_note])
-            elif params.update_id:
-                args.extend(["--update", params.update_id])
-                if params.note:
-                    args.extend(["--note", params.note])
-            elif params.remove_id:
-                args.extend(["--remove", params.remove_id])
-            stdout, stderr, code = await run_command("doc-link", args)
-            return make_response(stdout, stderr, code)
-
-        else:
-            return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
-
-    except ValueError as e:
-        return [types.TextContent(type="text", text=f"Validation error: {e}")]
-    except Exception as e:
-        return [types.TextContent(type="text", text=f"Error: {e}")]
-
-
-async def main():
-    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options(),
+        run_server(
+            transport=transport,
+            host=args.host,
+            port=args.port,
         )
+    except KeyboardInterrupt:
+        print("\nServer stopped", file=sys.stderr)
+    except Exception as error:
+        print(f"Server error: {error}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

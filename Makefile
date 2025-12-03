@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-cs-mcp stop-cs-mcp
 
 # Default target
 help:
@@ -37,9 +37,11 @@ help:
 	@echo "  make stop-mcps      - Stop MCP servers"
 	@echo "  make logs-mcps      - View MCP server logs"
 	@echo ""
-	@echo "Agent Orchestrator MCP server (HTTP mode):"
+	@echo "MCP servers (HTTP mode):"
 	@echo "  make start-ao-mcp   - Start Agent Orchestrator MCP server (HTTP)"
 	@echo "  make stop-ao-mcp    - Stop Agent Orchestrator MCP server"
+	@echo "  make start-cs-mcp   - Start Context Store MCP server (HTTP)"
+	@echo "  make stop-cs-mcp    - Stop Context Store MCP server"
 
 # Build all images
 build:
@@ -292,4 +294,47 @@ stop-ao-mcp:
 	else \
 		echo "No PID file found. Trying to find and kill process..."; \
 		pkill -f "agent-orchestrator-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
+	fi
+
+# Context Store MCP server (HTTP mode)
+# Loads configuration from .env file
+CS_MCP_SERVER_SCRIPT := interfaces/context-store-mcp-server/context-store-mcp.py
+CS_MCP_SERVER_PID_FILE := .context-store-mcp-server.pid
+
+start-cs-mcp:
+	@echo "Starting Context Store MCP server (HTTP mode)..."
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a; \
+	fi; \
+	PORT=$${CONTEXT_STORE_MCP_PORT:-9501}; \
+	HOST=$${CONTEXT_STORE_MCP_HOST:-127.0.0.1}; \
+	if [ -f $(CS_MCP_SERVER_PID_FILE) ] && kill -0 $$(cat $(CS_MCP_SERVER_PID_FILE)) 2>/dev/null; then \
+		echo "MCP server already running (PID: $$(cat $(CS_MCP_SERVER_PID_FILE)))"; \
+		exit 1; \
+	fi; \
+	echo "Configuration:"; \
+	echo "  Host: $$HOST"; \
+	echo "  Port: $$PORT"; \
+	echo ""; \
+	uv run $(CS_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
+	echo $$! > $(CS_MCP_SERVER_PID_FILE); \
+	sleep 2; \
+	echo ""; \
+	echo "MCP server started (PID: $$(cat $(CS_MCP_SERVER_PID_FILE)))"; \
+	echo "Endpoint: http://$$HOST:$$PORT/mcp"
+
+stop-cs-mcp:
+	@echo "Stopping Context Store MCP server..."
+	@if [ -f $(CS_MCP_SERVER_PID_FILE) ]; then \
+		PID=$$(cat $(CS_MCP_SERVER_PID_FILE)); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID; \
+			echo "Server stopped (PID: $$PID)"; \
+		else \
+			echo "Server not running (stale PID file)"; \
+		fi; \
+		rm -f $(CS_MCP_SERVER_PID_FILE); \
+	else \
+		echo "No PID file found. Trying to find and kill process..."; \
+		pkill -f "context-store-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
 	fi
