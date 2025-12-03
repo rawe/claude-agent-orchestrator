@@ -131,9 +131,24 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
 
   const isMarkdown = document.content_type.includes('markdown') || document.filename.endsWith('.md');
   const isJson = document.content_type.includes('json') || document.filename.endsWith('.json');
-  const canPreview = isMarkdown || isJson || document.content_type.includes('text');
+  const isImage = document.content_type.startsWith('image/');
+  const canPreview = isMarkdown || isJson || isImage || document.content_type.includes('text');
 
   const renderContent = () => {
+    // Images don't need text content loading - render directly from URL
+    if (isImage) {
+      return (
+        <div className="flex justify-center">
+          <img
+            src={document.url}
+            alt={document.filename}
+            className="max-w-full h-auto rounded-lg shadow-sm"
+            style={{ maxHeight: isFullscreen ? 'calc(100vh - 200px)' : '500px' }}
+          />
+        </div>
+      );
+    }
+
     if (loading) {
       return (
         <div className="flex justify-center py-8">
