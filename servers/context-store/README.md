@@ -121,6 +121,7 @@ Query documents with optional filtering by filename and/or tags.
   - `tags` (optional): Comma-separated tags - uses AND logic (document must have ALL tags)
   - `limit` (default: 100): Maximum number of results
   - `offset` (default: 0): Pagination offset
+  - `include_relations` (default: false): Include document relations in response
 - **Response**: 200 OK with array of `DocumentResponse`
 
 **Examples**:
@@ -139,9 +140,25 @@ curl "http://localhost:8766/documents?tags=documentation,example"
 
 # Combine filename and tags
 curl "http://localhost:8766/documents?filename=guide&tags=python"
+
+# Include relations in response
+curl "http://localhost:8766/documents?include_relations=true"
 ```
 
 **Tag AND Logic**: When querying with multiple tags (e.g., `tags=python,tutorial`), only documents that have BOTH tags will be returned.
+
+**Relations**: When `include_relations=true`, each document includes a `relations` field grouped by relation type:
+```json
+{
+  "id": "doc_a1b2c3d4",
+  "filename": "example.md",
+  "relations": {
+    "parent": [
+      {"id": "1", "related_document_id": "doc_child1", "relation_type": "parent", "note": "Child document"}
+    ]
+  }
+}
+```
 
 ### GET /documents/{document_id}/metadata
 
@@ -186,11 +203,15 @@ Semantic search across indexed documents. Only available when semantic search is
 - **Query parameters**:
   - `q` (required): Natural language search query
   - `limit` (default: 10): Maximum number of documents to return (1-100)
+  - `include_relations` (default: false): Include document relations in response
 - **Response**: 200 OK with `SearchResponse`
 
 **Example**:
 ```bash
 curl "http://localhost:8766/search?q=how%20to%20configure%20authentication&limit=5"
+
+# Include relations in search results
+curl "http://localhost:8766/search?q=authentication&include_relations=true"
 ```
 
 **Success Response**:
@@ -211,6 +232,28 @@ curl "http://localhost:8766/search?q=how%20to%20configure%20authentication&limit
 }
 ```
 
+**Response with Relations** (when `include_relations=true`):
+```json
+{
+  "query": "authentication",
+  "results": [
+    {
+      "document_id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+      "filename": "auth-guide.md",
+      "document_url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+      "sections": [
+        { "score": 0.92, "offset": 2000, "limit": 1000 }
+      ],
+      "relations": {
+        "child": [
+          {"id": "5", "related_document_id": "doc_parent", "relation_type": "child", "note": "Part of security docs"}
+        ]
+      }
+    }
+  ]
+}
+```
+
 **Response Fields**:
 - `document_id`: Unique identifier of the matching document
 - `filename`: Original filename
@@ -219,6 +262,7 @@ curl "http://localhost:8766/search?q=how%20to%20configure%20authentication&limit
   - `score`: Similarity score (0-1, higher is more relevant)
   - `offset`: Character position where the matching section starts
   - `limit`: Number of characters in the section
+- `relations` (optional): Document relations grouped by type (only when `include_relations=true`)
 
 **Error Response** (404 if semantic search is disabled):
 ```json

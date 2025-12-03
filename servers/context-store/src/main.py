@@ -7,7 +7,7 @@ import os
 import json
 
 from .models import (
-    DocumentResponse, SearchResponse, SearchResultItem, SectionInfo,
+    DocumentResponse, SearchResponse, SearchResultItem, SectionInfo, RelationInfo,
     # Relation models
     RelationDefinitions, RelationDefinitionResponse, RelationCreateRequest,
     RelationResponse, RelationCreateResponse, RelationUpdateRequest,
@@ -86,7 +86,8 @@ async def health_check():
 @app.get("/search", response_model=SearchResponse)
 async def search_documents_endpoint(
     q: str = Query(..., description="Natural language search query"),
-    limit: int = Query(10, description="Maximum documents to return", ge=1, le=100)
+    limit: int = Query(10, description="Maximum documents to return", ge=1, le=100),
+    include_relations: bool = Query(False, description="Include document relations in response")
 ):
     """
     Semantic search across indexed documents.
@@ -105,17 +106,31 @@ async def search_documents_endpoint(
     # Perform semantic search
     results = search_documents(q, limit=limit)
 
+    # Collect document IDs for batch relation fetching
+    doc_ids = [result["document_id"] for result in results]
+
+    # Fetch relations in batch if requested
+    relations_by_doc: dict[str, list[dict]] = {}
+    if include_relations and doc_ids:
+        relations_by_doc = db.get_relations_batch(doc_ids)
+
     # Enrich results with document metadata
     enriched_results = []
     for result in results:
         doc_metadata = db.get_document(result["document_id"])
         if doc_metadata:
+            relations = None
+            if include_relations:
+                doc_relations = relations_by_doc.get(result["document_id"], [])
+                relations = _group_relations_for_response(doc_relations) if doc_relations else {}
+
             enriched_results.append(
                 SearchResultItem(
                     document_id=result["document_id"],
                     filename=doc_metadata.filename,
                     document_url=get_document_url(result["document_id"]),
-                    sections=[SectionInfo(**s) for s in result["sections"]]
+                    sections=[SectionInfo(**s) for s in result["sections"]],
+                    relations=relations
                 )
             )
 
@@ -281,12 +296,29 @@ async def get_document(
     )
 
 
+def _group_relations_for_response(relations: list[dict]) -> dict[str, list[RelationInfo]]:
+    """Group relation dicts by relation_type and convert to RelationInfo."""
+    grouped: dict[str, list[RelationInfo]] = {}
+    for rel in relations:
+        rel_type = rel["relation_type"]
+        if rel_type not in grouped:
+            grouped[rel_type] = []
+        grouped[rel_type].append(RelationInfo(
+            id=str(rel["id"]),
+            related_document_id=rel["related_document_id"],
+            relation_type=rel["relation_type"],
+            note=rel["note"]
+        ))
+    return grouped
+
+
 @app.get("/documents", response_model=list[DocumentResponse])
 async def list_documents(
     filename: Optional[str] = Query(None),
     tags: Optional[str] = Query(None),
     limit: int = Query(100),
-    offset: int = Query(0)
+    offset: int = Query(0),
+    include_relations: bool = Query(False, description="Include document relations in response")
 ):
     """List all documents with optional filtering by filename and/or tags."""
     # Parse tags if provided
@@ -295,9 +327,24 @@ async def list_documents(
     # Query database
     documents = db.query_documents(filename=filename, tags=parsed_tags)
 
+    # Apply pagination first (before fetching relations)
+    paginated_docs = documents[offset:offset + limit]
+
+    # Fetch relations in batch if requested
+    relations_by_doc: dict[str, list[dict]] = {}
+    if include_relations and paginated_docs:
+        doc_ids = [doc.id for doc in paginated_docs]
+        relations_by_doc = db.get_relations_batch(doc_ids)
+
     # Convert to response model
-    responses = [
-        DocumentResponse(
+    responses = []
+    for doc in paginated_docs:
+        relations = None
+        if include_relations:
+            doc_relations = relations_by_doc.get(doc.id, [])
+            relations = _group_relations_for_response(doc_relations) if doc_relations else {}
+
+        responses.append(DocumentResponse(
             id=doc.id,
             filename=doc.filename,
             content_type=doc.content_type,
@@ -306,13 +353,11 @@ async def list_documents(
             updated_at=doc.updated_at,
             tags=doc.tags,
             metadata=doc.metadata,
-            url=get_document_url(doc.id)
-        )
-        for doc in documents
-    ]
+            url=get_document_url(doc.id),
+            relations=relations
+        ))
 
-    # Apply pagination (simple slicing)
-    return responses[offset:offset + limit]
+    return responses
 
 
 # ==================== Relation Endpoints ====================

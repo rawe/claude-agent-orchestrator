@@ -33,6 +33,14 @@ class DocumentQueryParams(BaseModel):
     offset: int = 0
 
 
+class RelationInfo(BaseModel):
+    """Relation info for inclusion in document responses."""
+    id: str
+    related_document_id: str
+    relation_type: str
+    note: str | None
+
+
 class DocumentResponse(BaseModel):
     """Public-facing document response (excludes storage_path)."""
     id: str
@@ -44,6 +52,7 @@ class DocumentResponse(BaseModel):
     tags: list[str]
     metadata: dict[str, str]
     url: str  # Fully qualified URL to retrieve the document
+    relations: dict[str, list[RelationInfo]] | None = None  # Grouped by relation_type, optional
 
 
 class DeleteResponse(BaseModel):
@@ -66,6 +75,7 @@ class SearchResultItem(BaseModel):
     filename: str
     document_url: str
     sections: list[SectionInfo]
+    relations: dict[str, list[RelationInfo]] | None = None  # Grouped by relation_type, optional
 
 
 class SearchResponse(BaseModel):

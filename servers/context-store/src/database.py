@@ -289,6 +289,38 @@ class DocumentDatabase:
             for row in rows
         ]
 
+    def get_relations_batch(self, document_ids: List[str]) -> dict[str, List[dict]]:
+        """Get all relations for multiple documents in one query.
+
+        Returns a dict mapping document_id -> list of relation dicts.
+        """
+        if not document_ids:
+            return {}
+
+        cursor = self.conn.cursor()
+        placeholders = ','.join(['?' for _ in document_ids])
+        cursor.execute(f"""
+            SELECT id, document_id, related_document_id, relation_type, note, created_at, updated_at
+            FROM document_relations WHERE document_id IN ({placeholders})
+        """, document_ids)
+        rows = cursor.fetchall()
+
+        # Group by document_id
+        result: dict[str, List[dict]] = {doc_id: [] for doc_id in document_ids}
+        for row in rows:
+            relation = {
+                "id": row["id"],
+                "document_id": row["document_id"],
+                "related_document_id": row["related_document_id"],
+                "relation_type": row["relation_type"],
+                "note": row["note"],
+                "created_at": datetime.fromisoformat(row["created_at"]),
+                "updated_at": datetime.fromisoformat(row["updated_at"])
+            }
+            result[row["document_id"]].append(relation)
+
+        return result
+
     def find_relation(
         self,
         document_id: str,
