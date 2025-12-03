@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps
 
 # Default target
 help:
@@ -31,6 +31,11 @@ help:
 	@echo "  make restart-runtime - Restart agent runtime"
 	@echo "  make restart-doc    - Restart context store"
 	@echo "  make restart-agent  - Restart agent registry"
+	@echo ""
+	@echo "Example MCP servers (config/mcps):"
+	@echo "  make start-mcps     - Start Atlassian & ADO MCP servers"
+	@echo "  make stop-mcps      - Stop MCP servers"
+	@echo "  make logs-mcps      - View MCP server logs"
 
 # Build all images
 build:
@@ -218,3 +223,24 @@ restart-doc:
 
 restart-agent:
 	docker-compose restart agent-registry
+
+# Example MCP servers (for agent capabilities)
+start-mcps:
+	@echo "Starting example MCP servers..."
+	@if [ ! -f config/mcps/.env ]; then \
+		echo "⚠️  No .env file found. Copy the example and configure credentials:"; \
+		echo "   cp config/mcps/.env.example config/mcps/.env"; \
+		exit 1; \
+	fi
+	docker compose -f config/mcps/docker-compose.yml up -d --build
+	@echo ""
+	@echo "MCP servers started:"
+	@echo "  - Atlassian (Jira + Confluence): http://localhost:9000"
+	@echo "  - Azure DevOps:                  http://localhost:9001"
+
+stop-mcps:
+	@echo "Stopping MCP servers..."
+	docker compose -f config/mcps/docker-compose.yml down
+
+logs-mcps:
+	docker compose -f config/mcps/docker-compose.yml logs -f

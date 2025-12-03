@@ -1,19 +1,8 @@
 {
   "mcpServers": {
-    "mcp-atlassian": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e", "CONFLUENCE_URL",
-        "-e", "CONFLUENCE_USERNAME",
-        "-e", "CONFLUENCE_API_TOKEN",
-        "-e", "JIRA_URL",
-        "-e", "JIRA_USERNAME",
-        "-e", "JIRA_API_TOKEN",
-        "ghcr.io/sooperset/mcp-atlassian:latest"
-      ]
+    "mcp-atlassian-http": {
+      "type": "http",
+      "url": "http://localhost:9000/mcp"
     }
   }
 }

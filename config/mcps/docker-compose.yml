@@ -1,0 +1,35 @@
+services:
+  mcp-atlassian:
+    image: ghcr.io/sooperset/mcp-atlassian:latest
+    container_name: mcp-atlassian-server
+    ports:
+      - "127.0.0.1:9000:9000"
+    env_file:
+      - .env
+    command: ["--transport", "streamable-http", "--port", "9000", "-vv"]
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  mcp-ado:
+    build: ./ado
+    image: ado-mcp-http-wrapper:latest
+    container_name: mcp-ado-server
+    ports:
+      - "127.0.0.1:9001:3000"
+    environment:
+      - ADO_ORG=${ADO_ORG}
+      - ADO_PAT=${ADO_PAT}
+      - PORT=3000
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  mcp-network:
+    driver: bridge

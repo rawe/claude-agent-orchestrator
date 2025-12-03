@@ -1,0 +1,17 @@
+services:
+  ado-mcp-http:
+    build: .
+    image: ado-mcp-http-wrapper:latest
+    container_name: ado-mcp-http
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - ADO_ORG=${ADO_ORG}
+      - ADO_PAT=${ADO_PAT}
+      - PORT=3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

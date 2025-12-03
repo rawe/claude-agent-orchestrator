@@ -1,0 +1,4 @@
+{
+  "name": "local-codebase-researcher",
+  "description": "Conducts iterative codebase research to find and analyze code, generates concise findings with documented JSON sources pointing to absolute file paths. Should be run in async/background mode as it could be a long-running research task. Requires a specific project directory to work on. Input: project_dir (required, absolute path to the codebase to search), question (research query)"
+}

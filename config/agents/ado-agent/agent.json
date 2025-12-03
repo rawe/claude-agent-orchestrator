@@ -1,0 +1,4 @@
+{
+  "name": "ado-agent",
+  "description": "A simple agent with access to Azure DevOps, it should be used for simple interactions with work items."
+}

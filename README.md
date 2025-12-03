@@ -128,15 +128,44 @@ agent-orchestrator-framework/
 │
 ├── dashboard/                         # Web UI (React + Vite)
 │
-└── plugins/                           # Claude Code plugins
-    ├── orchestrator/                  # Agent orchestration commands
-    │   └── skills/orchestrator/
-    │       └── commands/              # ao-* commands
-    │
-    └── context-store/                 # Document management commands
-        └── skills/context-store/
-            └── commands/              # doc-* commands
+├── plugins/                           # Claude Code plugins
+│   ├── orchestrator/                  # Agent orchestration commands
+│   └── context-store/                 # Document management commands
+│
+└── config/                            # Example agents & MCP servers
+    ├── agents/                        # Agent blueprints
+    └── mcps/                          # Docker-based MCP servers
 ```
+
+## Example Agents
+
+The `config/` folder contains example agent blueprints and the MCP servers required to run them.
+
+| Agent | Purpose | MCP Dependency |
+|-------|---------|----------------|
+| `atlassian-agent` | Jira & Confluence CRUD | Atlassian MCP |
+| `confluence-researcher` | Confluence research (CQL) | Atlassian MCP |
+| `ado-agent` | Azure DevOps work items | ADO MCP |
+| `ado-researcher` | ADO research | ADO MCP |
+| `web-researcher` | Web research | None (built-in) |
+| `browser-tester` | Playwright automation | Playwright (npx) |
+
+### MCP Servers (Docker)
+
+Orchestrated agents require HTTP-based MCP servers (stdio doesn't work in headless mode):
+
+```bash
+cd config/mcps
+cp .env.example .env  # Configure credentials
+docker compose up -d
+```
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `mcp-atlassian` | 9000 | Jira + Confluence |
+| `mcp-ado` | 9001 | Azure DevOps |
+
+See `config/mcps/README.md` for setup details.
 
 ## Quick Start
 
