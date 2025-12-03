@@ -2,14 +2,16 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Form, Respo
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-from datetime import datetime
 import uvicorn
 import os
 import json
 
 from .models import (
-    DocumentMetadata, DocumentResponse, DocumentQueryParams, DeleteResponse,
-    SearchResponse, SearchResultItem, SectionInfo
+    DocumentResponse, SearchResponse, SearchResultItem, SectionInfo,
+    # Relation models
+    RelationDefinitions, RelationDefinitionResponse, RelationCreateRequest,
+    RelationResponse, RelationCreateResponse, RelationUpdateRequest,
+    DocumentRelationsResponse, RelationDeleteResponse, DeleteResponseWithCascade
 )
 from .storage import DocumentStorage
 from .database import DocumentDatabase
@@ -313,27 +315,215 @@ async def list_documents(
     return responses[offset:offset + limit]
 
 
-@app.delete("/documents/{document_id}", response_model=DeleteResponse)
-async def delete_document(document_id: str):
-    """Delete a document by ID from both storage and database."""
-    # Delete from database first
-    db_deleted = db.delete_document(document_id)
+# ==================== Relation Endpoints ====================
 
-    if not db_deleted:
+@app.get("/relations/definitions", response_model=list[RelationDefinitionResponse])
+async def list_relation_definitions():
+    """List all available relation definitions."""
+    definitions = RelationDefinitions.get_all()
+    return [
+        RelationDefinitionResponse(
+            name=d.name,
+            description=d.description,
+            from_type=d.from_type,
+            to_type=d.to_type
+        )
+        for d in definitions
+    ]
+
+
+@app.post("/relations", response_model=RelationCreateResponse, status_code=201)
+async def create_relation(request: RelationCreateRequest):
+    """
+    Create a bidirectional relation between two documents.
+
+    Creates two relation rows:
+    - From document stores relation_type = definition.from_type
+    - To document stores relation_type = definition.to_type
+    """
+    # Validate definition
+    definition = RelationDefinitions.get_by_name(request.definition)
+    if not definition:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid relation definition: {request.definition}. "
+                   f"Valid options: {[d.name for d in RelationDefinitions.get_all()]}"
+        )
+
+    # Validate documents exist
+    if not db.document_exists(request.from_document_id):
+        raise HTTPException(status_code=404, detail=f"Document not found: {request.from_document_id}")
+    if not db.document_exists(request.to_document_id):
+        raise HTTPException(status_code=404, detail=f"Document not found: {request.to_document_id}")
+
+    # Check if relation already exists
+    existing = db.find_relation(
+        request.from_document_id,
+        request.to_document_id,
+        definition.from_type
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Relation already exists between these documents with type '{definition.name}'"
+        )
+
+    # Create both relation rows
+    from_relation_id = db.create_relation(
+        request.from_document_id,
+        request.to_document_id,
+        definition.from_type,
+        request.from_note
+    )
+    to_relation_id = db.create_relation(
+        request.to_document_id,
+        request.from_document_id,
+        definition.to_type,
+        request.to_note
+    )
+
+    # Retrieve created relations for response
+    from_relation = db.get_relation(from_relation_id)
+    to_relation = db.get_relation(to_relation_id)
+
+    return RelationCreateResponse(
+        success=True,
+        message="Relation created",
+        from_relation=RelationResponse(**from_relation),
+        to_relation=RelationResponse(**to_relation)
+    )
+
+
+@app.get("/documents/{document_id}/relations", response_model=DocumentRelationsResponse)
+async def get_document_relations(document_id: str):
+    """Get all relations for a document, grouped by relation_type."""
+    # Validate document exists
+    if not db.document_exists(document_id):
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Delete from storage
-    storage_deleted = storage.delete_document(document_id)
+    # Get all relations
+    relations = db.get_document_relations(document_id)
+
+    # Group by relation_type
+    grouped: dict[str, list[RelationResponse]] = {}
+    for rel in relations:
+        rel_type = rel["relation_type"]
+        if rel_type not in grouped:
+            grouped[rel_type] = []
+        grouped[rel_type].append(RelationResponse(**rel))
+
+    return DocumentRelationsResponse(
+        document_id=document_id,
+        relations=grouped
+    )
+
+
+@app.patch("/relations/{relation_id}", response_model=RelationResponse)
+async def update_relation_note(relation_id: int, request: RelationUpdateRequest):
+    """Update the note for an existing relation."""
+    # Check if relation exists
+    relation = db.get_relation(relation_id)
+    if not relation:
+        raise HTTPException(status_code=404, detail="Relation not found")
+
+    # Update the note
+    db.update_relation_note(relation_id, request.note)
+
+    # Return updated relation
+    updated = db.get_relation(relation_id)
+    return RelationResponse(**updated)
+
+
+@app.delete("/relations/{relation_id}", response_model=RelationDeleteResponse)
+async def delete_relation(relation_id: int):
+    """
+    Delete a relation and its bidirectional counterpart.
+
+    This removes the relation only, NOT the documents.
+    Both relation rows (the relation and its inverse) are deleted.
+    """
+    # Get the relation being deleted
+    relation = db.get_relation(relation_id)
+    if not relation:
+        raise HTTPException(status_code=404, detail="Relation not found")
+
+    deleted_ids = [relation_id]
+
+    # Find and delete the counterpart relation
+    inverse_type = RelationDefinitions.get_inverse_type(relation["relation_type"])
+    if inverse_type:
+        counterpart = db.find_relation(
+            relation["related_document_id"],
+            relation["document_id"],
+            inverse_type
+        )
+        if counterpart:
+            db.delete_relation(counterpart["id"])
+            deleted_ids.append(counterpart["id"])
+
+    # Delete the original relation
+    db.delete_relation(relation_id)
+
+    return RelationDeleteResponse(
+        success=True,
+        message="Relation removed",
+        deleted_relation_ids=deleted_ids
+    )
+
+
+def _delete_document_with_cascade(doc_id: str) -> list[str]:
+    """
+    Delete a document with cascade deletion of children (parent-child relations).
+
+    Uses recursive calls so each document handles its own cleanup
+    (file, Elasticsearch, database).
+
+    Returns list of all deleted document IDs.
+    """
+    deleted_ids = []
+
+    # Get children (where this document is a parent)
+    children = db.get_child_document_ids(doc_id)
+
+    # Recursively delete children first
+    for child_id in children:
+        deleted_ids.extend(_delete_document_with_cascade(child_id))
+
+    # Delete this document's resources
+    storage.delete_document(doc_id)
 
     # Delete from semantic search index if enabled
     if semantic_config.enabled:
         from .semantic.indexer import delete_document_index
-        delete_document_index(document_id)
+        delete_document_index(doc_id)
 
-    return DeleteResponse(
+    # Delete from database (relations auto-deleted via FK CASCADE)
+    db.delete_document(doc_id)
+    deleted_ids.append(doc_id)
+
+    return deleted_ids
+
+
+@app.delete("/documents/{document_id}", response_model=DeleteResponseWithCascade)
+async def delete_document(document_id: str):
+    """
+    Delete a document by ID from storage, database, and search index.
+
+    For documents with parent-child relations:
+    - If the document is a parent, all children are recursively deleted first
+    - Related documents (non-hierarchical) are NOT deleted, only their relations are removed
+    """
+    # Check if document exists
+    if not db.document_exists(document_id):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Delete with cascade
+    deleted_ids = _delete_document_with_cascade(document_id)
+
+    return DeleteResponseWithCascade(
         success=True,
-        message=f"Document {document_id} deleted successfully",
-        document_id=document_id
+        message=f"Deleted {len(deleted_ids)} document(s)",
+        deleted_document_ids=deleted_ids
     )
 
 

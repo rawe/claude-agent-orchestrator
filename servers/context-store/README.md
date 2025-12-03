@@ -293,22 +293,37 @@ Content-Type: text/markdown
 
 ### DELETE /documents/{document_id}
 
-Delete a document by ID. Removes both the file and database metadata.
+Delete a document by ID. Removes the file, database metadata, and semantic search index (if enabled).
+
+**Cascade Delete Behavior**: If the document has **parent-child relations**, all child documents are **recursively deleted** first. Related documents (non-hierarchical) are NOT deleted, only their relations are removed.
 
 - **Path parameter**: `document_id` - The document's unique identifier
-- **Response**: 200 OK with `DeleteResponse`
+- **Response**: 200 OK with `DeleteResponseWithCascade`
 
 **Example**:
 ```bash
 curl -X DELETE http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2
 ```
 
-**Success Response**:
+**Success Response** (single document):
 ```json
 {
   "success": true,
-  "message": "Document doc_a1b2c3d4e5f6a7b8c9d0e1f2 deleted successfully",
-  "document_id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2"
+  "message": "Deleted 1 document(s)",
+  "deleted_document_ids": ["doc_a1b2c3d4e5f6a7b8c9d0e1f2"]
+}
+```
+
+**Success Response** (with cascade - parent with 2 children):
+```json
+{
+  "success": true,
+  "message": "Deleted 3 document(s)",
+  "deleted_document_ids": [
+    "doc_child1",
+    "doc_child2",
+    "doc_parent"
+  ]
 }
 ```
 
@@ -319,7 +334,262 @@ curl -X DELETE http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2
 }
 ```
 
-Tags associated with the document are automatically removed (CASCADE deletion).
+Tags and relations associated with the document are automatically removed (CASCADE deletion).
+
+## Document Relations
+
+The context store supports **bidirectional relations** between documents. Relations allow you to model hierarchies (parent-child) and peer connections (related) between documents.
+
+### Terminology
+
+- **Relation Definition**: A named relation type (e.g., `parent-child`, `related`) that describes how two documents are connected
+- **Relation Type**: The database value stored for each side of a relation (e.g., `parent`, `child`, `related`)
+- **Bidirectional**: Each relation creates two database entries, one from each document's perspective
+
+### Available Definitions
+
+| Definition | From Type | To Type | Cascade Delete |
+|------------|-----------|---------|----------------|
+| `parent-child` | `parent` | `child` | Yes (children deleted with parent) |
+| `related` | `related` | `related` | No (only relation removed) |
+
+### GET /relations/definitions
+
+List all available relation definitions.
+
+- **Response**: 200 OK with array of `RelationDefinitionResponse`
+
+**Example**:
+```bash
+curl http://localhost:8766/relations/definitions
+```
+
+**Response**:
+```json
+[
+  {
+    "name": "parent-child",
+    "description": "Hierarchical relation where parent owns children. Cascade delete enabled.",
+    "from_type": "parent",
+    "to_type": "child"
+  },
+  {
+    "name": "related",
+    "description": "Peer relation between related documents. No cascade delete.",
+    "from_type": "related",
+    "to_type": "related"
+  }
+]
+```
+
+### POST /relations
+
+Create a bidirectional relation between two documents.
+
+- **Request body**: `RelationCreateRequest` (JSON)
+  - `definition` (required): Relation definition name (`parent-child` or `related`)
+  - `from_document_id` (required): First document ID
+  - `to_document_id` (required): Second document ID
+  - `from_note` (optional): Note from first document's perspective
+  - `to_note` (optional): Note from second document's perspective
+- **Response**: 201 Created with `RelationCreateResponse`
+
+**Example** (creating parent-child relation):
+```bash
+curl -X POST http://localhost:8766/relations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "definition": "parent-child",
+    "from_document_id": "doc_architecture",
+    "to_document_id": "doc_database_design",
+    "from_note": "Database layer documentation",
+    "to_note": "Part of system architecture"
+  }'
+```
+
+**Success Response**:
+```json
+{
+  "success": true,
+  "message": "Relation created",
+  "from_relation": {
+    "id": 1,
+    "document_id": "doc_architecture",
+    "related_document_id": "doc_database_design",
+    "relation_type": "parent",
+    "note": "Database layer documentation",
+    "created_at": "2025-12-03T10:00:00",
+    "updated_at": "2025-12-03T10:00:00"
+  },
+  "to_relation": {
+    "id": 2,
+    "document_id": "doc_database_design",
+    "related_document_id": "doc_architecture",
+    "relation_type": "child",
+    "note": "Part of system architecture",
+    "created_at": "2025-12-03T10:00:00",
+    "updated_at": "2025-12-03T10:00:00"
+  }
+}
+```
+
+**Error Responses**:
+- `400`: Invalid relation definition
+- `404`: Document not found
+- `409`: Relation already exists
+
+### GET /documents/{document_id}/relations
+
+Get all relations for a document, grouped by relation type.
+
+- **Path parameter**: `document_id` - The document's unique identifier
+- **Response**: 200 OK with `DocumentRelationsResponse`
+
+**Example**:
+```bash
+curl http://localhost:8766/documents/doc_architecture/relations
+```
+
+**Response**:
+```json
+{
+  "document_id": "doc_architecture",
+  "relations": {
+    "parent": [
+      {
+        "id": 1,
+        "document_id": "doc_architecture",
+        "related_document_id": "doc_database_design",
+        "relation_type": "parent",
+        "note": "Database layer documentation",
+        "created_at": "2025-12-03T10:00:00",
+        "updated_at": "2025-12-03T10:00:00"
+      },
+      {
+        "id": 3,
+        "document_id": "doc_architecture",
+        "related_document_id": "doc_api_design",
+        "relation_type": "parent",
+        "note": "API layer documentation",
+        "created_at": "2025-12-03T10:00:00",
+        "updated_at": "2025-12-03T10:00:00"
+      }
+    ]
+  }
+}
+```
+
+**Error Response** (404 if document not found):
+```json
+{
+  "detail": "Document not found"
+}
+```
+
+### PATCH /relations/{relation_id}
+
+Update the note for an existing relation. Only updates the specified side of the relation.
+
+- **Path parameter**: `relation_id` - The relation's unique identifier
+- **Request body**: `RelationUpdateRequest` (JSON)
+  - `note` (optional): New note value (null to clear)
+- **Response**: 200 OK with `RelationResponse`
+
+**Example**:
+```bash
+curl -X PATCH http://localhost:8766/relations/1 \
+  -H "Content-Type: application/json" \
+  -d '{"note": "Updated context information"}'
+```
+
+**Success Response**:
+```json
+{
+  "id": 1,
+  "document_id": "doc_architecture",
+  "related_document_id": "doc_database_design",
+  "relation_type": "parent",
+  "note": "Updated context information",
+  "created_at": "2025-12-03T10:00:00",
+  "updated_at": "2025-12-03T10:30:00"
+}
+```
+
+**Error Response** (404 if relation not found):
+```json
+{
+  "detail": "Relation not found"
+}
+```
+
+### DELETE /relations/{relation_id}
+
+Delete a relation and its bidirectional counterpart. This removes the relation only, NOT the documents.
+
+- **Path parameter**: `relation_id` - The relation's unique identifier
+- **Response**: 200 OK with `RelationDeleteResponse`
+
+**Example**:
+```bash
+curl -X DELETE http://localhost:8766/relations/1
+```
+
+**Success Response**:
+```json
+{
+  "success": true,
+  "message": "Relation removed",
+  "deleted_relation_ids": [1, 2]
+}
+```
+
+The response includes both relation IDs that were deleted (the specified relation and its inverse counterpart).
+
+**Error Response** (404 if relation not found):
+```json
+{
+  "detail": "Relation not found"
+}
+```
+
+### Relation Usage Examples
+
+**Creating a Documentation Hierarchy**:
+```bash
+# Create architecture document
+curl -X POST http://localhost:8766/documents -F "file=@architecture.md"
+# Returns: doc_architecture
+
+# Create child documents
+curl -X POST http://localhost:8766/documents -F "file=@database-design.md"
+# Returns: doc_database_design
+
+curl -X POST http://localhost:8766/documents -F "file=@api-design.md"
+# Returns: doc_api_design
+
+# Create parent-child relations
+curl -X POST http://localhost:8766/relations \
+  -H "Content-Type: application/json" \
+  -d '{"definition":"parent-child","from_document_id":"doc_architecture","to_document_id":"doc_database_design"}'
+
+curl -X POST http://localhost:8766/relations \
+  -H "Content-Type: application/json" \
+  -d '{"definition":"parent-child","from_document_id":"doc_architecture","to_document_id":"doc_api_design"}'
+```
+
+Result:
+```
+doc_architecture (parent)
+├── doc_database_design (child)
+└── doc_api_design (child)
+```
+
+**Deleting the Parent (Cascade)**:
+```bash
+curl -X DELETE http://localhost:8766/documents/doc_architecture
+```
+
+This will delete `doc_architecture` and both children (`doc_database_design`, `doc_api_design`).
 
 ## Document URL Behavior
 

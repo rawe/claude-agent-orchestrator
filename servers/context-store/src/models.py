@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -71,3 +72,148 @@ class SearchResponse(BaseModel):
     """Response model for semantic search."""
     query: str
     results: list[SearchResultItem]
+
+
+# ==================== Relation Models ====================
+
+@dataclass(frozen=True)
+class RelationDefinition:
+    """
+    Defines a relation with its two sides for bidirectional linking.
+    Immutable to ensure consistency.
+    """
+    name: str           # API identifier: "parent-child", "related"
+    description: str    # Human-readable description
+    from_type: str      # DB value for first document: "parent", "related"
+    to_type: str        # DB value for second document: "child", "related"
+
+
+class RelationDefinitions:
+    """
+    Central registry of all relation definitions.
+    Use these constants instead of magic strings.
+    """
+
+    PARENT_CHILD = RelationDefinition(
+        name="parent-child",
+        description="Hierarchical relation where parent owns children. Cascade delete enabled.",
+        from_type="parent",
+        to_type="child"
+    )
+
+    RELATED = RelationDefinition(
+        name="related",
+        description="Peer relation between related documents. No cascade delete.",
+        from_type="related",
+        to_type="related"
+    )
+
+    # Registry for lookups (initialized lazily)
+    _BY_NAME: dict[str, RelationDefinition] = {}
+    _BY_TYPE: dict[str, RelationDefinition] = {}
+
+    @classmethod
+    def _init_registry(cls):
+        """Initialize lookup mappings."""
+        all_definitions = [cls.PARENT_CHILD, cls.RELATED]
+        cls._BY_NAME = {d.name: d for d in all_definitions}
+        cls._BY_TYPE = {}
+        for d in all_definitions:
+            cls._BY_TYPE[d.from_type] = d
+            cls._BY_TYPE[d.to_type] = d
+
+    @classmethod
+    def get_by_name(cls, name: str) -> RelationDefinition | None:
+        """Lookup by API name (e.g., 'parent-child'). Returns None if not found."""
+        if not cls._BY_NAME:
+            cls._init_registry()
+        return cls._BY_NAME.get(name)
+
+    @classmethod
+    def get_by_type(cls, relation_type: str) -> RelationDefinition | None:
+        """Lookup by database relation_type value (e.g., 'parent'). Returns None if not found."""
+        if not cls._BY_TYPE:
+            cls._init_registry()
+        return cls._BY_TYPE.get(relation_type)
+
+    @classmethod
+    def get_inverse_type(cls, relation_type: str) -> str | None:
+        """Get the inverse relation_type for bidirectional operations."""
+        definition = cls.get_by_type(relation_type)
+        if not definition:
+            return None
+        if relation_type == definition.from_type:
+            return definition.to_type
+        return definition.from_type
+
+    @classmethod
+    def get_all(cls) -> list[RelationDefinition]:
+        """Get all available relation definitions."""
+        return [cls.PARENT_CHILD, cls.RELATED]
+
+
+# Initialize registry on module load
+RelationDefinitions._init_registry()
+
+
+# ==================== Relation Pydantic Models ====================
+
+class RelationDefinitionResponse(BaseModel):
+    """Available relation definition for API response."""
+    name: str
+    description: str
+    from_type: str
+    to_type: str
+
+
+class RelationCreateRequest(BaseModel):
+    """Request to create a bidirectional relation."""
+    definition: str                      # "parent-child" or "related"
+    from_document_id: str                # First document
+    to_document_id: str                  # Second document
+    from_note: str | None = None         # Note from first document's perspective
+    to_note: str | None = None           # Note from second document's perspective
+
+
+class RelationResponse(BaseModel):
+    """Single relation from a document's perspective."""
+    id: int
+    document_id: str
+    related_document_id: str
+    relation_type: str                   # DB value: "parent", "child", "related"
+    note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RelationCreateResponse(BaseModel):
+    """Response after creating a bidirectional relation."""
+    success: bool
+    message: str
+    from_relation: RelationResponse
+    to_relation: RelationResponse
+
+
+class RelationUpdateRequest(BaseModel):
+    """Update note for an existing relation."""
+    note: str | None
+
+
+class DocumentRelationsResponse(BaseModel):
+    """All relations for a document, grouped by relation_type."""
+    document_id: str
+    relations: dict[str, list[RelationResponse]]  # Grouped by relation_type
+
+
+class RelationDeleteResponse(BaseModel):
+    """Response after deleting a relation."""
+    success: bool
+    message: str
+    deleted_relation_ids: list[int]  # Both sides of bidirectional relation
+
+
+class DeleteResponseWithCascade(BaseModel):
+    """Response for document deletion with cascade information."""
+    success: bool
+    message: str
+    deleted_document_ids: list[str]  # All deleted documents including children
