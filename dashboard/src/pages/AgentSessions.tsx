@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSessions, useSessionEvents } from '@/hooks/useSessions';
-import { SessionList, EventTimeline } from '@/components/features/sessions';
+import { SessionList, SessionHeader, EventTimeline } from '@/components/features/sessions';
 import { ConfirmModal, EmptyState } from '@/components/common';
 import { useNotification } from '@/contexts';
 import { Activity, PanelLeftClose, PanelLeft } from 'lucide-react';
@@ -77,10 +77,10 @@ export function AgentSessions() {
       {/* Event Timeline */}
       <div className="flex-1 bg-gray-50 flex flex-col min-w-0 overflow-hidden">
         {/* Sidebar toggle */}
-        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1">
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-3 py-2 flex items-center justify-between">
           <button
             onClick={() => setSidebarVisible(!sidebarVisible)}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title={sidebarVisible ? 'Hide session list' : 'Show session list'}
           >
             {sidebarVisible ? (
@@ -97,6 +97,11 @@ export function AgentSessions() {
           </button>
         </div>
 
+        {/* Session Header (when session selected) */}
+        {selectedSession && (
+          <SessionHeader session={selectedSession} />
+        )}
+
         {/* Timeline content */}
         <div className="flex-1 min-h-0 overflow-hidden">
           {selectedSessionId ? (
@@ -106,7 +111,7 @@ export function AgentSessions() {
               isRunning={selectedSession?.status === 'running'}
             />
           ) : (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full flex items-center justify-center bg-gray-50">
               <EmptyState
                 icon={<Activity className="w-16 h-16" />}
                 title="Select a session"

@@ -1,7 +1,7 @@
 import { Session } from '@/types';
-import { StatusBadge, Badge, CopyButton } from '@/components/common';
+import { StatusBadge, CopyButton } from '@/components/common';
 import { formatRelativeTime, formatAbsoluteTime, getLastPathSegment } from '@/utils/formatters';
-import { Folder, Trash2, Square } from 'lucide-react';
+import { Folder, Trash2, Square, Bot } from 'lucide-react';
 
 interface SessionCardProps {
   session: Session;
@@ -11,6 +11,19 @@ interface SessionCardProps {
   onDelete: () => void;
 }
 
+function getStatusAccentColor(status: Session['status']): string {
+  switch (status) {
+    case 'running':
+      return 'bg-emerald-500';
+    case 'finished':
+      return 'bg-gray-300';
+    case 'stopped':
+      return 'bg-amber-500';
+    default:
+      return 'bg-gray-300';
+  }
+}
+
 export function SessionCard({
   session,
   isSelected,
@@ -18,94 +31,96 @@ export function SessionCard({
   onStop,
   onDelete,
 }: SessionCardProps) {
-  const displayName = session.session_name || session.session_id;
+  const displayName = session.session_name || session.session_id.slice(0, 12);
   const projectFolder = session.project_dir ? getLastPathSegment(session.project_dir) : null;
+  const accentColor = getStatusAccentColor(session.status);
 
   return (
     <div
       onClick={onSelect}
-      className={`p-3 border rounded-lg cursor-pointer transition-all ${
+      className={`group relative flex overflow-hidden rounded-lg cursor-pointer transition-all duration-200 ${
         isSelected
-          ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
-          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+          ? 'bg-primary-50 ring-2 ring-primary-500 shadow-sm'
+          : 'bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 hover:shadow-sm'
       }`}
     >
-      {/* Header: Name and Status */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-gray-900 truncate" title={displayName}>
-            {displayName}
-          </h3>
-          {session.session_name && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="text-xs text-gray-500 truncate" title={session.session_id}>
-                {session.session_id.slice(0, 8)}...
+      {/* Status accent bar */}
+      <div className={`w-1 ${accentColor} flex-shrink-0`} />
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0 p-3">
+        {/* Header: Name and Status */}
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium text-gray-900 truncate" title={session.session_name || session.session_id}>
+              {displayName}
+            </h3>
+          </div>
+          <StatusBadge status={session.status} />
+        </div>
+
+        {/* Session ID (if has name) */}
+        {session.session_name && (
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-xs text-gray-400 font-mono truncate" title={session.session_id}>
+              {session.session_id.slice(0, 8)}...
+            </span>
+            <CopyButton text={session.session_id} />
+          </div>
+        )}
+
+        {/* Agent and Project - stacked vertically */}
+        <div className="space-y-1 mb-2">
+          {session.agent_name && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+              <Bot className="w-3 h-3 text-gray-400" />
+              <span className="truncate font-medium">{session.agent_name}</span>
+            </div>
+          )}
+          {projectFolder && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Folder className="w-3 h-3 text-gray-400" />
+              <span className="truncate" title={session.project_dir}>
+                {projectFolder}
               </span>
-              <CopyButton text={session.session_id} />
             </div>
           )}
         </div>
-        <StatusBadge status={session.status} />
-      </div>
 
-      {/* Agent badge */}
-      {session.agent_name && (
-        <div className="mb-2">
-          <Badge variant="info" size="sm">
-            {session.agent_name}
-          </Badge>
+        {/* Timestamp */}
+        <div className="text-xs text-gray-400" title={formatAbsoluteTime(session.modified_at || session.created_at)}>
+          {formatRelativeTime(session.modified_at || session.created_at)}
         </div>
-      )}
 
-      {/* Project directory */}
-      {projectFolder && (
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-          <Folder className="w-3.5 h-3.5" />
-          <span className="truncate" title={session.project_dir}>
-            {projectFolder}
-          </span>
-          <CopyButton text={session.project_dir!} />
-        </div>
-      )}
-
-      {/* Timestamps */}
-      <div className="text-xs text-gray-400 space-y-0.5">
-        <div title={formatAbsoluteTime(session.created_at)}>
-          Created: {formatRelativeTime(session.created_at)}
-        </div>
-        {session.modified_at && (
-          <div title={formatAbsoluteTime(session.modified_at)}>
-            Modified: {formatRelativeTime(session.modified_at)}
-          </div>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100">
-        {session.status === 'running' && onStop && (
+        {/* Actions - visible on hover or when selected */}
+        <div className={`flex items-center gap-1 mt-2 pt-2 border-t border-gray-100 transition-opacity duration-200 ${
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
+          {session.status === 'running' && onStop && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onStop();
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 rounded transition-colors"
+              title="Stop session"
+            >
+              <Square className="w-3 h-3" />
+              Stop
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onStop();
+              onDelete();
             }}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded transition-colors"
-            title="Stop session"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+            title="Delete session"
           >
-            <Square className="w-3 h-3" />
-            Stop
+            <Trash2 className="w-3 h-3" />
+            Delete
           </button>
-        )}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
-          title="Delete session"
-        >
-          <Trash2 className="w-3 h-3" />
-          Delete
-        </button>
+        </div>
       </div>
     </div>
   );
