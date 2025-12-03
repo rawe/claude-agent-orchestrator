@@ -251,6 +251,7 @@ export function Documents() {
             setDeleteConfirm({ isOpen: true, documentId: selectedDocument.id });
           }
         }}
+        onNavigateToDocument={setSelectedDocument}
       />
 
       {/* Upload Modal */}

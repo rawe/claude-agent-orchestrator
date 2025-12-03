@@ -10,7 +10,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: '/', icon: <Activity className="w-5 h-5" />, label: 'Agent Sessions' },
-  { to: '/documents', icon: <FileText className="w-5 h-5" />, label: 'Documents' },
+  { to: '/documents', icon: <FileText className="w-5 h-5" />, label: 'Context Documents' },
   { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Manager' },
 ];
 

@@ -13,9 +13,10 @@ interface DocumentPreviewProps {
   isOpen: boolean;
   onClose: () => void;
   onDelete: () => void;
+  onNavigateToDocument?: (doc: Document) => void;
 }
 
-export function DocumentPreview({ document, isOpen, onClose, onDelete }: DocumentPreviewProps) {
+export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigateToDocument }: DocumentPreviewProps) {
   const { content, loading } = useDocumentContent(document?.id || null);
   const [viewMode, setViewMode] = useState<'rendered' | 'raw'>('rendered');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -449,14 +450,25 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
                         const truncatedDesc = description && description.length > 80
                           ? description.slice(0, 80) + '...'
                           : description;
+                        const canNavigate = relatedDoc && onNavigateToDocument;
 
                         return (
                           <div key={rel.id} className="bg-gray-50 rounded p-2 hover:bg-gray-100 transition-colors">
                             {/* Primary: Filename */}
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-900 truncate flex-1">
-                                {relatedDoc?.filename || 'Loading...'}
-                              </span>
+                              {canNavigate ? (
+                                <button
+                                  onClick={() => onNavigateToDocument(relatedDoc)}
+                                  className="text-sm font-medium text-primary-600 hover:text-primary-800 hover:underline truncate flex-1 text-left"
+                                  title={`Open ${relatedDoc.filename}`}
+                                >
+                                  {relatedDoc.filename}
+                                </button>
+                              ) : (
+                                <span className="text-sm font-medium text-gray-900 truncate flex-1">
+                                  {relatedDoc?.filename || 'Loading...'}
+                                </span>
+                              )}
                             </div>
 
                             {/* Secondary: Description with tooltip */}
