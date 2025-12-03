@@ -20,6 +20,7 @@ const elements = {
   selectorValid: document.getElementById('selector-valid'),
   selectorInvalid: document.getElementById('selector-invalid'),
   copySelectorBtn: document.getElementById('copy-selector-btn'),
+  includeScreenshot: document.getElementById('include-screenshot'),
   includeHtml: document.getElementById('include-html'),
   includeConsole: document.getElementById('include-console'),
   includeMetadata: document.getElementById('include-metadata'),
@@ -397,6 +398,24 @@ function renderTags() {
 }
 
 /**
+ * Capture screenshot of the full visible tab
+ * Full tab screenshot provides better context for bug reports
+ * @returns {Promise<string>} Screenshot data URL
+ */
+async function captureFullTabScreenshot() {
+  const screenshotResponse = await browserAPI.runtime.sendMessage({
+    type: 'CAPTURE_SCREENSHOT',
+    tabId: currentTab.id
+  });
+
+  if (!screenshotResponse.success) {
+    throw new Error(screenshotResponse.error || 'Failed to capture screenshot');
+  }
+
+  return screenshotResponse.dataUrl;
+}
+
+/**
  * Push data to Context Store
  */
 async function pushToContextStore() {
@@ -454,7 +473,7 @@ async function pushToContextStore() {
       metadata.viewport = `${capturedData.systemMetadata.viewportWidth}x${capturedData.systemMetadata.viewportHeight}`;
     }
 
-    // Push to Context Store
+    // Push main report to Context Store
     const pushResponse = await browserAPI.runtime.sendMessage({
       type: 'PUSH_DOCUMENT',
       data: {
@@ -469,7 +488,72 @@ async function pushToContextStore() {
       throw new Error(pushResponse.error || 'Failed to push document');
     }
 
-    showSuccess(`Report submitted!<span class="doc-id">ID: ${pushResponse.data.id}</span>`);
+    const reportId = pushResponse.data.id;
+    let screenshotId = null;
+
+    // Handle screenshot if enabled
+    if (elements.includeScreenshot.checked) {
+      try {
+        // Capture full visible tab screenshot (provides better context for bug reports)
+        const screenshotDataUrl = await captureFullTabScreenshot();
+
+        // Generate screenshot filename
+        const screenshotFilename = filename.replace('.md', '-screenshot.png');
+
+        // Build screenshot metadata
+        const screenshotMetadata = {
+          source_url: capturedData.url,
+          source_domain: capturedData.domain,
+          captured_at: capturedData.capturedAt,
+          css_selector: selectedElementData.selector,
+          element_tag: selectedElementData.tagName,
+          parent_report_id: reportId
+        };
+
+        // Push screenshot to Context Store
+        const screenshotResponse = await browserAPI.runtime.sendMessage({
+          type: 'PUSH_IMAGE_DOCUMENT',
+          data: {
+            imageDataUrl: screenshotDataUrl,
+            filename: screenshotFilename,
+            tags: [...tags, 'screenshot'],
+            metadata: screenshotMetadata
+          }
+        });
+
+        if (screenshotResponse.success) {
+          screenshotId = screenshotResponse.data.id;
+
+          // Create parent-child relation between report and screenshot
+          const relationResponse = await browserAPI.runtime.sendMessage({
+            type: 'CREATE_RELATION',
+            data: {
+              definition: 'parent-child',
+              fromDocumentId: reportId,
+              toDocumentId: screenshotId,
+              fromNote: 'Bug report with screenshot attachment',
+              toNote: 'Screenshot of selected element'
+            }
+          });
+
+          if (!relationResponse.success) {
+            console.warn('[Bug Spotter] Failed to create relation:', relationResponse.error);
+          }
+        } else {
+          console.warn('[Bug Spotter] Failed to upload screenshot:', screenshotResponse.error);
+        }
+      } catch (screenshotError) {
+        console.warn('[Bug Spotter] Screenshot capture failed:', screenshotError.message);
+        // Continue without screenshot - main report was already uploaded
+      }
+    }
+
+    // Show success message with both IDs
+    if (screenshotId) {
+      showSuccess(`Report submitted!<span class="doc-id">Report ID: ${reportId}</span><span class="doc-id">Screenshot ID: ${screenshotId}</span>`);
+    } else {
+      showSuccess(`Report submitted!<span class="doc-id">ID: ${reportId}</span>`);
+    }
 
   } catch (error) {
     showError(error.message);
