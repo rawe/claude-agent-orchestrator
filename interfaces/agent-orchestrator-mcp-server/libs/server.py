@@ -18,6 +18,7 @@ from typing import Literal, Optional
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 from pydantic import Field
 
@@ -331,6 +332,15 @@ For MCP clients (Claude Desktop, Claude CLI), use the `/mcp` endpoint.
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
         lifespan=mcp_app.lifespan,
+    )
+
+    # Add CORS middleware to allow requests from any origin
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # Create REST API router with core functions (not MCP tool wrappers)

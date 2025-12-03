@@ -1,12 +1,14 @@
 import { RouterProvider } from 'react-router-dom';
-import { WebSocketProvider, NotificationProvider } from '@/contexts';
+import { WebSocketProvider, NotificationProvider, ChatProvider } from '@/contexts';
 import { router } from './router';
 
 function App() {
   return (
     <NotificationProvider>
       <WebSocketProvider>
-        <RouterProvider router={router} />
+        <ChatProvider>
+          <RouterProvider router={router} />
+        </ChatProvider>
       </WebSocketProvider>
     </NotificationProvider>
   );

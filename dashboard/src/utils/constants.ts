@@ -2,6 +2,7 @@
 export const AGENT_RUNTIME_URL = import.meta.env.VITE_AGENT_RUNTIME_URL || 'http://localhost:8765';
 export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || 'http://localhost:8766';
 export const AGENT_REGISTRY_URL = import.meta.env.VITE_AGENT_REGISTRY_URL || 'http://localhost:8767';
+export const AGENT_ORCHESTRATOR_URL = import.meta.env.VITE_AGENT_ORCHESTRATOR_URL || 'http://localhost:9500';
 export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8765/ws';
 
 // Status colors

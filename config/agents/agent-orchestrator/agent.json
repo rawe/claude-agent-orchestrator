@@ -1,0 +1,4 @@
+{
+  "name": "agent-orchestrator",
+  "description": "agent able to spawn other agents"
+}

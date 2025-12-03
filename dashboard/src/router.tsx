@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from '@/components/layout';
-import { AgentSessions, Documents, AgentManager } from '@/pages';
+import { AgentSessions, Documents, AgentManager, Chat } from '@/pages';
 
 export const router = createBrowserRouter([
   {
@@ -18,6 +18,10 @@ export const router = createBrowserRouter([
       {
         path: 'agents',
         element: <AgentManager />,
+      },
+      {
+        path: 'chat',
+        element: <Chat />,
       },
     ],
   },

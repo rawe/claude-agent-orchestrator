@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AGENT_RUNTIME_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL } from '@/utils/constants';
+import { AGENT_RUNTIME_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL, AGENT_ORCHESTRATOR_URL } from '@/utils/constants';
 
 // Axios instance for agent runtime
 export const agentRuntimeApi = axios.create({
@@ -25,6 +25,14 @@ export const agentRegistryApi = axios.create({
   },
 });
 
+// Axios instance for agent orchestrator API
+export const agentOrchestratorApi = axios.create({
+  baseURL: AGENT_ORCHESTRATOR_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Add response interceptors for error handling
 const handleError = (error: unknown) => {
   if (axios.isAxiosError(error)) {
@@ -38,3 +46,4 @@ const handleError = (error: unknown) => {
 agentRuntimeApi.interceptors.response.use((response) => response, handleError);
 documentApi.interceptors.response.use((response) => response, handleError);
 agentRegistryApi.interceptors.response.use((response) => response, handleError);
+agentOrchestratorApi.interceptors.response.use((response) => response, handleError);

@@ -37,7 +37,11 @@ Environment Variables:
 import argparse
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress websockets deprecation warnings from uvicorn
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="websockets")
 
 # Add libs directory to Python path
 SCRIPT_DIR = Path(__file__).parent.resolve()
