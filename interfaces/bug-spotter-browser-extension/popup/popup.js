@@ -453,25 +453,10 @@ async function pushToContextStore() {
     // Generate filename based on selector
     const filename = generateFilename(selectedElementData.selector, capturedData.title);
 
-    // Build metadata
+    // Build simple metadata with description pattern
     const metadata = {
-      source_url: capturedData.url,
-      source_domain: capturedData.domain,
-      captured_at: capturedData.capturedAt,
-      css_selector: selectedElementData.selector,
-      element_tag: selectedElementData.tagName
+      description: `Bug report for ${capturedData.domain}`
     };
-
-    if (elements.comment.value.trim()) {
-      metadata.description = elements.comment.value.trim();
-    }
-
-    if (options.includeMetadata && capturedData.systemMetadata) {
-      metadata.browser = capturedData.systemMetadata.browser;
-      metadata.browser_version = capturedData.systemMetadata.browserVersion;
-      metadata.os = capturedData.systemMetadata.os;
-      metadata.viewport = `${capturedData.systemMetadata.viewportWidth}x${capturedData.systemMetadata.viewportHeight}`;
-    }
 
     // Push main report to Context Store
     const pushResponse = await browserAPI.runtime.sendMessage({
@@ -500,14 +485,9 @@ async function pushToContextStore() {
         // Generate screenshot filename
         const screenshotFilename = filename.replace('.md', '-screenshot.png');
 
-        // Build screenshot metadata
+        // Build simple screenshot metadata with description pattern
         const screenshotMetadata = {
-          source_url: capturedData.url,
-          source_domain: capturedData.domain,
-          captured_at: capturedData.capturedAt,
-          css_selector: selectedElementData.selector,
-          element_tag: selectedElementData.tagName,
-          parent_report_id: reportId
+          description: `Screenshot for bug report on ${capturedData.domain}`
         };
 
         // Push screenshot to Context Store
