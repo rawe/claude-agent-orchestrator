@@ -57,7 +57,7 @@ JIRA_API_TOKEN=your-api-token
 
 ---
 
-### Azure DevOps MCP Server (Port 3000)
+### Azure DevOps MCP Server (Port 9001)
 
 **Services:** Work Items access only
 
@@ -71,8 +71,8 @@ ADO_PAT=your-personal-access-token
 ```
 
 **Endpoints:**
-- MCP Endpoint: `http://127.0.0.1:3000/mcp`
-- Health Check: `http://127.0.0.1:3000/health`
+- MCP Endpoint: `http://127.0.0.1:9001/mcp`
+- Health Check: `http://127.0.0.1:9001/health`
 
 **Create PAT:** https://dev.azure.com/{org}/_usersSettings/tokens
 
@@ -149,7 +149,7 @@ docker compose logs mcp-ado
 
 **Health check:**
 ```bash
-curl http://127.0.0.1:3000/health
+curl http://127.0.0.1:9001/health
 # Expected: {"status":"healthy","mcp_process":"running"}
 ```
 
@@ -170,7 +170,7 @@ curl http://127.0.0.1:3000/health
 
 **Port Summary:**
 - `127.0.0.1:9000` → Atlassian MCP
-- `127.0.0.1:3000` → Azure DevOps MCP
+- `127.0.0.1:9001` → Azure DevOps MCP
 
 ---
 

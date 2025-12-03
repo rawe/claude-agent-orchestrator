@@ -4,7 +4,7 @@ services:
     image: ado-mcp-http-wrapper:latest
     container_name: ado-mcp-http
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:9001:3000"
     environment:
       - ADO_ORG=${ADO_ORG}
       - ADO_PAT=${ADO_PAT}

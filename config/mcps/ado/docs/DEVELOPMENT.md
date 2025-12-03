@@ -98,7 +98,7 @@ app.listen(3000, '0.0.0.0');
 **Security:** Port mapping in docker-compose provides external localhost binding:
 ```yaml
 ports:
-  - "127.0.0.1:3000:3000"  # Only accessible on host's 127.0.0.1
+  - "127.0.0.1:9001:3000"  # Only accessible on host's 127.0.0.1
 ```
 
 ### 4. MCP Process Lifecycle
@@ -265,23 +265,24 @@ mcpProcess.stderr.on('data', (data) => {
 });
 ```
 
-**2. Test MCP Protocol Manually:**
+**2. Test MCP Protocol Manually (Docker):**
 ```bash
 # Send initialize request
-curl -X POST http://127.0.0.1:3000/mcp \
+curl -X POST http://127.0.0.1:9001/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}},"id":1}'
 
 # Send notification
-curl -X POST http://127.0.0.1:3000/mcp \
+curl -X POST http://127.0.0.1:9001/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
 # List tools
-curl -X POST http://127.0.0.1:3000/mcp \
+curl -X POST http://127.0.0.1:9001/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":2}'
 ```
+
 
 **3. Monitor Process State:**
 ```bash
@@ -501,7 +502,7 @@ When something goes wrong, check in this order:
 
 2. **Server Listening?**
    ```bash
-   curl http://127.0.0.1:3000/health
+   curl http://127.0.0.1:9001/health
    ```
 
 3. **Environment Set?**

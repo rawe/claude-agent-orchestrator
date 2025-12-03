@@ -21,7 +21,7 @@ If you want to run only the ADO MCP server:
 
 3. **Verify:**
    ```bash
-   curl http://127.0.0.1:3000/health
+   curl http://127.0.0.1:9001/health
    ```
 
 ---
@@ -71,12 +71,12 @@ See `../README.md` for complete multi-server setup instructions.
 
 **Health Check:**
 ```bash
-curl http://127.0.0.1:3000/health
+curl http://127.0.0.1:9001/health
 ```
 
 **MCP Endpoint:**
 ```bash
-curl -X POST http://127.0.0.1:3000/mcp \
+curl -X POST http://127.0.0.1:9001/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
