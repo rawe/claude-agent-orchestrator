@@ -113,9 +113,16 @@ class RelationDefinitions:
 
     RELATED = RelationDefinition(
         name="related",
-        description="Peer relation between related documents. No cascade delete.",
+        description="Peer relation between related documents.",
         from_type="related",
         to_type="related"
+    )
+
+    PREDECESSOR_SUCCESSOR = RelationDefinition(
+        name="predecessor-successor",
+        description="Sequential ordering relation.",
+        from_type="predecessor",
+        to_type="successor"
     )
 
     # Registry for lookups (initialized lazily)
@@ -125,7 +132,7 @@ class RelationDefinitions:
     @classmethod
     def _init_registry(cls):
         """Initialize lookup mappings."""
-        all_definitions = [cls.PARENT_CHILD, cls.RELATED]
+        all_definitions = [cls.PARENT_CHILD, cls.RELATED, cls.PREDECESSOR_SUCCESSOR]
         cls._BY_NAME = {d.name: d for d in all_definitions}
         cls._BY_TYPE = {}
         for d in all_definitions:
@@ -159,7 +166,7 @@ class RelationDefinitions:
     @classmethod
     def get_all(cls) -> list[RelationDefinition]:
         """Get all available relation definitions."""
-        return [cls.PARENT_CHILD, cls.RELATED]
+        return [cls.PARENT_CHILD, cls.RELATED, cls.PREDECESSOR_SUCCESSOR]
 
 
 # Initialize registry on module load
@@ -178,7 +185,7 @@ class RelationDefinitionResponse(BaseModel):
 
 class RelationCreateRequest(BaseModel):
     """Request to create a bidirectional relation."""
-    definition: str                      # "parent-child" or "related"
+    definition: str                      # "parent-child", "related", or "predecessor-successor"
     from_document_id: str                # First document
     to_document_id: str                  # Second document
     from_note: str | None = None         # Note from first document's perspective
@@ -190,7 +197,7 @@ class RelationResponse(BaseModel):
     id: str                              # String externally, int internally
     document_id: str
     related_document_id: str
-    relation_type: str                   # DB value: "parent", "child", "related"
+    relation_type: str                   # DB value: "parent", "child", "related", "predecessor", "successor"
     note: str | None
     created_at: datetime
     updated_at: datetime

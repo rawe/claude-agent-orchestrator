@@ -396,6 +396,7 @@ The context store supports **bidirectional relations** between documents. Relati
 |------------|-----------|---------|----------------|
 | `parent-child` | `parent` | `child` | Yes (children deleted with parent) |
 | `related` | `related` | `related` | No (only relation removed) |
+| `predecessor-successor` | `predecessor` | `successor` | No (only relation removed) |
 
 **Note**: Relation IDs are **strings** in the API (e.g., `"1"`, `"42"`), allowing for future flexibility.
 
@@ -421,9 +422,15 @@ curl http://localhost:8766/relations/definitions
   },
   {
     "name": "related",
-    "description": "Peer relation between related documents. No cascade delete.",
+    "description": "Peer relation between related documents.",
     "from_type": "related",
     "to_type": "related"
+  },
+  {
+    "name": "predecessor-successor",
+    "description": "Sequential ordering relation.",
+    "from_type": "predecessor",
+    "to_type": "successor"
   }
 ]
 ```
@@ -433,7 +440,7 @@ curl http://localhost:8766/relations/definitions
 Create a bidirectional relation between two documents.
 
 - **Request body**: `RelationCreateRequest` (JSON)
-  - `definition` (required): Relation definition name (`parent-child` or `related`)
+  - `definition` (required): Relation definition name (`parent-child`, `related`, or `predecessor-successor`)
   - `from_document_id` (required): First document ID
   - `to_document_id` (required): Second document ID
   - `from_note` (optional): Note from first document's perspective

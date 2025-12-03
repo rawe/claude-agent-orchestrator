@@ -7,7 +7,7 @@ description: Context Store - Document management system for storing, querying, a
 
 ## What & When
 
-**What**: Commands for uploading, downloading, querying, and deleting documents with metadata and tags through the Context Store server.
+**What**: Commands for uploading, downloading, querying and deleting documents with metadata and tags through the Context Store server. Also linking to one another via relations.
 
 **When to use**:
 - Store important documents for retrieval in future sessions
@@ -134,6 +134,12 @@ uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
 
 ### Link Related Documents
 ```bash
+# Get relation types
+uv run <skill-root>/commands/doc-link --types
+
+# Create a sewuential relationship
+uv run <skill-root>/commands/doc-link --create doc_design doc_implementation --type predecessor-successor --from-note "Design doc" --to-note "Implementation plan"
+
 # Create hierarchical relationship (parent owns children)
 uv run <skill-root>/commands/doc-link --create doc_architecture doc_api --type parent-child --from-note "API spec"
 

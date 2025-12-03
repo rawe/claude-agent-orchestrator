@@ -4,7 +4,7 @@ import { Modal, Badge, CopyButton, Spinner } from '@/components/common';
 import { useDocumentContent } from '@/hooks/useDocuments';
 import { documentService } from '@/services/documentService';
 import { formatAbsoluteTime, formatFileSize } from '@/utils/formatters';
-import { Download, Trash2, Eye, Code, Maximize2, Minimize2, X, Link2, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
+import { Download, Trash2, Eye, Code, Maximize2, Minimize2, X, Link2, ArrowUp, ArrowDown, ArrowLeftRight, ArrowLeft, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -116,6 +116,8 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
       case 'parent': return <ArrowUp className="w-3.5 h-3.5 text-blue-500" />;
       case 'child': return <ArrowDown className="w-3.5 h-3.5 text-green-500" />;
       case 'related': return <ArrowLeftRight className="w-3.5 h-3.5 text-purple-500" />;
+      case 'predecessor': return <ArrowLeft className="w-3.5 h-3.5 text-amber-500" />;
+      case 'successor': return <ArrowRight className="w-3.5 h-3.5 text-amber-500" />;
       default: return <Link2 className="w-3.5 h-3.5 text-gray-500" />;
     }
   };
@@ -125,6 +127,8 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete }: Documen
       case 'parent': return 'Parent of';
       case 'child': return 'Child of';
       case 'related': return 'Related to';
+      case 'predecessor': return 'Precedes';
+      case 'successor': return 'Follows';
       default: return type;
     }
   };
