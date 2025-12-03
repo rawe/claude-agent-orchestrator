@@ -84,7 +84,7 @@ Upload a new document with optional tags and metadata.
 - **Parameters**:
   - `file` (required): File to upload
   - `tags` (optional): Comma-separated list of tags (e.g., "documentation,example")
-  - `metadata` (optional): JSON string with key-value pairs (e.g., `{"author":"John Doe"}`)
+  - `metadata` (optional): JSON string with key-value pairs. Use `description` to provide a human-readable summary of the document's purpose or content.
 - **Response**: 201 Created with `DocumentResponse`
 
 **Example**:
@@ -92,7 +92,7 @@ Upload a new document with optional tags and metadata.
 curl -X POST http://localhost:8766/documents \
   -F "file=@example.md" \
   -F "tags=documentation,example" \
-  -F "metadata={\"author\":\"John Doe\",\"version\":\"1.0\"}"
+  -F "metadata={\"description\":\"API usage guide for the authentication module\"}"
 ```
 
 **Response**:
@@ -105,7 +105,7 @@ curl -X POST http://localhost:8766/documents \
   "created_at": "2025-11-22T12:34:56.789012",
   "updated_at": "2025-11-22T12:34:56.789012",
   "tags": ["documentation", "example"],
-  "metadata": {"author": "John Doe", "version": "1.0"},
+  "metadata": {"description": "API usage guide for the authentication module"},
   "url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2"
 }
 ```
