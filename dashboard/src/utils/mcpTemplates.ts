@@ -13,14 +13,22 @@ import type { MCPServerConfig } from '@/types';
  * 4. The template will appear in the AgentEditor dropdown
  */
 export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
-  playwright: {
-    command: 'npx',
-    args: ['@playwright/mcp@latest'],
-  },
   'mcp-atlassian-http': {
     type: 'http',
     url: 'http://localhost:9000/mcp',
   },
+  'mcp-ado-http': {
+    type: 'http',
+    url: 'http://localhost:9001/mcp',
+  },
+  'agent-orchestrator-http': {
+    type: 'http',
+    url: 'http://localhost:9500/mcp',
+  },
+  'context-store-http': {
+    type: 'http',
+    url: 'http://localhost:9501/mcp',
+  }
 };
 
 export const TEMPLATE_NAMES = Object.keys(MCP_TEMPLATES);

@@ -309,15 +309,18 @@ export function AgentEditor({
 
             {/* Skills */}
             <div>
-              <label className="label">Skills</label>
+              <label className="label">Skills <span className="text-xs text-gray-400 font-normal">(coming soon)</span></label>
               <div className="flex flex-wrap gap-2">
                 {SKILLS.map((skill) => (
                   <button
                     key={skill.name}
                     type="button"
-                    onClick={() => toggleSkill(skill.name)}
+                    onClick={() => !skill.disabled && toggleSkill(skill.name)}
+                    disabled={skill.disabled}
                     className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                      watchedSkills?.includes(skill.name)
+                      skill.disabled
+                        ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                        : watchedSkills?.includes(skill.name)
                         ? 'bg-primary-50 border-primary-300 text-primary-700'
                         : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
                     }`}

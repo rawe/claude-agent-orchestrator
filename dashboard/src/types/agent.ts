@@ -41,10 +41,11 @@ export interface AgentUpdate {
 }
 
 // Predefined skills available for selection
+// Set disabled: true for skills not yet implemented
 export const SKILLS = [
-  { name: 'pdf', label: 'PDF Handler' },
-  { name: 'xlsx', label: 'Excel Handler' },
-  { name: 'csv', label: 'CSV Handler' },
-  { name: 'image', label: 'Image Handler' },
-  { name: 'context-store', label: 'Context Store' },
+  { name: 'pdf', label: 'PDF Handler', disabled: true },
+  { name: 'xlsx', label: 'Excel Handler', disabled: true },
+  { name: 'csv', label: 'CSV Handler', disabled: true },
+  { name: 'image', label: 'Image Handler', disabled: true },
+  { name: 'context-store', label: 'Context Store', disabled: true },
 ] as const;
