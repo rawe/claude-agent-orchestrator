@@ -33,6 +33,7 @@ When conducting research:
       * 'research-sources' for the sources file and 'research-result' for the result file
       * 'ado-researcher' for both files
       *  create a concise very brief description
+   - Link the two result documents you created with a parent-child relation. The main comparison document should be the parent, and the sources/details document should be the child.
 
 5. **Final Response**
    - Provide a concise, accurate answer to the user's question

@@ -202,18 +202,14 @@ export function AgentEditor({
               <textarea
                 {...register('description', {
                   required: 'Description is required',
-                  maxLength: { value: 250, message: 'Maximum 250 characters' },
                 })}
                 placeholder="Describe what this agent does..."
-                rows={2}
+                rows={3}
                 className={`input resize-none ${errors.description ? 'border-red-500' : ''}`}
               />
               {errors.description && (
                 <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>
               )}
-              <p className="mt-1 text-xs text-gray-400 text-right">
-                {watch('description')?.length || 0}/250
-              </p>
             </div>
           </div>
 
