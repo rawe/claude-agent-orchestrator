@@ -104,7 +104,7 @@ async function init() {
   setupEventListeners();
 
   // Add default tags
-  addTag('bug-report');
+  addTag('bug-screenshot');
   try {
     const url = new URL(currentTab.url);
     addTag(url.hostname);

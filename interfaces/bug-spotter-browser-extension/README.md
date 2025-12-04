@@ -58,7 +58,7 @@ The key value is the **reproducible CSS selector** - another developer can use i
    - "Console logs" - include captured console output
    - "System metadata" - include browser/OS info
 10. **Add a description** explaining the issue
-11. **Add tags** for organization (default: `bug-report`, domain name)
+11. **Add tags** for organization (default: `bug-screenshot`, domain name)
 12. **Click "Push to Context Store"**
 
 ### Visual Feedback During Selection
@@ -267,7 +267,7 @@ POST /documents
 Content-Type: multipart/form-data
 
 file: <Markdown report content>
-tags: bug-report,example.com,login-page
+tags: bug-screenshot,example.com,login-page
 metadata: {
   "source_url": "https://example.com/login",
   "source_domain": "example.com",
@@ -291,7 +291,7 @@ metadata: {
   "content_type": "text/markdown",
   "size_bytes": 1847,
   "created_at": "2025-12-02T14:30:01.000000",
-  "tags": ["bug-report", "example.com"],
+  "tags": ["bug-screenshot", "example.com"],
   "metadata": { ... },
   "url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6"
 }
