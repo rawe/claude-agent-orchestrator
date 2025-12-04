@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-ao-api stop-ao-api start-cs-mcp stop-cs-mcp
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc restart-dashboard restart-runtime restart-doc start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-ao-api stop-ao-api start-cs-mcp stop-cs-mcp
 
 # Default target
 help:
@@ -26,11 +26,9 @@ help:
 	@echo "  make logs-dashboard - View dashboard logs"
 	@echo "  make logs-runtime   - View agent runtime logs"
 	@echo "  make logs-doc       - View context store logs"
-	@echo "  make logs-agent     - View agent registry logs"
 	@echo "  make restart-dashboard - Restart dashboard"
 	@echo "  make restart-runtime - Restart agent runtime"
 	@echo "  make restart-doc    - Restart context store"
-	@echo "  make restart-agent  - Restart agent registry"
 	@echo ""
 	@echo "Example MCP servers (config/mcps):"
 	@echo "  make start-mcps     - Start Atlassian & ADO MCP servers"
@@ -100,11 +98,8 @@ health:
 	@echo "Dashboard (port 3000):"
 	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:3000 || echo "  ❌ Not responding"
 	@echo ""
-	@echo "Agent Registry (port 8767):"
-	@curl -s http://localhost:8767/health || echo "  ❌ Not responding"
-	@echo ""
 	@echo "Agent Runtime (port 8765):"
-	@curl -s http://localhost:8765/sessions | head -c 100 && echo "  ✅ OK" || echo "  ❌ Not responding"
+	@curl -s http://localhost:8765/health || echo "  ❌ Not responding"
 	@echo ""
 	@echo "Context Store (port 8766):"
 	@curl -s http://localhost:8766/health || echo "  ❌ Not responding"
@@ -120,15 +115,10 @@ info:
 	@echo "   Purpose:     Unified UI for agent management, sessions, and documents"
 	@echo "   Action:      Open this URL in your browser"
 	@echo ""
-	@echo "🤖 AGENT REGISTRY"
-	@echo "   URL:         http://localhost:8767"
-	@echo "   Purpose:     CRUD API for agent blueprints"
-	@echo "   Endpoints:   /health, /agents, /agents/{name}, /agents/{name}/status"
-	@echo ""
 	@echo "⚙️  AGENT RUNTIME"
 	@echo "   URL:         http://localhost:8765"
-	@echo "   Purpose:     Session management and real-time observability"
-	@echo "   Endpoints:   /sessions, /events/{id}, /ws"
+	@echo "   Purpose:     Session management, observability, and agent blueprints"
+	@echo "   Endpoints:   /health, /sessions, /events/{id}, /ws, /agents"
 	@echo ""
 	@echo "📄 CONTEXT STORE"
 	@echo "   URL:         http://localhost:8766"
@@ -216,9 +206,6 @@ logs-runtime:
 logs-doc:
 	docker-compose logs context-store
 
-logs-agent:
-	docker-compose logs agent-registry
-
 # Individual service restart
 restart-dashboard:
 	docker-compose restart dashboard
@@ -228,9 +215,6 @@ restart-runtime:
 
 restart-doc:
 	docker-compose restart context-store
-
-restart-agent:
-	docker-compose restart agent-registry
 
 # Example MCP servers (for agent capabilities)
 start-mcps:

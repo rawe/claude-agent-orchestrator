@@ -13,7 +13,7 @@ The Orchestrator plugin enables you to create and manage specialized Claude Code
 
 ## Architecture
 
-The plugin uses a **thin-client architecture** where the `ao-*` commands are HTTP clients that communicate with backend servers:
+The plugin uses a **thin-client architecture** where the `ao-*` commands are HTTP clients that communicate with the backend server:
 
 ```
 ┌─────────────────┐     HTTP      ┌───────────────────┐
@@ -22,12 +22,6 @@ The plugin uses a **thin-client architecture** where the `ao-*` commands are HTT
 └─────────────────┘              │  - Sessions       │
                                  │  - Events         │
                                  │  - Results        │
-                                 └───────────────────┘
-                                          │
-                                          ▼
-                                 ┌───────────────────┐
-                                 │  Agent Registry   │
-                                 │  (Port 8767)      │
                                  │  - Blueprints     │
                                  └───────────────────┘
 ```
@@ -103,12 +97,12 @@ uv run skills/orchestrator/commands/ao-list-blueprints
 ## Key Concepts
 
 ### Agent Blueprints
-Reusable configurations stored in the Agent Registry that define specialized agent behavior:
+Reusable configurations stored in the Agent Runtime that define specialized agent behavior:
 - Custom system prompts
 - MCP server configurations
 - Capability descriptions
 
-Managed via the Agent Registry API (port 8767) or the Dashboard UI.
+Managed via the Agent Runtime API (port 8765) or the Dashboard UI.
 
 ### Sessions
 Running agent conversations managed by the Agent Runtime:
@@ -116,12 +110,10 @@ Running agent conversations managed by the Agent Runtime:
 - Persistent conversation history
 - Real-time status and event tracking
 
-Managed via the Agent Runtime API (port 8765).
-
 ### API-Based Architecture
-All state is managed by backend servers:
-- **Agent Registry** (port 8767): Blueprint CRUD operations
-- **Agent Runtime** (port 8765): Session lifecycle, events, results
+All state is managed by the Agent Runtime backend server (port 8765):
+- Blueprint CRUD operations
+- Session lifecycle, events, results
 
 The `ao-*` commands are stateless thin clients.
 
@@ -129,8 +121,8 @@ The `ao-*` commands are stateless thin clients.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_AGENT_API_URL` | `http://localhost:8767` | Agent Registry API URL |
-| `AGENT_ORCHESTRATOR_SESSION_API_URL` | `http://localhost:8765` | Agent Runtime API URL |
+| `AGENT_ORCHESTRATOR_AGENT_API_URL` | `http://localhost:8765` | Agent Runtime API URL (for blueprints) |
+| `AGENT_ORCHESTRATOR_SESSION_API_URL` | `http://localhost:8765` | Agent Runtime API URL (for sessions) |
 
 See `skills/orchestrator/references/ENV_VARS.md` for all options.
 

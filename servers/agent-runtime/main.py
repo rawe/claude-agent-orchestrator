@@ -10,7 +10,12 @@ from database import (
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result
 )
-from models import Event, SessionMetadataUpdate, SessionCreate
+from models import (
+    Event, SessionMetadataUpdate, SessionCreate,
+    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate
+)
+import agent_storage
+from validation import validate_agent_name
 from datetime import datetime, timezone
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
@@ -33,7 +38,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent Runtime",
-    version="0.1.0",
+    description="Unified service for agent session management and agent blueprint registry",
+    version="0.2.0",
     lifespan=lifespan
 )
 
@@ -302,6 +308,73 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         connections.discard(websocket)
+
+
+# ==============================================================================
+# Agent Registry Routes (merged from agent-registry service)
+# ==============================================================================
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+
+@app.get("/agents", response_model=list[Agent])
+def list_agents():
+    """List all agents."""
+    return agent_storage.list_agents()
+
+
+@app.get("/agents/{name}", response_model=Agent)
+def get_agent(name: str):
+    """Get agent by name."""
+    agent = agent_storage.get_agent(name)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
+    return agent
+
+
+@app.post("/agents", response_model=Agent, status_code=201)
+def create_agent(data: AgentCreate):
+    """Create a new agent."""
+    try:
+        validate_agent_name(data.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        agent = agent_storage.create_agent(data)
+        return agent
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.patch("/agents/{name}", response_model=Agent)
+def update_agent(name: str, updates: AgentUpdate):
+    """Update an existing agent (partial update)."""
+    agent = agent_storage.update_agent(name, updates)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
+    return agent
+
+
+@app.delete("/agents/{name}", status_code=204)
+def delete_agent(name: str):
+    """Delete an agent."""
+    if not agent_storage.delete_agent(name):
+        raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
+    return None
+
+
+@app.patch("/agents/{name}/status", response_model=Agent)
+def update_agent_status(name: str, data: AgentStatusUpdate):
+    """Update agent status (active/inactive)."""
+    agent = agent_storage.set_agent_status(name, data.status)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
+    return agent
+
 
 if __name__ == "__main__":
     uvicorn.run(

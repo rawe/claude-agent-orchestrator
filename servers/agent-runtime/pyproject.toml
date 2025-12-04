@@ -1,7 +1,7 @@
 [project]
 name = "agent-runtime"
-version = "0.1.0"
-description = "Agent Runtime server for session management and real-time observability"
+version = "0.2.0"
+description = "Unified Agent Runtime server for session management, real-time observability, and agent blueprint registry"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.104.0",

@@ -22,7 +22,7 @@ Both integration options require the backend services running. The plugins and M
 ```bash
 git clone <your-repo-url>
 cd claude-agent-orchestrator
-make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Agent Registry (:8767), Context Store (:8766)
+make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Context Store (:8766)
 ```
 
 **Requirements:** 
@@ -118,8 +118,7 @@ agent-orchestrator-framework/
 │   └── agent-runtime/                 # Agent Runtime server docs
 │
 ├── servers/                           # Backend servers
-│   ├── agent-runtime/                 # Session management + event capture
-│   ├── agent-registry/                # Blueprint management (CRUD)
+│   ├── agent-runtime/                 # Session management + event capture + agent registry
 │   └── context-store/                 # Document storage
 │
 ├── interfaces/
@@ -209,8 +208,7 @@ make open
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
-| Agent Runtime | http://localhost:8765 | Session management, WebSocket events |
-| Agent Registry | http://localhost:8767 | Blueprint CRUD API |
+| Agent Runtime | http://localhost:8765 | Session management, WebSocket events, Blueprint API |
 | Context Store | http://localhost:8766 | Document storage API |
 
 See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for full architecture.
@@ -219,10 +217,9 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 
 | Term | Definition |
 |------|------------|
-| **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Registry. |
+| **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Runtime. |
 | **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
-| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, spawns agents, and captures events. |
-| **Agent Registry** | Backend server (port 8767) that stores and serves agent blueprints via REST API. |
+| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, spawns agents, captures events, and stores agent blueprints. |
 | **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
 | **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 

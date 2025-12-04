@@ -14,47 +14,16 @@ services:
       # These are baked in at build time via Vite
       - VITE_AGENT_RUNTIME_URL=http://localhost:8765
       - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-      - VITE_AGENT_REGISTRY_URL=http://localhost:8767
       - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
     depends_on:
-      - agent-registry
       - agent-runtime
       - context-store
 
   # ============================================================================
-  # AGENT REGISTRY
-  # ============================================================================
-  agent-registry:
-    container_name: agent-orchestrator-agent-registry
-    build:
-      context: ./servers/agent-registry
-      dockerfile: Dockerfile
-    ports:
-      - "8767:8767"
-    volumes:
-      - ./servers/agent-registry:/app
-      - ${AGENT_DIR:-./config/agents}:/data/agents
-    environment:
-      - PYTHONUNBUFFERED=1
-      - AGENT_REGISTRY_HOST=0.0.0.0
-      - AGENT_REGISTRY_PORT=8767
-      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
-      - CORS_ORIGINS=*
-    networks:
-      - agent-orchestrator-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8767/health')"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-
-  # ============================================================================
-  # AGENT RUNTIME
+  # AGENT RUNTIME (includes agent registry functionality)
   # ============================================================================
   agent-runtime:
     container_name: agent-orchestrator-agent-runtime
@@ -66,16 +35,19 @@ services:
     volumes:
       - ./servers/agent-runtime:/app
       - runtime-data:/app/.agent-orchestrator
+      - ${AGENT_DIR:-./config/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
       # Enable verbose debug logging for troubleshooting (set to true to enable)
       - DEBUG_LOGGING=false
       - CORS_ORIGINS=*
+      # Agent registry configuration (merged into runtime)
+      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/sessions')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
       interval: 30s
       timeout: 3s
       retries: 3

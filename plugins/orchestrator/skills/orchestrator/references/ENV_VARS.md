@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Agent Orchestrator Skill uses environment variables to configure the project directory, logging, and observability integration. Session and agent management is handled via APIs (AgentRuntime and AgentRegistry services).
+The Agent Orchestrator Skill uses environment variables to configure the project directory, logging, and observability integration. Session and agent management is handled via the Agent Runtime API (which also includes agent blueprint management).
 
 **Configuration Precedence:** CLI Flags > Environment Variables > Defaults
 
