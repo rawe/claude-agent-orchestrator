@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "context-store": {
+      "command": "uv",
+      "args": [
+        "run",
+        "${PROJECT_ROOT}/interfaces/context-store-mcp-server/context-store-mcp.py"
+      ]
+    }
+  }
+}
