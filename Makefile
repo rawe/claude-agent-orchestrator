@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-ao-api stop-ao-api start-cs-mcp stop-cs-mcp
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc logs-agent restart-dashboard restart-runtime restart-doc restart-agent start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-ao-api stop-ao-api start-cs-mcp stop-cs-mcp start-demo stop-demo
 
 # Default target
 help:
@@ -44,6 +44,10 @@ help:
 	@echo "  make stop-ao-api    - Stop Agent Orchestrator API server"
 	@echo "  make start-cs-mcp   - Start Context Store MCP server (HTTP)"
 	@echo "  make stop-cs-mcp    - Stop Context Store MCP server"
+	@echo ""
+	@echo "Demo commands (starts/stops all services):"
+	@echo "  make start-demo     - Start all services for demo"
+	@echo "  make stop-demo      - Stop all demo services"
 
 # Build all images
 build:
@@ -389,3 +393,34 @@ stop-cs-mcp:
 		echo "No PID file found. Trying to find and kill process..."; \
 		pkill -f "context-store-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
 	fi
+
+# Demo commands - start/stop all services
+start-demo:
+	@echo "Starting all demo services..."
+	@echo ""
+	@$(MAKE) --no-print-directory start-bg
+	@echo ""
+	@$(MAKE) --no-print-directory start-mcps
+	@echo ""
+	@$(MAKE) --no-print-directory start-ao-api
+	@echo ""
+	@$(MAKE) --no-print-directory start-cs-mcp
+	@echo ""
+	@echo "============================================"
+	@echo "All demo services started!"
+	@echo "============================================"
+
+stop-demo:
+	@echo "Stopping all demo services..."
+	@echo ""
+	@$(MAKE) --no-print-directory stop
+	@echo ""
+	@$(MAKE) --no-print-directory stop-mcps
+	@echo ""
+	@$(MAKE) --no-print-directory stop-ao-api
+	@echo ""
+	@$(MAKE) --no-print-directory stop-cs-mcp
+	@echo ""
+	@echo "============================================"
+	@echo "All demo services stopped!"
+	@echo "============================================"

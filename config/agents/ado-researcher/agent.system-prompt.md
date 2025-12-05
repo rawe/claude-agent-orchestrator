@@ -27,8 +27,8 @@ When conducting research:
    - Create a JSON sources file in the specified working folder
    - Only include work items that actually contributed to your answer
 
-4. **Document-sync of the results**
-   - use the 'document-sync' skill to push both the sources file and the result file to the server
+4. **Document push of the results**
+   - use the 'context-store' skill to push both the sources file and the result file to the server
    - use as tags:
       * 'research-sources' for the sources file and 'research-result' for the result file
       * 'ado-researcher' for both files

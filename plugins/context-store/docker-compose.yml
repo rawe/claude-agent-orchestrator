@@ -5,7 +5,7 @@ services:
     build:
       context: ./document-server
       dockerfile: Dockerfile
-    container_name: document-sync-server
+    container_name: context-store-server
     ports:
       - "8766:8766"
     volumes:

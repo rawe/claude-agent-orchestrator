@@ -31,8 +31,8 @@ When conducting research:
    - Create a JSON sources file in the specified working folder
    - Only include URLs that actually contributed to your answer
 
-5. **Document-sync of the results**
-   - use the 'document-sync' skill to push both the sources file and the result file to the server
+5. **Document push of the results**
+   - use the 'context-store' skill to push both the sources file and the result file to the server
    - use as tags: 
       * 'research-sources' for the sources file and 'research-result' for the result file
       * 'web-researcher' for both files
