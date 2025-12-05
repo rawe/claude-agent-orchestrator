@@ -47,7 +47,7 @@ def main(
 
         # Try API first
         try:
-            client = SessionClient(config.session_manager_url)
+            client = SessionClient(config.api_url)
             session = client.get_session_by_name(session_name)
             if session:
                 status = client.get_status(session['session_id'])

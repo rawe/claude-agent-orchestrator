@@ -12,7 +12,7 @@ services:
       - "3000:80"
     environment:
       # These are baked in at build time via Vite
-      - VITE_AGENT_RUNTIME_URL=http://localhost:8765
+      - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
       - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
       - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
     networks:

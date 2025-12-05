@@ -28,18 +28,18 @@ def main():
     Examples:
         ao-delete-all
     """
-    from config import get_session_manager_url
+    from config import get_api_url
     from session_client import SessionClient, SessionClientError
 
     try:
-        # Get session manager URL
-        session_manager_url = get_session_manager_url()
+        # Get API URL
+        api_url = get_api_url()
 
         deleted_count = 0
 
         # Delete all sessions via API
         try:
-            client = SessionClient(session_manager_url)
+            client = SessionClient(api_url)
             sessions = client.list_sessions()
             for s in sessions:
                 session_id = s.get('session_id')

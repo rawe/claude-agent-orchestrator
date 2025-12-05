@@ -4,21 +4,15 @@ HTTP client for Agent API (agent blueprints).
 The agent registry is now merged into the agent-runtime service.
 
 Environment variables:
-    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8765)
-
-Note: The default port is now 8765 (agent-runtime) instead of the old 8767 (agent-registry).
+    AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
 """
 
-import os
 import urllib.request
 import urllib.error
 import json
 from typing import Optional
 
-
-def get_api_url() -> str:
-    """Get Agent API URL from environment or default."""
-    return os.environ.get("AGENT_ORCHESTRATOR_AGENT_API_URL", "http://localhost:8765")
+from config import get_api_url
 
 
 class AgentAPIError(Exception):

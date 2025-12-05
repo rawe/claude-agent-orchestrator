@@ -10,11 +10,11 @@ The Agent Orchestrator Skill uses environment variables to configure the project
 
 | Variable | Default | Type | Description |
 |----------|---------|------|-------------|
+| `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | URL | Agent Orchestrator API endpoint (sessions + blueprints) |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `$PWD` | Path | Project working directory |
 | `AGENT_ORCHESTRATOR_ENABLE_LOGGING` | `false` | Boolean | Enable debug logging |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY_ENABLED` | `true` | Boolean | Enable observability events |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY_URL` | `http://127.0.0.1:8765` | URL | Observability backend endpoint |
-| `AGENT_ORCHESTRATOR_SESSION_MANAGER_URL` | `http://127.0.0.1:8765` | URL | Session manager API endpoint |
 
 ## Detailed Descriptions
 

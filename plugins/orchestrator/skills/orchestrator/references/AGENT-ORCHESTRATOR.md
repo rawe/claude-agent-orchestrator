@@ -15,19 +15,11 @@ The orchestrator uses a **thin-client architecture**:
 │  ao-* commands  │──HTTP──▶│   Agent Runtime   │◀──────▶│ Claude Agent SDK│
 │  (thin clients) │         │   (Port 8765)     │         │                 │
 └─────────────────┘         └───────────────────┘         └─────────────────┘
-                                     │
-                                     │ queries
-                                     ▼
-                            ┌───────────────────┐
-                            │  Agent Registry   │
-                            │  (Port 8767)      │
-                            └───────────────────┘
 ```
 
 **Components:**
 - **ao-* commands**: Stateless CLI tools that call backend APIs
-- **Agent Runtime** (port 8765): Manages session lifecycle, spawns agents, captures events
-- **Agent Registry** (port 8767): Stores and serves agent blueprints
+- **Agent Runtime** (port 8765): Unified service for session management, event tracking, and agent blueprint registry
 
 ## Core Concepts
 
@@ -46,7 +38,7 @@ Think of sessions as individual workstreams you can delegate tasks to and check 
 
 An **agent blueprint** is a reusable configuration that defines the behavior, expertise, and capabilities for sessions. Blueprints are optional - you can create generic sessions without them, or use blueprints to create specialized sessions with predefined behavior.
 
-Blueprints are managed by the **Agent Registry** and can include:
+Blueprints are managed by the **Agent Runtime** and can include:
 - **Name**: Unique identifier
 - **Description**: Human-readable description
 - **System Prompt**: Role definition and behavioral guidelines
@@ -56,7 +48,7 @@ Blueprints are managed by the **Agent Registry** and can include:
 
 Blueprints can be managed via:
 1. **Dashboard UI** at http://localhost:3000
-2. **Agent Registry API** at http://localhost:8767
+2. **Agent Runtime API** at http://localhost:8765
 3. **ao-list-blueprints** command to view available blueprints
 
 ### Session States
@@ -149,8 +141,7 @@ uv run commands/ao-resume docs -p "Include error handling section"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_SESSION_API_URL` | `http://localhost:8765` | Agent Runtime API URL |
-| `AGENT_ORCHESTRATOR_AGENT_API_URL` | `http://localhost:8767` | Agent Registry API URL |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Orchestrator API URL (sessions + blueprints) |
 | `AGENT_ORCHESTRATOR_OBSERVABILITY` | `true` | Enable event capture |
 
 See `ENV_VARS.md` for complete reference.

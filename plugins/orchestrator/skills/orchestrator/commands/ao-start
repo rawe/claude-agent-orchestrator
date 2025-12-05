@@ -13,7 +13,7 @@ Start a new agent orchestrator session.
 This command starts a new Claude AI session, optionally with an agent configuration.
 
 Configuration:
-    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
+    AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
 """
 
 import sys
@@ -75,7 +75,7 @@ def main(
 
         # 3. Check session doesn't already exist (via API)
         try:
-            client = SessionClient(config.session_manager_url)
+            client = SessionClient(config.api_url)
             existing_session = client.get_session_by_name(session_name)
             if existing_session:
                 error_exit(
@@ -124,7 +124,7 @@ def main(
             project_dir=config.project_dir,
             session_name=session_name,
             mcp_servers=mcp_servers,
-            session_manager_url=config.session_manager_url,
+            api_url=config.api_url,
             agent_name=agent_name,
         )
 

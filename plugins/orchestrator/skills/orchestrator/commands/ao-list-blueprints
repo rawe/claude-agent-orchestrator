@@ -6,10 +6,10 @@
 # ]
 # ///
 """
-List all available agent blueprints from Agent Manager API.
+List all available agent blueprints from Agent Orchestrator API.
 
 Configuration:
-    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
+    AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
 """
 
 import sys

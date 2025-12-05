@@ -121,8 +121,7 @@ The `ao-*` commands are stateless thin clients.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_AGENT_API_URL` | `http://localhost:8765` | Agent Runtime API URL (for blueprints) |
-| `AGENT_ORCHESTRATOR_SESSION_API_URL` | `http://localhost:8765` | Agent Runtime API URL (for sessions) |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Orchestrator API URL (sessions + blueprints) |
 
 See `skills/orchestrator/references/ENV_VARS.md` for all options.
 

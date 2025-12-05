@@ -19,14 +19,14 @@ from utils import debug_log
 ENV_PROJECT_DIR = "AGENT_ORCHESTRATOR_PROJECT_DIR"
 ENV_ENABLE_LOGGING = "AGENT_ORCHESTRATOR_ENABLE_LOGGING"
 
-# Session Manager configuration (AgentRuntime API)
-ENV_SESSION_MANAGER_URL = "AGENT_ORCHESTRATOR_SESSION_MANAGER_URL"
-DEFAULT_SESSION_MANAGER_URL = "http://127.0.0.1:8765"
+# Agent Orchestrator API configuration (unified service for sessions + blueprints)
+ENV_API_URL = "AGENT_ORCHESTRATOR_API_URL"
+DEFAULT_API_URL = "http://127.0.0.1:8765"
 
 
-def get_session_manager_url() -> str:
-    """Get session manager URL from environment or default."""
-    return os.environ.get(ENV_SESSION_MANAGER_URL, DEFAULT_SESSION_MANAGER_URL)
+def get_api_url() -> str:
+    """Get Agent Orchestrator API URL from environment or default."""
+    return os.environ.get(ENV_API_URL, DEFAULT_API_URL)
 
 
 @dataclass
@@ -35,7 +35,7 @@ class Config:
 
     project_dir: Path
     enable_logging: bool
-    session_manager_url: str
+    api_url: str
 
 
 def resolve_absolute_path(path_str: str) -> Path:
@@ -131,26 +131,26 @@ def load_config(
     # Parse logging flag: enable if value is "1", "true", or "yes"
     enable_logging = env_logging in ("1", "true", "yes")
 
-    # Parse session manager configuration
-    session_manager_url = get_session_manager_url()
+    # Parse API URL configuration
+    api_url = get_api_url()
 
-    # DEBUG LOGGING - Session manager configuration
-    debug_log("load_config - SESSION_MANAGER", {
-        "url": session_manager_url,
+    # DEBUG LOGGING - API configuration
+    debug_log("load_config - API_URL", {
+        "url": api_url,
     })
 
     # Return Config object
     config = Config(
         project_dir=project_dir,
         enable_logging=enable_logging,
-        session_manager_url=session_manager_url,
+        api_url=api_url,
     )
 
     # DEBUG LOGGING - Final config
     debug_log("load_config - FINAL CONFIG", {
         "project_dir": str(config.project_dir),
         "enable_logging": config.enable_logging,
-        "session_manager_url": config.session_manager_url,
+        "api_url": config.api_url,
     })
 
     return config

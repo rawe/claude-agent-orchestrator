@@ -60,8 +60,8 @@ The application will be available at `http://localhost:3000`.
 Copy `.env.example` to `.env` and configure:
 
 ```bash
-# Agent Runtime handles sessions, events, and agent blueprints (merged)
-VITE_AGENT_RUNTIME_URL=http://localhost:8765
+# Agent Orchestrator API handles sessions, events, and agent blueprints (unified service)
+VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
 VITE_DOCUMENT_SERVER_URL=http://localhost:8766
 VITE_WEBSOCKET_URL=ws://localhost:8765/ws
 ```

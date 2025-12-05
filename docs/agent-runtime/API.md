@@ -274,7 +274,7 @@ See [Event model](DATA_MODELS.md#event)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_SESSION_MANAGER_URL` | `http://127.0.0.1:8765` | Agent Runtime URL |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | Agent Orchestrator API URL |
 | `DEBUG_LOGGING` | `false` | Enable verbose logging |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
 

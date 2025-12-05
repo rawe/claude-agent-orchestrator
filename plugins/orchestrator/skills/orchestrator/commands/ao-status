@@ -34,7 +34,7 @@ def main(
     Examples:
         ao-status mysession
     """
-    from config import get_session_manager_url
+    from config import get_api_url
     from session import validate_session_name
     from session_client import SessionClient, SessionClientError
 
@@ -42,12 +42,12 @@ def main(
         # Validate session name
         validate_session_name(session_name)
 
-        # Get session manager URL
-        session_manager_url = get_session_manager_url()
+        # Get API URL
+        api_url = get_api_url()
 
         # Get session status via API
         try:
-            client = SessionClient(session_manager_url)
+            client = SessionClient(api_url)
             session = client.get_session_by_name(session_name)
             if session:
                 status = client.get_status(session['session_id'])

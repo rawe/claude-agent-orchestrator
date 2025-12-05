@@ -106,8 +106,8 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 
 | Variable | Default | Used By |
 |----------|---------|---------|
-| `AGENT_ORCHESTRATOR_SESSION_MANAGER_URL` | `http://127.0.0.1:8765` | Commands |
-| `AGENT_ORCHESTRATOR_AGENT_API_URL` | `http://localhost:8765` | Commands |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | ao-* Commands |
+| `VITE_AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Dashboard |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | cwd | Commands, MCP Server |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Runtime |
 | `DEBUG_LOGGING` | `false` | Agent Runtime |
