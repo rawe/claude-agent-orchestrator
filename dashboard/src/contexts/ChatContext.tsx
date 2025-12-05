@@ -1,16 +1,9 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { useWebSocket } from './WebSocketContext';
-import type { WebSocketMessage } from '@/types';
+import { sessionService } from '@/services';
+import type { WebSocketMessage, SessionEvent, Session } from '@/types';
 
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  status?: 'pending' | 'complete' | 'error';
-}
-
-interface ToolCall {
+export interface ToolCall {
   id: string;
   name: string;
   status: 'running' | 'completed' | 'error';
@@ -20,15 +13,28 @@ interface ToolCall {
   error?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  status?: 'pending' | 'complete' | 'error';
+  toolCalls?: ToolCall[];  // Tool calls associated with this message
+}
+
+type ChatMode = 'new' | 'linked';
+
 interface ChatState {
   messages: ChatMessage[];
   sessionName: string | null;
   sessionId: string | null;
+  linkedSessionId: string | null;  // When linked to an existing session
+  mode: ChatMode;
   selectedBlueprint: string;
   agentStatus: string;
   isLoading: boolean;
   pendingMessageId: string | null;
-  toolCalls: ToolCall[];
+  currentToolCalls: ToolCall[];  // Tool calls for the current pending message
 }
 
 interface ChatContextValue {
@@ -44,36 +50,149 @@ interface ChatContextValue {
   sessionNameRef: React.MutableRefObject<string | null>;
   sessionIdRef: React.MutableRefObject<string | null>;
   pendingMessageIdRef: React.MutableRefObject<string | null>;
+  linkedSessionIdRef: React.MutableRefObject<string | null>;
   resetChat: () => void;
+  // Session linking
+  linkToSession: (session: Session) => Promise<void>;
+  startNewChat: () => void;
+  isSessionActive: () => boolean;
 }
 
 const initialState: ChatState = {
   messages: [],
   sessionName: null,
   sessionId: null,
+  linkedSessionId: null,
+  mode: 'new',
   selectedBlueprint: '',
   agentStatus: '',
   isLoading: false,
   pendingMessageId: null,
-  toolCalls: [],
+  currentToolCalls: [],
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
+
+// Helper function to convert SessionEvents to ChatMessages
+function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+  const toolCallsMap: Map<number, ToolCall[]> = new Map(); // Map message index to its tool calls
+
+  // First pass: collect all messages and build tool call associations
+  let currentAssistantMsgIndex = -1;
+  const pendingToolCalls: ToolCall[] = [];
+
+  for (const event of events) {
+    if (event.event_type === 'message' && event.role && event.content) {
+      // Flush pending tool calls to the previous assistant message
+      if (pendingToolCalls.length > 0 && currentAssistantMsgIndex >= 0) {
+        toolCallsMap.set(currentAssistantMsgIndex, [...pendingToolCalls]);
+        pendingToolCalls.length = 0;
+      }
+
+      // Extract text content from the message
+      const textContent = event.content
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text)
+        .join('\n') || '';
+
+      const msg: ChatMessage = {
+        id: `msg-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        role: event.role,
+        content: textContent,
+        timestamp: new Date(event.timestamp),
+        status: 'complete',
+      };
+
+      messages.push(msg);
+
+      if (event.role === 'assistant') {
+        currentAssistantMsgIndex = messages.length - 1;
+      }
+    } else if (event.event_type === 'post_tool' && event.tool_name) {
+      // Collect tool calls - they belong to the next assistant message or current one
+      pendingToolCalls.push({
+        id: `tool-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        name: event.tool_name,
+        status: event.error ? 'error' : 'completed',
+        timestamp: new Date(event.timestamp),
+        input: event.tool_input,
+        output: event.tool_output,
+        error: event.error,
+      });
+    }
+  }
+
+  // Flush any remaining tool calls to the last assistant message
+  if (pendingToolCalls.length > 0 && currentAssistantMsgIndex >= 0) {
+    toolCallsMap.set(currentAssistantMsgIndex, [...pendingToolCalls]);
+  }
+
+  // Second pass: attach tool calls to messages
+  // Tool calls should be attached to the assistant message that comes AFTER them
+  // We need to re-process: tool calls belong to the assistant message they precede
+  const result: ChatMessage[] = [];
+  let accumulatedToolCalls: ToolCall[] = [];
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
+
+    if (event.event_type === 'post_tool' && event.tool_name) {
+      accumulatedToolCalls.push({
+        id: `tool-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        name: event.tool_name,
+        status: event.error ? 'error' : 'completed',
+        timestamp: new Date(event.timestamp),
+        input: event.tool_input,
+        output: event.tool_output,
+        error: event.error,
+      });
+    } else if (event.event_type === 'message' && event.role && event.content) {
+      const textContent = event.content
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text)
+        .join('\n') || '';
+
+      const msg: ChatMessage = {
+        id: `msg-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        role: event.role,
+        content: textContent,
+        timestamp: new Date(event.timestamp),
+        status: 'complete',
+        toolCalls: event.role === 'assistant' && accumulatedToolCalls.length > 0
+          ? [...accumulatedToolCalls]
+          : undefined,
+      };
+
+      result.push(msg);
+
+      // Clear accumulated tool calls after attaching to assistant message
+      if (event.role === 'assistant') {
+        accumulatedToolCalls = [];
+      }
+    }
+  }
+
+  return result;
+}
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialState.messages);
   const [sessionName, setSessionNameState] = useState<string | null>(initialState.sessionName);
   const [sessionId, setSessionIdState] = useState<string | null>(initialState.sessionId);
+  const [linkedSessionId, setLinkedSessionIdState] = useState<string | null>(initialState.linkedSessionId);
+  const [mode, setMode] = useState<ChatMode>(initialState.mode);
   const [selectedBlueprint, setSelectedBlueprint] = useState<string>(initialState.selectedBlueprint);
   const [agentStatus, setAgentStatus] = useState<string>(initialState.agentStatus);
   const [isLoading, setIsLoading] = useState<boolean>(initialState.isLoading);
   const [pendingMessageId, setPendingMessageIdState] = useState<string | null>(initialState.pendingMessageId);
-  const [toolCalls, setToolCalls] = useState<ToolCall[]>(initialState.toolCalls);
+  const [currentToolCalls, setCurrentToolCalls] = useState<ToolCall[]>(initialState.currentToolCalls);
 
   // Refs for WebSocket callbacks
   const sessionNameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pendingMessageIdRef = useRef<string | null>(null);
+  const linkedSessionIdRef = useRef<string | null>(null);
 
   // Wrapper to keep ref in sync with state
   const setSessionName = (name: string | null) => {
@@ -91,23 +210,69 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     pendingMessageIdRef.current = id;
   };
 
+  const setLinkedSessionId = (id: string | null) => {
+    setLinkedSessionIdState(id);
+    linkedSessionIdRef.current = id;
+  };
+
   const resetChat = () => {
     setMessages([]);
     setSessionName(null);
     setSessionId(null);
+    setLinkedSessionId(null);
+    setMode('new');
     setAgentStatus('');
     setIsLoading(false);
     setPendingMessageId(null);
-    setToolCalls([]);
+    setCurrentToolCalls([]);
     // Don't reset selectedBlueprint - user might want to keep it
   };
 
+  // Start a new chat (unlink from any session)
+  const startNewChat = useCallback(() => {
+    resetChat();
+  }, []);
+
+  // Link to an existing session
+  const linkToSession = useCallback(async (session: Session) => {
+    // Fetch events for this session
+    const events = await sessionService.getSessionEvents(session.session_id);
+
+    // Convert events to messages
+    const convertedMessages = convertEventsToMessages(events);
+
+    // Update state
+    setMessages(convertedMessages);
+    setSessionId(session.session_id);
+    setLinkedSessionId(session.session_id);
+    setSessionName(session.session_name || null);
+    setMode('linked');
+    setAgentStatus(session.status === 'running' ? 'running' : 'finished');
+    setIsLoading(false);
+    setPendingMessageId(null);
+    setCurrentToolCalls([]);
+  }, []);
+
+  // Check if current session is active (running)
+  const isSessionActive = useCallback(() => {
+    return isLoading || agentStatus === 'running' || agentStatus === 'starting';
+  }, [isLoading, agentStatus]);
+
   const { subscribe } = useWebSocket();
+
+  // Ref to track current tool calls for the pending message (needed for WebSocket callback)
+  const currentToolCallsRef = useRef<ToolCall[]>([]);
+
+  // Keep ref in sync
+  useEffect(() => {
+    currentToolCallsRef.current = currentToolCalls;
+  }, [currentToolCalls]);
 
   // Handle WebSocket messages at context level so they're processed even when Chat tab is not active
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     const currentSessionName = sessionNameRef.current;
     const currentSessionId = sessionIdRef.current;
+    const currentLinkedSessionId = linkedSessionIdRef.current;
     const currentPendingMessageId = pendingMessageIdRef.current;
 
     // Capture session_id from session_created or session_updated events
@@ -128,9 +293,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (message.type === 'event' && message.data) {
       const event = message.data;
 
-      // Check if this event is for our session
+      // Check if this event is for our session (either by sessionId or linkedSessionId)
       const isOurSession = currentSessionId
         ? event.session_id === currentSessionId
+        : currentLinkedSessionId
+        ? event.session_id === currentLinkedSessionId
         : false;
 
       if (!isOurSession) return;
@@ -144,15 +311,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           .join('\n') || '';
 
         if (textContent) {
-          // Update the pending message with the response and clear tool calls
+          // Get current tool calls to attach to the message
+          const toolCallsToAttach = [...currentToolCallsRef.current];
+
+          // Update the pending message with the response AND attach tool calls
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === currentPendingMessageId
-                ? { ...msg, content: textContent, status: 'complete' as const }
+                ? {
+                    ...msg,
+                    content: textContent,
+                    status: 'complete' as const,
+                    toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+                  }
                 : msg
             )
           );
-          setToolCalls([]);
+          // Clear current tool calls (they're now attached to the message)
+          setCurrentToolCalls([]);
           setAgentStatus('finished');
           setIsLoading(false);
           setPendingMessageId(null);
@@ -166,7 +342,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const toolOutput = event.tool_output;
         const toolError = event.error;
         const now = Date.now();
-        setToolCalls((prev) => {
+        setCurrentToolCalls((prev) => {
           // Deduplicate: check if same tool was added in last 500ms
           const recentDuplicate = prev.some(
             (tc) => tc.name === toolName && now - tc.timestamp.getTime() < 500
@@ -190,15 +366,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       // Also handle session_stop to mark completion if no message was received
       if (event.event_type === 'session_stop' && currentPendingMessageId) {
+        // Get current tool calls to attach to the message
+        const toolCallsToAttach = [...currentToolCallsRef.current];
+
         // Session ended - if we still have a pending message, mark it as complete
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === currentPendingMessageId && msg.status === 'pending'
-              ? { ...msg, content: msg.content || 'Session ended', status: 'complete' as const }
+              ? {
+                  ...msg,
+                  content: msg.content || 'Session ended',
+                  status: 'complete' as const,
+                  toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+                }
               : msg
           )
         );
-        setToolCalls([]);
+        setCurrentToolCalls([]);
         setAgentStatus('finished');
         setIsLoading(false);
         setPendingMessageId(null);
@@ -216,11 +400,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     messages,
     sessionName,
     sessionId,
+    linkedSessionId,
+    mode,
     selectedBlueprint,
     agentStatus,
     isLoading,
     pendingMessageId,
-    toolCalls,
+    currentToolCalls,
   };
 
   return (
@@ -237,7 +423,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         sessionNameRef,
         sessionIdRef,
         pendingMessageIdRef,
+        linkedSessionIdRef,
         resetChat,
+        linkToSession,
+        startNewChat,
+        isSessionActive,
       }}
     >
       {children}
