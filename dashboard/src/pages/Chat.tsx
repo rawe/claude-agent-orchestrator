@@ -136,7 +136,7 @@ function ToolCallBadge({ tool }: { tool: ToolCall }) {
         <div
           onMouseEnter={handlePopoverMouseEnter}
           onMouseLeave={handlePopoverMouseLeave}
-          className={`absolute z-50 w-96 max-w-[90vw] ${
+          className={`absolute z-50 min-w-96 w-auto max-w-xl max-w-[90vw] ${
             position.top ? 'bottom-full mb-2' : 'top-full mt-2'
           } ${
             position.left ? 'left-0' : 'right-0'
@@ -145,8 +145,8 @@ function ToolCallBadge({ tool }: { tool: ToolCall }) {
           <div className="bg-gray-900 text-gray-100 rounded-lg shadow-xl border border-gray-700 overflow-hidden max-h-80">
             {/* Header */}
             <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-gray-400" />
-              <span className="font-medium truncate">{tool.name}</span>
+              <Wrench className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="font-medium">{tool.name}</span>
               <span className={`ml-auto flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
                 tool.status === 'completed' ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'
               }`}>
@@ -373,21 +373,11 @@ export function Chat() {
                 : 'New conversation'}
             </p>
           </div>
-          {/* Session Info Badges */}
+          {/* Agent Badge */}
           {displayAgent && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
               <Bot className="w-3.5 h-3.5" />
               {displayAgent}
-            </div>
-          )}
-          {state.mode === 'linked' && currentSession && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-              {currentSession.status === 'finished' ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
-              ) : (
-                <XCircle className="w-3.5 h-3.5 text-amber-500" />
-              )}
-              {currentSession.status}
             </div>
           )}
         </div>
