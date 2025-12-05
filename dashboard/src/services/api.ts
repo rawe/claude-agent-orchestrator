@@ -9,10 +9,6 @@ export const agentOrchestratorApi = axios.create({
   },
 });
 
-// Aliases for backward compatibility
-export const agentRuntimeApi = agentOrchestratorApi;
-export const agentRegistryApi = agentOrchestratorApi;
-
 // Axios instance for context store server
 export const documentApi = axios.create({
   baseURL: DOCUMENT_SERVER_URL,
