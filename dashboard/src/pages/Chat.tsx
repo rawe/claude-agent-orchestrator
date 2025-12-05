@@ -466,11 +466,7 @@ export function Chat() {
                       {/* Loading indicator */}
                       <div className="flex items-center gap-2">
                         <Spinner size="sm" />
-                        <span className="text-sm text-gray-500">
-                          {state.currentToolCalls.some(tc => tc.status === 'running')
-                            ? 'Working...'
-                            : `Agent is ${state.agentStatus || 'starting'}...`}
-                        </span>
+                        <span className="text-sm text-gray-500">Agent is running...</span>
                       </div>
                     </div>
                   ) : message.role === 'assistant' ? (

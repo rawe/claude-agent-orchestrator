@@ -283,12 +283,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // Transition from 'new' to 'linked' mode once session is confirmed
         setMode('linked');
 
-        // Update status
+        // Update status - but only set 'running', not 'finished'
+        // The 'finished' status should only be set when we receive the actual response,
+        // otherwise we get a race condition where "Agent is finished" shows while still waiting
         if (message.session.status === 'running') {
           setAgentStatus('running');
-        } else if (message.session.status === 'finished') {
-          setAgentStatus('finished');
         }
+        // Note: 'finished' status is set when assistant message arrives (line ~332)
       }
     }
 
