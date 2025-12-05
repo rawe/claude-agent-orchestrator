@@ -12,6 +12,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.0",
     "@tanstack/react-table": "^8.21.0",
+    "@uiw/react-json-view": "^2.0.0-alpha.39",
     "axios": "^1.7.9",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",

@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useDocuments, useTags } from '@/hooks/useDocuments';
-import { DocumentTable, DocumentPreview, UploadModal } from '@/components/features/documents';
+import { DocumentTable, DocumentPreview, UploadModal, TagOverflowDropdown } from '@/components/features/documents';
 import { Button, Badge, ConfirmModal } from '@/components/common';
 import { useNotification } from '@/contexts';
 import { Document } from '@/types';
 import { documentService } from '@/services/documentService';
-import { Upload, X, Sparkles, RefreshCw } from 'lucide-react';
+import { Upload, X, Sparkles, RefreshCw, Tag } from 'lucide-react';
 
 export function Documents() {
   const { documents, loading, uploadDocument, deleteDocument, refetch } = useDocuments();
@@ -121,36 +121,46 @@ export function Documents() {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 p-4 border-b border-gray-200">
-        {/* Row 1: Upload + Refresh + Semantic Search */}
-        <div className="flex items-center gap-4">
-          <Button onClick={() => setShowUploadModal(true)} icon={<Upload className="w-4 h-4" />}>
-            Upload Document
+      {/* Header: Title + Actions */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <h1 className="text-lg font-semibold text-gray-900">Documents</h1>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setShowUploadModal(true)}
+            icon={<Upload className="w-4 h-4" />}
+          >
+            Upload
           </Button>
           <Button
             onClick={handleRefresh}
             variant="secondary"
             icon={<RefreshCw className={`w-4 h-4 ${loading || semanticSearching ? 'animate-spin' : ''}`} />}
             disabled={loading || semanticSearching}
-          >
-            Refresh
-          </Button>
+            title="Refresh"
+          />
+        </div>
+      </div>
 
-          {/* Semantic Search */}
-          <div className="flex items-center gap-2 flex-1 max-w-lg">
-            <div className="relative flex-1">
-              <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
-              <input
-                type="text"
-                placeholder="Ask a question about your documents..."
-                value={semanticQuery}
-                onChange={(e) => setSemanticQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch()}
-                disabled={semanticSearching}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50"
-              />
-            </div>
+      {/* Filter Section */}
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 space-y-3">
+        {/* Semantic Search */}
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            Semantic Search
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Ask a question about your documents..."
+              value={semanticQuery}
+              onChange={(e) => setSemanticQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch()}
+              disabled={semanticSearching}
+              className="flex-1 max-w-xl px-3 py-2 text-sm border border-gray-300 rounded-md
+                         focus:outline-none focus:ring-1 focus:ring-purple-500
+                         focus:border-purple-500 disabled:opacity-50"
+            />
             <Button
               onClick={handleSemanticSearch}
               disabled={!semanticQuery.trim() || semanticSearching}
@@ -158,73 +168,87 @@ export function Documents() {
             >
               {semanticSearching ? 'Searching...' : 'Search'}
             </Button>
-            {semanticResultIds !== null && (
+          </div>
+        </div>
+
+        {/* Tags */}
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+            <Tag className="w-4 h-4 text-gray-500" />
+            Tags
+            {visibleTags.length > 8 && (
+              <span className="text-xs text-gray-400 font-normal">
+                ({visibleTags.length} total)
+              </span>
+            )}
+          </label>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {visibleTags.slice(0, 8).map((tag) => (
               <button
-                onClick={clearSemanticSearch}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                title="Clear semantic search"
+                key={tag.name}
+                onClick={() => toggleTag(tag.name)}
+                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                  selectedTags.includes(tag.name)
+                    ? 'bg-primary-100 text-primary-700 font-medium'
+                    : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
               >
-                <X className="w-4 h-4" />
+                {tag.name} ({tag.count})
               </button>
+            ))}
+
+            {/* Overflow dropdown */}
+            {visibleTags.length > 8 && (
+              <TagOverflowDropdown
+                tags={visibleTags.slice(8)}
+                selectedTags={selectedTags}
+                onToggle={toggleTag}
+              />
+            )}
+
+            {visibleTags.length === 0 && (
+              <span className="text-xs text-gray-400 italic">No tags available</span>
             )}
           </div>
         </div>
 
-        {/* Row 2: Tag filter + Active filters */}
-        <div className="flex items-center justify-between gap-4">
-          {/* Tag filter */}
-          <div className="flex items-center gap-2 flex-1 max-w-xl">
-            <span className="text-sm text-gray-500">Tags:</span>
-            <div className="flex flex-wrap gap-1">
-              {visibleTags.slice(0, 10).map((tag) => (
-                <button
-                  key={tag.name}
-                  onClick={() => toggleTag(tag.name)}
-                  className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                    selectedTags.includes(tag.name)
-                      ? 'bg-primary-100 text-primary-700 font-medium'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {tag.name} ({tag.count})
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Active Filters */}
+        {(selectedTags.length > 0 || activeSemanticQuery) && (
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+            <span className="text-xs text-gray-500">Active:</span>
 
-          {/* Active filters */}
-          {(selectedTags.length > 0 || activeSemanticQuery) && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Filtering by:</span>
-              {activeSemanticQuery && (
-                <Badge size="sm" variant="info">
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  "{activeSemanticQuery.length > 30 ? activeSemanticQuery.slice(0, 30) + '...' : activeSemanticQuery}"
-                  <button onClick={clearSemanticSearch} className="ml-1">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              )}
-              {selectedTags.map((tag) => (
-                <Badge key={tag} size="sm" variant="info">
-                  {tag}
-                  <button onClick={() => toggleTag(tag)} className="ml-1">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-              <button
-                onClick={() => {
-                  setSelectedTags([]);
-                  clearSemanticSearch();
-                }}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
+            {activeSemanticQuery && (
+              <Badge size="sm" variant="info">
+                <Sparkles className="w-3 h-3 mr-1" />
+                {activeSemanticQuery.length > 30
+                  ? activeSemanticQuery.slice(0, 30) + '...'
+                  : activeSemanticQuery}
+                <button onClick={clearSemanticSearch} className="ml-1.5 hover:text-gray-700">
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+
+            {selectedTags.map((tag) => (
+              <Badge key={tag} size="sm" variant="info">
+                {tag}
+                <button onClick={() => toggleTag(tag)} className="ml-1.5 hover:text-gray-700">
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            ))}
+
+            <button
+              onClick={() => {
+                setSelectedTags([]);
+                clearSemanticSearch();
+              }}
+              className="ml-auto text-xs text-gray-500 hover:text-gray-700"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}

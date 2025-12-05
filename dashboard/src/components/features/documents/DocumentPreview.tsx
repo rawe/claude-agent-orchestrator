@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Document, DocumentRelation } from '@/types';
-import { Modal, Badge, CopyButton, Spinner } from '@/components/common';
+import { Modal, Badge, CopyButton, Spinner, JsonViewer } from '@/components/common';
 import { useDocumentContent } from '@/hooks/useDocuments';
 import { documentService } from '@/services/documentService';
 import { formatAbsoluteTime, formatFileSize } from '@/utils/formatters';
@@ -212,9 +212,11 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
           );
         }
         return (
-          <pre className="whitespace-pre-wrap text-sm font-mono bg-gray-900 text-gray-100 p-4 rounded-md">
-            {JSON.stringify(parsed, null, 2)}
-          </pre>
+          <JsonViewer
+            data={parsed}
+            collapsed={false}
+            className={isFullscreen ? 'max-h-none' : 'max-h-[500px]'}
+          />
         );
       } catch {
         return (
