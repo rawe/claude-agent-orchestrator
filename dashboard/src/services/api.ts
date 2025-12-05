@@ -1,9 +1,17 @@
 import axios from 'axios';
-import { AGENT_ORCHESTRATOR_API_URL, DOCUMENT_SERVER_URL } from '@/utils/constants';
+import { AGENT_ORCHESTRATOR_API_URL, AGENT_CONTROL_API_URL, DOCUMENT_SERVER_URL } from '@/utils/constants';
 
 // Axios instance for Agent Orchestrator API (sessions, events, agent blueprints)
 export const agentOrchestratorApi = axios.create({
   baseURL: AGENT_ORCHESTRATOR_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Axios instance for Agent Control API (start/resume sessions)
+export const agentControlApi = axios.create({
+  baseURL: AGENT_CONTROL_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -28,4 +36,5 @@ const handleError = (error: unknown) => {
 };
 
 agentOrchestratorApi.interceptors.response.use((response) => response, handleError);
+agentControlApi.interceptors.response.use((response) => response, handleError);
 documentApi.interceptors.response.use((response) => response, handleError);

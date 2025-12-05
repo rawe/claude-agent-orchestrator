@@ -7,6 +7,7 @@ services:
       # These are baked in at build time via Vite
       # For runtime config, use nginx reverse proxy or rebuild
       - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
+      - VITE_AGENT_CONTROL_API_URL=http://localhost:9500
       - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
       - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
     restart: unless-stopped
@@ -23,6 +24,7 @@ services:
     command: sh -c "npm install && npm run dev -- --host"
     environment:
       - VITE_AGENT_ORCHESTRATOR_API_URL=http://host.docker.internal:8765
+      - VITE_AGENT_CONTROL_API_URL=http://host.docker.internal:9500
       - VITE_DOCUMENT_SERVER_URL=http://host.docker.internal:8766
       - VITE_WEBSOCKET_URL=ws://host.docker.internal:8765/ws
     profiles:

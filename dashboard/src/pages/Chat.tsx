@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { chatService, Blueprint } from '@/services/chatService';
+import { chatService } from '@/services/chatService';
+import type { Agent } from '@/types';
 import { useNotification, useWebSocket, useChat } from '@/contexts';
 import { Button, Spinner } from '@/components/common';
 import { Send, Bot, User, RefreshCw, Wifi, WifiOff, RotateCw, Wrench, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
@@ -220,7 +221,7 @@ export function Chat() {
     resetChat,
   } = useChat();
 
-  const [blueprints, setBlueprints] = useState<Blueprint[]>([]);
+  const [blueprints, setBlueprints] = useState<Agent[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoadingBlueprints, setIsLoadingBlueprints] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);

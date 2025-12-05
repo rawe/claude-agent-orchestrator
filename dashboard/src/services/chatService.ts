@@ -1,13 +1,9 @@
-import { agentOrchestratorApi } from './api';
-
-export interface Blueprint {
-  name: string;
-  description: string;
-}
+import { agentOrchestratorApi, agentControlApi } from './api';
+import type { Agent } from '@/types';
 
 export interface BlueprintListResponse {
   total: number;
-  blueprints: Blueprint[];
+  blueprints: Agent[];
 }
 
 export interface SessionStartRequest {
@@ -31,26 +27,30 @@ export interface SessionResumeRequest {
 
 export const chatService = {
   /**
-   * List all available agent blueprints
+   * List all available agent blueprints from agent-runtime
    */
   async listBlueprints(): Promise<BlueprintListResponse> {
-    const response = await agentOrchestratorApi.get<BlueprintListResponse>('/api/blueprints');
-    return response.data;
+    const response = await agentOrchestratorApi.get<Agent[]>('/agents');
+    const agents = response.data;
+    return {
+      total: agents.length,
+      blueprints: agents,
+    };
   },
 
   /**
-   * Start a new agent session
+   * Start a new agent session via agent control API
    */
   async startSession(request: SessionStartRequest): Promise<SessionStartResponse> {
-    const response = await agentOrchestratorApi.post<SessionStartResponse>('/api/sessions', request);
+    const response = await agentControlApi.post<SessionStartResponse>('/api/sessions', request);
     return response.data;
   },
 
   /**
-   * Resume an existing session with a new prompt
+   * Resume an existing session with a new prompt via agent control API
    */
   async resumeSession(sessionName: string, request: SessionResumeRequest): Promise<SessionStartResponse> {
-    const response = await agentOrchestratorApi.post<SessionStartResponse>(
+    const response = await agentControlApi.post<SessionStartResponse>(
       `/api/sessions/${sessionName}/resume`,
       request
     );
