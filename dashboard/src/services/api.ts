@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { AGENT_RUNTIME_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL, AGENT_ORCHESTRATOR_URL } from '@/utils/constants';
+import { AGENT_RUNTIME_URL, DOCUMENT_SERVER_URL, AGENT_ORCHESTRATOR_URL } from '@/utils/constants';
 
-// Axios instance for agent runtime
+// Axios instance for agent runtime (also handles agent registry endpoints)
 export const agentRuntimeApi = axios.create({
   baseURL: AGENT_RUNTIME_URL,
   headers: {
@@ -9,17 +9,12 @@ export const agentRuntimeApi = axios.create({
   },
 });
 
+// Alias for backward compatibility - agent registry is now merged into runtime
+export const agentRegistryApi = agentRuntimeApi;
+
 // Axios instance for context store server
 export const documentApi = axios.create({
   baseURL: DOCUMENT_SERVER_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Axios instance for agent registry
-export const agentRegistryApi = axios.create({
-  baseURL: AGENT_REGISTRY_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -45,5 +40,4 @@ const handleError = (error: unknown) => {
 
 agentRuntimeApi.interceptors.response.use((response) => response, handleError);
 documentApi.interceptors.response.use((response) => response, handleError);
-agentRegistryApi.interceptors.response.use((response) => response, handleError);
 agentOrchestratorApi.interceptors.response.use((response) => response, handleError);
