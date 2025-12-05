@@ -524,7 +524,7 @@ export function Chat() {
 
         {/* Input Area */}
         <div className="p-4">
-          <div className="flex gap-3">
+          <div className="relative border border-gray-300 rounded-xl focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent transition-all">
             <textarea
               ref={inputRef}
               value={inputValue}
@@ -533,16 +533,15 @@ export function Chat() {
               placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
               disabled={state.isLoading}
               rows={3}
-              className="flex-1 px-4 py-3 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 pr-14 text-sm rounded-xl resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
             />
-            <Button
+            <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || state.isLoading || !connected}
-              icon={state.isLoading ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}
-              className="self-end"
+              className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
             >
-              Send
-            </Button>
+              {state.isLoading ? <Spinner size="sm" /> : <Send className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </div>

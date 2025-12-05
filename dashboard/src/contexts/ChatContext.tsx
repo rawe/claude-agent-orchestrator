@@ -280,6 +280,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (message.session.session_name === currentSessionName) {
         setSessionId(message.session.session_id);
 
+        // Transition from 'new' to 'linked' mode once session is confirmed
+        setMode('linked');
+
         // Update status
         if (message.session.status === 'running') {
           setAgentStatus('running');
