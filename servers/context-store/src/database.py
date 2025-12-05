@@ -370,13 +370,13 @@ class DocumentDatabase:
     def get_child_document_ids(self, document_id: str) -> List[str]:
         """Get IDs of all child documents (where this document is the parent).
 
-        A document is a parent when it has relations with relation_type='parent',
-        meaning it stores "I am parent of related_document_id".
+        A document is a parent when it has relations with relation_type='child',
+        meaning it stores "related_document_id is my child".
         """
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT related_document_id FROM document_relations
-            WHERE document_id = ? AND relation_type = 'parent'
+            WHERE document_id = ? AND relation_type = 'child'
         """, (document_id,))
         rows = cursor.fetchall()
         return [row["related_document_id"] for row in rows]

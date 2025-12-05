@@ -107,8 +107,8 @@ class RelationDefinitions:
     PARENT_CHILD = RelationDefinition(
         name="parent-child",
         description="Hierarchical relation where parent owns children. Cascade delete enabled.",
-        from_type="parent",
-        to_type="child"
+        from_type="child",
+        to_type="parent"
     )
 
     RELATED = RelationDefinition(
@@ -121,8 +121,8 @@ class RelationDefinitions:
     PREDECESSOR_SUCCESSOR = RelationDefinition(
         name="predecessor-successor",
         description="Sequential ordering relation.",
-        from_type="predecessor",
-        to_type="successor"
+        from_type="successor",
+        to_type="predecessor"
     )
 
     # Registry for lookups (initialized lazily)

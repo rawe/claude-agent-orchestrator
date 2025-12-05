@@ -511,8 +511,8 @@ async function pushToContextStore() {
               definition: 'parent-child',
               fromDocumentId: reportId,
               toDocumentId: screenshotId,
-              fromNote: 'associated bug report',
-              toNote: 'Screenshot of bug report'
+              fromNote: 'Visual evidence screenshot',
+              toNote: 'Parent bug report'
             }
           });
 

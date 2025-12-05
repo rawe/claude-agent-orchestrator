@@ -125,11 +125,11 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
 
   const getRelationLabel = (type: string) => {
     switch (type) {
-      case 'parent': return 'Parent of';
-      case 'child': return 'Child of';
-      case 'related': return 'Related to';
-      case 'predecessor': return 'Precedes';
-      case 'successor': return 'Follows';
+      case 'parent': return 'Parents';
+      case 'child': return 'Children';
+      case 'related': return 'Related';
+      case 'predecessor': return 'Predecessors';
+      case 'successor': return 'Successors';
       default: return type;
     }
   };
