@@ -5,7 +5,7 @@ import { useNotification, useWebSocket, useChat } from '@/contexts';
 import { useSessions } from '@/hooks/useSessions';
 import { Button, Spinner } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
-import { Send, Bot, User, RefreshCw, Wifi, WifiOff, Wrench, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
+import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ToolCall } from '@/contexts/ChatContext';
@@ -350,29 +350,48 @@ export function Chat() {
     }
   };
 
+  // Get current session info for header display
+  const currentSessionId = state.linkedSessionId || state.sessionId;
+  const currentSession = currentSessionId
+    ? sessions.find(s => s.session_id === currentSessionId)
+    : null;
+
+  // Determine what agent/blueprint to show
+  const displayAgent = currentSession?.agent_name
+    || (state.selectedBlueprint || null);
+
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 p-4 border-b border-gray-200">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Agent Chat</h2>
-          <p className="text-sm text-gray-500">
-            Chat with AI agents using the Agent Orchestration Framework
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Connection Status */}
-          <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
-            connected ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-          }`}>
-            {connected ? (
-              <Wifi className="w-3 h-3" />
-            ) : (
-              <WifiOff className="w-3 h-3" />
-            )}
-            {connected ? 'Connected' : 'Disconnected'}
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Agent Chat</h2>
+            <p className="text-sm text-gray-500">
+              {state.mode === 'linked' && currentSession
+                ? currentSession.session_name || currentSession.session_id.slice(0, 12)
+                : 'New conversation'}
+            </p>
           </div>
-
+          {/* Session Info Badges */}
+          {displayAgent && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
+              <Bot className="w-3.5 h-3.5" />
+              {displayAgent}
+            </div>
+          )}
+          {state.mode === 'linked' && currentSession && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+              {currentSession.status === 'finished' ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              ) : (
+                <XCircle className="w-3.5 h-3.5 text-amber-500" />
+              )}
+              {currentSession.status}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           {/* New Chat Button */}
           <Button
             variant="secondary"
@@ -382,6 +401,18 @@ export function Chat() {
           >
             New Chat
           </Button>
+          {/* Force Reset Button - always enabled */}
+          <button
+            onClick={() => {
+              resetChat();
+              setSelectedBlueprint(''); // Also clear the blueprint selection
+              startNewChat();
+            }}
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Force reset - clears everything even if agent is running"
+          >
+            <Ban className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
