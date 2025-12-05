@@ -13,7 +13,7 @@ Resume an existing agent orchestrator session.
 This command continues a previous session with a new prompt.
 
 Configuration:
-    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
+    AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
 """
 
 import sys
@@ -39,7 +39,7 @@ def main(
         ao-resume mysession -p "Add error handling"
         cat additional-requirements.md | ao-resume mysession
     """
-    from config import get_session_manager_url
+    from config import get_api_url
     from session import validate_session_name
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
@@ -62,12 +62,12 @@ def main(
         # 1. Validate session name
         validate_session_name(session_name)
 
-        # 2. Get session manager URL
-        session_manager_url = get_session_manager_url()
+        # 2. Get API URL
+        api_url = get_api_url()
 
         # 3. Check session exists and load metadata via API
         try:
-            client = SessionClient(session_manager_url)
+            client = SessionClient(api_url)
             session_data = client.get_session_by_name(session_name)
         except SessionClientError as e:
             error_exit(f"Failed to connect to session manager: {e}")
@@ -122,7 +122,7 @@ def main(
             session_name=session_name,
             mcp_servers=mcp_servers,
             resume_session_id=resume_session_id,  # KEY: Enable resume
-            session_manager_url=session_manager_url,
+            api_url=api_url,
             agent_name=session_agent,
         )
 

@@ -72,153 +72,7 @@ The current session status is only `running` | `finished`. Need to add:
 
 ---
 
-## 2. Agent Manager Service (New Service - Port 8767) ❌
-
-This is an **entirely new service** that needs to be created.
-
-### 2.1 Service Architecture
-
-**Technology Stack:**
-- FastAPI (consistent with other services)
-- SQLite or file-based storage
-- No authentication in V1
-
-**Base URL:** `http://localhost:8767`
-
-### 2.2 Required Endpoints
-
-#### GET /agents
-List all agent blueprints
-
-**Response:**
-```json
-[
-  {
-    "name": "code-reviewer",
-    "description": "Reviews code and suggests improvements",
-    "system_prompt": "You are a code reviewer...",
-    "mcp_servers": ["github", "filesystem"],
-    "skills": ["pdf"],
-    "status": "active",
-    "created_at": "2025-01-15T10:30:00Z",
-    "updated_at": "2025-01-15T10:30:00Z"
-  }
-]
-```
-
-#### GET /agents/{name}
-Get single agent blueprint
-
-**Response:** Same as single item from list
-
-#### POST /agents
-Create new agent blueprint
-
-**Request:**
-```json
-{
-  "name": "new-agent",
-  "description": "Agent description",
-  "system_prompt": "System prompt markdown...",
-  "mcp_servers": ["github"],
-  "skills": ["pdf"]
-}
-```
-
-**Response:**
-```json
-{
-  "name": "new-agent",
-  "description": "Agent description",
-  "system_prompt": "System prompt markdown...",
-  "mcp_servers": ["github"],
-  "skills": ["pdf"],
-  "status": "active",
-  "created_at": "2025-01-15T10:30:00Z",
-  "updated_at": "2025-01-15T10:30:00Z"
-}
-```
-
-**Validation:**
-- Name must be unique
-- Name must be alphanumeric + hyphens only
-- Description required
-- System prompt required
-
-#### PATCH /agents/{name}
-Update existing agent
-
-**Request:** Partial update allowed
-```json
-{
-  "description": "Updated description",
-  "system_prompt": "Updated prompt..."
-}
-```
-
-**Response:** Full agent object
-
-#### DELETE /agents/{name}
-Delete agent blueprint
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Agent deleted successfully"
-}
-```
-
-**Validation:**
-- Should warn/prevent deletion if agent has active sessions
-
-#### PATCH /agents/{name}/status
-Activate or deactivate agent
-
-**Request:**
-```json
-{
-  "status": "active" | "inactive"
-}
-```
-
-**Response:** Full agent object
-
-### 2.3 Storage Options
-
-**Option A: File-based (Recommended for V1)**
-- Continue using `.agent-orchestrator/agents/{name}/` structure
-- Add `agent.status.json` file for status tracking
-- Service reads/writes directly to file system
-- Pro: Consistent with existing CLI behavior
-- Con: Need to handle file locking, concurrent access
-
-**Option B: SQLite Database**
-- New database for agent blueprints
-- Pro: Better querying, transactions
-- Con: Duplication of source of truth with file system
-
-**Recommendation:** Start with Option A (file-based) to maintain consistency with CLI tools.
-
-### 2.4 Integration with Existing System
-
-The CLI currently reads agents from:
-```
-{project_dir}/.agent-orchestrator/agents/{agent-name}/
-  ├── agent.json          # name, description
-  ├── agent.system-prompt.md  # system prompt
-  └── agent.mcp.json      # MCP server config (optional)
-```
-
-The new Agent Manager Service should:
-1. Read from this same location
-2. Write to this same location
-3. Add a new file `agent.status.json` for active/inactive status
-4. Transform data to/from the API format
-
----
-
-## 3. Document Server Extensions (Port 8766)
+## 2. Document Server Extensions (Port 8766)
 
 ### Existing Endpoints ✅
 | Endpoint | Method | Status |
@@ -283,9 +137,9 @@ PATCH /documents/{id}
 
 ---
 
-## 4. Data Model Alignment
+## 3. Data Model Alignment
 
-### 4.1 Session Model Changes
+### 3.1 Session Model Changes
 
 **Current:**
 ```python
@@ -316,7 +170,7 @@ PATCH /documents/{id}
 - Add `modified_at` field (or rename existing if present)
 - Add `stopped` status option
 
-### 4.2 Document Model Alignment
+### 3.2 Document Model Alignment
 
 **Current field:** `content_type`
 **Design field:** `mime_type`
@@ -325,7 +179,7 @@ PATCH /documents/{id}
 
 ---
 
-## 5. WebSocket Events
+## 4. WebSocket Events
 
 ### Existing Events ✅
 - `init` - Initial state with all sessions
@@ -335,7 +189,7 @@ PATCH /documents/{id}
 
 ### Potentially Needed Events 🔧
 
-#### 5.1 Session Stopped Event
+#### 4.1 Session Stopped Event
 When session is stopped via new `/stop` endpoint:
 ```json
 {
@@ -352,7 +206,7 @@ This should work with existing `session_updated` event type.
 
 ---
 
-## 6. Implementation Priority
+## 5. Implementation Priority
 
 ### Phase 1: Minimum for Frontend Demo
 1. ❌ `GET /documents/tags` - Easy, enables tag filtering
@@ -362,36 +216,27 @@ This should work with existing `session_updated` event type.
 3. 🔧 Add `stopped` status to session model
 4. ❌ `POST /sessions/{id}/stop` - Complex, requires process management
 
-### Phase 3: Agent Management
-5. ❌ New Agent Manager Service - Complete service with file-based storage
-
 ---
 
-## 7. Configuration
+## 6. Configuration
 
-### Environment Variables for New Service
+### Environment Variables
 
 ```bash
-# Agent Manager Service
-AGENT_MANAGER_HOST=0.0.0.0
-AGENT_MANAGER_PORT=8767
-AGENT_MANAGER_PROJECT_DIR=/path/to/project  # Where .agent-orchestrator lives
-
-# Or use existing
+# Agent Runtime (unified service - sessions + agent blueprints)
 AGENT_ORCHESTRATOR_PROJECT_DIR=/path/to/project
 ```
 
 ### Frontend Environment Variables
 
 ```bash
-VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
-VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-VITE_AGENT_MANAGER_URL=http://localhost:8767
+VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765  # Sessions + Agent blueprints
+VITE_DOCUMENT_SERVER_URL=http://localhost:8766  # Document store
 ```
 
 ---
 
-## 8. Notes for Frontend Development
+## 7. Notes for Frontend Development
 
 While these backend features are being implemented, the frontend will:
 
@@ -406,9 +251,8 @@ While these backend features are being implemented, the frontend will:
    - Metadata editing: Disabled in V1 anyway
 
 3. **Agent Manager Tab:**
-   - Complete mock service in frontend
-   - All CRUD operations work with in-memory mock data
-   - Ready for real backend when implemented
+   - Uses Agent Runtime API at port 8765
+   - All CRUD operations functional
 
 ---
 

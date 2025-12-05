@@ -4,12 +4,11 @@ This guide explains how to use the centralized Docker setup for the Agent Orches
 
 ## Overview
 
-The Agent Orchestrator Framework consists of four main Docker services:
+The Agent Orchestrator Framework consists of three main Docker services:
 
 1. **Dashboard** (Port 3000) - React-based UI for agent management, session monitoring, and document management
-2. **Agent Registry** (Port 8767) - FastAPI service for agent blueprint CRUD operations
-3. **Agent Runtime** (Port 8765) - Python-based WebSocket server for agent session management and observability
-4. **Context Store** (Port 8766) - Python-based document storage and retrieval service
+2. **Agent Runtime** (Port 8765) - FastAPI server for agent session management, observability, and agent blueprint registry
+3. **Context Store** (Port 8766) - Python-based document storage and retrieval service
 
 ## Architecture
 
@@ -21,20 +20,22 @@ The Agent Orchestrator Framework consists of four main Docker services:
 │  ┌────────────────────────────────────────────────────────────────────┐  │
 │  │                         Dashboard (Port 3000)                       │  │
 │  │        Agent Management | Sessions | Documents                      │  │
-│  └───────────────┬─────────────────┬─────────────────┬────────────────┘  │
-│                  │                 │                 │                    │
-│                  ▼                 ▼                 ▼                    │
-│  ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐       │
-│  │  Agent Registry   │ │   Agent Runtime   │ │  Context Store    │       │
-│  │    (Port 8767)    │ │    (Port 8765)    │ │    (Port 8766)    │       │
-│  │                   │ │                   │ │                   │       │
-│  └─────────┬─────────┘ └───────────────────┘ └─────────┬─────────┘       │
-│            │                                           │                  │
-│            ▼                                           ▼                  │
-│  ┌───────────────────┐                      ┌───────────────────┐        │
-│  │   Volume Mount    │                      │   Named Volume    │        │
-│  │   (agents dir)    │                      │   (persistent)    │        │
-│  └───────────────────┘                      └───────────────────┘        │
+│  └───────────────────────────────────────┬──────────────────┬─────────┘  │
+│                                          │                  │            │
+│                                          ▼                  ▼            │
+│               ┌───────────────────────────────┐ ┌───────────────────┐    │
+│               │      Agent Runtime            │ │  Context Store    │    │
+│               │       (Port 8765)             │ │    (Port 8766)    │    │
+│               │  - Session management         │ │                   │    │
+│               │  - Agent blueprint registry   │ │                   │    │
+│               │  - WebSocket events           │ │                   │    │
+│               └───────────────┬───────────────┘ └─────────┬─────────┘    │
+│                               │                           │              │
+│                               ▼                           ▼              │
+│               ┌───────────────────┐           ┌───────────────────┐     │
+│               │   Volume Mount    │           │   Named Volume    │     │
+│               │   (agents dir)    │           │   (persistent)    │     │
+│               └───────────────────┘           └───────────────────┘     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,7 +73,7 @@ docker-compose logs -f
 
 ## Custom Agent Directory Configuration
 
-By default, the Agent Registry service looks for agent blueprints in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
+By default, the Agent Runtime service looks for agent blueprints in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
 
 ### Option 1: Using a `.env` file (Simplest)
 
@@ -102,7 +103,7 @@ Edit `docker-compose.override.yml`:
 
 ```yaml
 services:
-  agent-registry:
+  agent-runtime:
     volumes:
       - /path/to/your/agents:/data/agents
 ```
@@ -177,28 +178,27 @@ Run `make help` to see all available commands:
 - Document Management (upload, tag, preview)
 - Agent Manager (create/edit agent blueprints)
 
-### Agent Registry
+### Agent Runtime
 
-- **Port:** 8767
-- **Technology:** Python 3.12 + FastAPI
-- **Purpose:** CRUD API for agent blueprints
-- **Health Check:** http://localhost:8767/health
-- **Code Location:** `./servers/agent-registry`
+- **Port:** 8765
+- **Technology:** Python 3.11 + FastAPI + WebSockets
+- **Purpose:** Session management, agent blueprint registry, and real-time event capture
+- **Health Check:** http://localhost:8765/health
+- **Code Location:** `./servers/agent-runtime`
+
+**API Endpoints:**
+- `/sessions/*` - Session management
+- `/events/*` - Event tracking
+- `/ws` - WebSocket for real-time updates
+- `/agents/*` - Agent blueprint CRUD operations
+- `/health` - Health check
 
 **Environment Variables:**
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_REGISTRY_HOST` | `0.0.0.0` | Server bind address |
-| `AGENT_REGISTRY_PORT` | `8767` | Server port |
+| `DEBUG_LOGGING` | `false` | Enable verbose debug logging |
+| `CORS_ORIGINS` | `*` | Allowed CORS origins |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `/data/agents` | Agents storage directory (in container) |
-
-### Agent Runtime
-
-- **Port:** 8765
-- **Technology:** Python 3.12 + FastAPI + WebSockets
-- **Purpose:** Session management, agent spawning, and real-time event capture
-- **Health Check:** http://localhost:8765/sessions
-- **Code Location:** `./servers/agent-runtime`
 
 **Development Mode:**
 - Source code is mounted as a volume
@@ -309,9 +309,6 @@ docker-compose build --no-cache
 # Build only dashboard
 docker-compose build dashboard
 
-# Build only agent registry
-docker-compose build agent-registry
-
 # Build only agent runtime
 docker-compose build agent-runtime
 
@@ -329,14 +326,8 @@ The build process for each service:
 3. Builds production bundle with Vite
 4. Serves via nginx on port 80
 
-**Agent Registry:**
-1. Uses `python:3.12-slim` base image
-2. Installs `uv` package manager
-3. Copies `pyproject.toml` and installs dependencies
-4. Runs FastAPI server
-
 **Agent Runtime:**
-1. Uses `python:3.12-slim` base image
+1. Uses `python:3.11-slim` base image
 2. Installs `uv` package manager
 3. Copies `pyproject.toml` and installs dependencies
 4. Runs FastAPI server with WebSocket support
@@ -356,7 +347,6 @@ Check if ports are already in use:
 ```bash
 # Check if ports are occupied
 lsof -i :3000  # Dashboard
-lsof -i :8767  # Agent Registry
 lsof -i :8765  # Agent Runtime
 lsof -i :8766  # Context Store
 ```
@@ -373,8 +363,7 @@ Or manually:
 
 ```bash
 curl http://localhost:3000       # Dashboard
-curl http://localhost:8767/health  # Agent Registry
-curl http://localhost:8765/sessions  # Agent Runtime
+curl http://localhost:8765/health  # Agent Runtime
 curl http://localhost:8766/health  # Context Store
 ```
 
@@ -489,10 +478,10 @@ The dashboard provides a single interface for all agent orchestration tasks:
 Create a `.env` file in the project root:
 
 ```env
-# Agent Manager
+# Agent directory
 AGENT_DIR=/path/to/your/agents
 
-# Observability
+# Debug logging
 DEBUG_LOGGING=true
 ```
 
@@ -516,11 +505,11 @@ You can start specific services:
 # Only context store
 docker-compose up context-store
 
-# Only agent registry
-docker-compose up agent-registry
+# Only agent runtime
+docker-compose up agent-runtime
 
 # Dashboard with all backends
-docker-compose up dashboard agent-registry agent-runtime context-store
+docker-compose up dashboard agent-runtime context-store
 ```
 
 ## Service Architecture

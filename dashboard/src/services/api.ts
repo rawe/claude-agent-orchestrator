@@ -1,9 +1,17 @@
 import axios from 'axios';
-import { AGENT_RUNTIME_URL, DOCUMENT_SERVER_URL, AGENT_REGISTRY_URL, AGENT_ORCHESTRATOR_URL } from '@/utils/constants';
+import { AGENT_ORCHESTRATOR_API_URL, AGENT_CONTROL_API_URL, DOCUMENT_SERVER_URL } from '@/utils/constants';
 
-// Axios instance for agent runtime
-export const agentRuntimeApi = axios.create({
-  baseURL: AGENT_RUNTIME_URL,
+// Axios instance for Agent Orchestrator API (sessions, events, agent blueprints)
+export const agentOrchestratorApi = axios.create({
+  baseURL: AGENT_ORCHESTRATOR_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Axios instance for Agent Control API (start/resume sessions)
+export const agentControlApi = axios.create({
+  baseURL: AGENT_CONTROL_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,22 +20,6 @@ export const agentRuntimeApi = axios.create({
 // Axios instance for context store server
 export const documentApi = axios.create({
   baseURL: DOCUMENT_SERVER_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Axios instance for agent registry
-export const agentRegistryApi = axios.create({
-  baseURL: AGENT_REGISTRY_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Axios instance for agent orchestrator API
-export const agentOrchestratorApi = axios.create({
-  baseURL: AGENT_ORCHESTRATOR_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -43,7 +35,6 @@ const handleError = (error: unknown) => {
   throw error;
 };
 
-agentRuntimeApi.interceptors.response.use((response) => response, handleError);
-documentApi.interceptors.response.use((response) => response, handleError);
-agentRegistryApi.interceptors.response.use((response) => response, handleError);
 agentOrchestratorApi.interceptors.response.use((response) => response, handleError);
+agentControlApi.interceptors.response.use((response) => response, handleError);
+documentApi.interceptors.response.use((response) => response, handleError);

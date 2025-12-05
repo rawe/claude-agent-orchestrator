@@ -1,30 +1,28 @@
 """
-HTTP client for Agent Manager API.
+HTTP client for Agent API (agent blueprints).
+
+The agent registry is now merged into the agent-runtime service.
 
 Environment variables:
-    AGENT_ORCHESTRATOR_AGENT_API_URL: API base URL (default: http://localhost:8767)
+    AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
 """
 
-import os
 import urllib.request
 import urllib.error
 import json
 from typing import Optional
 
-
-def get_api_url() -> str:
-    """Get Agent Manager API URL from environment or default."""
-    return os.environ.get("AGENT_ORCHESTRATOR_AGENT_API_URL", "http://localhost:8767")
+from config import get_api_url
 
 
 class AgentAPIError(Exception):
-    """Error communicating with Agent Manager API."""
+    """Error communicating with Agent API."""
 
     pass
 
 
 def _request(method: str, path: str, data: Optional[dict] = None) -> dict | list | None:
-    """Make HTTP request to Agent Manager API."""
+    """Make HTTP request to Agent API."""
     url = f"{get_api_url()}{path}"
 
     request = urllib.request.Request(url, method=method)
@@ -50,8 +48,8 @@ def _request(method: str, path: str, data: Optional[dict] = None) -> dict | list
         raise AgentAPIError(f"API error ({e.code}): {detail}")
     except urllib.error.URLError as e:
         raise AgentAPIError(
-            f"Cannot connect to Agent Manager API at {get_api_url()}\n"
-            f"Ensure the service is running: make start-bg\n"
+            f"Cannot connect to Agent API at {get_api_url()}\n"
+            f"Ensure the agent-runtime service is running: make start-bg\n"
             f"Error: {e.reason}"
         )
 

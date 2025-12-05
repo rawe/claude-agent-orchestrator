@@ -32,7 +32,7 @@ def main(
     Examples:
         ao-show-config mysession
     """
-    from config import get_session_manager_url
+    from config import get_api_url
     from session import validate_session_name
     from session_client import SessionClient, SessionClientError
 
@@ -40,12 +40,12 @@ def main(
         # Validate session name
         validate_session_name(session_name)
 
-        # Get session manager URL
-        session_manager_url = get_session_manager_url()
+        # Get API URL
+        api_url = get_api_url()
 
         # Get session from API
         try:
-            client = SessionClient(session_manager_url)
+            client = SessionClient(api_url)
             session_data = client.get_session_by_name(session_name)
         except SessionClientError as e:
             print(f"Error: Failed to connect to session manager: {e}", file=sys.stderr)

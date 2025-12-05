@@ -20,8 +20,7 @@ make start-bg
 ```
 
 This starts in the background:
-- Agent Runtime (port 8765) - Session tracking
-- Agent Registry (port 8767) - Agent blueprints
+- Agent Runtime (port 8765) - Session tracking + Agent blueprints
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
@@ -100,8 +99,7 @@ make start-bg
 ```
 
 This starts in the background:
-- Agent Runtime (port 8765) - Session tracking
-- Agent Registry (port 8767) - Agent blueprints
+- Agent Runtime (port 8765) - Session tracking + Agent blueprints
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 

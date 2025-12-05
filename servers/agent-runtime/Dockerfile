@@ -18,9 +18,9 @@ COPY . .
 # Expose port
 EXPOSE 8765
 
-# Health check
+# Health check (uses /health endpoint)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8765/sessions')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')" || exit 1
 
 # Run the server
 CMD ["python", "-m", "main"]

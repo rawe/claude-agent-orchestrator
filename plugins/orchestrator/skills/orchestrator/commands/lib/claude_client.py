@@ -68,7 +68,7 @@ async def run_claude_session(
     session_name: Optional[str] = None,
     mcp_servers: Optional[dict] = None,
     resume_session_id: Optional[str] = None,
-    session_manager_url: str = "http://127.0.0.1:8765",
+    api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
@@ -83,7 +83,7 @@ async def run_claude_session(
         session_name: Session name for the session manager
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_session_id: If provided, resume existing session
-        session_manager_url: Base URL of session manager API
+        api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
 
     Returns:
@@ -103,7 +103,7 @@ async def run_claude_session(
         ... )
     """
     # Create session client for API calls
-    session_client = SessionClient(session_manager_url)
+    session_client = SessionClient(api_url)
 
     # Import SDK here to give better error message if not installed
     try:
@@ -276,7 +276,7 @@ def run_session_sync(
     session_name: Optional[str] = None,
     mcp_servers: Optional[dict] = None,
     resume_session_id: Optional[str] = None,
-    session_manager_url: str = "http://127.0.0.1:8765",
+    api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
@@ -291,7 +291,7 @@ def run_session_sync(
         session_name: Session name for the session manager
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_session_id: If provided, resume existing session
-        session_manager_url: Base URL of session manager API
+        api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
 
     Returns:
@@ -317,7 +317,7 @@ def run_session_sync(
             session_name=session_name,
             mcp_servers=mcp_servers,
             resume_session_id=resume_session_id,
-            session_manager_url=session_manager_url,
+            api_url=api_url,
             agent_name=agent_name,
         )
     )

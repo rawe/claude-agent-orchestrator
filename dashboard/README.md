@@ -60,9 +60,9 @@ The application will be available at `http://localhost:3000`.
 Copy `.env.example` to `.env` and configure:
 
 ```bash
-VITE_OBSERVABILITY_BACKEND_URL=http://localhost:8765
+# Agent Orchestrator API handles sessions, events, and agent blueprints (unified service)
+VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
 VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-VITE_AGENT_REGISTRY_URL=http://localhost:8767
 VITE_WEBSOCKET_URL=ws://localhost:8765/ws
 ```
 
@@ -102,9 +102,8 @@ src/
 
 The Dashboard requires the following backend services:
 
-1. **Agent Runtime** (port 8765) - Session and event management
+1. **Agent Runtime** (port 8765) - Session/event management and agent blueprint CRUD
 2. **Context Store** (port 8766) - Document storage and retrieval
-3. **Agent Registry** (port 8767) - Agent blueprint CRUD
 
 See `docs/BACKEND-TODO.md` for details on missing backend endpoints.
 

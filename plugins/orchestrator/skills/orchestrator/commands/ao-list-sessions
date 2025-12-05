@@ -30,7 +30,7 @@ def main():
     Examples:
         ao-list-sessions
     """
-    from config import get_session_manager_url
+    from config import get_api_url
     from session_client import SessionClient, SessionClientError
     from utils import debug_log
 
@@ -41,12 +41,12 @@ def main():
     })
 
     try:
-        # Get session manager URL
-        session_manager_url = get_session_manager_url()
+        # Get API URL
+        api_url = get_api_url()
 
         # List sessions via API
         try:
-            client = SessionClient(session_manager_url)
+            client = SessionClient(api_url)
             sessions = client.list_sessions()
             if not sessions:
                 print("No sessions found")
