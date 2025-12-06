@@ -358,7 +358,7 @@ class DocumentClient:
         """Get available relation definitions.
 
         Returns:
-            List of relation definitions with name, description, from_type, to_type
+            List of relation definitions with name, description, from_document_is, to_document_is
 
         Raises:
             Exception: On network or HTTP errors
@@ -406,8 +406,8 @@ class DocumentClient:
         from_document_id: str,
         to_document_id: str,
         definition: str,
-        from_note: Optional[str] = None,
-        to_note: Optional[str] = None
+        from_to_note: Optional[str] = None,
+        to_from_note: Optional[str] = None
     ) -> dict:
         """Create a bidirectional relation between documents.
 
@@ -415,8 +415,8 @@ class DocumentClient:
             from_document_id: Source document ID
             to_document_id: Target document ID
             definition: Relation type - 'parent-child' or 'related' (required)
-            from_note: Note from source document's perspective
-            to_note: Note from target document's perspective
+            from_to_note: Note on edge from source to target (source's note about target)
+            to_from_note: Note on edge from target to source (target's note about source)
 
         Returns:
             Dictionary with created relation details (from_relation, to_relation)
@@ -428,8 +428,8 @@ class DocumentClient:
             "definition": definition,
             "from_document_id": from_document_id,
             "to_document_id": to_document_id,
-            "from_note": from_note,
-            "to_note": to_note
+            "from_to_note": from_to_note,
+            "to_from_note": to_from_note
         }
         try:
             response = httpx.post(

@@ -93,8 +93,8 @@ uv run <skill-root>/commands/doc-link --remove <id>               # Remove relat
 **Use when**: Link documents together in parent-child or peer relationships.
 **Options for --create**:
 - `--type` - Required: `parent-child` (hierarchical) or `related` (peer)
-- `--from-note` - Note from source perspective
-- `--to-note` - Note from target perspective
+- `--from-to-note` - Note on edge from source to target (source's note about target)
+- `--to-from-note` - Note on edge from target to source (target's note about source)
 
 ---
 
@@ -137,14 +137,14 @@ uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
 # Get relation types
 uv run <skill-root>/commands/doc-link --types
 
-# Create a sewuential relationship
-uv run <skill-root>/commands/doc-link --create doc_design doc_implementation --type predecessor-successor --from-note "Design doc" --to-note "Implementation plan"
+# Create a sequential relationship
+uv run <skill-root>/commands/doc-link --create doc_design doc_implementation --type predecessor-successor --from-to-note "Design doc" --to-from-note "Implementation plan"
 
 # Create hierarchical relationship (parent owns children)
-uv run <skill-root>/commands/doc-link --create doc_architecture doc_api --type parent-child --from-note "API spec"
+uv run <skill-root>/commands/doc-link --create doc_architecture doc_api --type parent-child --from-to-note "API spec"
 
 # Create peer relationship
-uv run <skill-root>/commands/doc-link --create doc_api doc_models --type related --from-note "Data models"
+uv run <skill-root>/commands/doc-link --create doc_api doc_models --type related --from-to-note "Data models"
 
 # View document with its relations
 uv run <skill-root>/commands/doc-info doc_architecture

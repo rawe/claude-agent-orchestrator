@@ -377,14 +377,21 @@ def _relation_dict_to_response(rel: dict) -> RelationResponse:
 
 @app.get("/relations/definitions", response_model=list[RelationDefinitionResponse])
 async def list_relation_definitions():
-    """List all available relation definitions."""
+    """List all available relation definitions.
+
+    Note: from_document_is/to_document_is describe what each document IS in the relationship.
+    This is the inverse of internal from_type/to_type (what each document STORES).
+    Example: parent-child has from_type="child", to_type="parent" internally,
+    but from_document_is="parent", to_document_is="child" in the API response.
+    """
     definitions = RelationDefinitions.get_all()
     return [
         RelationDefinitionResponse(
             name=d.name,
             description=d.description,
-            from_type=d.from_type,
-            to_type=d.to_type
+            # Swap: from_document IS what to_type says, to_document IS what from_type says
+            from_document_is=d.to_type,
+            to_document_is=d.from_type
         )
         for d in definitions
     ]
@@ -427,17 +434,19 @@ async def create_relation(request: RelationCreateRequest):
         )
 
     # Create both relation rows
+    # from_to_note: note on edge from source to target (stored with from_document's relation row)
+    # to_from_note: note on edge from target to source (stored with to_document's relation row)
     from_relation_id = db.create_relation(
         request.from_document_id,
         request.to_document_id,
         definition.from_type,
-        request.from_note
+        request.from_to_note
     )
     to_relation_id = db.create_relation(
         request.to_document_id,
         request.from_document_id,
         definition.to_type,
-        request.to_note
+        request.to_from_note
     )
 
     # Retrieve created relations for response

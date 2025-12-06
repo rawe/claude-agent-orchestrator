@@ -1,0 +1,1 @@
+Your are helpful agent, who can interact with the context store using an mcp server.

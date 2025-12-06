@@ -339,13 +339,13 @@ async def doc_link(
         default=None,
         description="Relation type from types list (required for create)",
     ),
-    from_note: Optional[str] = Field(
+    from_to_note: Optional[str] = Field(
         default=None,
-        description="Note from source document's perspective",
+        description="Note on edge from source to target (source's note about target)",
     ),
-    to_note: Optional[str] = Field(
+    to_from_note: Optional[str] = Field(
         default=None,
-        description="Note from target document's perspective",
+        description="Note on edge from target to source (target's note about source)",
     ),
     update_id: Optional[str] = Field(
         default=None,
@@ -381,10 +381,10 @@ async def doc_link(
         args.extend(["--create", create_from, create_to])
         if relation_type:
             args.extend(["--type", relation_type])
-        if from_note:
-            args.extend(["--from-note", from_note])
-        if to_note:
-            args.extend(["--to-note", to_note])
+        if from_to_note:
+            args.extend(["--from-to-note", from_to_note])
+        if to_from_note:
+            args.extend(["--to-from-note", to_from_note])
     elif update_id:
         args.extend(["--update", update_id])
         if note:

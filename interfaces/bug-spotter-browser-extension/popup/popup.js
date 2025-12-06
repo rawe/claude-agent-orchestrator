@@ -104,7 +104,7 @@ async function init() {
   setupEventListeners();
 
   // Add default tags
-  addTag('bug-screenshot');
+  addTag('bug-spotter');
   try {
     const url = new URL(currentTab.url);
     addTag(url.hostname);
@@ -464,7 +464,7 @@ async function pushToContextStore() {
       data: {
         content: documentContent,
         filename: filename,
-        tags: tags,
+        tags: [...tags, 'bug-report'],
         metadata: metadata
       }
     });
@@ -496,7 +496,7 @@ async function pushToContextStore() {
           data: {
             imageDataUrl: screenshotDataUrl,
             filename: screenshotFilename,
-            tags: [...tags, 'screenshot'],
+            tags: [...tags, 'bug-screenshot'],
             metadata: screenshotMetadata
           }
         });
@@ -511,8 +511,8 @@ async function pushToContextStore() {
               definition: 'parent-child',
               fromDocumentId: reportId,
               toDocumentId: screenshotId,
-              fromNote: 'Visual evidence screenshot',
-              toNote: 'Parent bug report'
+              fromToNote: 'Visual evidence screenshot',
+              toFromNote: 'Parent bug report'
             }
           });
 

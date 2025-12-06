@@ -255,14 +255,14 @@ uv run commands/doc-link --types
   {
     "name": "parent-child",
     "description": "Hierarchical relation where parent owns children. Cascade delete enabled.",
-    "from_type": "parent",
-    "to_type": "child"
+    "from_document_is": "parent",
+    "to_document_is": "child"
   },
   {
     "name": "related",
     "description": "Peer relation between related documents. No cascade delete.",
-    "from_type": "related",
-    "to_type": "related"
+    "from_document_is": "related",
+    "to_document_is": "related"
   }
 ]
 ```
@@ -275,16 +275,16 @@ uv run commands/doc-link --create <from-doc-id> <to-doc-id> [options]
 
 **Options**:
 - `--type TEXT` or `-t TEXT` - Relation type: `parent-child` or `related` (required)
-- `--from-note TEXT` - Note from source document's perspective
-- `--to-note TEXT` - Note from target document's perspective
+- `--from-to-note TEXT` - Note on edge from source to target (source's note about target)
+- `--to-from-note TEXT` - Note on edge from target to source (target's note about source)
 
 **Examples**:
 ```bash
 # Create parent-child relation
-uv run commands/doc-link --create doc_parent doc_child --type parent-child --from-note "Child module"
+uv run commands/doc-link --create doc_parent doc_child --type parent-child --from-to-note "Child module"
 
 # Create peer relation
-uv run commands/doc-link --create doc_a doc_b --type related --from-note "See also" --to-note "Related doc"
+uv run commands/doc-link --create doc_a doc_b --type related --from-to-note "See also" --to-from-note "Related doc"
 ```
 
 **Output**:

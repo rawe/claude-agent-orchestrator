@@ -137,8 +137,8 @@ async function pushImageDocument(data) {
  * @param {string} data.definition - Relation type: "parent-child" or "related"
  * @param {string} data.fromDocumentId - Parent/source document ID
  * @param {string} data.toDocumentId - Child/target document ID
- * @param {string} [data.fromNote] - Note for parent document
- * @param {string} [data.toNote] - Note for child document
+ * @param {string} [data.fromToNote] - Note on edge from source to target document
+ * @param {string} [data.toFromNote] - Note on edge from target to source document
  * @returns {Promise<Object>} API response
  */
 async function createRelation(data) {
@@ -157,8 +157,8 @@ async function createRelation(data) {
         definition: data.definition,
         from_document_id: data.fromDocumentId,
         to_document_id: data.toDocumentId,
-        from_note: data.fromNote || null,
-        to_note: data.toNote || null
+        from_to_note: data.fromToNote || null,
+        to_from_note: data.toFromNote || null
       }),
       signal: controller.signal
     });

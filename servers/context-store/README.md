@@ -417,20 +417,20 @@ curl http://localhost:8766/relations/definitions
   {
     "name": "parent-child",
     "description": "Hierarchical relation where parent owns children. Cascade delete enabled.",
-    "from_type": "parent",
-    "to_type": "child"
+    "from_document_is": "parent",
+    "to_document_is": "child"
   },
   {
     "name": "related",
     "description": "Peer relation between related documents.",
-    "from_type": "related",
-    "to_type": "related"
+    "from_document_is": "related",
+    "to_document_is": "related"
   },
   {
     "name": "predecessor-successor",
     "description": "Sequential ordering relation.",
-    "from_type": "predecessor",
-    "to_type": "successor"
+    "from_document_is": "predecessor",
+    "to_document_is": "successor"
   }
 ]
 ```
@@ -443,8 +443,8 @@ Create a bidirectional relation between two documents.
   - `definition` (required): Relation definition name (`parent-child`, `related`, or `predecessor-successor`)
   - `from_document_id` (required): First document ID
   - `to_document_id` (required): Second document ID
-  - `from_note` (optional): Note from first document's perspective
-  - `to_note` (optional): Note from second document's perspective
+  - `from_to_note` (optional): Note on edge from source to target (from_doc's note about to_doc)
+  - `to_from_note` (optional): Note on edge from target to source (to_doc's note about from_doc)
 - **Response**: 201 Created with `RelationCreateResponse`
 
 **Example** (creating parent-child relation):
@@ -455,8 +455,8 @@ curl -X POST http://localhost:8766/relations \
     "definition": "parent-child",
     "from_document_id": "doc_architecture",
     "to_document_id": "doc_database_design",
-    "from_note": "Database layer documentation",
-    "to_note": "Part of system architecture"
+    "from_to_note": "Database layer documentation",
+    "to_from_note": "Part of system architecture"
   }'
 ```
 

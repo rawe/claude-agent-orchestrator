@@ -63,13 +63,13 @@ def main(
         None, "--type", "-t",
         help="Relation type from --types (required for --create)"
     ),
-    from_note: Optional[str] = typer.Option(
-        None, "--from-note",
-        help="Note from source document's perspective"
+    from_to_note: Optional[str] = typer.Option(
+        None, "--from-to-note",
+        help="Note on edge from source to target (source's note about target)"
     ),
-    to_note: Optional[str] = typer.Option(
-        None, "--to-note",
-        help="Note from target document's perspective"
+    to_from_note: Optional[str] = typer.Option(
+        None, "--to-from-note",
+        help="Note on edge from target to source (target's note about source)"
     ),
     # Options for --update
     note: Optional[str] = typer.Option(
@@ -88,7 +88,7 @@ def main(
     Examples:
       doc-link --types
       doc-link --create <from-doc> <to-doc> --type <type>
-      doc-link --create <from-doc> <to-doc> --type <type> --from-note "Note" --to-note "Note"
+      doc-link --create <from-doc> <to-doc> --type <type> --from-to-note "Note" --to-from-note "Note"
       doc-link --update <relation-id> --note "Updated note"
       doc-link --remove <relation-id>
     """
@@ -122,8 +122,8 @@ def main(
                 from_document_id=create,
                 to_document_id=to_document,
                 definition=relation_type,
-                from_note=from_note,
-                to_note=to_note
+                from_to_note=from_to_note,
+                to_from_note=to_from_note
             )
             output_json({
                 "success": True,

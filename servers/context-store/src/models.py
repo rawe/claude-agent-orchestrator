@@ -176,20 +176,29 @@ RelationDefinitions._init_registry()
 # ==================== Relation Pydantic Models ====================
 
 class RelationDefinitionResponse(BaseModel):
-    """Available relation definition for API response."""
+    """Available relation definition for API response.
+
+    Note: from_document_is/to_document_is describe what each document IS in the relationship,
+    which is the inverse of internal from_type/to_type that describe what each document STORES.
+    """
     name: str
     description: str
-    from_type: str
-    to_type: str
+    from_document_is: str  # What the from_document IS in this relation (e.g., "parent")
+    to_document_is: str    # What the to_document IS in this relation (e.g., "child")
 
 
 class RelationCreateRequest(BaseModel):
-    """Request to create a bidirectional relation."""
+    """Request to create a bidirectional relation.
+
+    Mental model:
+        [from_doc] ---from_to_note---> [to_doc]
+                   <--to_from_note----
+    """
     definition: str                      # "parent-child", "related", or "predecessor-successor"
     from_document_id: str                # First document
     to_document_id: str                  # Second document
-    from_note: str | None = None         # Note from first document's perspective
-    to_note: str | None = None           # Note from second document's perspective
+    from_to_note: str | None = None      # Note on edge from source to target (from_doc's note about to_doc)
+    to_from_note: str | None = None      # Note on edge from target to source (to_doc's note about from_doc)
 
 
 class RelationResponse(BaseModel):

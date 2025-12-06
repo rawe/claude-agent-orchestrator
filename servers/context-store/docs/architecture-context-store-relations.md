@@ -330,18 +330,23 @@ from datetime import datetime
 
 class RelationDefinitionResponse(BaseModel):
     """Available relation definition"""
-    name: str            # "parent-child", "related"
-    description: str     # Human-readable description
-    from_type: str       # DB value for from document
-    to_type: str         # DB value for to document
+    name: str                # "parent-child", "related"
+    description: str         # Human-readable description
+    from_document_is: str    # What the from_document IS (e.g., "parent")
+    to_document_is: str      # What the to_document IS (e.g., "child")
 
 class RelationCreateRequest(BaseModel):
-    """Request to create a relation"""
+    """Request to create a relation
+
+    Mental model:
+        [from_doc] ---from_to_note---> [to_doc]
+                   <--to_from_note----
+    """
     definition: str                  # "parent-child", "related"
     from_document_id: str            # First document
     to_document_id: str              # Second document
-    from_note: str | None = None     # Note from first document's perspective
-    to_note: str | None = None       # Note from second document's perspective
+    from_to_note: str | None = None  # Note on edge from source to target
+    to_from_note: str | None = None  # Note on edge from target to source
 
 class RelationResponse(BaseModel):
     """Single relation from a document's perspective"""
@@ -379,14 +384,14 @@ Response: 200 OK
     {
         "name": "parent-child",
         "description": "Hierarchical relation where parent owns children",
-        "from_type": "parent",
-        "to_type": "child"
+        "from_document_is": "parent",
+        "to_document_is": "child"
     },
     {
         "name": "related",
         "description": "Peer relation between related documents",
-        "from_type": "related",
-        "to_type": "related"
+        "from_document_is": "related",
+        "to_document_is": "related"
     }
 ]
 ```
@@ -401,8 +406,8 @@ Request Body:
     "definition": "parent-child",
     "from_document_id": "doc_abc123",
     "to_document_id": "doc_def456",
-    "from_note": "Main implementation document",
-    "to_note": "See parent for overview"
+    "from_to_note": "Main implementation document",
+    "to_from_note": "See parent for overview"
 }
 
 Response: 201 Created
@@ -610,8 +615,8 @@ POST /relations
     "definition": "parent-child",
     "from_document_id": "doc_architecture",
     "to_document_id": "doc_database_design",
-    "from_note": "Database layer documentation",
-    "to_note": "Part of system architecture"
+    "from_to_note": "Database layer documentation",
+    "to_from_note": "Part of system architecture"
 }
 
 POST /relations
@@ -619,8 +624,8 @@ POST /relations
     "definition": "parent-child",
     "from_document_id": "doc_architecture",
     "to_document_id": "doc_api_design",
-    "from_note": "API layer documentation",
-    "to_note": "Part of system architecture"
+    "from_to_note": "API layer documentation",
+    "to_from_note": "Part of system architecture"
 }
 ```
 
