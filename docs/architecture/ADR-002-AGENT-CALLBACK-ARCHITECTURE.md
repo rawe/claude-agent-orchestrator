@@ -81,6 +81,20 @@ Orchestrator ──start (callback)──► Child Agent ──runs──► com
                Retrieve results with ao-get-result."
 ```
 
+### Applicability Constraint
+
+**Callbacks only work when the parent (orchestrator) is started and controlled by the Agent Orchestrator framework.**
+
+| Parent Started By | Callbacks Work? | Reason |
+|-------------------|-----------------|--------|
+| Dashboard → Job API → Launcher | ✅ Yes | Framework can resume parent |
+| User runs `claude` CLI directly | ❌ No | No external resume hook |
+| Claude Desktop | ❌ No | No external resume hook |
+
+The callback mechanism requires the ability to resume the parent session via the Agent Launcher. External agents (CLI, Desktop) have no API for resume injection.
+
+See [ADR-003](./ADR-003-AGENT-LAUNCHER-POC.md) for implementation details.
+
 ## Motivation
 
 ### Why Callback-Based Async?
