@@ -1,21 +1,31 @@
 # Work Package 4: Parent Session Context
 
 **Reference**: [agent-callback-architecture.md](./agent-callback-architecture.md)
-- Read sections: "Parent Session Context", "Required Changes to ao-* Commands", "Parent Session Context via MCP HTTP Mode", "Implementation Plan > Phase 4"
+- Read sections: "Callback Opt-In Mechanism", "Parent Session Context", "Required Changes to ao-* Commands", "Parent Session Context via MCP HTTP Mode", "Implementation Plan > Phase 4"
 
 ## Goal
 
-Enable child sessions to know their parent. When an orchestrator starts a child agent, the child's session records `parent_session_name`. This is the foundation for callbacks.
+Enable child sessions to know their parent. When an orchestrator starts a child agent with `callback=true`, the child's session records `parent_session_name`. This is the foundation for callbacks.
+
+**Key insight**: Callback is opt-in via the MCP server's `callback` parameter. The MCP server is responsible for propagating parent context when callback is requested.
 
 ## Runnable State After Completion
 
 - Sessions table tracks parent-child relationships
-- Launcher sets `AGENT_SESSION_NAME` environment variable
+- Launcher sets `AGENT_SESSION_NAME` environment variable for sessions it starts
+- MCP server propagates `AGENT_SESSION_NAME` when `callback=true`
 - ao-start reads env var and passes to Sessions API
-- MCP HTTP mode propagates parent context via headers
-- Dashboard shows parent relationships (optional enhancement)
+- Parent-child relationships visible in Sessions API responses
 
 ## Files to Modify
+
+### MCP Server (callback opt-in)
+
+| File | Changes |
+|------|---------|
+| `interfaces/agent-orchestrator-mcp-server/libs/server.py` | Add `callback` parameter to tools |
+| `interfaces/agent-orchestrator-mcp-server/libs/core_functions.py` | Pass `callback` to execute_script_async |
+| `interfaces/agent-orchestrator-mcp-server/libs/utils.py` | Propagate env var when callback=true |
 
 ### Agent Runtime
 
@@ -38,12 +48,6 @@ Enable child sessions to know their parent. When an orchestrator starts a child 
 |------|---------|
 | `servers/agent-launcher/lib/executor.py` | Set `AGENT_SESSION_NAME` in subprocess env |
 
-### MCP Server (for HTTP mode)
-
-| File | Changes |
-|------|---------|
-| `interfaces/agent-orchestrator-mcp-server/libs/core_functions.py` | Extract header, set env var |
-
 ### Dashboard (optional)
 
 | File | Changes |
@@ -53,7 +57,80 @@ Enable child sessions to know their parent. When an orchestrator starts a child 
 
 ## Implementation Tasks
 
-### 1. Database Schema Update (`database.py`)
+### 1. MCP Server: Add `callback` Parameter to Tools (`libs/server.py`)
+
+Add `callback: bool = False` parameter to start/resume tools:
+
+```python
+@mcp.tool()
+async def start_agent_session(
+    session_name: str,
+    prompt: str,
+    agent_blueprint_name: Optional[str] = None,
+    project_dir: Optional[str] = None,
+    async_mode: bool = False,
+    callback: bool = False,  # NEW
+) -> str:
+    """Start a new agent session.
+
+    Args:
+        callback: If true (requires async_mode=true), parent will be resumed
+                  when this child completes. Parent must be running via Launcher.
+    """
+```
+
+### 2. MCP Server: Pass `callback` to Implementation (`libs/core_functions.py`)
+
+Update `start_agent_session_impl` and `resume_agent_session_impl`:
+
+```python
+async def start_agent_session_impl(
+    config: ServerConfig,
+    session_name: str,
+    prompt: str,
+    agent_blueprint_name: Optional[str] = None,
+    project_dir: Optional[str] = None,
+    async_mode: bool = False,
+    callback: bool = False,  # NEW
+) -> str:
+    # ...
+    if async_mode:
+        async_result = await execute_script_async(config, args, callback=callback)
+        # ...
+```
+
+### 3. MCP Server: Propagate Env Var (`libs/utils.py`)
+
+Update `execute_script_async()` to set `AGENT_SESSION_NAME` when callback=true:
+
+```python
+async def execute_script_async(
+    config: ServerConfig,
+    args: List[str],
+    stdin_input: Optional[str] = None,
+    callback: bool = False,  # NEW
+) -> AsyncExecutionResult:
+    # ...
+    env = os.environ.copy()
+
+    # Propagate parent session context for callbacks
+    if callback:
+        parent_session = os.environ.get("AGENT_SESSION_NAME")
+        if parent_session:
+            env["AGENT_SESSION_NAME"] = parent_session
+            logger.info(f"Callback enabled, propagating parent session: {parent_session}")
+        else:
+            logger.warn("callback=true but AGENT_SESSION_NAME not set - callback will not work")
+
+    process = subprocess.Popen(
+        uv_args,
+        # ...
+        env=env,  # Use modified env
+        # ...
+    )
+```
+
+### 4. Database Schema Update (`database.py`)
 
 Add column to sessions table:
 ```python
@@ -63,7 +140,7 @@ Add column to sessions table:
 
 Handle migration gracefully (column may already exist).
 
-### 2. Session Models (`models.py`)
+### 5. Session Models (`models.py`)
 
 Update `SessionCreate`:
 ```python
@@ -77,7 +154,7 @@ class SessionCreate(BaseModel):
 
 Update session queries to return `parent_session_name`.
 
-### 3. Sessions API (`main.py`)
+### 6. Sessions API (`main.py`)
 
 In `POST /sessions`:
 - Accept `parent_session_name` field
@@ -86,7 +163,7 @@ In `POST /sessions`:
 In `GET /sessions/{id}` and `GET /sessions`:
 - Return `parent_session_name` in response
 
-### 4. Session Client (`lib/session_client.py`)
+### 7. Session Client (`lib/session_client.py`)
 
 Update `create_session()`:
 ```python
@@ -104,7 +181,7 @@ def create_session(
     return self._post("/sessions", data)
 ```
 
-### 5. ao-start Command
+### 8. ao-start Command
 
 Read environment variable and pass to session creation:
 ```python
@@ -118,7 +195,7 @@ session_client.create_session(
 )
 ```
 
-### 6. Agent Launcher Executor (`executor.py`)
+### 9. Agent Launcher Executor (`executor.py`)
 
 When spawning subprocess, set environment:
 ```python
@@ -130,7 +207,7 @@ def execute_job(job: Job) -> subprocess.Popen:
     return subprocess.Popen(cmd, env=env, ...)
 ```
 
-### 7. MCP Server HTTP Mode (Optional for POC)
+### 10. MCP Server HTTP Mode (Optional for POC)
 
 In `core_functions.py`, when executing ao-* commands:
 ```python
@@ -146,7 +223,7 @@ if parent_session:
     env["AGENT_SESSION_NAME"] = parent_session
 ```
 
-### 8. Dashboard MCP Templates (Optional)
+### 11. Dashboard MCP Templates (Optional)
 
 Update `MCPServerHttp` type:
 ```typescript
@@ -157,28 +234,18 @@ export interface MCPServerHttp {
 }
 ```
 
-Add default template with placeholder:
-```typescript
-'agent-orchestrator-http': {
-  type: 'http',
-  url: 'http://localhost:9500/mcp',
-  headers: {
-    'X-Agent-Session-Name': '${AGENT_SESSION_NAME}'
-  }
-}
-```
-
 ## Testing Checklist
 
-- [ ] Start session via Launcher → check `parent_session_name` is null
-- [ ] Start child via running orchestrator → child has `parent_session_name` set
+- [ ] MCP tool shows `callback` parameter in schema
+- [ ] `async_mode=true, callback=false` → No parent_session_name set (existing behavior)
+- [ ] `async_mode=true, callback=true` → parent_session_name set in child session
+- [ ] Start session via Launcher → `AGENT_SESSION_NAME` env var is set
 - [ ] Query sessions API → `parent_session_name` returned correctly
-- [ ] Multiple levels: orchestrator → child → grandchild (each knows parent)
-- [ ] MCP HTTP mode: header propagates to subprocess (if implemented)
+- [ ] Multiple levels: orchestrator → child (with callback) → grandchild
 
 ## Notes
 
+- **Callback is opt-in**: Only when `callback=true` is passed to MCP tool
 - Environment variable name: `AGENT_SESSION_NAME`
 - HTTP header name: `X-Agent-Session-Name`
-- Placeholder pattern: `${AGENT_SESSION_NAME}`
-- The Launcher sets env var for the session it starts (that session becomes parent of any children it spawns)
+- The Launcher sets env var for the session it starts (that session becomes parent of any children it spawns via MCP with callback=true)

@@ -116,21 +116,72 @@ The callback mechanism requires the ability to resume the parent session. This i
 
 **Rationale:** Claude Code CLI and Claude Desktop have no external API or hook for injecting resume commands. If the framework didn't start the parent, it cannot resume it.
 
+### Callback Opt-In Mechanism
+
+**Callbacks are opt-in.** The orchestrator must explicitly request callback behavior when spawning a child agent.
+
+#### Why Opt-In?
+
+1. **Backward compatibility**: Existing `async=true` behavior (fire-and-forget with manual polling) continues to work unchanged
+2. **Explicit intent**: The orchestrator consciously chooses callback-based coordination vs polling
+3. **Resource control**: Callbacks consume resources (resume jobs, parent context tracking); only use when needed
+
+#### MCP Server Parameter Change
+
+The MCP server `start_agent_session` and `resume_agent_session` tools gain a new parameter:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `async_mode` | boolean | `false` | Existing: fire-and-forget execution |
+| `callback` | boolean | `false` | **NEW**: Request callback when child completes |
+
+**Interaction:**
+- `async_mode=false, callback=false` → Synchronous (blocking) execution
+- `async_mode=true, callback=false` → Async fire-and-forget, use polling
+- `async_mode=true, callback=true` → Async with callback on completion
+- `async_mode=false, callback=true` → Invalid (ignored, sync already waits)
+
+#### MCP Server Implementation
+
+When `callback=true`:
+1. MCP server reads `AGENT_SESSION_NAME` from environment (set by Launcher for parent)
+2. Sets `AGENT_SESSION_NAME={parent_session_name}` in subprocess environment when spawning `ao-start`
+3. `ao-start` reads env var and passes `parent_session_name` to Sessions API
+
+```python
+# In MCP server execute_script_async()
+async def execute_script_async(config, args, callback: bool = False):
+    env = os.environ.copy()
+
+    if callback:
+        parent_session = os.environ.get("AGENT_SESSION_NAME")
+        if parent_session:
+            env["AGENT_SESSION_NAME"] = parent_session
+        else:
+            logger.warn("callback=true but AGENT_SESSION_NAME not set - callback will not work")
+
+    process = subprocess.Popen(uv_args, env=env, ...)
+```
+
 ### Parent Session Context
 
 For callbacks to work, child agents must know their parent's identity. This requires:
 
 1. **Launcher sets environment variable** when starting a session:
    ```bash
-   AGENT_SESSION_NAME=orchestrator ao-start child-task ...
+   AGENT_SESSION_NAME=orchestrator ao-start orchestrator -p "..."
    ```
 
-2. **ao-start/ao-resume read this variable** and include it in API calls:
+2. **MCP server propagates** when `callback=true`:
+   - Reads `AGENT_SESSION_NAME` from its own environment
+   - Sets it in child subprocess environment
+
+3. **ao-start/ao-resume read this variable** and include it in API calls:
    ```python
    parent_session_name = os.environ.get("AGENT_SESSION_NAME")
    ```
 
-3. **Sessions API extended** to track parent-child relationships:
+4. **Sessions API extended** to track parent-child relationships:
    ```json
    POST /sessions
    {
@@ -141,7 +192,7 @@ For callbacks to work, child agents must know their parent's identity. This requ
    }
    ```
 
-4. **Sessions table extended** with new column:
+5. **Sessions table extended** with new column:
    ```sql
    ALTER TABLE sessions ADD COLUMN parent_session_name TEXT;
    ```
@@ -169,16 +220,20 @@ For callbacks to work, child agents must know their parent's identity. This requ
 1. Launcher starts orchestrator:
    AGENT_SESSION_NAME=orchestrator ao-start orchestrator -p "..."
 
-2. Orchestrator (now running) starts child via ao-start:
+2. Orchestrator calls MCP tool with callback=true:
+   start_agent_session(name="child", prompt="...", async_mode=true, callback=true)
+
+3. MCP server spawns ao-start with env var:
+   AGENT_SESSION_NAME=orchestrator ao-start child -p "..."
    → ao-start reads AGENT_SESSION_NAME=orchestrator
    → Child session created with parent_session_name=orchestrator
 
-3. Child completes (session_stop event)
+4. Child completes (session_stop event)
    → Callback Processor checks: does child have parent_session_name?
    → Yes: parent_session_name=orchestrator
    → Create resume job for "orchestrator"
 
-4. Launcher resumes orchestrator:
+5. Launcher resumes orchestrator:
    ao-resume orchestrator -p "Child task completed..."
 ```
 
