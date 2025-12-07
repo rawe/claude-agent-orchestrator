@@ -87,6 +87,8 @@ For the POC, callbacks use an **immediate strategy with aggregation**:
 
 This naturally handles parallel spawns - if an orchestrator spawns 5 agents and continues working, it receives one resume message listing all children that completed while it was busy.
 
+**Implementation Note:** The notification queue is stored as an **in-memory dict** within the Callback Processor service, keyed by parent session name. This means pending notifications are lost if Agent Runtime restarts - acceptable for POC.
+
 ## Goals
 
 1. **Replace Agent Control API** - Eliminate the current MCP-server-based control API
@@ -240,7 +242,7 @@ The Launcher sets the `AGENT_SESSION_NAME` environment variable before spawning 
 
 1. Read the environment variable
 2. Fetch the agent blueprint from Agent Runtime (which contains MCP config with `${AGENT_SESSION_NAME}` placeholder)
-3. Replace the placeholder with the actual session name
+3. Replace the placeholder with the actual session name (done in `agent_api.py` which understands the MCP config model)
 4. Pass the resolved config to the Claude Agent Python SDK
 
 This approach:
@@ -502,14 +504,13 @@ When a child agent completes and triggers a callback, the Callback Processor cre
   "job_id": "job_callback_001",
   "type": "resume_session",
   "session_name": "orchestrator-main",
-  "prompt": "## Agent Callback Notification\n\nAgent session `task-1` has completed with status: finished.\n\nTo retrieve the result: `ao-get-result task-1`",
-  "project_dir": "/path/to/project"
+  "prompt": "## Agent Callback Notification\n\nAgent session `task-1` has completed with status: finished.\n\nTo retrieve the result: `ao-get-result task-1`"
 }
 ```
 
 The launcher executes:
 ```bash
-ao-resume orchestrator-main -p "Child session completed..." --project-dir /path/to/project
+ao-resume orchestrator-main -p "Child session completed..."
 ```
 
 ## API Specification
@@ -655,7 +656,9 @@ Get job status.
 | Type | Purpose | Parameters | Executed As |
 |------|---------|------------|-------------|
 | `start_session` | Start a new agent session | `session_name`, `agent_name`, `prompt`, `project_dir` | `ao-start` subprocess |
-| `resume_session` | Resume an existing session | `session_name`, `prompt`, `project_dir` | `ao-resume` subprocess |
+| `resume_session` | Resume an existing session | `session_name`, `prompt` | `ao-resume` subprocess |
+
+**Note:** `resume_session` does not require `project_dir` - the `ao-resume` command fetches the original `project_dir` from the session API, ensuring consistency with the original session.
 
 ## Callback Flow
 
@@ -745,6 +748,8 @@ The Agent Launcher enables the following callback flow:
    - `start_session` → `ao-start --name X --agent Y --prompt "Z"`
    - `resume_session` → `ao-resume --session X --message "Y"`
    - Use `subprocess.Popen()` for non-blocking execution
+   - **Command Discovery**: Auto-discover `ao-*` commands relative to project root (same pattern as MCP server in `interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py`). Don't use `AGENT_ORCHESTRATOR_COMMAND_PATH` env var for override.
+   - **Logging**: Log job execution to stdout/stderr (concise, not verbose) for visibility during POC
 
 7. **Implement Heartbeat Thread**
    - Background thread sending periodic heartbeats
@@ -755,7 +760,9 @@ The Agent Launcher enables the following callback flow:
 
 1. **Update Chat tab**
    - Change from Agent Control API to new `/jobs` endpoint
-   - Create job → poll for completion → show result
+   - Create job via `POST /jobs`
+   - Rely on existing WebSocket connection for session updates (no job status polling)
+   - IMPORTANT: Also liststen for session start events for the current sessean name in the websocket, as now the resume can autoamatically start the session again. 
 
 2. **Remove Agent Control API dependency**
    - Remove `VITE_AGENT_CONTROL_API_URL` usage
@@ -791,13 +798,16 @@ The Agent Launcher enables the following callback flow:
 **Files to modify:** `servers/agent-runtime/`
 
 1. **Implement Callback Processor**
-   - Listen for session_stop events
+   - Called directly from Sessions API when `session_stop` event is received (synchronous function call)
+   - Maintains in-memory notification queue (dict keyed by parent session name)
    - Check if session has `parent_session_name`
    - Check parent session status (must be `finished` = idle)
-   - Create resume_session job for parent when conditions met
+   - If parent is idle: create resume_session job immediately
+   - If parent is still running: add to notification queue
+   - When parent's own `session_stop` event arrives: check queue and create aggregated resume job
 
 2. **Wire into session events**
-   - On session_stop event, trigger callback check
+   - Sessions API calls Callback Processor directly on `session_stop` events
    - Generate resume message: "Child session X completed..."
 
 ## File Structure (Proposed)
@@ -921,6 +931,10 @@ The following are explicitly **out of scope** for the POC:
 2. **Job failure notification to Dashboard** - If a job fails (e.g., `ao-start` errors), the Dashboard has no way to know. It creates a job and relies on WebSocket for session updates; if the session never starts, the Dashboard sees nothing. Future: broadcast job failures via WebSocket or have Dashboard poll job status briefly after creation.
 
 3. **Callback strategies** - Only "immediate with aggregation" is implemented. No configurable strategies like "wait for all children" or "batch with delay".
+
+4. **Parent session cleanup** - When a parent session is deleted while children are running or callbacks are pending, the callbacks will fail gracefully (Callback Processor logs an error). No automatic cleanup of pending notifications.
+
+5. **Heartbeat timeout handling** - When a Launcher's heartbeat times out, it is marked as dead but orphaned jobs remain in their current state. No automatic job recovery or reassignment.
 
 ## Related Documents
 
