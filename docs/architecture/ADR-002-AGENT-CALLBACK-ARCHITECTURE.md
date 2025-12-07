@@ -2,6 +2,24 @@
 
 ## Status
 
+**Superseded** - This document has been superseded by the POC implementation specification.
+
+> **Note:** The implementation specification for the POC is now located at:
+> [`docs/features/agent-callback-architecture.md`](../features/agent-callback-architecture.md)
+>
+> This ADR is retained for reference as it contains additional design considerations
+> (callback strategies, detailed state machines, database schemas) that may be relevant
+> for future iterations beyond the POC. However, **do not use this document for
+> implementing the current POC** - refer to the feature spec instead.
+
+---
+
+## Original Document (Archived)
+
+*The content below represents the original architectural exploration and is kept for historical reference.*
+
+### Original Status
+
 **Draft** - Architectural Design Document
 
 ## Context
