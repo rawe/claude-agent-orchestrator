@@ -287,7 +287,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // The 'finished' status should only be set when we receive the actual response,
         // otherwise we get a race condition where "Agent is finished" shows while still waiting
         if (message.session.status === 'running') {
+          // Check if session was previously finished - this indicates a callback resume
+          const wasFinished = agentStatus === 'finished';
+
           setAgentStatus('running');
+
+          // If session was finished and is now running again, this is a callback resume
+          // Add a pending assistant message to show the agent is responding
+          if (wasFinished && !currentPendingMessageId) {
+            const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: newPendingId,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date(),
+                status: 'pending',
+              },
+            ]);
+            setPendingMessageId(newPendingId);
+            setIsLoading(true);
+            setCurrentToolCalls([]);
+          }
         }
         // Note: 'finished' status is set when assistant message arrives (line ~332)
       }

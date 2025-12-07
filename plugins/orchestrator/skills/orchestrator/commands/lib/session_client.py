@@ -55,7 +55,8 @@ class SessionClient:
         session_id: str,
         session_name: str,
         project_dir: Optional[str] = None,
-        agent_name: Optional[str] = None
+        agent_name: Optional[str] = None,
+        parent_session_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create new session with full metadata."""
         data = {
@@ -66,6 +67,8 @@ class SessionClient:
             data["project_dir"] = project_dir
         if agent_name is not None:
             data["agent_name"] = agent_name
+        if parent_session_name is not None:
+            data["parent_session_name"] = parent_session_name
 
         result = self._request("POST", "/sessions", json_data=data)
         return result.get("session", result)

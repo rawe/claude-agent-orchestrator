@@ -24,6 +24,9 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
   'agent-orchestrator-http': {
     type: 'http',
     url: 'http://localhost:9500/mcp',
+    headers: {
+      'X-Agent-Session-Name': '${AGENT_SESSION_NAME}',
+    },
   },
   'context-store-http': {
     type: 'http',

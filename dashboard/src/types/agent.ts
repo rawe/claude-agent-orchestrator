@@ -10,6 +10,7 @@ export interface MCPServerStdio {
 export interface MCPServerHttp {
   type: 'http';
   url: string;
+  headers?: Record<string, string>;
 }
 
 export type MCPServerConfig = MCPServerStdio | MCPServerHttp;

@@ -7,6 +7,7 @@ They are used by both the MCP tools and the REST API.
 
 import asyncio
 import json
+import os
 from typing import Literal, Optional
 
 from constants import (
@@ -95,6 +96,7 @@ async def start_agent_session_impl(
     agent_blueprint_name: Optional[str] = None,
     project_dir: Optional[str] = None,
     async_mode: bool = False,
+    callback: bool = False,
 ) -> str:
     """Start a new agent session instance that immediately begins execution."""
     logger.info(
@@ -105,6 +107,7 @@ async def start_agent_session_impl(
             "project_dir": project_dir,
             "prompt_length": len(prompt),
             "async_mode": async_mode,
+            "callback": callback,
         },
     )
 
@@ -121,15 +124,28 @@ async def start_agent_session_impl(
 
         if async_mode:
             logger.info("start_agent_session: using async execution")
-            async_result = await execute_script_async(config, args)
-            return json.dumps(
-                {
-                    "session_name": async_result.session_name,
-                    "status": async_result.status,
-                    "message": async_result.message,
-                },
-                indent=2,
-            )
+
+            # Build extra environment variables for callback support
+            extra_env = None
+            if callback:
+                # Read parent session name from current environment
+                parent_session_name = os.environ.get("AGENT_SESSION_NAME")
+                if parent_session_name:
+                    extra_env = {"AGENT_SESSION_NAME": parent_session_name}
+                    logger.info(
+                        "start_agent_session: callback enabled",
+                        {"parent_session_name": parent_session_name}
+                    )
+
+            async_result = await execute_script_async(config, args, extra_env=extra_env)
+            response = {
+                "session_name": async_result.session_name,
+                "status": async_result.status,
+                "message": async_result.message,
+            }
+            if callback and extra_env:
+                response["callback_to"] = extra_env.get("AGENT_SESSION_NAME")
+            return json.dumps(response, indent=2)
 
         logger.info("start_agent_session: using synchronous execution")
         result = await execute_script(config, args)
@@ -152,6 +168,7 @@ async def resume_agent_session_impl(
     session_name: str,
     prompt: str,
     async_mode: bool = False,
+    callback: bool = False,
 ) -> str:
     """Resume an existing agent session instance with a new prompt to continue work."""
     logger.info(
@@ -160,6 +177,7 @@ async def resume_agent_session_impl(
             "session_name": session_name,
             "prompt_length": len(prompt),
             "async_mode": async_mode,
+            "callback": callback,
         },
     )
 
@@ -169,15 +187,28 @@ async def resume_agent_session_impl(
 
         if async_mode:
             logger.info("resume_agent_session: using async execution")
-            async_result = await execute_script_async(config, args)
-            return json.dumps(
-                {
-                    "session_name": async_result.session_name,
-                    "status": async_result.status,
-                    "message": async_result.message,
-                },
-                indent=2,
-            )
+
+            # Build extra environment variables for callback support
+            extra_env = None
+            if callback:
+                # Read parent session name from current environment
+                parent_session_name = os.environ.get("AGENT_SESSION_NAME")
+                if parent_session_name:
+                    extra_env = {"AGENT_SESSION_NAME": parent_session_name}
+                    logger.info(
+                        "resume_agent_session: callback enabled",
+                        {"parent_session_name": parent_session_name}
+                    )
+
+            async_result = await execute_script_async(config, args, extra_env=extra_env)
+            response = {
+                "session_name": async_result.session_name,
+                "status": async_result.status,
+                "message": async_result.message,
+            }
+            if callback and extra_env:
+                response["callback_to"] = extra_env.get("AGENT_SESSION_NAME")
+            return json.dumps(response, indent=2)
 
         logger.info("resume_agent_session: using synchronous execution")
         result = await execute_script(config, args)

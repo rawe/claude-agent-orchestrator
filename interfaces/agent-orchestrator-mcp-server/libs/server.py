@@ -146,6 +146,10 @@ async def start_agent_session(
         default=False,
         description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info.",
     ),
+    callback: bool = Field(
+        default=False,
+        description="Request callback when child completes (requires async_mode=true). Parent will be resumed automatically.",
+    ),
 ) -> str:
     """Start a new agent session instance that immediately begins execution.
 
@@ -170,7 +174,7 @@ async def start_agent_session(
       - Don't use when: Session already exists (use resume_agent_session instead)
     """
     return await start_agent_session_impl(
-        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode
+        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback
     )
 
 
@@ -189,6 +193,10 @@ async def resume_agent_session(
         default=False,
         description="Run agent in background (fire-and-forget mode). When true, returns immediately.",
     ),
+    callback: bool = Field(
+        default=False,
+        description="Request callback when child completes (requires async_mode=true). Parent will be resumed automatically.",
+    ),
 ) -> str:
     """Resume an existing agent session instance with a new prompt to continue work.
 
@@ -206,7 +214,7 @@ async def resume_agent_session(
       - Use when: "Continue the architecture work" -> Resume existing architect session
       - Don't use when: Session doesn't exist (use start_agent_session to create it)
     """
-    return await resume_agent_session_impl(config, session_name, prompt, async_mode)
+    return await resume_agent_session_impl(config, session_name, prompt, async_mode, callback)
 
 
 @mcp.tool()
@@ -348,8 +356,8 @@ For MCP clients (Claude Desktop, Claude CLI), use the `/mcp` endpoint.
     core_functions = {
         "list_agent_blueprints": lambda response_format="json": list_agent_blueprints_impl(config, response_format),
         "list_agent_sessions": lambda response_format="json": list_agent_sessions_impl(config, response_format),
-        "start_agent_session": lambda session_name, prompt, agent_blueprint_name=None, project_dir=None, async_mode=False: start_agent_session_impl(config, session_name, prompt, agent_blueprint_name, project_dir, async_mode),
-        "resume_agent_session": lambda session_name, prompt, async_mode=False: resume_agent_session_impl(config, session_name, prompt, async_mode),
+        "start_agent_session": lambda session_name, prompt, agent_blueprint_name=None, project_dir=None, async_mode=False, callback=False: start_agent_session_impl(config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback),
+        "resume_agent_session": lambda session_name, prompt, async_mode=False, callback=False: resume_agent_session_impl(config, session_name, prompt, async_mode, callback),
         "get_agent_session_status": lambda session_name, wait_seconds=0: get_agent_session_status_impl(config, session_name, wait_seconds),
         "get_agent_session_result": lambda session_name: get_agent_session_result_impl(config, session_name),
         "delete_all_agent_sessions": lambda: delete_all_agent_sessions_impl(config),

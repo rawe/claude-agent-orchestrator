@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, List, Literal, Union
 
 
@@ -9,6 +9,8 @@ from typing import Optional, Any, List, Literal, Union
 class MCPServerStdio(BaseModel):
     """MCP server configuration for stdio transport (command-based)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["stdio"] = "stdio"
     command: str
     args: list[str]
@@ -18,8 +20,11 @@ class MCPServerStdio(BaseModel):
 class MCPServerHttp(BaseModel):
     """MCP server configuration for HTTP transport."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["http"]
     url: str
+    headers: Optional[dict[str, str]] = None
 
 
 MCPServerConfig = Union[MCPServerStdio, MCPServerHttp]
@@ -84,6 +89,7 @@ class SessionCreate(BaseModel):
     session_name: str
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
+    parent_session_name: Optional[str] = None
 
 class MessageContent(BaseModel):
     """Content block within a message"""

@@ -1,14 +1,17 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import uvicorn
 import json
 import os
+import asyncio
 
 from database import (
     init_db, insert_session, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
-    create_session, get_session_by_id, get_session_result
+    create_session, get_session_by_id, get_session_result, get_session_by_name
 )
 from models import (
     Event, SessionMetadataUpdate, SessionCreate,
@@ -18,8 +21,17 @@ import agent_storage
 from validation import validate_agent_name
 from datetime import datetime, timezone
 
+# Import job queue and launcher registry services
+from services.job_queue import job_queue, JobCreate, Job, JobStatus
+from services.launcher_registry import launcher_registry
+
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
+
+# Launcher configuration
+LAUNCHER_POLL_TIMEOUT = int(os.getenv("LAUNCHER_POLL_TIMEOUT", "30"))
+LAUNCHER_HEARTBEAT_INTERVAL = int(os.getenv("LAUNCHER_HEARTBEAT_INTERVAL", "60"))
+LAUNCHER_HEARTBEAT_TIMEOUT = int(os.getenv("LAUNCHER_HEARTBEAT_TIMEOUT", "120"))
 
 # WebSocket connections (in-memory set)
 connections: set[WebSocket] = set()
@@ -121,7 +133,8 @@ async def create_session_endpoint(session: SessionCreate):
             session_name=session.session_name,
             timestamp=timestamp,
             project_dir=session.project_dir,
-            agent_name=session.agent_name
+            agent_name=session.agent_name,
+            parent_session_name=session.parent_session_name,
         )
     except Exception as e:
         if "UNIQUE constraint failed" in str(e):
@@ -137,6 +150,15 @@ async def create_session_endpoint(session: SessionCreate):
             connections.discard(ws)
 
     return {"ok": True, "session": new_session}
+
+
+@app.get("/sessions/by-name/{session_name}")
+async def get_session_by_name_endpoint(session_name: str):
+    """Get session by session_name"""
+    session = get_session_by_name(session_name)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session": session}
 
 
 @app.get("/sessions/{session_id}")
@@ -320,13 +342,13 @@ def health_check():
     return {"status": "healthy"}
 
 
-@app.get("/agents", response_model=list[Agent])
+@app.get("/agents", response_model=list[Agent], response_model_exclude_none=True)
 def list_agents():
     """List all agents."""
     return agent_storage.list_agents()
 
 
-@app.get("/agents/{name}", response_model=Agent)
+@app.get("/agents/{name}", response_model=Agent, response_model_exclude_none=True)
 def get_agent(name: str):
     """Get agent by name."""
     agent = agent_storage.get_agent(name)
@@ -335,7 +357,7 @@ def get_agent(name: str):
     return agent
 
 
-@app.post("/agents", response_model=Agent, status_code=201)
+@app.post("/agents", response_model=Agent, status_code=201, response_model_exclude_none=True)
 def create_agent(data: AgentCreate):
     """Create a new agent."""
     try:
@@ -350,7 +372,7 @@ def create_agent(data: AgentCreate):
         raise HTTPException(status_code=409, detail=str(e))
 
 
-@app.patch("/agents/{name}", response_model=Agent)
+@app.patch("/agents/{name}", response_model=Agent, response_model_exclude_none=True)
 def update_agent(name: str, updates: AgentUpdate):
     """Update an existing agent (partial update)."""
     agent = agent_storage.update_agent(name, updates)
@@ -367,13 +389,179 @@ def delete_agent(name: str):
     return None
 
 
-@app.patch("/agents/{name}/status", response_model=Agent)
+@app.patch("/agents/{name}/status", response_model=Agent, response_model_exclude_none=True)
 def update_agent_status(name: str, data: AgentStatusUpdate):
     """Update agent status (active/inactive)."""
     agent = agent_storage.set_agent_status(name, data.status)
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
     return agent
+
+
+# ==============================================================================
+# Launcher API Routes (for Agent Launcher communication)
+# ==============================================================================
+
+class LauncherRegisterResponse(BaseModel):
+    """Response from launcher registration."""
+    launcher_id: str
+    poll_endpoint: str
+    poll_timeout_seconds: int
+    heartbeat_interval_seconds: int
+
+
+class LauncherIdRequest(BaseModel):
+    """Request body containing launcher_id."""
+    launcher_id: str
+
+
+class JobCompletedRequest(BaseModel):
+    """Request body for job completion."""
+    launcher_id: str
+    status: str = "success"
+
+
+class JobFailedRequest(BaseModel):
+    """Request body for job failure."""
+    launcher_id: str
+    error: str
+
+
+@app.post("/launcher/register")
+async def register_launcher():
+    """Register a new launcher instance.
+
+    Returns launcher_id and configuration for polling.
+    """
+    launcher = launcher_registry.register_launcher()
+
+    if DEBUG:
+        print(f"[DEBUG] Registered new launcher: {launcher.launcher_id}", flush=True)
+
+    return LauncherRegisterResponse(
+        launcher_id=launcher.launcher_id,
+        poll_endpoint="/launcher/jobs",
+        poll_timeout_seconds=LAUNCHER_POLL_TIMEOUT,
+        heartbeat_interval_seconds=LAUNCHER_HEARTBEAT_INTERVAL,
+    )
+
+
+@app.get("/launcher/jobs")
+async def poll_for_jobs(launcher_id: str = Query(..., description="The registered launcher ID")):
+    """Long-poll for available jobs.
+
+    Holds the connection open for up to LAUNCHER_POLL_TIMEOUT seconds,
+    returning immediately if a job is available.
+    Returns 204 No Content if no jobs available after timeout.
+    """
+    # Verify launcher is registered
+    if not launcher_registry.get_launcher(launcher_id):
+        raise HTTPException(status_code=401, detail="Launcher not registered")
+
+    # Poll for jobs with timeout
+    poll_interval = 0.5  # Check every 500ms
+    elapsed = 0.0
+
+    while elapsed < LAUNCHER_POLL_TIMEOUT:
+        job = job_queue.claim_job(launcher_id)
+        if job:
+            if DEBUG:
+                print(f"[DEBUG] Launcher {launcher_id} claimed job {job.job_id}", flush=True)
+            return {"job": job.model_dump()}
+
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+
+    # No jobs available after timeout
+    return Response(status_code=204)
+
+
+@app.post("/launcher/jobs/{job_id}/started")
+async def report_job_started(job_id: str, request: LauncherIdRequest):
+    """Report that job execution has started."""
+    # Verify launcher
+    if not launcher_registry.get_launcher(request.launcher_id):
+        raise HTTPException(status_code=401, detail="Launcher not registered")
+
+    job = job_queue.update_job_status(job_id, JobStatus.RUNNING)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if DEBUG:
+        print(f"[DEBUG] Job {job_id} started by launcher {request.launcher_id}", flush=True)
+
+    return {"ok": True}
+
+
+@app.post("/launcher/jobs/{job_id}/completed")
+async def report_job_completed(job_id: str, request: JobCompletedRequest):
+    """Report that job completed successfully."""
+    # Verify launcher
+    if not launcher_registry.get_launcher(request.launcher_id):
+        raise HTTPException(status_code=401, detail="Launcher not registered")
+
+    job = job_queue.update_job_status(job_id, JobStatus.COMPLETED)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if DEBUG:
+        print(f"[DEBUG] Job {job_id} completed by launcher {request.launcher_id}", flush=True)
+
+    return {"ok": True}
+
+
+@app.post("/launcher/jobs/{job_id}/failed")
+async def report_job_failed(job_id: str, request: JobFailedRequest):
+    """Report that job execution failed."""
+    # Verify launcher
+    if not launcher_registry.get_launcher(request.launcher_id):
+        raise HTTPException(status_code=401, detail="Launcher not registered")
+
+    job = job_queue.update_job_status(job_id, JobStatus.FAILED, error=request.error)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if DEBUG:
+        print(f"[DEBUG] Job {job_id} failed: {request.error}", flush=True)
+
+    return {"ok": True}
+
+
+@app.post("/launcher/heartbeat")
+async def launcher_heartbeat(request: LauncherIdRequest):
+    """Keep launcher registration alive."""
+    if not launcher_registry.heartbeat(request.launcher_id):
+        raise HTTPException(status_code=401, detail="Launcher not registered")
+
+    return {"ok": True}
+
+
+# ==============================================================================
+# Jobs API Routes (for creating and querying jobs)
+# ==============================================================================
+
+@app.post("/jobs")
+async def create_job(job_create: JobCreate):
+    """Create a new job for the launcher to execute.
+
+    Used by Dashboard and future ao-start to queue work.
+    """
+    job = job_queue.add_job(job_create)
+
+    if DEBUG:
+        print(f"[DEBUG] Created job {job.job_id}: type={job.type}, session={job.session_name}", flush=True)
+
+    return {"job_id": job.job_id, "status": job.status}
+
+
+@app.get("/jobs/{job_id}")
+async def get_job(job_id: str):
+    """Get job status and details."""
+    job = job_queue.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return job.model_dump()
 
 
 if __name__ == "__main__":

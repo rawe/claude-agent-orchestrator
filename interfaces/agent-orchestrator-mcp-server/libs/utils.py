@@ -154,6 +154,7 @@ async def execute_script_async(
     config: ServerConfig,
     args: List[str],
     stdin_input: Optional[str] = None,
+    extra_env: Optional[dict] = None,
 ) -> AsyncExecutionResult:
     """
     Execute a script command asynchronously (fire-and-forget mode)
@@ -163,6 +164,7 @@ async def execute_script_async(
         config: Server configuration
         args: Command arguments (first element is command name)
         stdin_input: Optional stdin input to pass to the process
+        extra_env: Optional additional environment variables to set
 
     Returns:
         AsyncExecutionResult with session metadata
@@ -196,6 +198,11 @@ async def execute_script_async(
     )
 
     try:
+        # Build environment with extra vars if provided
+        env = os.environ.copy()
+        if extra_env:
+            env.update(extra_env)
+
         # Spawn detached process using subprocess.Popen
         # In Python, we use start_new_session=True for detachment
         process = subprocess.Popen(
@@ -203,7 +210,7 @@ async def execute_script_async(
             stdin=subprocess.PIPE if stdin_input else subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            env=os.environ.copy(),
+            env=env,
             start_new_session=True,  # KEY: Process runs independently of parent
         )
 

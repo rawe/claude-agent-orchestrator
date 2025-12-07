@@ -8,9 +8,61 @@ Uses SessionClient for API-based session management.
 from pathlib import Path
 from typing import Optional
 import asyncio
+import copy
+import os
+import re
 from datetime import datetime, UTC
 
 from session_client import SessionClient, SessionClientError
+
+
+# =============================================================================
+# MCP Config Placeholder Replacement
+# =============================================================================
+
+def _replace_env_placeholders(value: str) -> str:
+    """
+    Replace ${VAR_NAME} placeholders with environment variable values.
+
+    If the environment variable is not set, the placeholder is left unchanged.
+    """
+    def replace_match(match: re.Match) -> str:
+        var_name = match.group(1)
+        return os.environ.get(var_name, match.group(0))
+
+    return re.sub(r'\$\{([^}]+)\}', replace_match, value)
+
+
+def _process_mcp_servers(mcp_servers: dict) -> dict:
+    """
+    Process MCP server config to replace environment variable placeholders.
+
+    Handles ${AGENT_SESSION_NAME} and similar placeholders in header values.
+    Creates a deep copy to avoid modifying the original config.
+
+    Example:
+        Input:  {"headers": {"X-Agent-Session-Name": "${AGENT_SESSION_NAME}"}}
+        Output: {"headers": {"X-Agent-Session-Name": "orchestrator"}}
+    """
+    result = copy.deepcopy(mcp_servers)
+
+    for server_name, server_config in result.items():
+        if isinstance(server_config, dict):
+            # Process headers if present (HTTP servers)
+            headers = server_config.get('headers')
+            if isinstance(headers, dict):
+                for header_name, header_value in headers.items():
+                    if isinstance(header_value, str):
+                        headers[header_name] = _replace_env_placeholders(header_value)
+
+            # Process env if present (stdio servers)
+            env = server_config.get('env')
+            if isinstance(env, dict):
+                for env_name, env_value in env.items():
+                    if isinstance(env_value, str):
+                        env[env_name] = _replace_env_placeholders(env_value)
+
+    return result
 
 
 # =============================================================================
@@ -70,6 +122,7 @@ async def run_claude_session(
     resume_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
+    parent_session_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Run Claude session with API-based session management.
@@ -85,6 +138,7 @@ async def run_claude_session(
         resume_session_id: If provided, resume existing session
         api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
+        parent_session_name: Parent session name (for callback support)
 
     Returns:
         Tuple of (session_id, result)
@@ -143,9 +197,9 @@ async def run_claude_session(
     if resume_session_id:
         options.resume = resume_session_id
 
-    # Add MCP servers if provided
+    # Add MCP servers if provided (with placeholder replacement)
     if mcp_servers:
-        options.mcp_servers = mcp_servers
+        options.mcp_servers = _process_mcp_servers(mcp_servers)
 
     # Initialize tracking variables
     session_id = None
@@ -176,7 +230,8 @@ async def run_claude_session(
                                         session_id=session_id,
                                         session_name=session_name or session_id,
                                         project_dir=str(project_dir),
-                                        agent_name=agent_name
+                                        agent_name=agent_name,
+                                        parent_session_name=parent_session_name,
                                     )
                                 else:
                                     # Resume: update last_resumed_at
@@ -278,6 +333,7 @@ def run_session_sync(
     resume_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
+    parent_session_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -293,6 +349,7 @@ def run_session_sync(
         resume_session_id: If provided, resume existing session
         api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
+        parent_session_name: Parent session name (for callback support)
 
     Returns:
         Tuple of (session_id, result)
@@ -319,5 +376,6 @@ def run_session_sync(
             resume_session_id=resume_session_id,
             api_url=api_url,
             agent_name=agent_name,
+            parent_session_name=parent_session_name,
         )
     )
