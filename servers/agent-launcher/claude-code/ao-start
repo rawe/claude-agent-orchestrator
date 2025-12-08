@@ -45,7 +45,6 @@ def main(
         cat prompt.md | ao-start mysession
     """
     from config import load_config
-    from session import validate_session_name
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
@@ -66,15 +65,12 @@ def main(
     })
 
     try:
-        # 1. Validate session name
-        validate_session_name(session_name)
-
-        # 2. Load configuration
+        # 1. Load configuration
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
         )
 
-        # 3. Check session doesn't already exist (via API)
+        # 2. Check session doesn't already exist (via API)
         try:
             client = SessionClient(config.api_url)
             existing_session = client.get_session_by_name(session_name)
@@ -87,10 +83,10 @@ def main(
             # API error - warn but continue (session will be created)
             print(f"Warning: Could not check session existence: {e}", file=sys.stderr)
 
-        # 4. Get prompt (from -p and/or stdin)
+        # 3. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 5. Load agent from API if specified
+        # 4. Load agent from API if specified
         final_prompt = user_prompt
         mcp_servers = None
         agent_name = None
@@ -119,10 +115,10 @@ def main(
             if mcp_servers_data:
                 mcp_servers = mcp_servers_data
 
-        # 6. Read parent session context from environment (for callback support)
+        # 5. Read parent session context from environment (for callback support)
         parent_session_name = os.environ.get("AGENT_SESSION_NAME")
 
-        # 7. Run Claude session (session is created via API during execution)
+        # 6. Run Claude session (session is created via API during execution)
         session_id, result = run_session_sync(
             prompt=final_prompt,
             project_dir=config.project_dir,
@@ -133,7 +129,7 @@ def main(
             parent_session_name=parent_session_name,
         )
 
-        # 8. Print result to stdout
+        # 7. Print result to stdout
         print(result)
 
     except ValueError as e:

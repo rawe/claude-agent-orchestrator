@@ -40,7 +40,6 @@ def main(
         cat additional-requirements.md | ao-resume mysession
     """
     from config import get_api_url
-    from session import validate_session_name
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
@@ -59,13 +58,10 @@ def main(
     })
 
     try:
-        # 1. Validate session name
-        validate_session_name(session_name)
-
-        # 2. Get API URL
+        # 1. Get API URL
         api_url = get_api_url()
 
-        # 3. Check session exists and load metadata via API
+        # 2. Check session exists and load metadata via API
         try:
             client = SessionClient(api_url)
             session_data = client.get_session_by_name(session_name)
@@ -83,17 +79,17 @@ def main(
         session_project_dir = Path(session_data.get('project_dir', str(Path.cwd())))
         session_agent = session_data.get('agent_name')
 
-        # 4. Validate session_id exists
+        # 3. Validate session_id exists
         if not resume_session_id:
             error_exit(
                 f"Session '{session_name}' has no session_id. "
                 "Cannot resume incomplete session"
             )
 
-        # 7. Get prompt (from -p and/or stdin)
+        # 4. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 6. Load agent MCP configuration from API if session has agent
+        # 5. Load agent MCP configuration from API if session has agent
         # NOTE: Do NOT prepend system prompt for resume (only for new sessions)
         mcp_servers = None
 
