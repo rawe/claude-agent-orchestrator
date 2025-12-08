@@ -18,17 +18,12 @@ logger = logging.getLogger(__name__)
 def discover_commands_dir() -> Path:
     """Auto-discover the ao-* commands directory.
 
-    Follows the same pattern as the MCP server:
-    servers/agent-launcher/ -> plugins/orchestrator/skills/orchestrator/commands/
+    Commands are in servers/agent-launcher/claude-code/
     """
-    # Start from this file's location
+    # Start from this file's location (lib/executor.py)
+    # Go up to agent-launcher dir, then into claude-code/
     launcher_dir = Path(__file__).parent.parent.resolve()
-
-    # Navigate to project root (servers/agent-launcher -> project root)
-    project_root = launcher_dir.parent.parent
-
-    # Commands are in plugins/orchestrator/skills/orchestrator/commands/
-    commands_dir = project_root / "plugins" / "orchestrator" / "skills" / "orchestrator" / "commands"
+    commands_dir = launcher_dir / "claude-code"
 
     if not commands_dir.exists():
         raise RuntimeError(f"Commands directory not found: {commands_dir}")

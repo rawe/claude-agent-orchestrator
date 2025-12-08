@@ -121,6 +121,7 @@ class Launcher:
             logger.info(f"Registered as {self.launcher_id}")
             logger.info(f"  Poll timeout: {response.poll_timeout_seconds}s")
             logger.info(f"  Heartbeat interval: {response.heartbeat_interval_seconds}s")
+            logger.info(f"  Project directory: {self.config.project_dir}")
         except Exception as e:
             logger.error(f"Failed to register: {e}")
             raise
