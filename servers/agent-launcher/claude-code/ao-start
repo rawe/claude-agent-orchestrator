@@ -17,7 +17,6 @@ Configuration:
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add lib to path for shared modules
@@ -115,10 +114,9 @@ def main(
             if mcp_servers_data:
                 mcp_servers = mcp_servers_data
 
-        # 5. Read parent session context from environment (for callback support)
-        parent_session_name = os.environ.get("AGENT_SESSION_NAME")
-
-        # 6. Run Claude session (session is created via API during execution)
+        # 5. Run Claude session (session is created via API during execution)
+        # NOTE: parent_session_name is now handled by Agent Runtime via Jobs API
+        # (see Phase 2 of mcp-server-api-refactor.md)
         session_id, result = run_session_sync(
             prompt=final_prompt,
             project_dir=config.project_dir,
@@ -126,7 +124,6 @@ def main(
             mcp_servers=mcp_servers,
             api_url=config.api_url,
             agent_name=agent_name,
-            parent_session_name=parent_session_name,
         )
 
         # 7. Print result to stdout

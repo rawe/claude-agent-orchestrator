@@ -32,6 +32,7 @@ class JobCreate(BaseModel):
     agent_name: Optional[str] = None
     prompt: str
     project_dir: Optional[str] = None
+    parent_session_name: Optional[str] = None
 
 
 class Job(BaseModel):
@@ -42,6 +43,7 @@ class Job(BaseModel):
     agent_name: Optional[str] = None
     prompt: str
     project_dir: Optional[str] = None
+    parent_session_name: Optional[str] = None
     status: JobStatus = JobStatus.PENDING
     launcher_id: Optional[str] = None
     error: Optional[str] = None
@@ -70,6 +72,7 @@ class JobQueue:
             agent_name=job_create.agent_name,
             prompt=job_create.prompt,
             project_dir=job_create.project_dir,
+            parent_session_name=job_create.parent_session_name,
             status=JobStatus.PENDING,
             created_at=now,
         )
@@ -140,6 +143,17 @@ class JobQueue:
         """Get all jobs (for debugging)."""
         with self._lock:
             return list(self._jobs.values())
+
+    def get_job_by_session_name(self, session_name: str) -> Optional[Job]:
+        """Find a running or claimed job by session_name.
+
+        Used to link job's parent_session_name to newly created sessions.
+        """
+        with self._lock:
+            for job in self._jobs.values():
+                if job.session_name == session_name and job.status in (JobStatus.CLAIMED, JobStatus.RUNNING):
+                    return job
+        return None
 
 
 # Module-level singleton

@@ -2,8 +2,17 @@
 Constants for Agent Orchestrator MCP Server
 """
 
-# Environment variable names
-ENV_COMMAND_PATH = "AGENT_ORCHESTRATOR_COMMAND_PATH"
+import os
+
+# API Configuration
+ENV_API_URL = "AGENT_ORCHESTRATOR_API_URL"
+DEFAULT_API_URL = "http://127.0.0.1:8765"
+
+
+def get_api_url() -> str:
+    """Get Agent Runtime API URL from environment or default."""
+    return os.environ.get(ENV_API_URL, DEFAULT_API_URL)
+
 
 # Session name constraints
 MAX_SESSION_NAME_LENGTH = 60
@@ -12,11 +21,8 @@ SESSION_NAME_PATTERN = r"^[a-zA-Z0-9_-]+$"
 # Character limit for responses
 CHARACTER_LIMIT = 25000
 
-# Internal command names (used as keys to map to Python CLI commands)
-CMD_START_SESSION = "start-session"
-CMD_RESUME_SESSION = "resume-session"
-CMD_LIST_SESSIONS = "list-sessions"
-CMD_LIST_BLUEPRINTS = "list-blueprints"
-CMD_DELETE_ALL_SESSIONS = "delete-all-sessions"
-CMD_GET_STATUS = "get-status"
-CMD_GET_RESULT = "get-result"
+# HTTP Header for parent session (in HTTP mode)
+HEADER_AGENT_SESSION_NAME = "X-Agent-Session-Name"
+
+# Environment variable for parent session (in stdio mode)
+ENV_AGENT_SESSION_NAME = "AGENT_SESSION_NAME"

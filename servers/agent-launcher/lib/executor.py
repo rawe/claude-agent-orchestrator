@@ -79,12 +79,15 @@ class JobExecutor:
         project_dir = job.project_dir or self.default_project_dir
         cmd.extend(["--project-dir", project_dir])
 
-        # Build environment - inherit from parent but don't set AGENT_SESSION_NAME
-        # The session name env var is only set by the MCP server when spawning
-        # children with callback=true. Jobs from the queue are top-level sessions
-        # with no parent (unless AGENT_SESSION_NAME is already in the environment
-        # from a parent MCP server process).
+        # Build environment
         env = os.environ.copy()
+
+        # Set AGENT_SESSION_NAME so the session knows its own identity.
+        # This allows MCP servers to include the session name in HTTP headers
+        # for callback support (X-Agent-Session-Name header).
+        # Flow: Launcher sets env → ao-start replaces ${AGENT_SESSION_NAME} in MCP config
+        #       → Claude sends X-Agent-Session-Name header → MCP server reads it
+        env["AGENT_SESSION_NAME"] = job.session_name
 
         logger.info(f"Executing: {' '.join(cmd)}")
 
@@ -110,9 +113,11 @@ class JobExecutor:
             "--prompt", job.prompt,
         ]
 
-        # Build environment - inherit from parent but don't set AGENT_SESSION_NAME
-        # Same as start_session: the env var is only set by MCP server for callbacks.
+        # Build environment
         env = os.environ.copy()
+
+        # Set AGENT_SESSION_NAME so the session knows its own identity (same as start)
+        env["AGENT_SESSION_NAME"] = job.session_name
 
         logger.info(f"Executing: {' '.join(cmd)}")
 

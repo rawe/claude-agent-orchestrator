@@ -11,7 +11,8 @@ import asyncio
 from database import (
     init_db, insert_session, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
-    create_session, get_session_by_id, get_session_result, get_session_by_name
+    create_session, get_session_by_id, get_session_result, get_session_by_name,
+    update_session_parent
 )
 from models import (
     Event, SessionMetadataUpdate, SessionCreate,
@@ -127,6 +128,16 @@ async def create_session_endpoint(session: SessionCreate):
     """Create a new session with full metadata"""
     timestamp = datetime.now(timezone.utc).isoformat()
 
+    # Determine parent_session_name: prefer job's value over request's value
+    parent_session_name = session.parent_session_name
+
+    # Check if there's a running/claimed job for this session_name
+    job = job_queue.get_job_by_session_name(session.session_name)
+    if job and job.parent_session_name:
+        parent_session_name = job.parent_session_name
+        if DEBUG:
+            print(f"[DEBUG] Session {session.session_name} inheriting parent {parent_session_name} from job {job.job_id}", flush=True)
+
     try:
         new_session = create_session(
             session_id=session.session_id,
@@ -134,7 +145,7 @@ async def create_session_endpoint(session: SessionCreate):
             timestamp=timestamp,
             project_dir=session.project_dir,
             agent_name=session.agent_name,
-            parent_session_name=session.parent_session_name,
+            parent_session_name=parent_session_name,
         )
     except Exception as e:
         if "UNIQUE constraint failed" in str(e):
@@ -483,9 +494,23 @@ async def report_job_started(job_id: str, request: LauncherIdRequest):
     if not launcher_registry.get_launcher(request.launcher_id):
         raise HTTPException(status_code=401, detail="Launcher not registered")
 
-    job = job_queue.update_job_status(job_id, JobStatus.RUNNING)
+    # Get job first to access parent_session_name
+    job = job_queue.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # Update job status to running
+    job = job_queue.update_job_status(job_id, JobStatus.RUNNING)
+
+    # Link job's parent_session_name to session (for resume case where session already exists)
+    if job.parent_session_name:
+        session = get_session_by_name(job.session_name)
+        if session:
+            # Session exists (resume case) - update parent
+            update_session_parent(session["session_id"], job.parent_session_name)
+            if DEBUG:
+                print(f"[DEBUG] Updated session {job.session_name} parent to {job.parent_session_name}", flush=True)
+        # If session doesn't exist yet (start case), POST /sessions will pick up parent from job
 
     if DEBUG:
         print(f"[DEBUG] Job {job_id} started by launcher {request.launcher_id}", flush=True)

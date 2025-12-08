@@ -122,13 +122,16 @@ async def run_claude_session(
     resume_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
-    parent_session_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Run Claude session with API-based session management.
 
     This function uses the Claude Agent SDK to create or resume a session,
     with session state managed via the AgentRuntime API.
+
+    NOTE: parent_session_name is now handled automatically by Agent Runtime
+    via the Jobs API. The launcher sets AGENT_SESSION_NAME env var which
+    flows through the job to the session. See mcp-server-api-refactor.md.
 
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
@@ -138,7 +141,6 @@ async def run_claude_session(
         resume_session_id: If provided, resume existing session
         api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
-        parent_session_name: Parent session name (for callback support)
 
     Returns:
         Tuple of (session_id, result)
@@ -226,12 +228,13 @@ async def run_claude_session(
                             try:
                                 if not resume_session_id:
                                     # New session: create via API
+                                    # NOTE: parent_session_name is set by Agent Runtime
+                                    # from the Job's parent_session_name field
                                     session_client.create_session(
                                         session_id=session_id,
                                         session_name=session_name or session_id,
                                         project_dir=str(project_dir),
                                         agent_name=agent_name,
-                                        parent_session_name=parent_session_name,
                                     )
                                 else:
                                     # Resume: update last_resumed_at
@@ -333,13 +336,15 @@ def run_session_sync(
     resume_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
-    parent_session_name: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
 
     This allows command scripts to remain synchronous while using
     the SDK's async API internally.
+
+    NOTE: parent_session_name is now handled automatically by Agent Runtime
+    via the Jobs API. See mcp-server-api-refactor.md.
 
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
@@ -349,7 +354,6 @@ def run_session_sync(
         resume_session_id: If provided, resume existing session
         api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
-        parent_session_name: Parent session name (for callback support)
 
     Returns:
         Tuple of (session_id, result)
@@ -376,6 +380,5 @@ def run_session_sync(
             resume_session_id=resume_session_id,
             api_url=api_url,
             agent_name=agent_name,
-            parent_session_name=parent_session_name,
         )
     )

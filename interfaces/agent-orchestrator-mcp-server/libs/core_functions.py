@@ -1,7 +1,7 @@
 """
-Core functions for Agent Orchestrator
+Core functions for Agent Orchestrator MCP Server.
 
-These functions contain the actual logic for agent orchestration operations.
+These functions implement the actual logic by calling the Agent Runtime API.
 They are used by both the MCP tools and the REST API.
 """
 
@@ -10,83 +10,122 @@ import json
 import os
 from typing import Literal, Optional
 
+from api_client import APIClient, APIError
 from constants import (
-    CMD_DELETE_ALL_SESSIONS,
-    CMD_GET_RESULT,
-    CMD_GET_STATUS,
-    CMD_LIST_BLUEPRINTS,
-    CMD_LIST_SESSIONS,
-    CMD_RESUME_SESSION,
-    CMD_START_SESSION,
-    MAX_SESSION_NAME_LENGTH,
+    CHARACTER_LIMIT,
+    ENV_AGENT_SESSION_NAME,
+    HEADER_AGENT_SESSION_NAME,
 )
 from logger import logger
-from types_models import ResponseFormat, ServerConfig
-from utils import (
-    execute_script,
-    execute_script_async,
-    format_agents_as_json,
-    format_agents_as_markdown,
-    format_sessions_as_json,
-    format_sessions_as_markdown,
-    format_tool_response,
-    handle_script_error,
-    parse_agent_list,
-    parse_session_list,
-    truncate_response,
-)
+from types_models import ServerConfig
+
+
+def get_api_client(config: ServerConfig) -> APIClient:
+    """Get API client instance."""
+    return APIClient(config.api_url)
+
+
+def get_parent_session_name(http_headers: Optional[dict] = None) -> Optional[str]:
+    """
+    Get parent session name from environment or HTTP headers.
+
+    - stdio mode: reads from AGENT_SESSION_NAME env var
+    - HTTP mode: reads from X-Agent-Session-Name header
+    """
+    # Try HTTP header first (if provided)
+    if http_headers:
+        # HTTP headers are case-insensitive; get_http_headers() returns lowercase keys
+        header_key_lower = HEADER_AGENT_SESSION_NAME.lower()
+        parent = http_headers.get(header_key_lower)
+        if parent:
+            return parent
+
+    # Fall back to environment variable
+    return os.environ.get(ENV_AGENT_SESSION_NAME)
+
+
+def truncate_response(text: str) -> tuple[str, bool]:
+    """Truncate response if it exceeds character limit."""
+    if len(text) <= CHARACTER_LIMIT:
+        return text, False
+
+    truncated = text[:CHARACTER_LIMIT] + "\n\n[Response truncated due to length]"
+    return truncated, True
 
 
 async def list_agent_blueprints_impl(
     config: ServerConfig,
     response_format: Literal["markdown", "json"] = "markdown",
 ) -> str:
-    """List all available agent blueprints that can be used to create agent sessions."""
+    """List all available agent blueprints."""
     logger.info("list_agent_blueprints called", {"response_format": response_format})
 
     try:
-        args = [CMD_LIST_BLUEPRINTS]
-        result = await execute_script(config, args)
+        client = get_api_client(config)
+        agents = await client.list_agents()
 
-        if result.exitCode != 0:
-            return handle_script_error(result)
+        # Filter to active agents only
+        active_agents = [a for a in agents if a.get("status") == "active"]
 
-        agents = parse_agent_list(result.stdout)
-        fmt = ResponseFormat.JSON if response_format == "json" else ResponseFormat.MARKDOWN
-        formatted_response = format_tool_response(
-            agents, fmt, format_agents_as_markdown, format_agents_as_json
-        )
-        text, _ = truncate_response(formatted_response)
-        return text
+        if response_format == "json":
+            return json.dumps(
+                {
+                    "total": len(active_agents),
+                    "agents": [
+                        {"name": a["name"], "description": a.get("description", "")}
+                        for a in active_agents
+                    ],
+                },
+                indent=2,
+            )
+        else:
+            if not active_agents:
+                return "No agent blueprints found"
 
-    except Exception as error:
-        return f"Error: {str(error)}"
+            lines = ["# Available Agent Blueprints", ""]
+            for agent in active_agents:
+                lines.append(f"## {agent['name']}")
+                lines.append(agent.get("description", "No description"))
+                lines.append("")
+            return "\n".join(lines)
+
+    except APIError as e:
+        logger.error("list_agent_blueprints error", {"error": str(e)})
+        return f"Error: {str(e)}"
 
 
 async def list_agent_sessions_impl(
     config: ServerConfig,
     response_format: Literal["markdown", "json"] = "markdown",
 ) -> str:
-    """List all agent session instances (running, completed, or initializing)."""
+    """List all agent sessions."""
     logger.info("list_agent_sessions called", {"response_format": response_format})
 
     try:
-        args = [CMD_LIST_SESSIONS]
-        result = await execute_script(config, args)
+        client = get_api_client(config)
+        sessions = await client.list_sessions()
 
-        if result.exitCode != 0:
-            return handle_script_error(result)
+        if response_format == "json":
+            return json.dumps(
+                {"total": len(sessions), "sessions": sessions},
+                indent=2,
+            )
+        else:
+            if not sessions:
+                return "No sessions found"
 
-        sessions = parse_session_list(result.stdout)
-        fmt = ResponseFormat.JSON if response_format == "json" else ResponseFormat.MARKDOWN
-        formatted_response = format_tool_response(
-            sessions, fmt, format_sessions_as_markdown, format_sessions_as_json
-        )
-        text, _ = truncate_response(formatted_response)
-        return text
+            lines = ["# Agent Sessions", "", f"Found {len(sessions)} session(s)", ""]
+            for s in sessions:
+                lines.append(f"## {s.get('session_name', 'unknown')}")
+                lines.append(f"- **Session ID**: {s.get('session_id', 'unknown')}")
+                lines.append(f"- **Status**: {s.get('status', 'unknown')}")
+                lines.append(f"- **Project Directory**: {s.get('project_dir', 'N/A')}")
+                lines.append("")
+            return "\n".join(lines)
 
-    except Exception as error:
-        return f"Error: {str(error)}"
+    except APIError as e:
+        logger.error("list_agent_sessions error", {"error": str(e)})
+        return f"Error: {str(e)}"
 
 
 async def start_agent_session_impl(
@@ -97,70 +136,72 @@ async def start_agent_session_impl(
     project_dir: Optional[str] = None,
     async_mode: bool = False,
     callback: bool = False,
+    http_headers: Optional[dict] = None,
 ) -> str:
-    """Start a new agent session instance that immediately begins execution."""
+    """Start a new agent session."""
     logger.info(
         "start_agent_session called",
         {
             "session_name": session_name,
             "agent_blueprint_name": agent_blueprint_name,
-            "project_dir": project_dir,
-            "prompt_length": len(prompt),
             "async_mode": async_mode,
             "callback": callback,
         },
     )
 
     try:
-        args = [CMD_START_SESSION, session_name]
+        client = get_api_client(config)
 
-        if project_dir:
-            args.extend(["--project-dir", project_dir])
+        # Get parent session name for callback support
+        parent_session_name = None
+        if callback:
+            parent_session_name = get_parent_session_name(http_headers)
+            if not parent_session_name:
+                logger.warn("callback=true but no parent session name available")
 
-        if agent_blueprint_name:
-            args.extend(["--agent", agent_blueprint_name])
+        # Create job
+        # Note: If project_dir is None, the Agent Runtime/Launcher decides the default
+        job_id = await client.create_job(
+            job_type="start_session",
+            session_name=session_name,
+            prompt=prompt,
+            agent_name=agent_blueprint_name,
+            project_dir=project_dir,
+            parent_session_name=parent_session_name,
+        )
 
-        args.extend(["-p", prompt])
+        logger.info(f"Created job {job_id} for session {session_name}")
 
         if async_mode:
-            logger.info("start_agent_session: using async execution")
-
-            # Build extra environment variables for callback support
-            extra_env = None
-            if callback:
-                # Read parent session name from current environment
-                parent_session_name = os.environ.get("AGENT_SESSION_NAME")
-                if parent_session_name:
-                    extra_env = {"AGENT_SESSION_NAME": parent_session_name}
-                    logger.info(
-                        "start_agent_session: callback enabled",
-                        {"parent_session_name": parent_session_name}
-                    )
-
-            async_result = await execute_script_async(config, args, extra_env=extra_env)
+            # Return immediately
             response = {
-                "session_name": async_result.session_name,
-                "status": async_result.status,
-                "message": async_result.message,
+                "session_name": session_name,
+                "job_id": job_id,
+                "status": "running",
+                "message": "Agent started in background. Use get_agent_session_status to poll for completion.",
             }
-            if callback and extra_env:
-                response["callback_to"] = extra_env.get("AGENT_SESSION_NAME")
+            if callback and parent_session_name:
+                response["callback_to"] = parent_session_name
             return json.dumps(response, indent=2)
 
-        logger.info("start_agent_session: using synchronous execution")
-        result = await execute_script(config, args)
+        # Synchronous: wait for completion
+        logger.info(f"Waiting for job {job_id} to complete...")
+        await client.wait_for_job(job_id)
 
-        if result.exitCode != 0:
-            return handle_script_error(result)
+        # Get result from session
+        session = await client.get_session_by_name(session_name)
+        if not session:
+            return f"Error: Session '{session_name}' not found after job completed"
 
-        text, truncated = truncate_response(result.stdout)
+        result = await client.get_session_result(session["session_id"])
+        text, truncated = truncate_response(result)
         if truncated:
             logger.warn("start_agent_session: response truncated")
         return text
 
-    except Exception as error:
-        logger.error("start_agent_session: exception", {"error": str(error)})
-        return f"Error: {str(error)}"
+    except APIError as e:
+        logger.error("start_agent_session error", {"error": str(e)})
+        return f"Error: {str(e)}"
 
 
 async def resume_agent_session_impl(
@@ -169,75 +210,64 @@ async def resume_agent_session_impl(
     prompt: str,
     async_mode: bool = False,
     callback: bool = False,
+    http_headers: Optional[dict] = None,
 ) -> str:
-    """Resume an existing agent session instance with a new prompt to continue work."""
+    """Resume an existing agent session."""
     logger.info(
         "resume_agent_session called",
         {
             "session_name": session_name,
-            "prompt_length": len(prompt),
             "async_mode": async_mode,
             "callback": callback,
         },
     )
 
     try:
-        args = [CMD_RESUME_SESSION, session_name]
-        args.extend(["-p", prompt])
+        client = get_api_client(config)
+
+        # Get parent session name for callback support
+        parent_session_name = None
+        if callback:
+            parent_session_name = get_parent_session_name(http_headers)
+            if not parent_session_name:
+                logger.warn("callback=true but no parent session name available")
+
+        # Create resume job
+        job_id = await client.create_job(
+            job_type="resume_session",
+            session_name=session_name,
+            prompt=prompt,
+            parent_session_name=parent_session_name,
+        )
+
+        logger.info(f"Created resume job {job_id} for session {session_name}")
 
         if async_mode:
-            logger.info("resume_agent_session: using async execution")
-
-            # Build extra environment variables for callback support
-            extra_env = None
-            if callback:
-                # Read parent session name from current environment
-                parent_session_name = os.environ.get("AGENT_SESSION_NAME")
-                if parent_session_name:
-                    extra_env = {"AGENT_SESSION_NAME": parent_session_name}
-                    logger.info(
-                        "resume_agent_session: callback enabled",
-                        {"parent_session_name": parent_session_name}
-                    )
-
-            async_result = await execute_script_async(config, args, extra_env=extra_env)
             response = {
-                "session_name": async_result.session_name,
-                "status": async_result.status,
-                "message": async_result.message,
+                "session_name": session_name,
+                "job_id": job_id,
+                "status": "running",
+                "message": "Agent resumed in background. Use get_agent_session_status to poll for completion.",
             }
-            if callback and extra_env:
-                response["callback_to"] = extra_env.get("AGENT_SESSION_NAME")
+            if callback and parent_session_name:
+                response["callback_to"] = parent_session_name
             return json.dumps(response, indent=2)
 
-        logger.info("resume_agent_session: using synchronous execution")
-        result = await execute_script(config, args)
+        # Synchronous: wait for completion
+        await client.wait_for_job(job_id)
 
-        if result.exitCode != 0:
-            return handle_script_error(result)
+        # Get result
+        session = await client.get_session_by_name(session_name)
+        if not session:
+            return f"Error: Session '{session_name}' not found after job completed"
 
-        text, _ = truncate_response(result.stdout)
+        result = await client.get_session_result(session["session_id"])
+        text, _ = truncate_response(result)
         return text
 
-    except Exception as error:
-        return f"Error: {str(error)}"
-
-
-async def delete_all_agent_sessions_impl(config: ServerConfig) -> str:
-    """Permanently delete all agent session instances and their associated data."""
-    logger.info("delete_all_agent_sessions called")
-
-    try:
-        args = [CMD_DELETE_ALL_SESSIONS]
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return handle_script_error(result)
-
-        return result.stdout
-
-    except Exception as error:
-        return f"Error: {str(error)}"
+    except APIError as e:
+        logger.error("resume_agent_session error", {"error": str(e)})
+        return f"Error: {str(e)}"
 
 
 async def get_agent_session_status_impl(
@@ -245,28 +275,30 @@ async def get_agent_session_status_impl(
     session_name: str,
     wait_seconds: int = 0,
 ) -> str:
-    """Check the current status of an agent session instance."""
+    """Get session status."""
     logger.info(
         "get_agent_session_status called",
-        {"session_name": session_name, "wait_seconds": wait_seconds},
+        {
+            "session_name": session_name,
+            "wait_seconds": wait_seconds,
+        },
     )
 
     try:
         if wait_seconds > 0:
-            logger.debug(f"Waiting {wait_seconds} seconds before status check")
             await asyncio.sleep(wait_seconds)
 
-        args = [CMD_GET_STATUS, session_name]
-        result = await execute_script(config, args)
+        client = get_api_client(config)
+        session = await client.get_session_by_name(session_name)
 
-        if result.exitCode != 0:
+        if not session:
             return json.dumps({"status": "not_existent"}, indent=2)
 
-        status = result.stdout.strip()
+        status = await client.get_session_status(session["session_id"])
         return json.dumps({"status": status}, indent=2)
 
-    except Exception as error:
-        logger.error("get_agent_session_status: exception", {"error": str(error)})
+    except APIError as e:
+        logger.error("get_agent_session_status error", {"error": str(e)})
         return json.dumps({"status": "not_existent"}, indent=2)
 
 
@@ -274,33 +306,50 @@ async def get_agent_session_result_impl(
     config: ServerConfig,
     session_name: str,
 ) -> str:
-    """Retrieve the final output/result from a completed agent session instance."""
+    """Get session result."""
     logger.info("get_agent_session_result called", {"session_name": session_name})
 
     try:
-        # First check status
-        status_args = [CMD_GET_STATUS, session_name]
-        status_result = await execute_script(config, status_args)
-        status = status_result.stdout.strip()
+        client = get_api_client(config)
+        session = await client.get_session_by_name(session_name)
 
-        if status == "not_existent":
-            return f"Error: Session '{session_name}' does not exist. Please check the session name."
+        if not session:
+            return f"Error: Session '{session_name}' does not exist."
+
+        status = await client.get_session_status(session["session_id"])
 
         if status == "running":
-            return f"Error: Session '{session_name}' is still running. Use get_agent_session_status to poll until status is 'finished'."
+            return f"Error: Session '{session_name}' is still running. Use get_agent_session_status to poll until finished."
 
-        # Session is finished, retrieve result
-        args = [CMD_GET_RESULT, session_name]
-        result = await execute_script(config, args)
-
-        if result.exitCode != 0:
-            return f"Error retrieving result: {result.stderr or 'Unknown error'}"
-
-        text, truncated = truncate_response(result.stdout)
+        result = await client.get_session_result(session["session_id"])
+        text, truncated = truncate_response(result)
         if truncated:
             logger.warn("get_agent_session_result: response truncated")
         return text
 
-    except Exception as error:
-        logger.error("get_agent_session_result: exception", {"error": str(error)})
-        return f"Error: {str(error)}"
+    except APIError as e:
+        logger.error("get_agent_session_result error", {"error": str(e)})
+        return f"Error: {str(e)}"
+
+
+async def delete_all_agent_sessions_impl(config: ServerConfig) -> str:
+    """Delete all agent sessions."""
+    logger.info("delete_all_agent_sessions called")
+
+    try:
+        client = get_api_client(config)
+        sessions = await client.list_sessions()
+
+        if not sessions:
+            return "No sessions to delete"
+
+        deleted = 0
+        for session in sessions:
+            if await client.delete_session(session["session_id"]):
+                deleted += 1
+
+        return f"Deleted {deleted} session(s)"
+
+    except APIError as e:
+        logger.error("delete_all_agent_sessions error", {"error": str(e)})
+        return f"Error: {str(e)}"

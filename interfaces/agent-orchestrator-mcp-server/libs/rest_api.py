@@ -165,7 +165,7 @@ def create_api_router(mcp_tools: dict) -> APIRouter:
                 total=data.get("total", len(data.get("sessions", []))),
                 sessions=[
                     SessionInfo(
-                        name=s["name"],
+                        name=s["session_name"],
                         session_id=s.get("session_id", s.get("sessionId", "unknown")),
                         project_dir=s.get("project_dir", s.get("projectDir", "")),
                     )

@@ -3,7 +3,7 @@
 Agent Orchestrator MCP Server
 
 This MCP server provides tools to orchestrate specialized Claude Code agents
-through the agent-orchestrator Python commands. It enables:
+through the Agent Runtime API. It enables:
 - Listing available agent blueprints
 - Managing agent sessions (create, resume, list, clean)
 - Executing long-running tasks in specialized agent contexts
@@ -11,18 +11,17 @@ through the agent-orchestrator Python commands. It enables:
 Supports both stdio and HTTP transports via FastMCP.
 """
 
-import os
 import sys
-from pathlib import Path
 from typing import Literal, Optional
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_headers
 from pydantic import Field
 
-from constants import ENV_COMMAND_PATH, MAX_SESSION_NAME_LENGTH
+from constants import MAX_SESSION_NAME_LENGTH, get_api_url
 from core_functions import (
     delete_all_agent_sessions_impl,
     get_agent_session_result_impl,
@@ -39,16 +38,7 @@ from types_models import ServerConfig
 
 def get_server_config() -> ServerConfig:
     """Get configuration from environment variables"""
-    command_path = os.environ.get(ENV_COMMAND_PATH)
-    if not command_path:
-        print(f"ERROR: {ENV_COMMAND_PATH} environment variable not set and auto-discovery failed", file=sys.stderr)
-        print("This should not happen - please check the MCP server installation", file=sys.stderr)
-        sys.exit(1)
-
-    # Normalize path: remove trailing slash if present
-    normalized_path = command_path.rstrip("/")
-
-    return ServerConfig(commandPath=Path(normalized_path).resolve().as_posix())
+    return ServerConfig(api_url=get_api_url())
 
 
 # Get server configuration
@@ -173,8 +163,10 @@ async def start_agent_session(
       - Use when: "Create an architecture design" -> Start session with system-architect blueprint
       - Don't use when: Session already exists (use resume_agent_session instead)
     """
+    # Get HTTP headers for parent session name extraction (callback support)
+    http_headers = get_http_headers()
     return await start_agent_session_impl(
-        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback
+        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback, http_headers
     )
 
 
@@ -214,7 +206,9 @@ async def resume_agent_session(
       - Use when: "Continue the architecture work" -> Resume existing architect session
       - Don't use when: Session doesn't exist (use start_agent_session to create it)
     """
-    return await resume_agent_session_impl(config, session_name, prompt, async_mode, callback)
+    # Get HTTP headers for parent session name extraction (callback support)
+    http_headers = get_http_headers()
+    return await resume_agent_session_impl(config, session_name, prompt, async_mode, callback, http_headers)
 
 
 @mcp.tool()
@@ -354,12 +348,24 @@ For MCP clients (Claude Desktop, Claude CLI), use the `/mcp` endpoint.
     # Create REST API router with core functions (not MCP tool wrappers)
     # These are the actual async functions that do the work
     core_functions = {
-        "list_agent_blueprints": lambda response_format="json": list_agent_blueprints_impl(config, response_format),
-        "list_agent_sessions": lambda response_format="json": list_agent_sessions_impl(config, response_format),
-        "start_agent_session": lambda session_name, prompt, agent_blueprint_name=None, project_dir=None, async_mode=False, callback=False: start_agent_session_impl(config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback),
-        "resume_agent_session": lambda session_name, prompt, async_mode=False, callback=False: resume_agent_session_impl(config, session_name, prompt, async_mode, callback),
-        "get_agent_session_status": lambda session_name, wait_seconds=0: get_agent_session_status_impl(config, session_name, wait_seconds),
-        "get_agent_session_result": lambda session_name: get_agent_session_result_impl(config, session_name),
+        "list_agent_blueprints": lambda response_format="json": list_agent_blueprints_impl(
+            config, response_format
+        ),
+        "list_agent_sessions": lambda response_format="json": list_agent_sessions_impl(
+            config, response_format
+        ),
+        "start_agent_session": lambda session_name, prompt, agent_blueprint_name=None, project_dir=None, async_mode=False, callback=False: start_agent_session_impl(
+            config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback
+        ),
+        "resume_agent_session": lambda session_name, prompt, async_mode=False, callback=False: resume_agent_session_impl(
+            config, session_name, prompt, async_mode, callback
+        ),
+        "get_agent_session_status": lambda session_name, wait_seconds=0: get_agent_session_status_impl(
+            config, session_name, wait_seconds
+        ),
+        "get_agent_session_result": lambda session_name: get_agent_session_result_impl(
+            config, session_name
+        ),
         "delete_all_agent_sessions": lambda: delete_all_agent_sessions_impl(config),
     }
     api_router = create_api_router(core_functions)
@@ -396,12 +402,12 @@ def run_server(
             "transport": transport,
             "host": host if transport != "stdio" else None,
             "port": port if transport != "stdio" else None,
-            "commandPath": config.commandPath,
+            "api_url": config.api_url,
         },
     )
 
     print("Agent Orchestrator MCP Server", file=sys.stderr)
-    print(f"Commands path: {config.commandPath}", file=sys.stderr)
+    print(f"Agent Runtime API: {config.api_url}", file=sys.stderr)
     print(f"Transport: {transport}", file=sys.stderr)
 
     if transport == "stdio":
@@ -414,7 +420,7 @@ def run_server(
         print(f"Running via SSE at http://{host}:{port}/sse", file=sys.stderr)
         mcp.run(transport="sse", host=host, port=port)
     elif transport == "api":
-        print(f"Running combined MCP + REST API server", file=sys.stderr)
+        print("Running combined MCP + REST API server", file=sys.stderr)
         print(f"  MCP endpoint:  http://{host}:{port}/mcp", file=sys.stderr)
         print(f"  REST API:      http://{host}:{port}/api", file=sys.stderr)
         print(f"  API Docs:      http://{host}:{port}/api/docs", file=sys.stderr)

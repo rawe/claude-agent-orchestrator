@@ -280,3 +280,17 @@ def get_session_by_name(session_name: str) -> dict | None:
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def update_session_parent(session_id: str, parent_session_name: str) -> None:
+    """Update the parent_session_name of a session.
+
+    Used when resuming a session - the parent may be different from the original.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "UPDATE sessions SET parent_session_name = ? WHERE session_id = ?",
+        (parent_session_name, session_id)
+    )
+    conn.commit()
+    conn.close()

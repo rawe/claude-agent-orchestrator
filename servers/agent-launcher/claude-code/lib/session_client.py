@@ -56,9 +56,13 @@ class SessionClient:
         session_name: str,
         project_dir: Optional[str] = None,
         agent_name: Optional[str] = None,
-        parent_session_name: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create new session with full metadata."""
+        """
+        Create new session with full metadata.
+
+        NOTE: parent_session_name is now set by Agent Runtime from the Job's
+        parent_session_name field. See mcp-server-api-refactor.md Phase 2.
+        """
         data = {
             "session_id": session_id,
             "session_name": session_name,
@@ -67,8 +71,6 @@ class SessionClient:
             data["project_dir"] = project_dir
         if agent_name is not None:
             data["agent_name"] = agent_name
-        if parent_session_name is not None:
-            data["parent_session_name"] = parent_session_name
 
         result = self._request("POST", "/sessions", json_data=data)
         return result.get("session", result)
