@@ -16,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
-from typing import Optional
 
 app = typer.Typer(add_completion=False)
 
@@ -24,7 +23,6 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def main(
     session_name: str = typer.Argument(..., help="Name of the session"),
-    project_dir: Optional[Path] = typer.Option(None, "--project-dir", help="Project directory"),
 ):
     """
     Extract the result from a completed session.
@@ -32,62 +30,30 @@ def main(
     Examples:
         ao-get-result mysession
     """
-    from config import load_config
-    from session import validate_session_name, get_session_status, extract_result
+    from config import get_api_url
     from session_client import SessionClient, SessionClientError
 
     try:
-        # Validate session name
-        validate_session_name(session_name)
+        api_url = get_api_url()
+        client = SessionClient(api_url)
 
-        # Load configuration with CLI overrides
-        config = load_config(
-            cli_project_dir=str(project_dir) if project_dir else None,
-        )
-
-        # Try API first
-        try:
-            client = SessionClient(config.api_url)
-            session = client.get_session_by_name(session_name)
-            if session:
-                status = client.get_status(session['session_id'])
-                if status == "running":
-                    print(f"Error: Session '{session_name}' is still running. Wait for completion or check status with ao-status.", file=sys.stderr)
-                    raise typer.Exit(1)
-                result = client.get_result(session['session_id'])
-                print(result)
-                return
-            # Session not found in API, fall back to file-based
-        except SessionClientError as e:
-            # API error, fall back to file-based
-            print(f"Warning: API error: {e}", file=sys.stderr)
-
-        # Fallback to file-based
-        status = get_session_status(session_name, config.sessions_dir)
-
-        if status == "not_existent":
+        session = client.get_session_by_name(session_name)
+        if not session:
             print(f"Error: Session '{session_name}' does not exist", file=sys.stderr)
             raise typer.Exit(1)
 
+        status = client.get_status(session['session_id'])
         if status == "running":
             print(f"Error: Session '{session_name}' is still running. Wait for completion or check status with ao-status.", file=sys.stderr)
             raise typer.Exit(1)
 
-        # Extract and print result
-        session_file = config.sessions_dir / f"{session_name}.jsonl"
-        result = extract_result(session_file)
+        result = client.get_result(session['session_id'])
         print(result)
 
-    except ValueError as e:
-        # Session validation errors or result extraction errors
-        print(f"Error: {e}", file=sys.stderr)
-        raise typer.Exit(1)
-    except FileNotFoundError as e:
-        # Session file not found
+    except SessionClientError as e:
         print(f"Error: {e}", file=sys.stderr)
         raise typer.Exit(1)
     except Exception as e:
-        # Unexpected errors
         print(f"Error: {e}", file=sys.stderr)
         raise typer.Exit(1)
 

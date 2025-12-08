@@ -2,7 +2,6 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "claude-agent-sdk",
 #     "typer",
 #     "httpx",
 # ]
@@ -10,14 +9,13 @@
 """
 Start a new agent orchestrator session.
 
-This command starts a new Claude AI session, optionally with an agent configuration.
+This command creates a job to start a new Claude AI session via the Agent Runtime.
 
 Configuration:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add lib to path for shared modules
@@ -45,56 +43,24 @@ def main(
         cat prompt.md | ao-start mysession
     """
     from config import load_config
-    from session import validate_session_name
-    from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
-    from claude_client import run_session_sync
+    from job_client import JobClient, JobClientError, JobFailedError, JobTimeoutError
     from utils import (
         get_prompt_from_args_and_stdin,
         error_exit,
-        debug_log,
     )
 
-    # DEBUG LOGGING - Command entry
-    debug_log("COMMAND - ao-start", {
-        "cwd": str(Path.cwd()),
-        "argv": sys.argv,
-        "session_name": session_name,
-        "prompt": prompt or "None (will read from stdin)",
-        "agent": agent or "None",
-        "project_dir": str(project_dir) if project_dir else "None",
-    })
-
     try:
-        # 1. Validate session name
-        validate_session_name(session_name)
-
-        # 2. Load configuration
+        # 1. Load configuration
         config = load_config(
             cli_project_dir=str(project_dir) if project_dir else None,
         )
 
-        # 3. Check session doesn't already exist (via API)
-        try:
-            client = SessionClient(config.api_url)
-            existing_session = client.get_session_by_name(session_name)
-            if existing_session:
-                error_exit(
-                    f"Session '{session_name}' already exists. "
-                    "Use 'ao-resume' command to continue or choose a different name"
-                )
-        except SessionClientError as e:
-            # API error - warn but continue (session will be created)
-            print(f"Warning: Could not check session existence: {e}", file=sys.stderr)
-
-        # 4. Get prompt (from -p and/or stdin)
+        # 2. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 5. Load agent from API if specified
-        final_prompt = user_prompt
-        mcp_servers = None
+        # 3. Validate agent exists if specified
         agent_name = None
-
         if agent:
             try:
                 agent_data = get_agent_api(agent)
@@ -109,44 +75,29 @@ def main(
 
             agent_name = agent_data.get("name")
 
-            # Prepend system prompt if available
-            system_prompt = agent_data.get("system_prompt")
-            if system_prompt:
-                final_prompt = f"{system_prompt}\n\n---\n\n{user_prompt}"
-
-            # Build MCP servers dict from API response
-            mcp_servers_data = agent_data.get("mcp_servers")
-            if mcp_servers_data:
-                mcp_servers = mcp_servers_data
-
-        # 6. Read parent session context from environment (for callback support)
-        parent_session_name = os.environ.get("AGENT_SESSION_NAME")
-
-        # 7. Run Claude session (session is created via API during execution)
-        session_id, result = run_session_sync(
-            prompt=final_prompt,
-            project_dir=config.project_dir,
+        # 4. Create job and wait for result
+        job_client = JobClient(config.api_url)
+        result = job_client.start_session(
             session_name=session_name,
-            mcp_servers=mcp_servers,
-            api_url=config.api_url,
+            prompt=user_prompt,
             agent_name=agent_name,
-            parent_session_name=parent_session_name,
+            project_dir=str(config.project_dir),
         )
 
-        # 8. Print result to stdout
+        # 5. Print result to stdout
         print(result)
 
+    except JobFailedError as e:
+        error_exit(str(e))
+    except JobTimeoutError as e:
+        error_exit(str(e))
+    except JobClientError as e:
+        error_exit(str(e))
     except ValueError as e:
-        # Session validation errors, prompt errors, etc.
-        error_exit(str(e))
-    except FileNotFoundError as e:
-        # Agent not found, config file issues, etc.
-        error_exit(str(e))
-    except ImportError as e:
-        # SDK not installed
+        # Prompt errors, etc.
         error_exit(str(e))
     except Exception as e:
-        # Unexpected errors (SDK errors, etc.)
+        # Unexpected errors
         error_exit(f"Unexpected error: {e}")
 
 
