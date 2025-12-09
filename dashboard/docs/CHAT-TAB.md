@@ -90,7 +90,110 @@ The Chat tab reuses the **existing WebSocket connection** from the dashboard. Th
     content: [{ type: 'text', text: '...' }]
   }
 }
+
+// Session start/resume (used for callback detection)
+{ type: 'event', data: {
+    session_id,
+    event_type: 'session_start'
+  }
+}
+
+// Tool execution completed
+{ type: 'event', data: {
+    session_id,
+    event_type: 'post_tool',
+    tool_name: 'ToolName',
+    tool_input: {...},
+    tool_output: {...}
+  }
+}
+
+// Session stopped
+{ type: 'event', data: {
+    session_id,
+    event_type: 'session_stop',
+    exit_code: 0
+  }
+}
 ```
+
+## Callback Resume Feature
+
+The Chat tab supports automatic updates when a session resumes via the callback architecture. This happens when:
+
+1. A parent session spawns a child agent with `callback=true`
+2. The parent session goes to `finished` state while waiting
+3. The child session completes its work
+4. The framework calls back to resume the parent session
+5. The parent session continues processing
+
+### How Callback Resume Works
+
+```
+┌─────────────────┐                    ┌─────────────────┐
+│  Parent Session │                    │  Child Session  │
+│   (Chat Tab)    │                    │   (Math Agent)  │
+└────────┬────────┘                    └────────┬────────┘
+         │                                      │
+         │ 1. User sends prompt                 │
+         │    "calculate 1+5 with callback"     │
+         ▼                                      │
+    ┌─────────┐                                 │
+    │ running │                                 │
+    └────┬────┘                                 │
+         │ 2. Spawns child with callback=true   │
+         │ ─────────────────────────────────────►
+         ▼                                      ▼
+    ┌──────────┐                          ┌─────────┐
+    │ finished │                          │ running │
+    └────┬─────┘                          └────┬────┘
+         │                                     │
+         │ 3. Chat shows "Agent is finished"   │ 4. Child calculates
+         │                                     │
+         │                                     ▼
+         │                               ┌──────────┐
+         │                               │ finished │
+         │                               └────┬─────┘
+         │                                    │
+         │ ◄──────────────────────────────────┘
+         │ 5. Callback resumes parent
+         ▼
+    ┌─────────┐
+    │ running │  ◄── session_start event triggers refresh
+    └────┬────┘
+         │
+         │ 6. Chat fetches updated events
+         │    Shows user message + pending indicator
+         │
+         ▼
+    ┌──────────┐
+    │ finished │  ◄── Assistant response displayed
+    └──────────┘
+```
+
+### Implementation Details
+
+The callback resume detection is implemented in `ChatContext.tsx`:
+
+1. **Session Matching**: Sessions are matched by `session_id`, `linkedSessionId`, or `session_name`
+
+2. **Callback Detection**: Listens for `session_start` events on finished sessions
+   ```typescript
+   if (event.event_type === 'session_start') {
+     const wasFinished = currentAgentStatus === 'finished';
+     if (wasFinished && !currentPendingMessageId) {
+       // Callback resume detected!
+     }
+   }
+   ```
+
+3. **Message Refresh**: When callback resume is detected:
+   - Fetches all session events from the API
+   - Converts events to chat messages (includes user message that triggered callback)
+   - Adds a pending message indicator for the assistant response
+   - Displays the assistant response when it arrives
+
+4. **Stale Closure Prevention**: Uses refs (`agentStatusRef`, `sessionIdRef`, etc.) to ensure WebSocket callbacks always have current state values
 
 ## State Management
 

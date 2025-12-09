@@ -268,50 +268,50 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     currentToolCallsRef.current = currentToolCalls;
   }, [currentToolCalls]);
 
+  // Ref to track agent status for WebSocket callback (avoids stale closures)
+  const agentStatusRef = useRef<string>(agentStatus);
+
+  // Keep agentStatusRef in sync with state
+  useEffect(() => {
+    agentStatusRef.current = agentStatus;
+  }, [agentStatus]);
+
+
   // Handle WebSocket messages at context level so they're processed even when Chat tab is not active
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     const currentSessionName = sessionNameRef.current;
     const currentSessionId = sessionIdRef.current;
     const currentLinkedSessionId = linkedSessionIdRef.current;
     const currentPendingMessageId = pendingMessageIdRef.current;
+    const currentAgentStatus = agentStatusRef.current;
 
     // Capture session_id from session_created or session_updated events
     if ((message.type === 'session_created' || message.type === 'session_updated') && message.session) {
-      if (message.session.session_name === currentSessionName) {
+      // Match by session_id (preferred) or session_name
+      const matchesById = currentSessionId && message.session.session_id === currentSessionId;
+      const matchesByLinkedId = currentLinkedSessionId && message.session.session_id === currentLinkedSessionId;
+      const matchesByName = currentSessionName && message.session.session_name === currentSessionName;
+      const isOurSession = matchesById || matchesByLinkedId || matchesByName;
+
+      if (isOurSession) {
         setSessionId(message.session.session_id);
 
         // Transition from 'new' to 'linked' mode once session is confirmed
         setMode('linked');
 
-        // Update status - but only set 'running', not 'finished'
-        // The 'finished' status should only be set when we receive the actual response,
-        // otherwise we get a race condition where "Agent is finished" shows while still waiting
-        if (message.session.status === 'running') {
-          // Check if session was previously finished - this indicates a callback resume
-          const wasFinished = agentStatus === 'finished';
+        const backendStatus = message.session.status;
 
+        // Update agent status based on backend session status
+        // Note: Callback resume is detected via session_start events, not status changes
+        if (backendStatus === 'running') {
           setAgentStatus('running');
-
-          // If session was finished and is now running again, this is a callback resume
-          // Add a pending assistant message to show the agent is responding
-          if (wasFinished && !currentPendingMessageId) {
-            const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: newPendingId,
-                role: 'assistant',
-                content: '',
-                timestamp: new Date(),
-                status: 'pending',
-              },
-            ]);
-            setPendingMessageId(newPendingId);
-            setIsLoading(true);
-            setCurrentToolCalls([]);
+        } else if (backendStatus === 'finished' || backendStatus === 'stopped') {
+          // Session is no longer running - update status but only if we don't have a pending message
+          // (the pending message handler will set finished when it receives the response)
+          if (!currentPendingMessageId) {
+            setAgentStatus('finished');
           }
         }
-        // Note: 'finished' status is set when assistant message arrives (line ~332)
       }
     }
 
@@ -327,6 +327,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         : false;
 
       if (!isOurSession) return;
+
+      // Handle session_start event - this indicates session resumed (callback!)
+      if (event.event_type === 'session_start') {
+        const wasFinished = currentAgentStatus === 'finished';
+
+        if (wasFinished && !currentPendingMessageId) {
+          // Callback resume detected - fetch updated messages
+          setAgentStatus('running');
+
+          sessionService.getSessionEvents(event.session_id).then((events) => {
+            const updatedMessages = convertEventsToMessages(events);
+
+            // Add a pending message for the assistant response
+            const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+            setMessages([
+              ...updatedMessages,
+              {
+                id: newPendingId,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date(),
+                status: 'pending',
+              },
+            ]);
+            setPendingMessageId(newPendingId);
+            setIsLoading(true);
+            setCurrentToolCalls([]);
+          });
+        }
+        return; // Don't process session_start as a regular event
+      }
 
       // Handle assistant messages
       if (event.event_type === 'message' && event.role === 'assistant' && currentPendingMessageId) {

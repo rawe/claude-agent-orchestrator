@@ -12,57 +12,43 @@ This document outlines the remaining work needed to complete the Agent Callback 
 
 ---
 
-## Task 1: Chat Window Does Not React to Callback Resume (BUG)
+## Task 1: Chat Window Does Not React to Callback Resume (BUG) - RESOLVED
 
 ### Problem
 The callback architecture works correctly in the **Sessions tab** - when a child session completes and triggers a callback, the parent session is automatically resumed and the UI updates properly.
 
-However, in the **Chat tab**, the parent session does NOT react to the callback. After the child session returns and the parent is resumed, the Chat window stops and does not show any updates. It appears the Chat tab is not properly handling the WebSocket events for callback-triggered session resumes.
+However, in the **Chat tab**, the parent session did NOT react to the callback. After the child session returns and the parent is resumed, the Chat window stopped and did not show any updates.
 
-### Current State
-- **Sessions tab**: Works correctly - parent resumes automatically via callback
-- **Chat tab**: Does NOT work - stops after child session returns, no reaction to resume
+### Root Causes Identified
 
-### Investigation Areas
+1. **Stale Closure**: The `agentStatus` variable was read directly in the `handleWebSocketMessage` callback, but since the callback had an empty dependency array `[]`, it captured the initial value and never updated.
 
-The issue is likely in the Chat tab's WebSocket event handling:
+2. **Wrong Signal**: The original code tried to detect callback resume via `session_updated` status changes, but the backend doesn't change the session status back to `running` on callback resume. Instead, a `session_start` event is emitted (same mechanism used by the Sessions tab).
 
-1. **ChatContext.tsx** (`dashboard/src/contexts/ChatContext.tsx`)
-   - Lines 272-417: `handleWebSocketMessage` callback handles WebSocket events
-   - Lines 279-316: Handles `session_created` and `session_updated` events
-   - Lines 291-312: Logic to detect callback resume (when `wasFinished` and session becomes `running` again)
+3. **Session Matching**: The original code only matched sessions by `session_name`, missing matches by `session_id` or `linkedSessionId`.
 
-   **Potential issues:**
-   - The `agentStatus` check at line 291 might not be correct - it reads from state but might be stale
-   - The condition at line 297 checks `!currentPendingMessageId` but this might not be the right check
-   - The session matching at line 280 only checks `session_name`, but callback resumes might have different identifiers
+### Solution Implemented
 
-2. **Possible root causes:**
-   - Session name mismatch between parent and callback context
-   - `agentStatus` state is stale when WebSocket callback fires
-   - The `session_updated` event for callback resume is not being received or processed
-   - The Chat tab might be filtering out events from resumed sessions
+1. **Added `agentStatusRef`**: Uses a ref to track agent status, keeping it in sync with state via `useEffect`. This ensures the WebSocket callback always has the current value.
 
-### Required Investigation Steps
+2. **Listen for `session_start` events**: Added handler for `event_type === 'session_start'` to detect when a callback resumes the session (same approach as Sessions tab in `useSessions.ts`).
 
-1. Add console logging to `handleWebSocketMessage` to trace:
-   - What `session_updated` events are received
-   - What values `currentSessionName`, `agentStatus`, and `wasFinished` have
-   - Whether the callback resume detection logic (lines 291-312) is triggered
+3. **Improved session matching**: Now matches sessions by `session_id`, `linkedSessionId`, or `session_name`.
 
-2. Compare event flow between Sessions tab and Chat tab for the same callback scenario
+4. **Fetch and display messages**: When callback resume is detected:
+   - Fetches all session events from the API
+   - Converts events to chat messages (includes user message that triggered callback)
+   - Adds a pending message indicator for the assistant response
+   - Displays the assistant response when it arrives
 
-3. Check if the WebSocket subscription in Chat tab is correctly receiving all events
-
-### Files to Investigate
-- `dashboard/src/contexts/ChatContext.tsx` - Main suspect
-- `dashboard/src/contexts/WebSocketContext.tsx` - WebSocket subscription mechanism
-- `dashboard/src/hooks/useSessions.ts` - How Sessions tab handles updates (for comparison)
+### Files Changed
+- `dashboard/src/contexts/ChatContext.tsx` - Main fix
+- `dashboard/docs/CHAT-TAB.md` - Documentation updated with callback feature details
 
 ### Acceptance Criteria
-- [ ] Chat tab reacts to callback resume (parent session continues after child returns)
-- [ ] Pending message indicator shows when parent is resumed via callback
-- [ ] Agent response from callback resume is displayed in Chat tab
+- [x] Chat tab reacts to callback resume (parent session continues after child returns)
+- [x] Pending message indicator shows when parent is resumed via callback
+- [x] Agent response from callback resume is displayed in Chat tab
 
 ---
 
