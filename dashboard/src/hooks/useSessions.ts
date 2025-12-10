@@ -96,11 +96,21 @@ export function useSessions() {
     []
   );
 
+  const deleteAllSessions = useCallback(async () => {
+    const sessionIds = sessions.map((s) => s.session_id);
+    for (const sessionId of sessionIds) {
+      await sessionService.deleteSession(sessionId);
+      // Remove the deleted session from state immediately
+      setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+    }
+  }, [sessions]);
+
   return {
     sessions,
     loading,
     stopSession,
     deleteSession,
+    deleteAllSessions,
   };
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, FileText, Settings, ChevronLeft, ChevronRight, MessageSquare, Server } from 'lucide-react';
+import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -9,11 +9,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', icon: <Activity className="w-5 h-5" />, label: 'Agent Sessions' },
-  { to: '/documents', icon: <FileText className="w-5 h-5" />, label: 'Context Documents' },
-  { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Manager' },
-  { to: '/launchers', icon: <Server className="w-5 h-5" />, label: 'Launchers' },
+  { to: '/', icon: <Home className="w-5 h-5" />, label: 'Home' },
   { to: '/chat', icon: <MessageSquare className="w-5 h-5" />, label: 'Chat' },
+  { to: '/sessions', icon: <Activity className="w-5 h-5" />, label: 'Agent Sessions' },
+  { to: '/context-store', icon: <Database className="w-5 h-5" />, label: 'Context Store' },
+  { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Blueprints' },
+  { to: '/launchers', icon: <Server className="w-5 h-5" />, label: 'Agent Launchers' },
 ];
 
 export function Sidebar() {

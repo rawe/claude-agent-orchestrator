@@ -36,6 +36,7 @@ export const sessionService = {
     await agentOrchestratorApi.delete(`/sessions/${sessionId}`);
   },
 
+
   /**
    * Stop a running session
    * NOTE: This endpoint is not yet implemented in the backend

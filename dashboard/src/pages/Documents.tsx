@@ -123,7 +123,10 @@ export function Documents() {
     <div className="h-full flex flex-col bg-white">
       {/* Header: Title + Actions */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h1 className="text-lg font-semibold text-gray-900">Documents</h1>
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Context Store</h1>
+          <p className="text-sm text-gray-500">Share documents between isolated agent sessions</p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setShowUploadModal(true)}

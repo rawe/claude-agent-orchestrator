@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useSessions, useSessionEvents } from '@/hooks/useSessions';
 import { SessionList, SessionHeader, EventTimeline } from '@/components/features/sessions';
-import { ConfirmModal, EmptyState } from '@/components/common';
+import { ConfirmModal, EmptyState, Button } from '@/components/common';
 import { useNotification } from '@/contexts';
-import { Activity, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Activity, PanelLeftClose, PanelLeft, Trash2 } from 'lucide-react';
 
 export function AgentSessions() {
-  const { sessions, loading, stopSession, deleteSession } = useSessions();
+  const { sessions, loading, stopSession, deleteSession, deleteAllSessions } = useSessions();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const { events, loading: eventsLoading } = useSessionEvents(selectedSessionId);
   const { showSuccess, showError, showWarning } = useNotification();
@@ -14,8 +14,8 @@ export function AgentSessions() {
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'stop' | 'delete';
-    sessionId: string;
+    type: 'stop' | 'delete' | 'delete-all';
+    sessionId?: string;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -58,21 +58,54 @@ export function AgentSessions() {
     }
   };
 
+  const handleDeleteAllSessions = async () => {
+    setActionLoading(true);
+    try {
+      await deleteAllSessions();
+      setSelectedSessionId(null);
+      showSuccess('All sessions deleted');
+    } catch (err) {
+      showError('Failed to delete all sessions');
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+      setConfirmModal(null);
+    }
+  };
+
   return (
-    <div className="h-full flex">
-      {/* Session List Sidebar */}
-      {sidebarVisible && (
-        <div className="w-80 border-r border-gray-200 bg-white flex-shrink-0">
-          <SessionList
-            sessions={sessions}
-            selectedSessionId={selectedSessionId}
-            onSelectSession={setSelectedSessionId}
-            onStopSession={(id) => setConfirmModal({ isOpen: true, type: 'stop', sessionId: id })}
-            onDeleteSession={(id) => setConfirmModal({ isOpen: true, type: 'delete', sessionId: id })}
-            loading={loading}
-          />
+    <div className="h-full flex flex-col">
+      {/* Page Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Agent Sessions</h1>
+          <p className="text-sm text-gray-500">Monitor running and completed agent sessions in real-time</p>
         </div>
-      )}
+        <Button
+          variant="danger"
+          onClick={() => setConfirmModal({ isOpen: true, type: 'delete-all' })}
+          icon={<Trash2 className="w-4 h-4" />}
+          disabled={sessions.length === 0}
+        >
+          Delete All
+        </Button>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex min-h-0">
+        {/* Session List Sidebar */}
+        {sidebarVisible && (
+          <div className="w-80 border-r border-gray-200 bg-white flex-shrink-0">
+            <SessionList
+              sessions={sessions}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={setSelectedSessionId}
+              onStopSession={(id) => setConfirmModal({ isOpen: true, type: 'stop', sessionId: id })}
+              onDeleteSession={(id) => setConfirmModal({ isOpen: true, type: 'delete', sessionId: id })}
+              loading={loading}
+            />
+          </div>
+        )}
 
       {/* Event Timeline */}
       <div className="flex-1 bg-gray-50 flex flex-col min-w-0 overflow-hidden">
@@ -121,17 +154,32 @@ export function AgentSessions() {
           )}
         </div>
       </div>
+      </div>
 
       {/* Confirm Modal */}
       {confirmModal && (
         <ConfirmModal
           isOpen={confirmModal.isOpen}
           onClose={() => setConfirmModal(null)}
-          onConfirm={confirmModal.type === 'stop' ? handleStopSession : handleDeleteSession}
-          title={confirmModal.type === 'stop' ? 'Stop Session' : 'Delete Session'}
+          onConfirm={
+            confirmModal.type === 'stop'
+              ? handleStopSession
+              : confirmModal.type === 'delete-all'
+              ? handleDeleteAllSessions
+              : handleDeleteSession
+          }
+          title={
+            confirmModal.type === 'stop'
+              ? 'Stop Session'
+              : confirmModal.type === 'delete-all'
+              ? 'Delete All Sessions'
+              : 'Delete Session'
+          }
           message={
             confirmModal.type === 'stop'
               ? 'Stop this session? This will terminate it immediately.'
+              : confirmModal.type === 'delete-all'
+              ? `Delete all ${sessions.length} sessions? This will permanently remove all session data and cannot be undone.`
               : 'Delete this session? This cannot be undone.'
           }
           confirmText={confirmModal.type === 'stop' ? 'Stop' : 'Delete'}

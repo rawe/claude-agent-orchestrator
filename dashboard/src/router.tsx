@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from '@/components/layout';
-import { AgentSessions, Documents, AgentManager, Launchers, Chat } from '@/pages';
+import { Home, AgentSessions, Documents, AgentManager, Launchers, Chat } from '@/pages';
 
 export const router = createBrowserRouter([
   {
@@ -9,10 +9,18 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <Home />,
+      },
+      {
+        path: 'chat',
+        element: <Chat />,
+      },
+      {
+        path: 'sessions',
         element: <AgentSessions />,
       },
       {
-        path: 'documents',
+        path: 'context-store',
         element: <Documents />,
       },
       {
@@ -22,10 +30,6 @@ export const router = createBrowserRouter([
       {
         path: 'launchers',
         element: <Launchers />,
-      },
-      {
-        path: 'chat',
-        element: <Chat />,
       },
     ],
   },
