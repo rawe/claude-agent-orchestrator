@@ -1,5 +1,7 @@
 # Work Package 6: Callback Queue for Busy Parents
 
+**Status**: ✅ Complete
+
 **Reference**: [agent-callback-architecture.md](./agent-callback-architecture.md), [05-callback-integration.md](./05-callback-integration.md)
 
 ## Problem Statement
@@ -250,10 +252,10 @@ Before implementing, investigate:
 
 ## Testing Checklist
 
-- [ ] Child completes while parent idle -> immediate resume
-- [ ] Child completes while parent busy -> notification queued
-- [ ] Parent stops -> queued notifications delivered
-- [ ] Multiple children complete while busy -> aggregated in single resume
+- [x] Child completes while parent idle -> immediate resume
+- [x] Child completes while parent busy -> notification queued
+- [x] Parent stops -> queued notifications delivered
+- [x] Multiple children complete while busy -> aggregated in single resume
 - [ ] Parent deleted -> graceful failure (no crash)
 - [ ] Verify no duplicate deliveries
 

@@ -69,6 +69,7 @@ Claude Agent SDK
 | [Known Bugs](./mcp-server-api-refactor-bugs.md) | Bug tracking for issues discovered during implementation |
 | [Callback Flow Test Plan](./callback-flow-test-plan.md) | Step-by-step testing procedures for verifying callback flow |
 | [Next Steps](./callback-architecture-next-steps.md) | Remaining work items (dashboard enhancements, debugging) |
+| [Callback Queue for Busy Parents](../06-callback-queue-busy-parent.md) | Fix for lost callbacks when parent agents are busy |
 
 ### Reading Order
 
@@ -92,6 +93,7 @@ Claude Agent SDK
 - `servers/agent-runtime/main.py` - API endpoints including Jobs API
 - `servers/agent-runtime/database.py` - Session and event storage
 - `servers/agent-runtime/services/job_queue.py` - Job queue with parent tracking
+- `servers/agent-runtime/services/callback_processor.py` - Callback queuing for busy parents
 
 ### Agent Launcher
 - `servers/agent-launcher/lib/executor.py` - Sets `AGENT_SESSION_NAME` env var
@@ -129,8 +131,8 @@ curl http://localhost:8765/sessions/by-name/test-child | jq '.session.parent_ses
 | Session-Job linking | ✅ Complete |
 | MCP Server API refactor | ✅ Complete |
 | HTTP header extraction | ✅ Complete |
+| Callback queue for busy parents | ✅ Complete |
 | Dashboard parent display | ⏳ Pending |
-| MCP tool input display | ⏳ Investigation needed |
 
 ---
 
