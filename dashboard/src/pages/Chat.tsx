@@ -500,7 +500,9 @@ export function Chat() {
                       </div>
                     </div>
                   ) : (
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    <div className="prose prose-sm max-w-none prose-invert prose-p:my-2 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-pre:bg-primary-700 prose-pre:text-white prose-table:border-collapse prose-th:border prose-th:border-primary-400 prose-th:bg-primary-700 prose-th:px-3 prose-th:py-1.5 prose-td:border prose-td:border-primary-400 prose-td:px-3 prose-td:py-1.5 prose-a:text-primary-200 prose-a:underline prose-code:text-primary-200 prose-code:bg-primary-700 prose-strong:text-white prose-em:text-white">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    </div>
                   )}
                 </div>
                 {message.role === 'user' && (
