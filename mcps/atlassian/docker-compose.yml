@@ -1,0 +1,10 @@
+services:
+  mcp-atlassian:
+    image: ghcr.io/sooperset/mcp-atlassian:latest
+    container_name: mcp-atlassian
+    ports:
+      - "127.0.0.1:9000:9000"
+    env_file:
+      - .env
+    command: ["--transport", "streamable-http", "--port", "9000", "-vv"]
+    restart: unless-stopped

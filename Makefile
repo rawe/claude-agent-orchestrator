@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc restart-dashboard restart-runtime restart-doc start-mcps stop-mcps logs-mcps start-ao-mcp stop-ao-mcp start-cs-mcp stop-cs-mcp start-demo stop-demo
+.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc restart-dashboard restart-runtime restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all
 
 # Default target
 help:
@@ -30,20 +30,21 @@ help:
 	@echo "  make restart-runtime - Restart agent runtime"
 	@echo "  make restart-doc    - Restart context store"
 	@echo ""
-	@echo "Example MCP servers (config/mcps):"
-	@echo "  make start-mcps     - Start Atlassian & ADO MCP servers"
-	@echo "  make stop-mcps      - Stop MCP servers"
-	@echo "  make logs-mcps      - View MCP server logs"
+	@echo "MCP servers (mcps/):"
+	@echo "  make start-mcp-agent-orchestrator - Start Agent Orchestrator MCP"
+	@echo "  make stop-mcp-agent-orchestrator  - Stop Agent Orchestrator MCP"
+	@echo "  make start-mcp-context-store      - Start Context Store MCP"
+	@echo "  make stop-mcp-context-store       - Stop Context Store MCP"
+	@echo "  make start-mcp-atlassian          - Start Atlassian MCP (Jira + Confluence)"
+	@echo "  make stop-mcp-atlassian           - Stop Atlassian MCP"
+	@echo "  make start-mcp-ado                - Start Azure DevOps MCP"
+	@echo "  make stop-mcp-ado                 - Stop Azure DevOps MCP"
+	@echo "  make start-mcps                   - Start all MCP servers"
+	@echo "  make stop-mcps                    - Stop all MCP servers"
 	@echo ""
-	@echo "MCP servers (HTTP mode):"
-	@echo "  make start-ao-mcp   - Start Agent Orchestrator MCP server (HTTP)"
-	@echo "  make stop-ao-mcp    - Stop Agent Orchestrator MCP server"
-	@echo "  make start-cs-mcp   - Start Context Store MCP server (HTTP)"
-	@echo "  make stop-cs-mcp    - Stop Context Store MCP server"
-	@echo ""
-	@echo "Demo commands (starts/stops all services):"
-	@echo "  make start-demo     - Start all services for demo"
-	@echo "  make stop-demo      - Stop all demo services"
+	@echo "All services:"
+	@echo "  make start-all      - Start core services + all MCP servers"
+	@echo "  make stop-all       - Stop everything"
 
 # Build all images
 build:
@@ -218,41 +219,63 @@ restart-runtime:
 restart-doc:
 	docker-compose restart context-store
 
-# Example MCP servers (for agent capabilities)
-start-mcps:
-	@echo "Starting example MCP servers..."
-	@if [ ! -f config/mcps/.env ]; then \
+# External MCP servers (mcps/)
+start-mcp-atlassian:
+	@echo "Starting Atlassian MCP server..."
+	@if [ ! -f mcps/atlassian/.env ]; then \
 		echo "⚠️  No .env file found. Copy the example and configure credentials:"; \
-		echo "   cp config/mcps/.env.example config/mcps/.env"; \
+		echo "   cp mcps/atlassian/.env.example mcps/atlassian/.env"; \
 		exit 1; \
 	fi
-	docker compose -f config/mcps/docker-compose.yml up -d --build
-	@echo ""
-	@echo "MCP servers started:"
-	@echo "  - Atlassian (Jira + Confluence): http://localhost:9000"
-	@echo "  - Azure DevOps:                  http://localhost:9001"
+	@cd mcps/atlassian && docker compose up -d
+	@echo "Atlassian MCP started: http://localhost:9000"
+
+stop-mcp-atlassian:
+	@echo "Stopping Atlassian MCP server..."
+	@cd mcps/atlassian && docker compose down
+
+start-mcp-ado:
+	@echo "Starting Azure DevOps MCP server..."
+	@if [ ! -f mcps/ado/.env ]; then \
+		echo "⚠️  No .env file found. Copy the example and configure credentials:"; \
+		echo "   cp mcps/ado/.env.example mcps/ado/.env"; \
+		exit 1; \
+	fi
+	@cd mcps/ado && docker compose up -d --build
+	@echo "Azure DevOps MCP started: http://localhost:9001"
+
+stop-mcp-ado:
+	@echo "Stopping Azure DevOps MCP server..."
+	@cd mcps/ado && docker compose down
+
+start-mcps:
+	@echo "Starting all MCP servers..."
+	@$(MAKE) --no-print-directory start-mcp-agent-orchestrator
+	@$(MAKE) --no-print-directory start-mcp-context-store
+	@$(MAKE) --no-print-directory start-mcp-atlassian
+	@$(MAKE) --no-print-directory start-mcp-ado
 
 stop-mcps:
-	@echo "Stopping MCP servers..."
-	docker compose -f config/mcps/docker-compose.yml down
-
-logs-mcps:
-	docker compose -f config/mcps/docker-compose.yml logs -f
+	@echo "Stopping all MCP servers..."
+	@$(MAKE) --no-print-directory stop-mcp-agent-orchestrator
+	@$(MAKE) --no-print-directory stop-mcp-context-store
+	@$(MAKE) --no-print-directory stop-mcp-atlassian
+	@$(MAKE) --no-print-directory stop-mcp-ado
 
 # Agent Orchestrator MCP server (HTTP mode)
 # Loads configuration from .env file
-MCP_SERVER_SCRIPT := interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py
-MCP_SERVER_PID_FILE := .agent-orchestrator-mcp-server.pid
+AO_MCP_SERVER_SCRIPT := mcps/agent-orchestrator/agent-orchestrator-mcp.py
+AO_MCP_SERVER_PID_FILE := .mcp-agent-orchestrator.pid
 
-start-ao-mcp:
-	@echo "Starting Agent Orchestrator MCP server (HTTP mode)..."
+start-mcp-agent-orchestrator:
+	@echo "Starting Agent Orchestrator MCP server..."
 	@if [ -f .env ]; then \
 		set -a && . ./.env && set +a; \
 	fi; \
 	PORT=$${AGENT_ORCHESTRATOR_MCP_PORT:-9500}; \
 	HOST=$${AGENT_ORCHESTRATOR_MCP_HOST:-127.0.0.1}; \
-	if [ -f $(MCP_SERVER_PID_FILE) ] && kill -0 $$(cat $(MCP_SERVER_PID_FILE)) 2>/dev/null; then \
-		echo "MCP server already running (PID: $$(cat $(MCP_SERVER_PID_FILE)))"; \
+	if [ -f $(AO_MCP_SERVER_PID_FILE) ] && kill -0 $$(cat $(AO_MCP_SERVER_PID_FILE)) 2>/dev/null; then \
+		echo "MCP server already running (PID: $$(cat $(AO_MCP_SERVER_PID_FILE)))"; \
 		exit 1; \
 	fi; \
 	echo "Configuration:"; \
@@ -261,24 +284,24 @@ start-ao-mcp:
 	echo "  Project Dir: $${AGENT_ORCHESTRATOR_PROJECT_DIR:-<not set, uses tool parameter>}"; \
 	echo ""; \
 	AGENT_ORCHESTRATOR_PROJECT_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR}" \
-	uv run $(MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
-	echo $$! > $(MCP_SERVER_PID_FILE); \
+	uv run $(AO_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
+	echo $$! > $(AO_MCP_SERVER_PID_FILE); \
 	sleep 2; \
 	echo ""; \
-	echo "MCP server started (PID: $$(cat $(MCP_SERVER_PID_FILE)))"; \
+	echo "Agent Orchestrator MCP started (PID: $$(cat $(AO_MCP_SERVER_PID_FILE)))"; \
 	echo "Endpoint: http://$$HOST:$$PORT/mcp"
 
-stop-ao-mcp:
+stop-mcp-agent-orchestrator:
 	@echo "Stopping Agent Orchestrator MCP server..."
-	@if [ -f $(MCP_SERVER_PID_FILE) ]; then \
-		PID=$$(cat $(MCP_SERVER_PID_FILE)); \
+	@if [ -f $(AO_MCP_SERVER_PID_FILE) ]; then \
+		PID=$$(cat $(AO_MCP_SERVER_PID_FILE)); \
 		if kill -0 $$PID 2>/dev/null; then \
 			kill $$PID; \
 			echo "Server stopped (PID: $$PID)"; \
 		else \
 			echo "Server not running (stale PID file)"; \
 		fi; \
-		rm -f $(MCP_SERVER_PID_FILE); \
+		rm -f $(AO_MCP_SERVER_PID_FILE); \
 	else \
 		echo "No PID file found. Trying to find and kill process..."; \
 		pkill -f "agent-orchestrator-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
@@ -286,11 +309,11 @@ stop-ao-mcp:
 
 # Context Store MCP server (HTTP mode)
 # Loads configuration from .env file
-CS_MCP_SERVER_SCRIPT := interfaces/context-store-mcp-server/context-store-mcp.py
-CS_MCP_SERVER_PID_FILE := .context-store-mcp-server.pid
+CS_MCP_SERVER_SCRIPT := mcps/context-store/context-store-mcp.py
+CS_MCP_SERVER_PID_FILE := .mcp-context-store.pid
 
-start-cs-mcp:
-	@echo "Starting Context Store MCP server (HTTP mode)..."
+start-mcp-context-store:
+	@echo "Starting Context Store MCP server..."
 	@if [ -f .env ]; then \
 		set -a && . ./.env && set +a; \
 	fi; \
@@ -308,10 +331,10 @@ start-cs-mcp:
 	echo $$! > $(CS_MCP_SERVER_PID_FILE); \
 	sleep 2; \
 	echo ""; \
-	echo "MCP server started (PID: $$(cat $(CS_MCP_SERVER_PID_FILE)))"; \
+	echo "Context Store MCP started (PID: $$(cat $(CS_MCP_SERVER_PID_FILE)))"; \
 	echo "Endpoint: http://$$HOST:$$PORT/mcp"
 
-stop-cs-mcp:
+stop-mcp-context-store:
 	@echo "Stopping Context Store MCP server..."
 	@if [ -f $(CS_MCP_SERVER_PID_FILE) ]; then \
 		PID=$$(cat $(CS_MCP_SERVER_PID_FILE)); \
@@ -327,33 +350,25 @@ stop-cs-mcp:
 		pkill -f "context-store-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
 	fi
 
-# Demo commands - start/stop all services
-start-demo:
-	@echo "Starting all demo services..."
+# Start/stop all services (core + MCPs)
+start-all:
+	@echo "Starting all services..."
 	@echo ""
 	@$(MAKE) --no-print-directory start-bg
 	@echo ""
 	@$(MAKE) --no-print-directory start-mcps
 	@echo ""
-	@$(MAKE) --no-print-directory start-ao-mcp
-	@echo ""
-	@$(MAKE) --no-print-directory start-cs-mcp
-	@echo ""
 	@echo "============================================"
-	@echo "All demo services started!"
+	@echo "All services started!"
 	@echo "============================================"
 
-stop-demo:
-	@echo "Stopping all demo services..."
+stop-all:
+	@echo "Stopping all services..."
 	@echo ""
 	@$(MAKE) --no-print-directory stop
 	@echo ""
 	@$(MAKE) --no-print-directory stop-mcps
 	@echo ""
-	@$(MAKE) --no-print-directory stop-ao-mcp
-	@echo ""
-	@$(MAKE) --no-print-directory stop-cs-mcp
-	@echo ""
 	@echo "============================================"
-	@echo "All demo services stopped!"
+	@echo "All services stopped!"
 	@echo "============================================"
