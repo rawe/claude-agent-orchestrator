@@ -21,12 +21,15 @@ from .semantic.config import config as semantic_config
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8766
 DEFAULT_STORAGE_DIR = "./document-data/files"
-DEFAULT_DB_PATH = "./document-data/documents.db"
 
 DOCUMENT_SERVER_HOST = os.getenv("DOCUMENT_SERVER_HOST", DEFAULT_HOST)
 DOCUMENT_SERVER_PORT = int(os.getenv("DOCUMENT_SERVER_PORT", str(DEFAULT_PORT)))
 STORAGE_DIR = os.getenv("DOCUMENT_SERVER_STORAGE", DEFAULT_STORAGE_DIR)
-DB_PATH = os.getenv("DOCUMENT_SERVER_DB", DEFAULT_DB_PATH)
+
+# Neo4j connection settings (read from environment or use defaults)
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "context-store-secret")
 
 # Public URL configuration for generating document URLs
 # This should be the externally accessible URL (important for Docker/proxy setups)
@@ -38,7 +41,7 @@ DOCUMENT_SERVER_PUBLIC_URL = os.getenv(
 
 # Initialize storage and database
 storage = DocumentStorage(STORAGE_DIR)
-db = DocumentDatabase(DB_PATH)
+db = DocumentDatabase(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PASSWORD)
 
 # CORS configuration - allow frontend origins
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
