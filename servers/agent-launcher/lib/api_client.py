@@ -50,12 +50,30 @@ class RuntimeAPIClient:
         """Close the HTTP client."""
         self._client.close()
 
-    def register(self) -> RegistrationResponse:
+    def register(
+        self,
+        hostname: Optional[str] = None,
+        project_dir: Optional[str] = None,
+    ) -> RegistrationResponse:
         """Register this launcher with Agent Runtime.
+
+        Args:
+            hostname: The machine hostname where the launcher is running
+            project_dir: The default project directory for this launcher
 
         Returns registration info including launcher_id.
         """
-        response = self._client.post(f"{self.base_url}/launcher/register")
+        # Build metadata payload
+        metadata = {}
+        if hostname:
+            metadata["hostname"] = hostname
+        if project_dir:
+            metadata["project_dir"] = project_dir
+
+        response = self._client.post(
+            f"{self.base_url}/launcher/register",
+            json=metadata if metadata else None,
+        )
         response.raise_for_status()
         data = response.json()
 

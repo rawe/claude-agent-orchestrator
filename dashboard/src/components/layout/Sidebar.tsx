@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, FileText, Settings, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { Activity, FileText, Settings, ChevronLeft, ChevronRight, MessageSquare, Server } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -12,6 +12,7 @@ const navItems: NavItem[] = [
   { to: '/', icon: <Activity className="w-5 h-5" />, label: 'Agent Sessions' },
   { to: '/documents', icon: <FileText className="w-5 h-5" />, label: 'Context Documents' },
   { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Manager' },
+  { to: '/launchers', icon: <Server className="w-5 h-5" />, label: 'Launchers' },
   { to: '/chat', icon: <MessageSquare className="w-5 h-5" />, label: 'Chat' },
 ];
 

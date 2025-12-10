@@ -16,6 +16,9 @@ class LauncherInfo(BaseModel):
     launcher_id: str
     registered_at: str
     last_heartbeat: str
+    # Metadata provided by the launcher
+    hostname: Optional[str] = None
+    project_dir: Optional[str] = None
 
 
 class LauncherRegistry:
@@ -26,8 +29,17 @@ class LauncherRegistry:
         self._lock = threading.Lock()
         self._heartbeat_timeout = heartbeat_timeout_seconds
 
-    def register_launcher(self) -> LauncherInfo:
-        """Register a new launcher and return its info."""
+    def register_launcher(
+        self,
+        hostname: Optional[str] = None,
+        project_dir: Optional[str] = None,
+    ) -> LauncherInfo:
+        """Register a new launcher and return its info.
+
+        Args:
+            hostname: The machine hostname where the launcher is running
+            project_dir: The default project directory for this launcher
+        """
         launcher_id = f"lnch_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat()
 
@@ -35,6 +47,8 @@ class LauncherRegistry:
             launcher_id=launcher_id,
             registered_at=now,
             last_heartbeat=now,
+            hostname=hostname,
+            project_dir=project_dir,
         )
 
         with self._lock:

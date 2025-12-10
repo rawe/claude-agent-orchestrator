@@ -25,6 +25,7 @@ Environment Variables:
 
 import sys
 import signal
+import socket
 import time
 import threading
 import logging
@@ -120,10 +121,17 @@ class Launcher:
         """Register with Agent Runtime."""
         logger.info(f"Connecting to Agent Runtime at {self.config.agent_runtime_url}")
 
+        # Get machine hostname for registration metadata
+        hostname = socket.gethostname()
+
         try:
-            response = self.api_client.register()
+            response = self.api_client.register(
+                hostname=hostname,
+                project_dir=self.config.project_dir,
+            )
             self.launcher_id = response.launcher_id
             logger.info(f"Registered as {self.launcher_id}")
+            logger.info(f"  Hostname: {hostname}")
             logger.info(f"  Poll timeout: {response.poll_timeout_seconds}s")
             logger.info(f"  Heartbeat interval: {response.heartbeat_interval_seconds}s")
             logger.info(f"  Project directory: {self.config.project_dir}")

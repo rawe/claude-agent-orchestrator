@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 
 # Import job queue and launcher registry services
 from services.job_queue import job_queue, JobCreate, Job, JobStatus
-from services.launcher_registry import launcher_registry
+from services.launcher_registry import launcher_registry, LauncherInfo
 from services import callback_processor
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
@@ -442,6 +442,12 @@ def update_agent_status(name: str, data: AgentStatusUpdate):
 # Launcher API Routes (for Agent Launcher communication)
 # ==============================================================================
 
+class LauncherRegisterRequest(BaseModel):
+    """Request body for launcher registration with metadata."""
+    hostname: str | None = None
+    project_dir: str | None = None
+
+
 class LauncherRegisterResponse(BaseModel):
     """Response from launcher registration."""
     launcher_id: str
@@ -468,15 +474,27 @@ class JobFailedRequest(BaseModel):
 
 
 @app.post("/launcher/register")
-async def register_launcher():
+async def register_launcher(request: LauncherRegisterRequest | None = None):
     """Register a new launcher instance.
 
+    Accepts optional metadata about the launcher (hostname, project_dir).
     Returns launcher_id and configuration for polling.
     """
-    launcher = launcher_registry.register_launcher()
+    # Handle both empty body and JSON body
+    hostname = request.hostname if request else None
+    project_dir = request.project_dir if request else None
+
+    launcher = launcher_registry.register_launcher(
+        hostname=hostname,
+        project_dir=project_dir,
+    )
 
     if DEBUG:
         print(f"[DEBUG] Registered new launcher: {launcher.launcher_id}", flush=True)
+        if hostname:
+            print(f"[DEBUG]   hostname: {hostname}", flush=True)
+        if project_dir:
+            print(f"[DEBUG]   project_dir: {project_dir}", flush=True)
 
     return LauncherRegisterResponse(
         launcher_id=launcher.launcher_id,
@@ -588,6 +606,40 @@ async def launcher_heartbeat(request: LauncherIdRequest):
         raise HTTPException(status_code=401, detail="Launcher not registered")
 
     return {"ok": True}
+
+
+class LauncherWithStatus(BaseModel):
+    """Launcher info with computed status fields."""
+    launcher_id: str
+    registered_at: str
+    last_heartbeat: str
+    hostname: str | None = None
+    project_dir: str | None = None
+    is_alive: bool
+
+
+@app.get("/launchers")
+async def list_launchers():
+    """List all registered launchers with their status.
+
+    Returns all launchers with an additional is_alive field indicating
+    whether the launcher has sent a heartbeat within the timeout period.
+    """
+    launchers = launcher_registry.get_all_launchers()
+    result = []
+
+    for launcher in launchers:
+        is_alive = launcher_registry.is_launcher_alive(launcher.launcher_id)
+        result.append(LauncherWithStatus(
+            launcher_id=launcher.launcher_id,
+            registered_at=launcher.registered_at,
+            last_heartbeat=launcher.last_heartbeat,
+            hostname=launcher.hostname,
+            project_dir=launcher.project_dir,
+            is_alive=is_alive,
+        ))
+
+    return {"launchers": result}
 
 
 # ==============================================================================
