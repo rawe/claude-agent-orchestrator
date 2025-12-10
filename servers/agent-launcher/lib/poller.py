@@ -83,7 +83,7 @@ class JobPoller:
 
     def _handle_job(self, job: Job) -> None:
         """Handle a received job by spawning subprocess."""
-        logger.info(f"Received job {job.job_id}: type={job.type}, session={job.session_name}")
+        logger.debug(f"Received job {job.job_id}: type={job.type}, session={job.session_name}")
 
         try:
             # Spawn subprocess
@@ -94,7 +94,7 @@ class JobPoller:
 
             # Report started
             self.api_client.report_started(self.launcher_id, job.job_id)
-            logger.info(f"Job {job.job_id} started (pid={process.pid})")
+            logger.debug(f"Job {job.job_id} started (pid={process.pid})")
 
         except Exception as e:
             logger.error(f"Failed to start job {job.job_id}: {e}")

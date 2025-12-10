@@ -43,7 +43,7 @@ class JobExecutor:
         self.default_project_dir = default_project_dir
         self.commands_dir = discover_commands_dir()
 
-        logger.info(f"Commands directory: {self.commands_dir}")
+        logger.debug(f"Commands directory: {self.commands_dir}")
 
     def execute(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
         """Execute a job by spawning the appropriate subprocess.
@@ -89,7 +89,7 @@ class JobExecutor:
         #       → Claude sends X-Agent-Session-Name header → MCP server reads it
         env["AGENT_SESSION_NAME"] = job.session_name
 
-        logger.info(f"Executing: {' '.join(cmd)}")
+        logger.info(f"Starting session: {job.session_name}" + (f" (agent={job.agent_name})" if job.agent_name else ""))
 
         # Spawn subprocess
         process = subprocess.Popen(
@@ -119,7 +119,7 @@ class JobExecutor:
         # Set AGENT_SESSION_NAME so the session knows its own identity (same as start)
         env["AGENT_SESSION_NAME"] = job.session_name
 
-        logger.info(f"Executing: {' '.join(cmd)}")
+        logger.info(f"Resuming session: {job.session_name}")
 
         # Spawn subprocess
         process = subprocess.Popen(

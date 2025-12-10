@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 # Import job queue and launcher registry services
 from services.job_queue import job_queue, JobCreate, Job, JobStatus
 from services.launcher_registry import launcher_registry
+from services import callback_processor
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
@@ -242,6 +243,34 @@ async def add_session_event(session_id: str, event: Event):
                 await ws.send_text(session_message)
             except:
                 connections.discard(ws)
+
+        # Callback processing: handle child completion and pending notifications
+        session_name = updated_session.get("session_name")
+        parent_session_name = updated_session.get("parent_session_name")
+
+        if parent_session_name:
+            # This is a child session completing - notify parent
+            parent_session = get_session_by_name(parent_session_name)
+            parent_status = parent_session["status"] if parent_session else "not_found"
+
+            # Get the child's result
+            child_result = get_session_result(session_id)
+
+            if DEBUG:
+                print(f"[DEBUG] Child '{session_name}' completed, parent '{parent_session_name}' status={parent_status}", flush=True)
+
+            callback_processor.on_child_completed(
+                child_session_name=session_name,
+                parent_session_name=parent_session_name,
+                parent_status=parent_status,
+                child_result=child_result,
+            )
+
+        # Check if this session has pending child callbacks to flush
+        project_dir = updated_session.get("project_dir")
+        flushed = callback_processor.on_session_stopped(session_name, project_dir)
+        if flushed > 0 and DEBUG:
+            print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_name}'", flush=True)
 
     # Broadcast event to WebSocket clients
     message = json.dumps({"type": "event", "data": event.dict()})

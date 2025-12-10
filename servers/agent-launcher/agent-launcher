@@ -49,6 +49,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agent-launcher")
 
+# Keep HTTP client loggers quiet (only warnings) - even in verbose mode
+# These are too low-level for normal debugging
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 app = typer.Typer()
 
 
@@ -87,9 +92,9 @@ class HeartbeatThread:
         while not self._stop_event.wait(self.interval):
             try:
                 self.api_client.heartbeat(self.launcher_id)
-                logger.debug("Heartbeat sent")
+                logger.info("Heartbeat sent to agent-runtime")
             except Exception as e:
-                logger.warning(f"Heartbeat failed: {e}")
+                logger.warning(f"Heartbeat to agent-runtime failed: {e}")
 
 
 class Launcher:
