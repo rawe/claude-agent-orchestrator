@@ -17,7 +17,7 @@ Usage:
     ./servers/agent-launcher/agent-launcher
 
 Environment Variables:
-    AGENT_RUNTIME_URL    - Agent Runtime URL (default: http://localhost:8765)
+    AGENT_ORCHESTRATOR_API_URL - Agent Runtime URL (default: http://localhost:8765)
     POLL_TIMEOUT         - Long-poll timeout in seconds (default: 30)
     HEARTBEAT_INTERVAL   - Heartbeat interval in seconds (default: 60)
     PROJECT_DIR          - Default project directory (default: cwd)
@@ -212,7 +212,7 @@ def main(
         None,
         "--runtime-url",
         "-r",
-        help="Agent Runtime URL (env: AGENT_RUNTIME_URL)",
+        help="Agent Runtime URL (env: AGENT_ORCHESTRATOR_API_URL)",
     ),
     project_dir: str = typer.Option(
         None,

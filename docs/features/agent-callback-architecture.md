@@ -939,7 +939,7 @@ from api_client import RuntimeAPIClient
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_RUNTIME_URL` | `http://localhost:8765` | Agent Runtime URL to connect to |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL to connect to |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
 | `PROJECT_DIR` | cwd | Default project directory for ao-* commands |

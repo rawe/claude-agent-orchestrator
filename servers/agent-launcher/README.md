@@ -39,7 +39,7 @@ Press `Ctrl+C` for graceful shutdown.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_RUNTIME_URL` | `http://localhost:8765` | Agent Runtime URL to connect to |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL to connect to |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
 | `PROJECT_DIR` | Current directory | Default project directory for ao-* commands |
@@ -47,7 +47,7 @@ Press `Ctrl+C` for graceful shutdown.
 ### CLI Options
 
 ```
---runtime-url, -r    Agent Runtime URL (overrides AGENT_RUNTIME_URL)
+--runtime-url, -r    Agent Runtime URL (overrides AGENT_ORCHESTRATOR_API_URL)
 --project-dir, -p    Default project directory (overrides PROJECT_DIR)
 --verbose, -v        Enable verbose logging
 ```

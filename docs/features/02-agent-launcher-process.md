@@ -32,7 +32,7 @@ Create standalone Agent Launcher process that polls Agent Runtime for jobs and e
 ### 1. Configuration (`lib/config.py`)
 
 Environment variables:
-- `AGENT_RUNTIME_URL` (default: `http://localhost:8765`)
+- `AGENT_ORCHESTRATOR_API_URL` (default: `http://localhost:8765`)
 - `POLL_TIMEOUT` (default: `30`)
 - `HEARTBEAT_INTERVAL` (default: `60`)
 - `PROJECT_DIR` (default: cwd)

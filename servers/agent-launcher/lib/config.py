@@ -28,7 +28,7 @@ class LauncherConfig:
     def from_env(cls) -> "LauncherConfig":
         """Load configuration from environment variables."""
         return cls(
-            agent_runtime_url=os.getenv("AGENT_RUNTIME_URL", "http://localhost:8765"),
+            agent_runtime_url=os.getenv("AGENT_ORCHESTRATOR_API_URL", "http://localhost:8765"),
             poll_timeout=int(os.getenv("POLL_TIMEOUT", "30")),
             heartbeat_interval=int(os.getenv("HEARTBEAT_INTERVAL", "60")),
             project_dir=os.getenv("PROJECT_DIR", os.getcwd()),
