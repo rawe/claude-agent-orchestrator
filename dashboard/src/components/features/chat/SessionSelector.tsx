@@ -1,17 +1,15 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Session, SessionStatus, Agent } from '@/types';
+import { Session, SessionStatus } from '@/types';
 import { StatusBadge } from '@/components/common';
 import { formatRelativeTime, getLastPathSegment } from '@/utils/formatters';
 import {
   Search,
   Filter,
-  Plus,
   X,
   ChevronUp,
   Bot,
   Folder,
   MessageSquare,
-  RotateCw,
   Lock,
 } from 'lucide-react';
 
@@ -19,13 +17,7 @@ interface SessionSelectorProps {
   sessions: Session[];
   currentSessionId: string | null;
   isCurrentSessionActive: boolean;
-  blueprints: Agent[];
-  selectedBlueprint: string;
-  onSelectBlueprint: (blueprint: string) => void;
   onSelectSession: (session: Session) => void;
-  onStartNewChat: () => void;
-  onRefreshBlueprints: () => void;
-  isLoadingBlueprints: boolean;
   mode: 'new' | 'linked';
 }
 
@@ -41,13 +33,7 @@ export function SessionSelector({
   sessions,
   currentSessionId,
   isCurrentSessionActive,
-  blueprints,
-  selectedBlueprint,
-  onSelectBlueprint,
   onSelectSession,
-  onStartNewChat,
-  onRefreshBlueprints,
-  isLoadingBlueprints,
   mode,
 }: SessionSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -111,11 +97,6 @@ export function SessionSelector({
     setIsOpen(false);
   };
 
-  const handleStartNewChat = () => {
-    onStartNewChat();
-    setIsOpen(false);
-  };
-
   return (
     <div className="relative" ref={panelRef}>
       {/* Trigger Button */}
@@ -157,53 +138,6 @@ export function SessionSelector({
             >
               <X className="w-4 h-4 text-gray-500" />
             </button>
-          </div>
-
-          {/* New Chat Section */}
-          <div className="p-3 border-b border-gray-200 bg-primary-50/50">
-            <button
-              onClick={handleStartNewChat}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${
-                mode === 'new'
-                  ? 'bg-primary-100 ring-2 ring-primary-500'
-                  : 'bg-white hover:bg-primary-100 border border-gray-200'
-              }`}
-            >
-              <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
-                <Plus className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-900">New Chat</div>
-                <div className="text-xs text-gray-500">Start a fresh conversation</div>
-              </div>
-            </button>
-
-            {/* Blueprint Selector (only show for new chat) */}
-            {mode === 'new' && (
-              <div className="mt-3 flex items-center gap-2">
-                <label className="text-xs font-medium text-gray-600 flex-shrink-0">Agent:</label>
-                <select
-                  value={selectedBlueprint}
-                  onChange={(e) => onSelectBlueprint(e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
-                >
-                  <option value="">Generic Agent</option>
-                  {blueprints.map((bp) => (
-                    <option key={bp.name} value={bp.name}>
-                      {bp.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={onRefreshBlueprints}
-                  disabled={isLoadingBlueprints}
-                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                  title="Refresh blueprints"
-                >
-                  <RotateCw className={`w-4 h-4 ${isLoadingBlueprints ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Search and Filter */}

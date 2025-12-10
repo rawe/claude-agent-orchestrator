@@ -3,7 +3,8 @@ import { chatService } from '@/services/chatService';
 import type { Agent, Session } from '@/types';
 import { useNotification, useWebSocket, useChat } from '@/contexts';
 import { useSessions } from '@/hooks/useSessions';
-import { Button, Spinner } from '@/components/common';
+import { Button, Spinner, Dropdown } from '@/components/common';
+import type { DropdownOption } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
 import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -382,6 +383,31 @@ export function Chat() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Agent Selector - only show when in new chat mode */}
+          {state.mode === 'new' && (
+            <Dropdown
+              options={[
+                { value: '', label: 'Generic Agent', description: 'Default Claude agent' },
+                ...blueprints
+                  .filter((bp) => bp.status === 'active')
+                  .map((bp): DropdownOption<string> => ({
+                    value: bp.name,
+                    label: bp.name,
+                    description: bp.description || undefined,
+                  })),
+              ]}
+              value={state.selectedBlueprint}
+              onChange={setSelectedBlueprint}
+              placeholder="Select Agent"
+              icon={<Bot className="w-4 h-4" />}
+              menuAlign="right"
+              className="min-w-[160px]"
+              searchable
+              searchPlaceholder="Search agents..."
+              onRefresh={loadBlueprints}
+              isRefreshing={isLoadingBlueprints}
+            />
+          )}
           {/* New Chat Button */}
           <Button
             variant="secondary"
@@ -497,13 +523,7 @@ export function Chat() {
             sessions={sessions}
             currentSessionId={state.linkedSessionId || state.sessionId}
             isCurrentSessionActive={isSessionActive()}
-            blueprints={blueprints}
-            selectedBlueprint={state.selectedBlueprint}
-            onSelectBlueprint={setSelectedBlueprint}
             onSelectSession={handleSelectSession}
-            onStartNewChat={startNewChat}
-            onRefreshBlueprints={loadBlueprints}
-            isLoadingBlueprints={isLoadingBlueprints}
             mode={state.mode}
           />
         </div>

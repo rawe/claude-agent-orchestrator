@@ -31,6 +31,10 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
   'context-store-http': {
     type: 'http',
     url: 'http://localhost:9501/mcp',
+  },
+  'neo4j-http': {
+    type: 'http',
+    url: 'http://localhost:9003/mcp/',
   }
 };
 
