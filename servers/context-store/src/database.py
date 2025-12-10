@@ -1,145 +1,116 @@
-"""Database layer for metadata persistence (Block 02 implementation)"""
+"""Database layer for metadata persistence using Neo4j graph database."""
 
-import sqlite3
+import json
+import os
 from datetime import datetime
 from typing import List, Optional
+
+from neo4j import GraphDatabase
+
 from .models import DocumentMetadata
 
 
 class DocumentDatabase:
-    """Manages document metadata in SQLite database."""
+    """Manages document metadata in Neo4j graph database."""
 
-    def __init__(self, db_path: str):
-        """Initialize database connection and create schema."""
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+    def __init__(self, uri: str = None, user: str = None, password: str = None):
+        """Initialize Neo4j connection and create schema constraints."""
+        self._uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        self._user = user or os.getenv("NEO4J_USER", "neo4j")
+        self._password = password or os.getenv("NEO4J_PASSWORD", "context-store-secret")
+
+        self._driver = GraphDatabase.driver(self._uri, auth=(self._user, self._password))
         self._init_database()
 
     def _init_database(self):
-        """Create database schema if it doesn't exist."""
-        cursor = self.conn.cursor()
+        """Create schema constraints and indexes."""
+        with self._driver.session() as session:
+            # Unique constraint on Document.id
+            session.run("""
+                CREATE CONSTRAINT document_id_unique IF NOT EXISTS
+                FOR (d:Document) REQUIRE d.id IS UNIQUE
+            """)
+            # Index on filename for faster queries
+            session.run("""
+                CREATE INDEX document_filename IF NOT EXISTS
+                FOR (d:Document) ON (d.filename)
+            """)
+            # Index on tags for faster tag queries
+            session.run("""
+                CREATE INDEX document_tags IF NOT EXISTS
+                FOR (d:Document) ON (d.tags)
+            """)
 
-        # Create documents table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS documents (
-                id TEXT PRIMARY KEY,
-                filename TEXT NOT NULL,
-                content_type TEXT NOT NULL,
-                size_bytes INTEGER NOT NULL,
-                checksum TEXT NOT NULL,
-                storage_path TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                metadata TEXT
-            )
-        """)
-
-        # Create document_tags table with cascade delete
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS document_tags (
-                document_id TEXT NOT NULL,
-                tag TEXT NOT NULL,
-                PRIMARY KEY (document_id, tag),
-                FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-            )
-        """)
-
-        # Create indexes for better query performance
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags ON document_tags(tag)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_filename ON documents(filename)")
-
-        # Create document_relations table for bidirectional document linking
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS document_relations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                document_id TEXT NOT NULL,
-                related_document_id TEXT NOT NULL,
-                relation_type TEXT NOT NULL,
-                note TEXT,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
-                FOREIGN KEY (related_document_id) REFERENCES documents(id) ON DELETE CASCADE,
-                UNIQUE(document_id, related_document_id, relation_type)
-            )
-        """)
-
-        # Create indexes for relation queries
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_document_id ON document_relations(document_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_related_document_id ON document_relations(related_document_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relations_type ON document_relations(relation_type)")
-
-        self.conn.commit()
+    def close(self):
+        """Close the Neo4j driver connection."""
+        self._driver.close()
 
     def insert_document(self, metadata: DocumentMetadata):
-        """Insert document metadata and tags into database."""
-        import json
-        cursor = self.conn.cursor()
-
-        # Serialize metadata dict to JSON string
+        """Insert document metadata into database."""
         metadata_json = json.dumps(metadata.metadata) if metadata.metadata else None
 
-        # Insert into documents table
-        cursor.execute("""
-            INSERT INTO documents (
-                id, filename, content_type, size_bytes, checksum,
-                storage_path, created_at, updated_at, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            metadata.id,
-            metadata.filename,
-            metadata.content_type,
-            metadata.size_bytes,
-            metadata.checksum,
-            metadata.storage_path,
-            metadata.created_at.isoformat(),
-            metadata.updated_at.isoformat(),
-            metadata_json
-        ))
-
-        # Insert tags
-        for tag in metadata.tags:
-            cursor.execute("""
-                INSERT INTO document_tags (document_id, tag)
-                VALUES (?, ?)
-            """, (metadata.id, tag))
-
-        self.conn.commit()
+        with self._driver.session() as session:
+            session.run("""
+                CREATE (d:Document {
+                    id: $id,
+                    filename: $filename,
+                    content_type: $content_type,
+                    size_bytes: $size_bytes,
+                    checksum: $checksum,
+                    storage_path: $storage_path,
+                    created_at: $created_at,
+                    updated_at: $updated_at,
+                    tags: $tags,
+                    metadata: $metadata
+                })
+            """, {
+                "id": metadata.id,
+                "filename": metadata.filename,
+                "content_type": metadata.content_type,
+                "size_bytes": metadata.size_bytes,
+                "checksum": metadata.checksum,
+                "storage_path": metadata.storage_path,
+                "created_at": metadata.created_at.isoformat(),
+                "updated_at": metadata.updated_at.isoformat(),
+                "tags": metadata.tags,
+                "metadata": metadata_json
+            })
 
     def get_document(self, doc_id: str) -> Optional[DocumentMetadata]:
         """Retrieve document metadata by ID."""
-        import json
-        cursor = self.conn.cursor()
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (d:Document {id: $id})
+                RETURN d
+            """, {"id": doc_id})
 
-        # Get document metadata
-        cursor.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
-        row = cursor.fetchone()
+            record = result.single()
+            if not record:
+                return None
 
-        if not row:
-            return None
+            node = record["d"]
+            return self._node_to_metadata(node)
 
-        # Get associated tags
-        cursor.execute("SELECT tag FROM document_tags WHERE document_id = ?", (doc_id,))
-        tags = [tag_row['tag'] for tag_row in cursor.fetchall()]
-
-        # Deserialize metadata JSON string to dict
+    def _node_to_metadata(self, node) -> DocumentMetadata:
+        """Convert a Neo4j node to DocumentMetadata."""
         metadata_dict = {}
-        if row['metadata']:
+        if node.get("metadata"):
             try:
-                metadata_dict = json.loads(row['metadata'])
+                metadata_dict = json.loads(node["metadata"])
             except json.JSONDecodeError:
                 metadata_dict = {}
 
-        # Construct DocumentMetadata
+        tags = list(node.get("tags", []))
+
         return DocumentMetadata(
-            id=row['id'],
-            filename=row['filename'],
-            content_type=row['content_type'],
-            size_bytes=row['size_bytes'],
-            checksum=row['checksum'],
-            storage_path=row['storage_path'],
-            created_at=datetime.fromisoformat(row['created_at']),
-            updated_at=datetime.fromisoformat(row['updated_at']),
+            id=node["id"],
+            filename=node["filename"],
+            content_type=node["content_type"],
+            size_bytes=node["size_bytes"],
+            checksum=node["checksum"],
+            storage_path=node["storage_path"],
+            created_at=datetime.fromisoformat(node["created_at"]),
+            updated_at=datetime.fromisoformat(node["updated_at"]),
             tags=tags,
             metadata=metadata_dict
         )
@@ -150,82 +121,52 @@ class DocumentDatabase:
         tags: Optional[List[str]] = None
     ) -> List[DocumentMetadata]:
         """Query documents with optional filters. Multiple tags use AND logic."""
-        cursor = self.conn.cursor()
+        with self._driver.session() as session:
+            # Build query based on filters
+            if tags and len(tags) > 0 and filename:
+                # Both tags and filename filter
+                query = """
+                    MATCH (d:Document)
+                    WHERE d.filename CONTAINS $filename
+                    AND ALL(tag IN $tags WHERE tag IN d.tags)
+                    RETURN d
+                """
+                params = {"filename": filename, "tags": tags}
+            elif tags and len(tags) > 0:
+                # Tags only filter (AND logic)
+                query = """
+                    MATCH (d:Document)
+                    WHERE ALL(tag IN $tags WHERE tag IN d.tags)
+                    RETURN d
+                """
+                params = {"tags": tags}
+            elif filename:
+                # Filename only filter
+                query = """
+                    MATCH (d:Document)
+                    WHERE d.filename CONTAINS $filename
+                    RETURN d
+                """
+                params = {"filename": filename}
+            else:
+                # No filters - return all
+                query = "MATCH (d:Document) RETURN d"
+                params = {}
 
-        # Build query based on filters
-        if tags and len(tags) > 0:
-            # Tag filtering with AND logic (document must have ALL tags)
-            placeholders = ','.join(['?' for _ in tags])
-            query = f"""
-                SELECT DISTINCT d.* FROM documents d
-                JOIN document_tags dt ON d.id = dt.document_id
-                WHERE dt.tag IN ({placeholders})
-            """
-            params = list(tags)
-
-            # Add filename filter if provided
-            if filename:
-                query += " AND d.filename LIKE ?"
-                params.append(f"%{filename}%")
-
-            # Group by and ensure all tags match
-            query += f"""
-                GROUP BY d.id
-                HAVING COUNT(DISTINCT dt.tag) = ?
-            """
-            params.append(len(tags))
-
-        elif filename:
-            # Filename-only filtering
-            query = "SELECT * FROM documents WHERE filename LIKE ?"
-            params = [f"%{filename}%"]
-
-        else:
-            # No filters - return all
-            query = "SELECT * FROM documents"
-            params = []
-
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-
-        # Build DocumentMetadata objects
-        import json
-        results = []
-        for row in rows:
-            # Get tags for this document
-            cursor.execute("SELECT tag FROM document_tags WHERE document_id = ?", (row['id'],))
-            tags_list = [tag_row['tag'] for tag_row in cursor.fetchall()]
-
-            # Deserialize metadata JSON string to dict
-            metadata_dict = {}
-            if row['metadata']:
-                try:
-                    metadata_dict = json.loads(row['metadata'])
-                except json.JSONDecodeError:
-                    metadata_dict = {}
-
-            results.append(DocumentMetadata(
-                id=row['id'],
-                filename=row['filename'],
-                content_type=row['content_type'],
-                size_bytes=row['size_bytes'],
-                checksum=row['checksum'],
-                storage_path=row['storage_path'],
-                created_at=datetime.fromisoformat(row['created_at']),
-                updated_at=datetime.fromisoformat(row['updated_at']),
-                tags=tags_list,
-                metadata=metadata_dict
-            ))
-
-        return results
+            result = session.run(query, params)
+            return [self._node_to_metadata(record["d"]) for record in result]
 
     def delete_document(self, doc_id: str) -> bool:
-        """Delete document metadata. CASCADE automatically deletes tags and relations."""
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-        self.conn.commit()
+        """Delete document and all its relationships."""
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (d:Document {id: $id})
+                DETACH DELETE d
+                RETURN count(d) AS deleted
+            """, {"id": doc_id})
 
-        return cursor.rowcount > 0
+            record = result.single()
+            return record["deleted"] > 0
 
     # ==================== Relation Methods ====================
 
@@ -236,90 +177,99 @@ class DocumentDatabase:
         relation_type: str,
         note: Optional[str] = None
     ) -> int:
-        """Create a single relation row. Returns the relation ID."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT INTO document_relations (document_id, related_document_id, relation_type, note)
-            VALUES (?, ?, ?, ?)
-        """, (document_id, related_document_id, relation_type, note))
-        self.conn.commit()
-        return cursor.lastrowid
+        """Create a relation between documents. Returns a unique relation ID."""
+        now = datetime.now().isoformat()
+
+        with self._driver.session() as session:
+            # Generate a unique ID for the relationship using timestamp + hash
+            result = session.run("""
+                MATCH (from:Document {id: $from_id})
+                MATCH (to:Document {id: $to_id})
+                CREATE (from)-[r:RELATES_TO {
+                    relation_type: $relation_type,
+                    note: $note,
+                    created_at: $created_at,
+                    updated_at: $updated_at
+                }]->(to)
+                RETURN elementId(r) AS rel_id
+            """, {
+                "from_id": document_id,
+                "to_id": related_document_id,
+                "relation_type": relation_type,
+                "note": note,
+                "created_at": now,
+                "updated_at": now
+            })
+
+            record = result.single()
+            # Neo4j elementId returns a string, we'll use a hash for integer ID
+            return self._element_id_to_int(record["rel_id"])
+
+    def _element_id_to_int(self, element_id: str) -> int:
+        """Convert Neo4j element ID to integer for API compatibility."""
+        # Use hash of the element ID, masked to positive int
+        return abs(hash(element_id)) % (2**31)
+
+    def _get_relation_from_result(self, record) -> dict:
+        """Extract relation dict from a query result record."""
+        rel = record["r"]
+        return {
+            "id": self._element_id_to_int(record["rel_id"]),
+            "document_id": record["from_id"],
+            "related_document_id": record["to_id"],
+            "relation_type": rel["relation_type"],
+            "note": rel.get("note"),
+            "created_at": datetime.fromisoformat(rel["created_at"]),
+            "updated_at": datetime.fromisoformat(rel["updated_at"]),
+            "_element_id": record["rel_id"]  # Keep for internal use
+        }
 
     def get_relation(self, relation_id: int) -> Optional[dict]:
         """Get a single relation by ID."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT id, document_id, related_document_id, relation_type, note, created_at, updated_at
-            FROM document_relations WHERE id = ?
-        """, (relation_id,))
-        row = cursor.fetchone()
+        with self._driver.session() as session:
+            # We need to scan relations and find matching hash
+            result = session.run("""
+                MATCH (from:Document)-[r:RELATES_TO]->(to:Document)
+                RETURN r, elementId(r) AS rel_id, from.id AS from_id, to.id AS to_id
+            """)
 
-        if not row:
+            for record in result:
+                if self._element_id_to_int(record["rel_id"]) == relation_id:
+                    return self._get_relation_from_result(record)
+
             return None
 
-        return {
-            "id": row["id"],
-            "document_id": row["document_id"],
-            "related_document_id": row["related_document_id"],
-            "relation_type": row["relation_type"],
-            "note": row["note"],
-            "created_at": datetime.fromisoformat(row["created_at"]),
-            "updated_at": datetime.fromisoformat(row["updated_at"])
-        }
-
     def get_document_relations(self, document_id: str) -> List[dict]:
-        """Get all relations for a document."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT id, document_id, related_document_id, relation_type, note, created_at, updated_at
-            FROM document_relations WHERE document_id = ?
-        """, (document_id,))
-        rows = cursor.fetchall()
+        """Get all relations for a document (outgoing relations)."""
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (from:Document {id: $doc_id})-[r:RELATES_TO]->(to:Document)
+                RETURN r, elementId(r) AS rel_id, from.id AS from_id, to.id AS to_id
+            """, {"doc_id": document_id})
 
-        return [
-            {
-                "id": row["id"],
-                "document_id": row["document_id"],
-                "related_document_id": row["related_document_id"],
-                "relation_type": row["relation_type"],
-                "note": row["note"],
-                "created_at": datetime.fromisoformat(row["created_at"]),
-                "updated_at": datetime.fromisoformat(row["updated_at"])
-            }
-            for row in rows
-        ]
+            return [self._get_relation_from_result(record) for record in result]
 
     def get_relations_batch(self, document_ids: List[str]) -> dict[str, List[dict]]:
-        """Get all relations for multiple documents in one query.
-
-        Returns a dict mapping document_id -> list of relation dicts.
-        """
+        """Get all relations for multiple documents in one query."""
         if not document_ids:
             return {}
 
-        cursor = self.conn.cursor()
-        placeholders = ','.join(['?' for _ in document_ids])
-        cursor.execute(f"""
-            SELECT id, document_id, related_document_id, relation_type, note, created_at, updated_at
-            FROM document_relations WHERE document_id IN ({placeholders})
-        """, document_ids)
-        rows = cursor.fetchall()
+        result_dict: dict[str, List[dict]] = {doc_id: [] for doc_id in document_ids}
 
-        # Group by document_id
-        result: dict[str, List[dict]] = {doc_id: [] for doc_id in document_ids}
-        for row in rows:
-            relation = {
-                "id": row["id"],
-                "document_id": row["document_id"],
-                "related_document_id": row["related_document_id"],
-                "relation_type": row["relation_type"],
-                "note": row["note"],
-                "created_at": datetime.fromisoformat(row["created_at"]),
-                "updated_at": datetime.fromisoformat(row["updated_at"])
-            }
-            result[row["document_id"]].append(relation)
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (from:Document)-[r:RELATES_TO]->(to:Document)
+                WHERE from.id IN $doc_ids
+                RETURN r, elementId(r) AS rel_id, from.id AS from_id, to.id AS to_id
+            """, {"doc_ids": document_ids})
 
-        return result
+            for record in result:
+                rel_dict = self._get_relation_from_result(record)
+                doc_id = rel_dict["document_id"]
+                if doc_id in result_dict:
+                    result_dict[doc_id].append(rel_dict)
+
+        return result_dict
 
     def find_relation(
         self,
@@ -328,44 +278,67 @@ class DocumentDatabase:
         relation_type: str
     ) -> Optional[dict]:
         """Find a specific relation by document IDs and type."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT id, document_id, related_document_id, relation_type, note, created_at, updated_at
-            FROM document_relations
-            WHERE document_id = ? AND related_document_id = ? AND relation_type = ?
-        """, (document_id, related_document_id, relation_type))
-        row = cursor.fetchone()
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (from:Document {id: $from_id})-[r:RELATES_TO {relation_type: $rel_type}]->(to:Document {id: $to_id})
+                RETURN r, elementId(r) AS rel_id, from.id AS from_id, to.id AS to_id
+            """, {
+                "from_id": document_id,
+                "to_id": related_document_id,
+                "rel_type": relation_type
+            })
 
-        if not row:
-            return None
+            record = result.single()
+            if not record:
+                return None
 
-        return {
-            "id": row["id"],
-            "document_id": row["document_id"],
-            "related_document_id": row["related_document_id"],
-            "relation_type": row["relation_type"],
-            "note": row["note"],
-            "created_at": datetime.fromisoformat(row["created_at"]),
-            "updated_at": datetime.fromisoformat(row["updated_at"])
-        }
+            return self._get_relation_from_result(record)
 
     def update_relation_note(self, relation_id: int, note: Optional[str]) -> bool:
         """Update the note for a relation."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            UPDATE document_relations
-            SET note = ?, updated_at = datetime('now')
-            WHERE id = ?
-        """, (note, relation_id))
-        self.conn.commit()
-        return cursor.rowcount > 0
+        # First find the relation to get its element ID
+        relation = self.get_relation(relation_id)
+        if not relation:
+            return False
+
+        now = datetime.now().isoformat()
+
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (from:Document {id: $from_id})-[r:RELATES_TO {relation_type: $rel_type}]->(to:Document {id: $to_id})
+                SET r.note = $note, r.updated_at = $updated_at
+                RETURN count(r) AS updated
+            """, {
+                "from_id": relation["document_id"],
+                "to_id": relation["related_document_id"],
+                "rel_type": relation["relation_type"],
+                "note": note,
+                "updated_at": now
+            })
+
+            record = result.single()
+            return record["updated"] > 0
 
     def delete_relation(self, relation_id: int) -> bool:
         """Delete a single relation by ID."""
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM document_relations WHERE id = ?", (relation_id,))
-        self.conn.commit()
-        return cursor.rowcount > 0
+        # First find the relation to get its element ID
+        relation = self.get_relation(relation_id)
+        if not relation:
+            return False
+
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (from:Document {id: $from_id})-[r:RELATES_TO {relation_type: $rel_type}]->(to:Document {id: $to_id})
+                DELETE r
+                RETURN count(r) AS deleted
+            """, {
+                "from_id": relation["document_id"],
+                "to_id": relation["related_document_id"],
+                "rel_type": relation["relation_type"]
+            })
+
+            record = result.single()
+            return record["deleted"] > 0
 
     def get_child_document_ids(self, document_id: str) -> List[str]:
         """Get IDs of all child documents (where this document is the parent).
@@ -373,16 +346,21 @@ class DocumentDatabase:
         A document is a parent when it has relations with relation_type='child',
         meaning it stores "related_document_id is my child".
         """
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT related_document_id FROM document_relations
-            WHERE document_id = ? AND relation_type = 'child'
-        """, (document_id,))
-        rows = cursor.fetchall()
-        return [row["related_document_id"] for row in rows]
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (parent:Document {id: $doc_id})-[r:RELATES_TO {relation_type: 'child'}]->(child:Document)
+                RETURN child.id AS child_id
+            """, {"doc_id": document_id})
+
+            return [record["child_id"] for record in result]
 
     def document_exists(self, document_id: str) -> bool:
         """Check if a document exists."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,))
-        return cursor.fetchone() is not None
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (d:Document {id: $id})
+                RETURN count(d) AS count
+            """, {"id": document_id})
+
+            record = result.single()
+            return record["count"] > 0

@@ -739,13 +739,31 @@ Configure the server using environment variables:
   DOCUMENT_SERVER_STORAGE=/var/documents uv run python -m src.main
   ```
 
-### DOCUMENT_SERVER_DB
+### NEO4J_URI
 
-- **Description**: SQLite database file path
-- **Default**: `./document-data/documents.db`
+- **Description**: Neo4j database connection URI
+- **Default**: `bolt://localhost:7687`
 - **Example**:
   ```bash
-  DOCUMENT_SERVER_DB=/var/db/documents.db uv run python -m src.main
+  NEO4J_URI=bolt://neo4j-server:7687 uv run python -m src.main
+  ```
+
+### NEO4J_USER
+
+- **Description**: Neo4j database username
+- **Default**: `neo4j`
+- **Example**:
+  ```bash
+  NEO4J_USER=myuser uv run python -m src.main
+  ```
+
+### NEO4J_PASSWORD
+
+- **Description**: Neo4j database password
+- **Default**: `context-store-secret`
+- **Example**:
+  ```bash
+  NEO4J_PASSWORD=mysecretpassword uv run python -m src.main
   ```
 
 ## Semantic Search (Optional)
@@ -786,15 +804,19 @@ Ollama must be installed and running on your machine with the embedding model pu
    ```
    You should see `nomic-embed-text` in the list of models.
 
-### Elasticsearch Setup
+### Neo4j and Elasticsearch Setup
 
-Elasticsearch is handled automatically via Docker Compose. When you start the full stack with `docker-compose up`, Elasticsearch will be started as a service.
+Neo4j (for document metadata and relations) and Elasticsearch (for semantic search) are handled automatically via Docker Compose. When you start the full stack with `docker-compose up`, both services will be started.
 
-For local development without the full stack, you can start only Elasticsearch:
+For local development without the full stack, you can start the dependencies locally:
 ```bash
 cd servers/context-store
 docker compose up -d
 ```
+
+This starts:
+- **Neo4j** on port 7474 (browser) and 7687 (bolt protocol)
+- **Elasticsearch** on port 9200
 
 ### Enabling Semantic Search
 
@@ -933,16 +955,15 @@ servers/context-store/
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md
-├── docker-compose.yml     # Local Elasticsearch for development
+├── docker-compose.yml     # Local Neo4j and Elasticsearch for development
 ├── .venv/
 ├── document-data/         # Created at runtime (gitignored)
-│   ├── files/
-│   └── documents.db
+│   └── files/             # Document file storage
 ├── src/
 │   ├── main.py
 │   ├── models.py
 │   ├── storage.py
-│   ├── database.py
+│   ├── database.py        # Neo4j database layer
 │   └── semantic/          # Semantic search module (optional)
 │       ├── __init__.py
 │       ├── config.py      # Configuration settings

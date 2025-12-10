@@ -70,7 +70,10 @@ services:
       - DOCUMENT_SERVER_HOST=0.0.0.0
       - DOCUMENT_SERVER_PORT=8766
       - DOCUMENT_SERVER_STORAGE=/app/data/files
-      - DOCUMENT_SERVER_DB=/app/data/documents.db
+      # Neo4j connection settings
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=context-store-secret
       # Public URL for generating document retrieval links
       # Change this if accessing from a different host/port or behind a proxy
       # Examples: "http://192.168.1.100:8766", "https://docs.example.com"
@@ -96,8 +99,36 @@ services:
       retries: 3
       start_period: 5s
     depends_on:
+      neo4j:
+        condition: service_healthy
       elasticsearch:
         condition: service_healthy
+
+  # ============================================================================
+  # NEO4J (graph database for context-store)
+  # ============================================================================
+  neo4j:
+    container_name: context-store-neo4j
+    image: neo4j:5-community
+    environment:
+      - NEO4J_AUTH=neo4j/context-store-secret
+      - NEO4J_PLUGINS=[]
+      - NEO4J_server_memory_heap_initial__size=256m
+      - NEO4J_server_memory_heap_max__size=512m
+    ports:
+      - "7474:7474"  # HTTP (browser interface)
+      - "7687:7687"  # Bolt protocol
+    volumes:
+      - neo4j-data:/data
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # ============================================================================
   # ELASTICSEARCH (for semantic search)
@@ -143,4 +174,7 @@ volumes:
     driver: local
   es-data:
     name: context-store-es-data
+    driver: local
+  neo4j-data:
+    name: context-store-neo4j-data
     driver: local
