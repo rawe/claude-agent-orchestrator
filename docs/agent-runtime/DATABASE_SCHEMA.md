@@ -19,7 +19,9 @@ CREATE TABLE sessions (
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     project_dir TEXT,
-    agent_name TEXT
+    agent_name TEXT,
+    last_resumed_at TEXT,
+    parent_session_name TEXT
 );
 ```
 
@@ -33,6 +35,8 @@ CREATE TABLE sessions (
 | `created_at` | TEXT | NO | ISO 8601 timestamp when session was created |
 | `project_dir` | TEXT | YES | Absolute path to the project directory |
 | `agent_name` | TEXT | YES | Name of the agent blueprint used for this session |
+| `last_resumed_at` | TEXT | YES | ISO 8601 timestamp when session was last resumed |
+| `parent_session_name` | TEXT | YES | Name of the parent session (for callback support) |
 
 **Indexes:**
 - Primary key index on `session_id`

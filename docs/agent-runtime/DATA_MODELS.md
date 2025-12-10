@@ -48,7 +48,8 @@ Common data structures used by the Agent Runtime.
   "created_at": "ISO 8601 string",
   "project_dir": "string (optional)",
   "agent_name": "string (optional)",
-  "last_resumed_at": "ISO 8601 string (optional)"
+  "last_resumed_at": "ISO 8601 string (optional)",
+  "parent_session_name": "string (optional)"
 }
 ```
 
@@ -60,6 +61,129 @@ Common data structures used by the Agent Runtime.
 - `project_dir` - Optional absolute path to the project directory (e.g., `/Users/name/projects/my-app`)
 - `agent_name` - Optional name of the agent blueprint that created this session
 - `last_resumed_at` - Optional timestamp when session was last resumed
+- `parent_session_name` - Optional name of the parent session (for callback support)
+
+## Job
+
+```json
+{
+  "job_id": "string",
+  "type": "start_session | resume_session",
+  "session_name": "string",
+  "agent_name": "string (optional)",
+  "prompt": "string",
+  "project_dir": "string (optional)",
+  "parent_session_name": "string (optional)",
+  "status": "pending | claimed | running | completed | failed",
+  "launcher_id": "string (optional)",
+  "error": "string (optional)",
+  "created_at": "ISO 8601 string",
+  "claimed_at": "ISO 8601 string (optional)",
+  "started_at": "ISO 8601 string (optional)",
+  "completed_at": "ISO 8601 string (optional)"
+}
+```
+
+**Fields:**
+- `job_id` - Unique identifier for the job (e.g., `job_abc123`)
+- `type` - Job type: `start_session` or `resume_session`
+- `session_name` - Name of the session to start/resume
+- `agent_name` - Optional name of the agent blueprint to use
+- `prompt` - User prompt/instruction for the agent
+- `project_dir` - Optional project directory path
+- `parent_session_name` - Optional parent session name (for callbacks)
+- `status` - Current job status
+- `launcher_id` - ID of the launcher that claimed/executed the job
+- `error` - Error message if job failed
+- `created_at` - Timestamp when job was created
+- `claimed_at` - Timestamp when launcher claimed the job
+- `started_at` - Timestamp when job execution started
+- `completed_at` - Timestamp when job completed or failed
+
+**Job Status Values:**
+- `pending` - Job created, waiting for launcher
+- `claimed` - Launcher claimed the job
+- `running` - Job execution started
+- `completed` - Job completed successfully
+- `failed` - Job execution failed
+
+## Launcher
+
+```json
+{
+  "launcher_id": "string",
+  "registered_at": "ISO 8601 string",
+  "last_heartbeat": "ISO 8601 string",
+  "hostname": "string (optional)",
+  "project_dir": "string (optional)"
+}
+```
+
+**Fields:**
+- `launcher_id` - Unique identifier for the launcher (e.g., `lnch_abc123`)
+- `registered_at` - Timestamp when launcher registered
+- `last_heartbeat` - Timestamp of the most recent heartbeat
+- `hostname` - Optional machine hostname where launcher is running
+- `project_dir` - Optional default project directory for this launcher
+
+**Note:** When fetching launchers via GET /launchers, additional computed fields are included:
+- `status` - Computed status: `online`, `stale`, or `offline`
+- `seconds_since_heartbeat` - Seconds since last heartbeat
+
+## Agent
+
+Agent blueprints (templates for creating agents with specific configurations).
+
+```json
+{
+  "name": "string",
+  "description": "string",
+  "system_prompt": "string (optional)",
+  "mcp_servers": {
+    "server-name": {
+      "type": "stdio | http",
+      "command": "string",
+      "args": ["string"],
+      "env": { "KEY": "value" },
+      "url": "string",
+      "headers": { "KEY": "value" }
+    }
+  },
+  "skills": ["string"],
+  "status": "active | inactive",
+  "created_at": "ISO 8601 string",
+  "modified_at": "ISO 8601 string"
+}
+```
+
+**Fields:**
+- `name` - Unique identifier/name for the agent blueprint
+- `description` - Human-readable description of the agent's purpose
+- `system_prompt` - Optional custom system prompt for the agent
+- `mcp_servers` - Optional MCP server configurations (see below)
+- `skills` - Optional list of skill tags (e.g., `["research", "coding"]`)
+- `status` - Agent status: `active` or `inactive`
+- `created_at` - Timestamp when agent was created
+- `modified_at` - Timestamp when agent was last modified
+
+**MCP Server Config (stdio):**
+```json
+{
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+  "env": { "BRAVE_API_KEY": "..." }
+}
+```
+
+**MCP Server Config (http):**
+```json
+{
+  "type": "http",
+  "url": "https://api.example.com",
+  "headers": { "Authorization": "Bearer ..." }
+}
+```
 
 ## Examples
 
