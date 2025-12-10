@@ -511,7 +511,16 @@ async def poll_for_jobs(launcher_id: str = Query(..., description="The registere
     Holds the connection open for up to LAUNCHER_POLL_TIMEOUT seconds,
     returning immediately if a job is available.
     Returns 204 No Content if no jobs available after timeout.
+    Returns {"deregistered": true} if launcher has been deregistered.
     """
+    # Check if launcher has been deregistered
+    if launcher_registry.is_deregistered(launcher_id):
+        # Confirm deregistration and remove from registry
+        launcher_registry.confirm_deregistered(launcher_id)
+        if DEBUG:
+            print(f"[DEBUG] Launcher {launcher_id} deregistered, signaling shutdown", flush=True)
+        return {"deregistered": True}
+
     # Verify launcher is registered
     if not launcher_registry.get_launcher(launcher_id):
         raise HTTPException(status_code=401, detail="Launcher not registered")
@@ -521,6 +530,13 @@ async def poll_for_jobs(launcher_id: str = Query(..., description="The registere
     elapsed = 0.0
 
     while elapsed < LAUNCHER_POLL_TIMEOUT:
+        # Check for deregistration during polling
+        if launcher_registry.is_deregistered(launcher_id):
+            launcher_registry.confirm_deregistered(launcher_id)
+            if DEBUG:
+                print(f"[DEBUG] Launcher {launcher_id} deregistered during poll, signaling shutdown", flush=True)
+            return {"deregistered": True}
+
         job = job_queue.claim_job(launcher_id)
         if job:
             if DEBUG:
@@ -615,31 +631,77 @@ class LauncherWithStatus(BaseModel):
     last_heartbeat: str
     hostname: str | None = None
     project_dir: str | None = None
-    is_alive: bool
+    status: str  # "online", "stale", or "offline"
+    seconds_since_heartbeat: float
 
 
 @app.get("/launchers")
 async def list_launchers():
     """List all registered launchers with their status.
 
-    Returns all launchers with an additional is_alive field indicating
-    whether the launcher has sent a heartbeat within the timeout period.
+    Returns all launchers with status:
+    - "online": heartbeat within last 2 minutes
+    - "stale": no heartbeat for 2+ minutes (connection may be lost)
+    - "offline": launcher has deregistered or been removed
     """
     launchers = launcher_registry.get_all_launchers()
     result = []
 
     for launcher in launchers:
-        is_alive = launcher_registry.is_launcher_alive(launcher.launcher_id)
+        seconds = launcher_registry.get_seconds_since_heartbeat(launcher.launcher_id)
+        if seconds is None:
+            continue  # Shouldn't happen, but skip if it does
+
+        # Determine status based on heartbeat age
+        if seconds < LAUNCHER_HEARTBEAT_TIMEOUT:
+            status = "online"
+        else:
+            status = "stale"
+
         result.append(LauncherWithStatus(
             launcher_id=launcher.launcher_id,
             registered_at=launcher.registered_at,
             last_heartbeat=launcher.last_heartbeat,
             hostname=launcher.hostname,
             project_dir=launcher.project_dir,
-            is_alive=is_alive,
+            status=status,
+            seconds_since_heartbeat=seconds,
         ))
 
     return {"launchers": result}
+
+
+@app.delete("/launchers/{launcher_id}")
+async def deregister_launcher(
+    launcher_id: str,
+    self_initiated: bool = Query(False, alias="self", description="True if launcher is deregistering itself"),
+):
+    """Deregister a launcher.
+
+    Two modes:
+    - External (dashboard): Marks launcher for deregistration, signals on next poll
+    - Self-initiated (launcher shutdown): Immediately removes from registry
+
+    Args:
+        launcher_id: The launcher to deregister
+        self_initiated: If true, launcher is deregistering itself (immediate removal)
+    """
+    # Check if launcher exists
+    if not launcher_registry.get_launcher(launcher_id):
+        raise HTTPException(status_code=404, detail="Launcher not found")
+
+    if self_initiated:
+        # Launcher is shutting down gracefully - remove immediately
+        launcher_registry.remove_launcher(launcher_id)
+        if DEBUG:
+            print(f"[DEBUG] Launcher {launcher_id} self-deregistered (graceful shutdown)", flush=True)
+        return {"ok": True, "message": "Launcher deregistered", "initiated_by": "self"}
+    else:
+        # External request (dashboard) - mark for deregistration, signal on next poll
+        launcher_registry.mark_deregistered(launcher_id)
+        if DEBUG:
+            print(f"[DEBUG] Launcher {launcher_id} marked for deregistration (external request)", flush=True)
+        return {"ok": True, "message": "Launcher marked for deregistration", "initiated_by": "external"}
 
 
 # ==============================================================================

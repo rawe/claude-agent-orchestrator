@@ -32,6 +32,13 @@ class Job:
     project_dir: Optional[str]
 
 
+@dataclass
+class PollResult:
+    """Result from polling for jobs."""
+    job: Optional[Job] = None
+    deregistered: bool = False
+
+
 class RuntimeAPIClient:
     """HTTP client for Agent Runtime Launcher API."""
 
@@ -84,10 +91,12 @@ class RuntimeAPIClient:
             heartbeat_interval_seconds=data["heartbeat_interval_seconds"],
         )
 
-    def poll_job(self, launcher_id: str) -> Optional[Job]:
+    def poll_job(self, launcher_id: str) -> PollResult:
         """Long-poll for a job to execute.
 
-        Returns Job if available, None if timeout with no jobs.
+        Returns PollResult with:
+        - job: Job if available
+        - deregistered: True if launcher has been deregistered externally
         """
         try:
             response = self._client.get(
@@ -97,13 +106,18 @@ class RuntimeAPIClient:
 
             if response.status_code == 204:
                 # No jobs available
-                return None
+                return PollResult()
 
             response.raise_for_status()
             data = response.json()
-            job_data = data["job"]
 
-            return Job(
+            # Check for deregistration signal
+            if data.get("deregistered"):
+                return PollResult(deregistered=True)
+
+            # Normal job response
+            job_data = data["job"]
+            job = Job(
                 job_id=job_data["job_id"],
                 type=job_data["type"],
                 session_name=job_data["session_name"],
@@ -111,10 +125,11 @@ class RuntimeAPIClient:
                 prompt=job_data["prompt"],
                 project_dir=job_data.get("project_dir"),
             )
+            return PollResult(job=job)
         except httpx.TimeoutException:
             # Timeout is expected for long-polling
             logger.debug("Poll timeout (expected)")
-            return None
+            return PollResult()
 
     def report_started(self, launcher_id: str, job_id: str) -> None:
         """Report that job execution has started."""
@@ -147,6 +162,23 @@ class RuntimeAPIClient:
             json={"launcher_id": launcher_id},
         )
         response.raise_for_status()
+
+    def deregister(self, launcher_id: str) -> None:
+        """Deregister this launcher (graceful shutdown).
+
+        Called when launcher is shutting down to immediately remove
+        itself from the registry.
+        """
+        try:
+            response = self._client.delete(
+                f"{self.base_url}/launchers/{launcher_id}",
+                params={"self": "true"},
+            )
+            response.raise_for_status()
+            logger.info(f"Deregistered launcher {launcher_id}")
+        except Exception as e:
+            # Don't fail shutdown if deregistration fails
+            logger.warning(f"Failed to deregister: {e}")
 
     def get_session_by_name(self, session_name: str) -> Optional[dict]:
         """Get session by session_name.

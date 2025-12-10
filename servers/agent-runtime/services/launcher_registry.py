@@ -26,6 +26,7 @@ class LauncherRegistry:
 
     def __init__(self, heartbeat_timeout_seconds: int = 120):
         self._launchers: dict[str, LauncherInfo] = {}
+        self._deregistered: set[str] = set()  # IDs pending deregistration signal
         self._lock = threading.Lock()
         self._heartbeat_timeout = heartbeat_timeout_seconds
 
@@ -76,19 +77,26 @@ class LauncherRegistry:
         with self._lock:
             return self._launchers.get(launcher_id)
 
-    def is_launcher_alive(self, launcher_id: str) -> bool:
-        """Check if launcher is registered and has sent a recent heartbeat."""
+    def get_seconds_since_heartbeat(self, launcher_id: str) -> float | None:
+        """Get seconds since last heartbeat for a launcher.
+
+        Returns None if launcher not found.
+        """
         with self._lock:
             launcher = self._launchers.get(launcher_id)
             if not launcher:
-                return False
+                return None
 
-            # Check if heartbeat is within timeout
             last_hb = datetime.fromisoformat(launcher.last_heartbeat.replace('Z', '+00:00'))
             now = datetime.now(timezone.utc)
-            seconds_since_heartbeat = (now - last_hb).total_seconds()
+            return (now - last_hb).total_seconds()
 
-            return seconds_since_heartbeat < self._heartbeat_timeout
+    def is_launcher_alive(self, launcher_id: str) -> bool:
+        """Check if launcher is registered and has sent a recent heartbeat."""
+        seconds = self.get_seconds_since_heartbeat(launcher_id)
+        if seconds is None:
+            return False
+        return seconds < self._heartbeat_timeout
 
     def get_all_launchers(self) -> list[LauncherInfo]:
         """Get all registered launchers."""
@@ -101,6 +109,36 @@ class LauncherRegistry:
         Returns True if launcher was removed, False if not found.
         """
         with self._lock:
+            if launcher_id in self._launchers:
+                del self._launchers[launcher_id]
+                return True
+            return False
+
+    def mark_deregistered(self, launcher_id: str) -> bool:
+        """Mark a launcher for deregistration.
+
+        The launcher will be signaled on its next poll and then removed.
+        Returns True if launcher exists, False otherwise.
+        """
+        with self._lock:
+            if launcher_id not in self._launchers:
+                return False
+            self._deregistered.add(launcher_id)
+            return True
+
+    def is_deregistered(self, launcher_id: str) -> bool:
+        """Check if launcher has been marked for deregistration."""
+        with self._lock:
+            return launcher_id in self._deregistered
+
+    def confirm_deregistered(self, launcher_id: str) -> bool:
+        """Confirm deregistration and remove launcher from registry.
+
+        Called after launcher has been notified of deregistration.
+        Returns True if launcher was removed, False if not found.
+        """
+        with self._lock:
+            self._deregistered.discard(launcher_id)
             if launcher_id in self._launchers:
                 del self._launchers[launcher_id]
                 return True

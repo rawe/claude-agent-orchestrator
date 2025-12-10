@@ -7,13 +7,16 @@ Runs in a background thread, spawning subprocesses for each job.
 import threading
 import time
 import logging
-from typing import Callable
+from typing import Callable, Optional
 
-from api_client import RuntimeAPIClient, Job
+from api_client import RuntimeAPIClient, Job, PollResult
 from executor import JobExecutor
 from registry import RunningJobsRegistry
 
 logger = logging.getLogger(__name__)
+
+# Number of consecutive connection failures before giving up
+MAX_CONNECTION_RETRIES = 3
 
 
 class JobPoller:
@@ -25,6 +28,7 @@ class JobPoller:
         executor: JobExecutor,
         registry: RunningJobsRegistry,
         launcher_id: str,
+        on_deregistered: Optional[Callable[[], None]] = None,
     ):
         """Initialize the poller.
 
@@ -33,11 +37,13 @@ class JobPoller:
             executor: Job executor for spawning subprocesses
             registry: Registry for tracking running jobs
             launcher_id: This launcher's ID
+            on_deregistered: Callback when launcher is deregistered externally
         """
         self.api_client = api_client
         self.executor = executor
         self.registry = registry
         self.launcher_id = launcher_id
+        self.on_deregistered = on_deregistered
 
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -65,19 +71,37 @@ class JobPoller:
 
     def _poll_loop(self) -> None:
         """Main polling loop."""
+        consecutive_failures = 0
+
         while not self._stop_event.is_set():
             try:
-                job = self.api_client.poll_job(self.launcher_id)
+                result = self.api_client.poll_job(self.launcher_id)
 
-                if job:
-                    self._handle_job(job)
-                    # Reset backoff on success
-                    self._backoff_seconds = 1.0
-                # If no job (timeout), continue immediately
+                # Successful connection - reset failure counter
+                consecutive_failures = 0
+                self._backoff_seconds = 1.0
+
+                # Check for deregistration signal
+                if result.deregistered:
+                    logger.warning("Received deregistration signal from Agent Runtime")
+                    if self.on_deregistered:
+                        self.on_deregistered()
+                    return  # Exit poll loop
+
+                if result.job:
+                    self._handle_job(result.job)
 
             except Exception as e:
-                logger.error(f"Poll error: {e}")
-                # Backoff on error
+                consecutive_failures += 1
+                logger.error(f"Poll error ({consecutive_failures}/{MAX_CONNECTION_RETRIES}): {e}")
+
+                if consecutive_failures >= MAX_CONNECTION_RETRIES:
+                    logger.error(f"Agent Runtime unreachable after {MAX_CONNECTION_RETRIES} attempts - shutting down")
+                    if self.on_deregistered:
+                        self.on_deregistered()
+                    return  # Exit poll loop
+
+                # Backoff before retry
                 time.sleep(self._backoff_seconds)
                 self._backoff_seconds = min(self._backoff_seconds * 2, self._max_backoff)
 

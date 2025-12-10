@@ -116,6 +116,7 @@ class Launcher:
         self.heartbeat: HeartbeatThread | None = None
 
         self._shutdown_event = threading.Event()
+        self._externally_deregistered = False  # True if shutdown was triggered by external deregistration
 
     def register(self) -> None:
         """Register with Agent Runtime."""
@@ -150,6 +151,7 @@ class Launcher:
             self.executor,
             self.registry,
             self.launcher_id,
+            on_deregistered=self._on_external_deregistration,
         )
 
         self.supervisor = JobSupervisor(
@@ -171,8 +173,14 @@ class Launcher:
 
         logger.info("Launcher started - waiting for jobs")
 
+    def _on_external_deregistration(self) -> None:
+        """Called when launcher is deregistered externally (e.g., from dashboard)."""
+        logger.warning("Launcher was deregistered externally - shutting down")
+        self._externally_deregistered = True
+        self.shutdown()
+
     def stop(self) -> None:
-        """Stop all background threads."""
+        """Stop all background threads and deregister from Agent Runtime."""
         logger.info("Stopping launcher...")
 
         if self.poller:
@@ -181,6 +189,10 @@ class Launcher:
             self.supervisor.stop()
         if self.heartbeat:
             self.heartbeat.stop()
+
+        # Deregister from Agent Runtime (only if not already deregistered externally)
+        if self.launcher_id and not self._externally_deregistered:
+            self.api_client.deregister(self.launcher_id)
 
         self.api_client.close()
         logger.info("Launcher stopped")
