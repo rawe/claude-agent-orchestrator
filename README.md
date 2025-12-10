@@ -184,6 +184,28 @@ The `config/agents/` folder contains example agent blueprints.
 
 See **[Getting Started](./docs/GETTING_STARTED.md)** for setup instructions.
 
+## Agent Launcher
+
+The Agent Launcher is a critical component that bridges the Agent Runtime with actual agent execution. It polls for jobs and spawns Claude Code sessions.
+
+**Start the launcher in your project directory:**
+```bash
+cd /path/to/your/project
+/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+```
+
+> **Important:** The launcher must run in the directory where you want agents to execute. Without a running launcher, agent sessions will be queued but not executed.
+
+The launcher:
+- Registers with Agent Runtime and appears in the Dashboard
+- Polls for pending jobs (start/resume sessions)
+- Executes jobs as Claude Code sessions
+- Reports job status back to the runtime
+
+Currently implements **Claude Code** as the agent backend. The architecture supports adding other backends in the future.
+
+See [servers/agent-launcher/README.md](./servers/agent-launcher/README.md) for detailed documentation.
+
 ## Core Concepts
 
 ### Agent Blueprints
@@ -233,7 +255,8 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 |------|------------|
 | **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Runtime. |
 | **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
-| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, spawns agents, captures events, and stores agent blueprints. |
+| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, queues jobs, captures events, and stores agent blueprints. |
+| **Agent Launcher** | Standalone process that polls Agent Runtime for jobs and executes them as Claude Code sessions. Must run in your project directory. |
 | **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
 | **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 
@@ -242,6 +265,7 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 - **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
+- **[Agent Launcher](./servers/agent-launcher/README.md)** - Job execution bridge
 - **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Option 1: Claude Code plugin
 - **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - Option 2: MCP server for agent orchestration
 - **[Context Store MCP](./mcps/context-store/README.md)** - MCP server for document management

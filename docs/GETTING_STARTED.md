@@ -2,6 +2,36 @@
 
 Quick setup guide for the Agent Orchestrator Framework.
 
+## Prerequisites
+
+- Claude Code CLI installed
+- Docker (Desktop or Engine + Compose V2)
+- Python 3.11+, [uv](https://docs.astral.sh/uv/)
+
+## Architecture Overview
+
+The framework has three layers:
+
+1. **Backend Services** (Docker) - Agent Runtime, Context Store, Dashboard
+2. **Agent Launcher** - Bridge that executes agent jobs (runs in your project directory)
+3. **Interface** - Plugin (Claude Code) or MCP Server (Claude Desktop)
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Claude Code    │     │  Agent Runtime  │     │ Agent Launcher  │
+│  or Claude      │────▶│    (Docker)     │────▶│ (your project)  │
+│  Desktop        │     │    :8765        │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+                                                ┌─────────────────┐
+                                                │  Claude Code    │
+                                                │  Agent Session  │
+                                                └─────────────────┘
+```
+
+---
+
 ## Use Case 1: Claude Code Plugin
 
 Use the orchestrator directly within Claude Code via plugins.
@@ -24,14 +54,22 @@ This starts in the background:
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
-**3. Open the dashboard:**
+**3. Start the Agent Launcher in your project directory:**
+```bash
+cd /path/to/your/project
+/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+```
+
+The launcher must run in the directory where you want agents to execute. It polls the Agent Runtime for jobs and spawns Claude Code sessions.
+
+**4. Open the dashboard:**
 ```bash
 make open
 ```
 
-Verify the dashboard is running at http://localhost:3000
+Verify the dashboard is running at http://localhost:3000. You should see the launcher registered.
 
-**4. Add plugins to Claude Code:**
+**5. Add plugins to Claude Code:**
 - Start Claude Code in your project directory
 - Open Claude Code settings
 - Add a new marketplace pointing to your cloned directory
@@ -40,7 +78,7 @@ Verify the dashboard is running at http://localhost:3000
   - `context-store` - Document sharing (doc-* commands)
 - Restart Claude Code
 
-**5. Verify the orchestrator skill:**
+**6. Verify the orchestrator skill:**
 ```
 /agent-orchestrator-init
 ```
@@ -91,8 +129,6 @@ AGENT_ORCHESTRATOR_PROJECT_DIR=/path/to/your/project
 # AGENT_ORCHESTRATOR_MCP_PORT=9500
 ```
 
-> **Important:** In HTTP mode, the MCP server runs standalone, so `AGENT_ORCHESTRATOR_PROJECT_DIR` must be set to tell agents which project to work in.
-
 **3. Start the backend services:**
 ```bash
 make start-bg
@@ -103,21 +139,29 @@ This starts in the background:
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
-**4. Open the dashboard:**
+**4. Start the Agent Launcher in your project directory:**
+```bash
+cd /path/to/your/project
+/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+```
+
+> **Important:** The Agent Launcher must run in the directory where you want agents to execute. Without the launcher, agent sessions will be queued but not executed.
+
+**5. Open the dashboard:**
 ```bash
 make open
 ```
 
-Verify the dashboard is running at http://localhost:3000
+Verify the dashboard is running at http://localhost:3000. You should see the launcher registered.
 
-**5. Start the MCP server (HTTP mode):**
+**6. Start the MCP server (HTTP mode):**
 ```bash
-make start-ao-mcp
+make start-mcp-agent-orchestrator
 ```
 
 This starts the Agent Orchestrator MCP server at `http://localhost:9500/mcp`
 
-**6. Configure your MCP client:**
+**7. Configure your MCP client:**
 
 **Option A: Claude Desktop**
 
@@ -140,12 +184,12 @@ Add to your Claude Desktop config file:
 
 Use the provided config file:
 ```
-interfaces/agent-orchestrator-mcp-server/.mcp-agent-orchestrator-http.json
+mcps/agent-orchestrator/.mcp-agent-orchestrator-http.json
 ```
 
 Or configure your client to connect to: `http://localhost:9500/mcp`
 
-**7. Restart your MCP client** (e.g., Claude Desktop) to pick up the new configuration.
+**8. Restart your MCP client** (e.g., Claude Desktop) to pick up the new configuration.
 
 ### Usage
 
@@ -174,12 +218,66 @@ Start a new agent session called "my-task" to analyze the codebase
 ### Stopping the Server
 
 ```bash
-make stop-ao-mcp
+make stop-mcp-agent-orchestrator
 ```
 
 ### Verify
 
-- Dashboard at http://localhost:3000 shows active sessions
+- Dashboard at http://localhost:3000 shows active sessions and registered launcher
 - MCP server endpoint: http://localhost:9500/mcp
 
-See [interfaces/agent-orchestrator-mcp-server/README.md](../interfaces/agent-orchestrator-mcp-server/README.md) for detailed MCP server documentation.
+See [mcps/agent-orchestrator/README.md](../mcps/agent-orchestrator/README.md) for detailed MCP server documentation.
+
+---
+
+## Agent Launcher
+
+The Agent Launcher is a critical component that bridges the Agent Runtime with actual agent execution. It must be running for agents to execute.
+
+### Starting the Launcher
+
+```bash
+# Navigate to your project directory
+cd /path/to/your/project
+
+# Start the launcher
+/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+
+# Or with options
+./servers/agent-launcher/agent-launcher --runtime-url http://localhost:8765 -v
+```
+
+### What It Does
+
+1. Registers with Agent Runtime
+2. Polls for pending jobs (start/resume sessions)
+3. Executes jobs as Claude Code sessions
+4. Reports job status back to the runtime
+
+### Why Run in Project Directory?
+
+The launcher spawns Claude Code sessions in its current working directory. Running it in your project ensures agents have access to your codebase.
+
+### Dashboard Integration
+
+Once registered, the launcher appears in the Dashboard. You can:
+- See launcher status and metadata
+- View running jobs
+- Deregister launchers remotely
+
+See [servers/agent-launcher/README.md](../servers/agent-launcher/README.md) for detailed documentation.
+
+---
+
+## Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `make start-bg` | Start backend services (Docker) |
+| `make stop` | Stop backend services |
+| `make start-mcps` | Start all MCP servers |
+| `make stop-mcps` | Stop all MCP servers |
+| `make start-all` | Start everything |
+| `make stop-all` | Stop everything |
+| `make open` | Open Dashboard in browser |
+| `./servers/agent-launcher/agent-launcher` | Start Agent Launcher |
