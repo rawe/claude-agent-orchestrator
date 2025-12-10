@@ -1,0 +1,10 @@
+services:
+  neo4j-mcp:
+    image: mcp/neo4j-cypher
+    container_name: neo4j-mcp-server
+    ports:
+      - "127.0.0.1:9003:9003"
+    env_file:
+      - .env
+    environment:
+      - NEO4J_MCP_SERVER_PORT=9003

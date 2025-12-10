@@ -8,7 +8,7 @@ General-purpose agent for interacting with Jira and Confluence. Suitable for tas
 
 **Important:** This agent requires the mcp-atlassian server running in HTTP mode via Docker.
 
-See [../../mcp/README.md](../../mcp/README.md) for complete setup instructions including:
+See [../../mcps/atlassian/README.md](../../mcps/atlassian/README.md) for complete setup instructions including:
 - Configuring Atlassian credentials in `.env`
 - Starting the centralized MCP server for all Atlassian agents
 

@@ -1,0 +1,60 @@
+{
+  "mcpServers": {
+    "neo4j-cypher": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "NEO4J_URL",
+        "-e",
+        "NEO4J_USERNAME",
+        "-e",
+        "NEO4J_DATABASE",
+        "-e",
+        "NEO4J_NAMESPACE",
+        "-e",
+        "NEO4J_TRANSPORT",
+        "-e",
+        "NEO4J_MCP_SERVER_HOST",
+        "-e",
+        "NEO4J_MCP_SERVER_PORT",
+        "-e",
+        "NEO4J_MCP_SERVER_PATH",
+        "-e",
+        "NEO4J_MCP_SERVER_ALLOW_ORIGINS",
+        "-e",
+        "NEO4J_MCP_SERVER_ALLOWED_HOSTS",
+        "-e",
+        "NEO4J_READ_TIMEOUT",
+        "-e",
+        "NEO4J_RESPONSE_TOKEN_LIMIT",
+        "-e",
+        "NEO4J_READ_ONLY",
+        "-e",
+        "NEO4J_SCHEMA_SAMPLE_SIZE",
+        "-e",
+        "NEO4J_PASSWORD",
+        "mcp/neo4j-cypher"
+      ],
+      "env": {
+        "NEO4J_URL": "host.docker.internal:7687",
+        "NEO4J_USERNAME": "neo4j",
+        "NEO4J_DATABASE": "neo4j",
+        "NEO4J_NAMESPACE": "",
+        "NEO4J_TRANSPORT": "http",
+        "NEO4J_MCP_SERVER_HOST": "0.0.0.0",
+        "NEO4J_MCP_SERVER_PORT": "9003",
+        "NEO4J_MCP_SERVER_PATH": "/mcp/",
+        "NEO4J_MCP_SERVER_ALLOW_ORIGINS": "example.com,www.example.com",
+        "NEO4J_MCP_SERVER_ALLOWED_HOSTS": "localhost,127.0.0.1",
+        "NEO4J_READ_TIMEOUT": "30",
+        "NEO4J_RESPONSE_TOKEN_LIMIT": "10000",
+        "NEO4J_READ_ONLY": "false",
+        "NEO4J_SCHEMA_SAMPLE_SIZE": "1000",
+        "NEO4J_PASSWORD": "password"
+      }
+    }
+  }
+}

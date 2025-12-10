@@ -15,7 +15,7 @@ The agent follows an iterative research pattern:
 
 **Important:** This agent requires the Azure DevOps MCP server running in HTTP mode.
 
-See [../../mcp/README.md](../../mcp/README.md) for complete setup instructions including:
+See [../../mcps/ado/README.md](../../mcps/ado/README.md) for complete setup instructions including:
 - Configuring Azure DevOps credentials in `.env`
 - Starting the MCP server
 
