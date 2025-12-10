@@ -4,9 +4,7 @@ HTTP wrapper for the official Azure DevOps MCP server, enabling remote access to
 
 ---
 
-## Quick Start (Standalone)
-
-If you want to run only the ADO MCP server:
+## Quick Start
 
 1. **Configure environment:**
    ```bash
@@ -16,29 +14,13 @@ If you want to run only the ADO MCP server:
 
 2. **Start server:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 3. **Verify:**
    ```bash
    curl http://127.0.0.1:9001/health
    ```
-
----
-
-## Multi-Server Setup (Recommended)
-
-**To run both ADO and Atlassian MCP servers together**, use the parent `docker-compose.yml`:
-
-```bash
-# From the parent mcp/ directory
-cd ..
-cp .env.example .env
-# Edit .env with all credentials
-docker compose up -d
-```
-
-See `../README.md` for complete multi-server setup instructions.
 
 ---
 
@@ -243,7 +225,7 @@ docker-compose up -d --build
 
 - **Architecture:** `docs/ado-mcp-http-wrapper-architecture.md` - Complete design document
 - **Development:** `docs/DEVELOPMENT.md` - Implementation details, debugging, troubleshooting
-- **Multi-server setup:** `../README.md` - Running with other MCP servers
+- **Other MCP servers:** `../README.md` - Overview of all available MCP servers
 
 ---
 

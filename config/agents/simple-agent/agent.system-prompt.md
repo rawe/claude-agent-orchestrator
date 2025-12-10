@@ -1,0 +1,1 @@
+be help full but embrace kiss and yagni principles

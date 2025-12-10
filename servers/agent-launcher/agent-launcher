@@ -1,0 +1,278 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx>=0.25.0",
+#     "typer>=0.9.0",
+# ]
+# ///
+"""
+Agent Launcher - Connects to Agent Runtime and executes jobs.
+
+The launcher polls for jobs from Agent Runtime and executes them as
+ao-start or ao-resume subprocesses. It supports concurrent job execution
+and reports job status back to the runtime.
+
+Usage:
+    ./servers/agent-launcher/agent-launcher
+
+Environment Variables:
+    AGENT_ORCHESTRATOR_API_URL - Agent Runtime URL (default: http://localhost:8765)
+    POLL_TIMEOUT         - Long-poll timeout in seconds (default: 30)
+    HEARTBEAT_INTERVAL   - Heartbeat interval in seconds (default: 60)
+    PROJECT_DIR          - Default project directory (default: cwd)
+"""
+
+import sys
+import signal
+import socket
+import time
+import threading
+import logging
+from pathlib import Path
+
+# Add lib to path for service modules
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+import typer
+from config import LauncherConfig
+from api_client import RuntimeAPIClient
+from registry import RunningJobsRegistry
+from executor import JobExecutor
+from poller import JobPoller
+from supervisor import JobSupervisor
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("agent-launcher")
+
+# Keep HTTP client loggers quiet (only warnings) - even in verbose mode
+# These are too low-level for normal debugging
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+app = typer.Typer()
+
+
+class HeartbeatThread:
+    """Background thread that sends periodic heartbeats."""
+
+    def __init__(
+        self,
+        api_client: RuntimeAPIClient,
+        launcher_id: str,
+        interval: int,
+    ):
+        self.api_client = api_client
+        self.launcher_id = launcher_id
+        self.interval = interval
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+
+    def start(self) -> None:
+        """Start the heartbeat thread."""
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self._thread.start()
+        logger.info(f"Heartbeat started (interval={self.interval}s)")
+
+    def stop(self) -> None:
+        """Stop the heartbeat thread."""
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=5.0)
+            self._thread = None
+        logger.info("Heartbeat stopped")
+
+    def _heartbeat_loop(self) -> None:
+        """Send heartbeats periodically."""
+        while not self._stop_event.wait(self.interval):
+            try:
+                self.api_client.heartbeat(self.launcher_id)
+                logger.info("Heartbeat sent to agent-runtime")
+            except Exception as e:
+                logger.warning(f"Heartbeat to agent-runtime failed: {e}")
+
+
+class Launcher:
+    """Main launcher orchestrator."""
+
+    def __init__(self, config: LauncherConfig):
+        self.config = config
+        self.api_client = RuntimeAPIClient(
+            config.agent_runtime_url,
+            timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
+        )
+        self.registry = RunningJobsRegistry()
+        self.executor = JobExecutor(config.project_dir)
+        self.launcher_id: str | None = None
+
+        self.poller: JobPoller | None = None
+        self.supervisor: JobSupervisor | None = None
+        self.heartbeat: HeartbeatThread | None = None
+
+        self._shutdown_event = threading.Event()
+        self._externally_deregistered = False  # True if shutdown was triggered by external deregistration
+
+    def register(self) -> None:
+        """Register with Agent Runtime."""
+        logger.info(f"Connecting to Agent Runtime at {self.config.agent_runtime_url}")
+
+        # Get machine hostname for registration metadata
+        hostname = socket.gethostname()
+
+        try:
+            response = self.api_client.register(
+                hostname=hostname,
+                project_dir=self.config.project_dir,
+            )
+            self.launcher_id = response.launcher_id
+            logger.info(f"Registered as {self.launcher_id}")
+            logger.info(f"  Hostname: {hostname}")
+            logger.info(f"  Poll timeout: {response.poll_timeout_seconds}s")
+            logger.info(f"  Heartbeat interval: {response.heartbeat_interval_seconds}s")
+            logger.info(f"  Project directory: {self.config.project_dir}")
+        except Exception as e:
+            logger.error(f"Failed to register: {e}")
+            raise
+
+    def start(self) -> None:
+        """Start all background threads."""
+        if not self.launcher_id:
+            raise RuntimeError("Must register before starting")
+
+        # Create components
+        self.poller = JobPoller(
+            self.api_client,
+            self.executor,
+            self.registry,
+            self.launcher_id,
+            on_deregistered=self._on_external_deregistration,
+        )
+
+        self.supervisor = JobSupervisor(
+            self.api_client,
+            self.registry,
+            self.launcher_id,
+        )
+
+        self.heartbeat = HeartbeatThread(
+            self.api_client,
+            self.launcher_id,
+            self.config.heartbeat_interval,
+        )
+
+        # Start threads
+        self.poller.start()
+        self.supervisor.start()
+        self.heartbeat.start()
+
+        logger.info("Launcher started - waiting for jobs")
+
+    def _on_external_deregistration(self) -> None:
+        """Called when launcher is deregistered externally (e.g., from dashboard)."""
+        logger.warning("Launcher was deregistered externally - shutting down")
+        self._externally_deregistered = True
+        self.shutdown()
+
+    def stop(self) -> None:
+        """Stop all background threads and deregister from Agent Runtime."""
+        logger.info("Stopping launcher...")
+
+        if self.poller:
+            self.poller.stop()
+        if self.supervisor:
+            self.supervisor.stop()
+        if self.heartbeat:
+            self.heartbeat.stop()
+
+        # Deregister from Agent Runtime (only if not already deregistered externally)
+        if self.launcher_id and not self._externally_deregistered:
+            self.api_client.deregister(self.launcher_id)
+
+        self.api_client.close()
+        logger.info("Launcher stopped")
+
+    def wait_for_shutdown(self) -> None:
+        """Wait for shutdown signal."""
+        self._shutdown_event.wait()
+
+    def shutdown(self) -> None:
+        """Signal shutdown."""
+        self._shutdown_event.set()
+
+
+@app.command()
+def main(
+    runtime_url: str = typer.Option(
+        None,
+        "--runtime-url",
+        "-r",
+        help="Agent Runtime URL (env: AGENT_ORCHESTRATOR_API_URL)",
+    ),
+    project_dir: str = typer.Option(
+        None,
+        "--project-dir",
+        "-p",
+        help="Default project directory (env: PROJECT_DIR)",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Enable verbose logging",
+    ),
+):
+    """
+    Agent Launcher - Execute jobs from Agent Runtime.
+
+    Polls Agent Runtime for jobs and executes them as ao-start or ao-resume
+    subprocesses. Supports concurrent job execution.
+    """
+    # Load config
+    config = LauncherConfig.from_env()
+
+    # Override with CLI args
+    if runtime_url:
+        config.agent_runtime_url = runtime_url
+    if project_dir:
+        config.project_dir = project_dir
+
+    # Set log level
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    # Create launcher
+    launcher = Launcher(config)
+
+    # Setup signal handlers
+    def handle_signal(signum, frame):
+        logger.info(f"Received signal {signum}")
+        launcher.shutdown()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    try:
+        # Register and start
+        launcher.register()
+        launcher.start()
+
+        # Wait for shutdown
+        launcher.wait_for_shutdown()
+
+    except KeyboardInterrupt:
+        logger.info("Interrupted")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)
+    finally:
+        launcher.stop()
+
+
+if __name__ == "__main__":
+    app()

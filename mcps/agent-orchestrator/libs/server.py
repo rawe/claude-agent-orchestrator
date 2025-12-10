@@ -3,7 +3,7 @@
 Agent Orchestrator MCP Server
 
 This MCP server provides tools to orchestrate specialized Claude Code agents
-through the agent-orchestrator Python commands. It enables:
+through the Agent Runtime API. It enables:
 - Listing available agent blueprints
 - Managing agent sessions (create, resume, list, clean)
 - Executing long-running tasks in specialized agent contexts
@@ -11,18 +11,14 @@ through the agent-orchestrator Python commands. It enables:
 Supports both stdio and HTTP transports via FastMCP.
 """
 
-import os
 import sys
-from pathlib import Path
 from typing import Literal, Optional
 
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_headers
 from pydantic import Field
 
-from constants import ENV_COMMAND_PATH, MAX_SESSION_NAME_LENGTH
+from constants import MAX_SESSION_NAME_LENGTH, get_api_url
 from core_functions import (
     delete_all_agent_sessions_impl,
     get_agent_session_result_impl,
@@ -33,22 +29,12 @@ from core_functions import (
     start_agent_session_impl,
 )
 from logger import logger
-from rest_api import create_api_router
 from types_models import ServerConfig
 
 
 def get_server_config() -> ServerConfig:
     """Get configuration from environment variables"""
-    command_path = os.environ.get(ENV_COMMAND_PATH)
-    if not command_path:
-        print(f"ERROR: {ENV_COMMAND_PATH} environment variable not set and auto-discovery failed", file=sys.stderr)
-        print("This should not happen - please check the MCP server installation", file=sys.stderr)
-        sys.exit(1)
-
-    # Normalize path: remove trailing slash if present
-    normalized_path = command_path.rstrip("/")
-
-    return ServerConfig(commandPath=Path(normalized_path).resolve().as_posix())
+    return ServerConfig(api_url=get_api_url())
 
 
 # Get server configuration
@@ -146,6 +132,10 @@ async def start_agent_session(
         default=False,
         description="Run agent in background (fire-and-forget mode). When true, returns immediately with session info.",
     ),
+    callback: bool = Field(
+        default=False,
+        description="Request callback when child completes (requires async_mode=true). Parent will be resumed automatically.",
+    ),
 ) -> str:
     """Start a new agent session instance that immediately begins execution.
 
@@ -169,8 +159,10 @@ async def start_agent_session(
       - Use when: "Create an architecture design" -> Start session with system-architect blueprint
       - Don't use when: Session already exists (use resume_agent_session instead)
     """
+    # Get HTTP headers for parent session name extraction (callback support)
+    http_headers = get_http_headers()
     return await start_agent_session_impl(
-        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode
+        config, session_name, prompt, agent_blueprint_name, project_dir, async_mode, callback, http_headers
     )
 
 
@@ -189,6 +181,10 @@ async def resume_agent_session(
         default=False,
         description="Run agent in background (fire-and-forget mode). When true, returns immediately.",
     ),
+    callback: bool = Field(
+        default=False,
+        description="Request callback when child completes (requires async_mode=true). Parent will be resumed automatically.",
+    ),
 ) -> str:
     """Resume an existing agent session instance with a new prompt to continue work.
 
@@ -206,7 +202,9 @@ async def resume_agent_session(
       - Use when: "Continue the architecture work" -> Resume existing architect session
       - Don't use when: Session doesn't exist (use start_agent_session to create it)
     """
-    return await resume_agent_session_impl(config, session_name, prompt, async_mode)
+    # Get HTTP headers for parent session name extraction (callback support)
+    http_headers = get_http_headers()
+    return await resume_agent_session_impl(config, session_name, prompt, async_mode, callback, http_headers)
 
 
 @mcp.tool()
@@ -290,97 +288,17 @@ async def get_agent_session_result(
     return await get_agent_session_result_impl(config, session_name)
 
 
-def create_combined_app(host: str = "127.0.0.1", port: int = 8080) -> FastAPI:
-    """Create a FastAPI application with both MCP and REST API endpoints.
-
-    Args:
-        host: Host address (for display purposes)
-        port: Port number (for display purposes)
-
-    Returns:
-        FastAPI application with:
-        - /mcp - MCP protocol endpoint
-        - /api/* - REST API endpoints
-        - /api/docs - OpenAPI Swagger documentation
-        - /api/redoc - ReDoc documentation
-    """
-    # Get the MCP ASGI app with proper path
-    mcp_app = mcp.http_app(path="/")
-
-    # Create FastAPI app with documentation
-    # Use MCP app's lifespan for proper session management
-    app = FastAPI(
-        title="Agent Orchestrator API",
-        description="""
-REST API for the Agent Orchestrator MCP Server.
-
-This API provides a RESTful interface to orchestrate specialized Claude Code agents.
-The same functionality is also available via the MCP protocol at `/mcp`.
-
-## Features
-
-- **Blueprints**: List available agent blueprint configurations
-- **Sessions**: Create, resume, monitor, and manage agent sessions
-- **Async Support**: Run long-running tasks in background mode
-
-## MCP Protocol
-
-For MCP clients (Claude Desktop, Claude CLI), use the `/mcp` endpoint.
-        """,
-        version="1.0.0",
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
-        lifespan=mcp_app.lifespan,
-    )
-
-    # Add CORS middleware to allow requests from any origin
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Create REST API router with core functions (not MCP tool wrappers)
-    # These are the actual async functions that do the work
-    core_functions = {
-        "list_agent_blueprints": lambda response_format="json": list_agent_blueprints_impl(config, response_format),
-        "list_agent_sessions": lambda response_format="json": list_agent_sessions_impl(config, response_format),
-        "start_agent_session": lambda session_name, prompt, agent_blueprint_name=None, project_dir=None, async_mode=False: start_agent_session_impl(config, session_name, prompt, agent_blueprint_name, project_dir, async_mode),
-        "resume_agent_session": lambda session_name, prompt, async_mode=False: resume_agent_session_impl(config, session_name, prompt, async_mode),
-        "get_agent_session_status": lambda session_name, wait_seconds=0: get_agent_session_status_impl(config, session_name, wait_seconds),
-        "get_agent_session_result": lambda session_name: get_agent_session_result_impl(config, session_name),
-        "delete_all_agent_sessions": lambda: delete_all_agent_sessions_impl(config),
-    }
-    api_router = create_api_router(core_functions)
-    app.include_router(api_router)
-
-    # Mount MCP app at /mcp path
-    app.mount("/mcp", mcp_app)
-
-    # Add root redirect to docs
-    @app.get("/", include_in_schema=False)
-    async def root():
-        from fastapi.responses import RedirectResponse
-
-        return RedirectResponse(url="/api/docs")
-
-    return app
-
-
 def run_server(
-    transport: Literal["stdio", "streamable-http", "sse", "api"] = "stdio",
+    transport: Literal["stdio", "streamable-http"] = "stdio",
     host: str = "127.0.0.1",
     port: int = 8080,
 ):
     """Run the MCP server with the specified transport.
 
     Args:
-        transport: Transport type - "stdio", "streamable-http", "sse", or "api"
-        host: Host to bind to (for HTTP transports)
-        port: Port to bind to (for HTTP transports)
+        transport: Transport type - "stdio" or "streamable-http"
+        host: Host to bind to (for HTTP transport)
+        port: Port to bind to (for HTTP transport)
     """
     logger.info(
         "Agent Orchestrator MCP Server starting",
@@ -388,12 +306,12 @@ def run_server(
             "transport": transport,
             "host": host if transport != "stdio" else None,
             "port": port if transport != "stdio" else None,
-            "commandPath": config.commandPath,
+            "api_url": config.api_url,
         },
     )
 
     print("Agent Orchestrator MCP Server", file=sys.stderr)
-    print(f"Commands path: {config.commandPath}", file=sys.stderr)
+    print(f"Agent Runtime API: {config.api_url}", file=sys.stderr)
     print(f"Transport: {transport}", file=sys.stderr)
 
     if transport == "stdio":
@@ -402,17 +320,6 @@ def run_server(
     elif transport == "streamable-http":
         print(f"Running via HTTP at http://{host}:{port}/mcp", file=sys.stderr)
         mcp.run(transport="streamable-http", host=host, port=port)
-    elif transport == "sse":
-        print(f"Running via SSE at http://{host}:{port}/sse", file=sys.stderr)
-        mcp.run(transport="sse", host=host, port=port)
-    elif transport == "api":
-        print(f"Running combined MCP + REST API server", file=sys.stderr)
-        print(f"  MCP endpoint:  http://{host}:{port}/mcp", file=sys.stderr)
-        print(f"  REST API:      http://{host}:{port}/api", file=sys.stderr)
-        print(f"  API Docs:      http://{host}:{port}/api/docs", file=sys.stderr)
-        print(f"  ReDoc:         http://{host}:{port}/api/redoc", file=sys.stderr)
-        app = create_combined_app(host, port)
-        uvicorn.run(app, host=host, port=port)
     else:
         raise ValueError(f"Unknown transport: {transport}")
 

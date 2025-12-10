@@ -66,7 +66,7 @@ Use the orchestrator skill to create a new session called "code-review"
   "mcpServers": {
     "agent-orchestrator": {
       "command": "uv",
-      "args": ["run", "/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"],
+      "args": ["run", "/path/to/mcps/agent-orchestrator/agent-orchestrator-mcp.py"],
       "env": {
         "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
@@ -74,7 +74,7 @@ Use the orchestrator skill to create a new session called "code-review"
     },
     "context-store": {
       "command": "uv",
-      "args": ["run", "/path/to/interfaces/context-store-mcp-server/context-store-mcp.py"],
+      "args": ["run", "/path/to/mcps/context-store/context-store-mcp.py"],
       "env": {
         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
       }
@@ -89,7 +89,7 @@ List available agents
 Create a new agent session called "code-review" using the code-reviewer agent
 ```
 
-**Documentation:** [interfaces/agent-orchestrator-mcp-server/README.md](./interfaces/agent-orchestrator-mcp-server/README.md)
+**Documentation:** [mcps/agent-orchestrator/README.md](./mcps/agent-orchestrator/README.md)
 
 **Limitation:** Due to a [known Claude Code bug](https://github.com/anthropics/claude-code/issues/3426), stdio MCP servers don't work in headless mode (`-p`). Orchestrated agents won't have access to stdio-based MCP servers. Use SSE transport or Option 1 as workaround.
 
@@ -121,9 +121,11 @@ agent-orchestrator-framework/
 │   ├── agent-runtime/                 # Session management + event capture + agent registry
 │   └── context-store/                 # Document storage
 │
-├── interfaces/
-│   ├── agent-orchestrator-mcp-server/ # MCP interface for agent orchestration
-│   └── context-store-mcp-server/      # MCP interface for document management
+├── mcps/                              # MCP servers (agent capabilities)
+│   ├── agent-orchestrator/            # Agent orchestration MCP (dual-purpose: capabilities + framework access)
+│   ├── context-store/                 # Document management MCP
+│   ├── atlassian/                     # Jira + Confluence MCP (Docker)
+│   └── ado/                           # Azure DevOps MCP (Docker)
 │
 ├── dashboard/                         # Web UI (React + Vite)
 │
@@ -131,14 +133,43 @@ agent-orchestrator-framework/
 │   ├── orchestrator/                  # Agent orchestration commands
 │   └── context-store/                 # Document management commands
 │
-└── config/                            # Example agents & MCP servers
-    ├── agents/                        # Agent blueprints
-    └── mcps/                          # Docker-based MCP servers
+└── config/                            # Configuration
+    └── agents/                        # Agent blueprints
 ```
+
+## MCP Servers (Agent Capabilities)
+
+The `mcps/` directory contains MCP servers that provide capabilities to agents. These are the tools agents can use to interact with external services and the framework itself.
+
+| MCP Server | Port | Purpose | Type |
+|------------|------|---------|------|
+| `agent-orchestrator` | 9500 | Agent orchestration tools + framework access for any MCP-capable AI | Internal |
+| `context-store` | 9501 | Document storage and retrieval | Internal |
+| `atlassian` | 9000 | Jira + Confluence integration | External (Docker) |
+| `ado` | 9001 | Azure DevOps work items | External (Docker) |
+
+**Start all MCP servers:**
+```bash
+make start-mcps
+```
+
+**Start individually:**
+```bash
+make start-mcp-agent-orchestrator  # Our orchestration framework
+make start-mcp-context-store       # Document management
+make start-mcp-atlassian           # Requires mcps/atlassian/.env
+make start-mcp-ado                 # Requires mcps/ado/.env
+```
+
+The **Agent Orchestrator MCP** has a dual purpose:
+1. Provides agent orchestration capabilities to orchestrated agents
+2. Exposes the framework to any MCP-compatible AI client (Claude Desktop, etc.)
+
+See `mcps/README.md` for detailed setup.
 
 ## Example Agents
 
-The `config/` folder contains example agent blueprints and the MCP servers required to run them.
+The `config/agents/` folder contains example agent blueprints.
 
 | Agent | Purpose | MCP Dependency |
 |-------|---------|----------------|
@@ -149,26 +180,31 @@ The `config/` folder contains example agent blueprints and the MCP servers requi
 | `web-researcher` | Web research | None (built-in) |
 | `browser-tester` | Playwright automation | Playwright (npx) |
 
-### MCP Servers (Docker)
-
-Orchestrated agents require HTTP-based MCP servers (stdio doesn't work in headless mode):
-
-```bash
-cd config/mcps
-cp .env.example .env  # Configure credentials
-docker compose up -d
-```
-
-| Service | Port | Purpose |
-|---------|------|---------|
-| `mcp-atlassian` | 9000 | Jira + Confluence |
-| `mcp-ado` | 9001 | Azure DevOps |
-
-See `config/mcps/README.md` for setup details.
-
 ## Quick Start
 
 See **[Getting Started](./docs/GETTING_STARTED.md)** for setup instructions.
+
+## Agent Launcher
+
+The Agent Launcher is a critical component that bridges the Agent Runtime with actual agent execution. It polls for jobs and spawns Claude Code sessions.
+
+**Start the launcher in your project directory:**
+```bash
+cd /path/to/your/project
+/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+```
+
+> **Important:** The launcher must run in the directory where you want agents to execute. Without a running launcher, agent sessions will be queued but not executed.
+
+The launcher:
+- Registers with Agent Runtime and appears in the Dashboard
+- Polls for pending jobs (start/resume sessions)
+- Executes jobs as Claude Code sessions
+- Reports job status back to the runtime
+
+Currently implements **Claude Code** as the agent backend. The architecture supports adding other backends in the future.
+
+See [servers/agent-launcher/README.md](./servers/agent-launcher/README.md) for detailed documentation.
 
 ## Core Concepts
 
@@ -219,7 +255,8 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 |------|------------|
 | **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Runtime. |
 | **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
-| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, spawns agents, captures events, and stores agent blueprints. |
+| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, queues jobs, captures events, and stores agent blueprints. |
+| **Agent Launcher** | Standalone process that polls Agent Runtime for jobs and executes them as Claude Code sessions. Must run in your project directory. |
 | **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
 | **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 
@@ -228,7 +265,9 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 - **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
+- **[Agent Launcher](./servers/agent-launcher/README.md)** - Job execution bridge
 - **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Option 1: Claude Code plugin
-- **[Agent Orchestrator MCP](./interfaces/agent-orchestrator-mcp-server/README.md)** - Option 2: MCP server for agent orchestration
-- **[Context Store MCP](./interfaces/context-store-mcp-server/README.md)** - MCP server for document management
+- **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - Option 2: MCP server for agent orchestration
+- **[Context Store MCP](./mcps/context-store/README.md)** - MCP server for document management
+- **[MCP Servers Overview](./mcps/README.md)** - All available MCP servers
 - **[Context Store Plugin](./plugins/context-store/README.md)** - Document management plugin

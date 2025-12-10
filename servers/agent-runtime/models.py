@@ -1,5 +1,41 @@
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, Any, List, Literal, Union
+
+
+# ==============================================================================
+# Validators
+# ==============================================================================
+
+SESSION_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+SESSION_NAME_MAX_LENGTH = 60
+
+
+def validate_session_name(name: str) -> str:
+    """
+    Validate session name format.
+
+    Rules:
+    - Not empty
+    - Max 60 characters
+    - Only alphanumeric, dash, underscore: ^[a-zA-Z0-9_-]+$
+
+    Returns the validated name or raises ValueError.
+    """
+    if not name:
+        raise ValueError("Session name cannot be empty")
+
+    if len(name) > SESSION_NAME_MAX_LENGTH:
+        raise ValueError(
+            f"Session name too long (max {SESSION_NAME_MAX_LENGTH} characters, got {len(name)})"
+        )
+
+    if not SESSION_NAME_PATTERN.match(name):
+        raise ValueError(
+            "Session name can only contain alphanumeric characters, dashes, and underscores"
+        )
+
+    return name
 
 
 # ==============================================================================
@@ -8,6 +44,8 @@ from typing import Optional, Any, List, Literal, Union
 
 class MCPServerStdio(BaseModel):
     """MCP server configuration for stdio transport (command-based)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["stdio"] = "stdio"
     command: str
@@ -18,8 +56,11 @@ class MCPServerStdio(BaseModel):
 class MCPServerHttp(BaseModel):
     """MCP server configuration for HTTP transport."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["http"]
     url: str
+    headers: Optional[dict[str, str]] = None
 
 
 MCPServerConfig = Union[MCPServerStdio, MCPServerHttp]
@@ -84,6 +125,12 @@ class SessionCreate(BaseModel):
     session_name: str
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
+    parent_session_name: Optional[str] = None
+
+    @field_validator("session_name")
+    @classmethod
+    def check_session_name(cls, v: str) -> str:
+        return validate_session_name(v)
 
 class MessageContent(BaseModel):
     """Content block within a message"""
@@ -107,3 +154,8 @@ class Event(BaseModel):
     # Message fields
     role: Optional[str] = None  # 'assistant' | 'user'
     content: Optional[List[dict]] = None  # Array of content blocks
+
+    @field_validator("session_name")
+    @classmethod
+    def check_session_name(cls, v: str) -> str:
+        return validate_session_name(v)

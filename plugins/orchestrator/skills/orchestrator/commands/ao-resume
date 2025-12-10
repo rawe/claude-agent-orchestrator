@@ -2,7 +2,6 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "claude-agent-sdk",
 #     "typer",
 #     "httpx",
 # ]
@@ -10,7 +9,7 @@
 """
 Resume an existing agent orchestrator session.
 
-This command continues a previous session with a new prompt.
+This command creates a job to resume a previous session with a new prompt.
 
 Configuration:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
@@ -40,109 +39,40 @@ def main(
         cat additional-requirements.md | ao-resume mysession
     """
     from config import get_api_url
-    from session import validate_session_name
-    from session_client import SessionClient, SessionClientError
-    from agent_api import get_agent_api, AgentAPIError
-    from claude_client import run_session_sync
+    from job_client import JobClient, JobClientError, JobFailedError, JobTimeoutError
     from utils import (
         get_prompt_from_args_and_stdin,
         error_exit,
-        debug_log,
     )
 
-    # DEBUG LOGGING - Command entry
-    debug_log("COMMAND - ao-resume", {
-        "cwd": str(Path.cwd()),
-        "argv": sys.argv,
-        "session_name": session_name,
-        "prompt": prompt or "None (will read from stdin)",
-    })
-
     try:
-        # 1. Validate session name
-        validate_session_name(session_name)
-
-        # 2. Get API URL
+        # 1. Get API URL
         api_url = get_api_url()
 
-        # 3. Check session exists and load metadata via API
-        try:
-            client = SessionClient(api_url)
-            session_data = client.get_session_by_name(session_name)
-        except SessionClientError as e:
-            error_exit(f"Failed to connect to session manager: {e}")
-
-        if not session_data:
-            error_exit(
-                f"Session '{session_name}' does not exist. "
-                "Use 'ao-start' command to create it"
-            )
-
-        # Use API data
-        resume_session_id = session_data.get('session_id')
-        session_project_dir = Path(session_data.get('project_dir', str(Path.cwd())))
-        session_agent = session_data.get('agent_name')
-
-        # 4. Validate session_id exists
-        if not resume_session_id:
-            error_exit(
-                f"Session '{session_name}' has no session_id. "
-                "Cannot resume incomplete session"
-            )
-
-        # 7. Get prompt (from -p and/or stdin)
+        # 2. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 6. Load agent MCP configuration from API if session has agent
-        # NOTE: Do NOT prepend system prompt for resume (only for new sessions)
-        mcp_servers = None
-
-        if session_agent:
-            try:
-                agent_data = get_agent_api(session_agent)
-            except AgentAPIError as e:
-                error_exit(str(e))
-
-            if not agent_data:
-                error_exit(f"Agent not found: {session_agent}")
-
-            if agent_data.get("status") == "inactive":
-                error_exit(
-                    f"Agent '{session_agent}' is inactive. "
-                    "Cannot resume session with deactivated agent blueprint."
-                )
-
-            # Get MCP servers from API response
-            mcp_servers = agent_data.get("mcp_servers")
-
-        # 6. Run Claude session with resume (session update happens via API)
-        session_id, result = run_session_sync(
-            prompt=user_prompt,  # No system prompt prepended!
-            project_dir=session_project_dir,
+        # 3. Create resume job and wait for result
+        job_client = JobClient(api_url)
+        result = job_client.resume_session(
             session_name=session_name,
-            mcp_servers=mcp_servers,
-            resume_session_id=resume_session_id,  # KEY: Enable resume
-            api_url=api_url,
-            agent_name=session_agent,
+            prompt=user_prompt,
         )
 
-        # 7. Print result to stdout
+        # 4. Print result to stdout
         print(result)
 
+    except JobFailedError as e:
+        error_exit(str(e))
+    except JobTimeoutError as e:
+        error_exit(str(e))
+    except JobClientError as e:
+        error_exit(str(e))
     except ValueError as e:
-        # Session validation errors, prompt errors, etc.
+        # Prompt errors, etc.
         error_exit(str(e))
-    except FileNotFoundError as e:
-        # Session not found, agent not found, etc.
-        error_exit(str(e))
-    except ImportError as e:
-        # SDK not installed
-        error_exit(
-            f"Claude SDK not installed: {e}\n"
-            "Install with: uv pip install claude-agent-sdk"
-        )
     except Exception as e:
-        # Unexpected errors (SDK errors, etc.)
+        # Unexpected errors
         error_exit(f"Unexpected error: {e}")
 
 

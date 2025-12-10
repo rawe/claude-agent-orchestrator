@@ -74,9 +74,8 @@ $RECYCLE.BIN/
 
 # Agent Orchestrator
 .agent-orchestrator/
-.agent-orchestrator-mcp-server.pid
-.agent-orchestrator-api-server.pid
-.context-store-mcp-server.pid
+.mcp-agent-orchestrator.pid
+.mcp-context-store.pid
 
 # Docker Compose local overrides (use docker-compose.override.yml.template as starting point)
 docker-compose.override.yml

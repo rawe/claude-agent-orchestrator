@@ -7,6 +7,7 @@
 #   "pydantic>=2.0.0",
 #   "fastapi>=0.115.0",
 #   "uvicorn>=0.32.0",
+#   "httpx>=0.28.0",
 # ]
 # ///
 """
@@ -14,6 +15,9 @@ Agent Orchestrator MCP Server
 
 Standalone entry point for the Agent Orchestrator MCP server.
 Uses UV for dependency management with inline dependency declarations.
+
+This server communicates with the Agent Runtime API to orchestrate Claude Code agents.
+It no longer spawns subprocess commands directly - all operations go through the Jobs API.
 
 Usage:
     # stdio mode (default, for Claude Desktop/CLI)
@@ -24,18 +28,13 @@ Usage:
     uv run agent-orchestrator-mcp.py --http-mode --port 9000
     uv run agent-orchestrator-mcp.py --http-mode --host 0.0.0.0 --port 8080
 
-    # API mode (MCP + REST API with OpenAPI docs)
-    uv run agent-orchestrator-mcp.py --api-mode
-    uv run agent-orchestrator-mcp.py --api-mode --port 9000
-
 Environment Variables:
-    AGENT_ORCHESTRATOR_COMMAND_PATH - Optional: Path to commands directory (auto-discovered if not set)
-    AGENT_ORCHESTRATOR_PROJECT_DIR  - Optional: Default project directory
-    MCP_SERVER_DEBUG                - Optional: Enable debug logging (true/false)
+    AGENT_ORCHESTRATOR_API_URL  - Optional: Agent Runtime API URL (default: http://127.0.0.1:8765)
+    AGENT_SESSION_NAME          - Optional: Parent session name for callback support (stdio mode)
+    MCP_SERVER_DEBUG            - Optional: Enable debug logging (true/false)
 """
 
 import argparse
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -46,13 +45,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="websocket
 # Add libs directory to Python path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR / "libs"))
-
-# Auto-discover commands directory if not set
-# Structure: interfaces/agent-orchestrator-mcp-server/ -> plugins/orchestrator/skills/orchestrator/commands/
-if "AGENT_ORCHESTRATOR_COMMAND_PATH" not in os.environ:
-    PROJECT_ROOT = SCRIPT_DIR.parent.parent
-    COMMANDS_DIR = PROJECT_ROOT / "plugins" / "orchestrator" / "skills" / "orchestrator" / "commands"
-    os.environ["AGENT_ORCHESTRATOR_COMMAND_PATH"] = str(COMMANDS_DIR)
 
 
 def parse_args():
@@ -73,13 +65,6 @@ Examples:
 
   # Run in HTTP mode, accessible from network
   uv run agent-orchestrator-mcp.py --http-mode --host 0.0.0.0 --port 8080
-
-  # Run in API mode (MCP + REST API with OpenAPI docs)
-  uv run agent-orchestrator-mcp.py --api-mode
-  uv run agent-orchestrator-mcp.py --api-mode --port 9000
-
-  # Run in SSE mode (legacy, for backward compatibility)
-  uv run agent-orchestrator-mcp.py --sse-mode --port 8080
         """,
     )
 
@@ -87,18 +72,6 @@ Examples:
         "--http-mode",
         action="store_true",
         help="Run as HTTP server using Streamable HTTP transport (recommended for network access)",
-    )
-
-    parser.add_argument(
-        "--api-mode",
-        action="store_true",
-        help="Run as combined MCP + REST API server with OpenAPI documentation at /api/docs",
-    )
-
-    parser.add_argument(
-        "--sse-mode",
-        action="store_true",
-        help="Run as HTTP server using SSE transport (legacy, for backward compatibility)",
     )
 
     parser.add_argument(
@@ -126,17 +99,8 @@ def main():
     from server import run_server
 
     # Determine transport mode
-    mode_count = sum([args.http_mode, args.sse_mode, args.api_mode])
-    if mode_count > 1:
-        print("Error: Cannot use multiple modes (--http-mode, --sse-mode, --api-mode)", file=sys.stderr)
-        sys.exit(1)
-
     if args.http_mode:
         transport = "streamable-http"
-    elif args.sse_mode:
-        transport = "sse"
-    elif args.api_mode:
-        transport = "api"
     else:
         transport = "stdio"
 

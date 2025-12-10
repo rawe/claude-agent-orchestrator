@@ -33,13 +33,9 @@ def main(
         ao-show-config mysession
     """
     from config import get_api_url
-    from session import validate_session_name
     from session_client import SessionClient, SessionClientError
 
     try:
-        # Validate session name
-        validate_session_name(session_name)
-
         # Get API URL
         api_url = get_api_url()
 
@@ -63,10 +59,6 @@ def main(
         print(f"  Created:         {session_data.get('created_at', 'unknown')}")
         print(f"  Last resumed:    {session_data.get('last_resumed_at', 'unknown')}")
 
-    except ValueError as e:
-        # Session validation errors
-        print(f"Error: {e}", file=sys.stderr)
-        raise typer.Exit(1)
     except Exception as e:
         # Unexpected errors
         print(f"Error: {e}", file=sys.stderr)

@@ -1,0 +1,121 @@
+# MCP Servers (Agent Capabilities)
+
+MCP (Model Context Protocol) servers that provide capabilities to agents. These are the tools agents use to interact with external services and the framework itself.
+
+**Why HTTP Mode?** Agents in this project use HTTP-mode MCP servers. The stdio transport is not supported due to subprocess handling limitations when agents start their own MCP server instances.
+
+---
+
+## Available Servers
+
+| Server | Port | Description | Type |
+|--------|------|-------------|------|
+| [Agent Orchestrator](./agent-orchestrator/) | 9500 | Agent orchestration + framework access | Internal (Python) |
+| [Context Store](./context-store/) | 9501 | Document storage and retrieval | Internal (Python) |
+| [Atlassian](./atlassian/) | 9000 | Confluence and Jira integration | External (Docker) |
+| [Azure DevOps](./ado/) | 9001 | Work Items access | External (Docker) |
+
+**Internal servers** are Python-based and run via `uv run`.
+**External servers** are Docker-based and require credentials in `.env` files.
+
+---
+
+## Quick Start
+
+From the project root, use Make commands:
+
+```bash
+# Start all MCP servers
+make start-mcps
+
+# Start individually
+make start-mcp-agent-orchestrator
+make start-mcp-context-store
+make start-mcp-atlassian    # Requires atlassian/.env
+make start-mcp-ado          # Requires ado/.env
+
+# Stop all
+make stop-mcps
+```
+
+---
+
+## Agent Orchestrator MCP (Dual Purpose)
+
+The Agent Orchestrator MCP server has a **dual purpose**:
+
+1. **Capabilities for orchestrated agents** - Provides tools that agents can use to spawn sub-agents, manage sessions, etc.
+
+2. **Framework access for any MCP client** - Exposes the Agent Orchestrator Framework to any MCP-compatible AI (Claude Desktop, other AI tools) allowing them to orchestrate agents.
+
+This means you can use Claude Desktop or any MCP-capable AI to orchestrate Claude Code agents without needing the plugin.
+
+---
+
+## Context Store MCP
+
+Provides document management capabilities:
+- Store documents with metadata and tags
+- Query documents by name or tags
+- Semantic search for documents by meaning
+- Read document content (full or partial)
+- Manage document relations
+
+---
+
+## External Servers Setup
+
+### Atlassian MCP Server
+
+```bash
+cd atlassian
+cp .env.example .env
+# Edit .env with your Atlassian credentials
+docker compose up -d
+```
+
+### Azure DevOps MCP Server
+
+```bash
+cd ado
+cp .env.example .env
+# Edit .env with ADO_ORG and ADO_PAT
+docker compose up -d
+```
+
+---
+
+## Port Summary
+
+| Service | Endpoint |
+|---------|----------|
+| Agent Orchestrator MCP | `http://127.0.0.1:9500/mcp` |
+| Context Store MCP | `http://127.0.0.1:9501/mcp` |
+| Atlassian MCP | `http://127.0.0.1:9000` |
+| Azure DevOps MCP | `http://127.0.0.1:9001/mcp` |
+
+---
+
+## Documentation
+
+- **Agent Orchestrator:** `agent-orchestrator/README.md`
+- **Context Store:** `context-store/README.md`
+- **Atlassian:** `atlassian/README.md`
+- **Azure DevOps:** `ado/README.md` and `ado/docs/`
+
+---
+
+## Network & Security
+
+**Local Access Only:** All servers bind to `127.0.0.1` (localhost). Not accessible from network.
+
+---
+
+## Adding New Servers
+
+1. Create a new subfolder (e.g., `newservice/`)
+2. For Docker-based: Add `docker-compose.yml` and `.env.example`
+3. For Python-based: Add the MCP server script
+4. Add `README.md` with setup instructions
+5. Add Make targets in the root `Makefile`
+6. Update this README's "Available Servers" table

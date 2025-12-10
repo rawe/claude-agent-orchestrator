@@ -102,8 +102,9 @@ Create a new session with full metadata.
 {
   "session_id": "abc-123",
   "session_name": "My Session",
-  "project_dir": "/path/to/project",  // optional
-  "agent_name": "researcher"          // optional
+  "project_dir": "/path/to/project",    // optional
+  "agent_name": "researcher",           // optional
+  "parent_session_name": "parent-task"  // optional
 }
 ```
 
@@ -268,6 +269,390 @@ See [Event model](DATA_MODELS.md#event)
 
 ---
 
+### Agents API
+
+Manage agent blueprints (templates for creating agents).
+
+#### GET /agents
+
+List all agent blueprints.
+
+**Response:**
+```json
+[
+  {
+    "name": "researcher",
+    "description": "Research agent with web search",
+    "system_prompt": "You are a research assistant...",
+    "mcp_servers": {
+      "brave-search": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "env": { "BRAVE_API_KEY": "..." }
+      }
+    },
+    "skills": ["research", "web-search"],
+    "status": "active",
+    "created_at": "2025-12-10T10:00:00Z",
+    "modified_at": "2025-12-10T10:00:00Z"
+  }
+]
+```
+
+#### GET /agents/{name}
+
+Get a specific agent blueprint.
+
+**Response:**
+```json
+{
+  "name": "researcher",
+  "description": "Research agent",
+  "system_prompt": "You are...",
+  "mcp_servers": {},
+  "skills": [],
+  "status": "active",
+  "created_at": "2025-12-10T10:00:00Z",
+  "modified_at": "2025-12-10T10:00:00Z"
+}
+```
+
+**Error:** `404 Not Found` if agent doesn't exist.
+
+#### POST /agents
+
+Create a new agent blueprint.
+
+**Request Body:**
+```json
+{
+  "name": "researcher",
+  "description": "Research agent",
+  "system_prompt": "You are...",  // optional
+  "mcp_servers": {},               // optional
+  "skills": []                     // optional
+}
+```
+
+**Response:** `201 Created` with Agent object.
+
+**Error:** `409 Conflict` if agent name already exists.
+
+#### PATCH /agents/{name}
+
+Update an existing agent blueprint (partial update).
+
+**Request Body:**
+```json
+{
+  "description": "Updated description",  // optional
+  "system_prompt": "...",                // optional
+  "mcp_servers": {},                     // optional
+  "skills": []                           // optional
+}
+```
+
+**Response:**
+```json
+{
+  "name": "researcher",
+  "description": "Updated description",
+  ...
+}
+```
+
+**Error:** `404 Not Found` if agent doesn't exist.
+
+#### DELETE /agents/{name}
+
+Delete an agent blueprint.
+
+**Response:** `204 No Content`
+
+**Error:** `404 Not Found` if agent doesn't exist.
+
+#### PATCH /agents/{name}/status
+
+Update agent status (active/inactive).
+
+**Request Body:**
+```json
+{
+  "status": "active" | "inactive"
+}
+```
+
+**Response:**
+```json
+{
+  "name": "researcher",
+  "status": "inactive",
+  ...
+}
+```
+
+---
+
+### Jobs API
+
+Queue and manage jobs for launchers to execute.
+
+#### POST /jobs
+
+Create a new job for a launcher to execute.
+
+**Request Body:**
+```json
+{
+  "type": "start_session" | "resume_session",
+  "session_name": "my-task",
+  "agent_name": "researcher",           // optional
+  "prompt": "Research quantum computing",
+  "project_dir": "/path/to/project",    // optional
+  "parent_session_name": "parent-task"  // optional
+}
+```
+
+**Response:**
+```json
+{
+  "job_id": "job_abc123",
+  "status": "pending"
+}
+```
+
+#### GET /jobs/{job_id}
+
+Get job status and details.
+
+**Response:**
+```json
+{
+  "job_id": "job_abc123",
+  "type": "start_session",
+  "session_name": "my-task",
+  "agent_name": "researcher",
+  "prompt": "Research quantum computing",
+  "project_dir": "/path/to/project",
+  "parent_session_name": "parent-task",
+  "status": "completed",
+  "launcher_id": "lnch_xyz789",
+  "error": null,
+  "created_at": "2025-12-10T10:00:00Z",
+  "claimed_at": "2025-12-10T10:00:01Z",
+  "started_at": "2025-12-10T10:00:02Z",
+  "completed_at": "2025-12-10T10:05:00Z"
+}
+```
+
+**Job Status Values:**
+- `pending` - Job created, waiting for launcher
+- `claimed` - Launcher claimed the job
+- `running` - Job execution started
+- `completed` - Job completed successfully
+- `failed` - Job execution failed
+
+**Error:** `404 Not Found` if job doesn't exist.
+
+---
+
+### Launcher API
+
+Endpoints for launcher instances to communicate with the Agent Runtime.
+
+#### POST /launcher/register
+
+Register a new launcher instance.
+
+**Request Body:**
+```json
+{
+  "hostname": "macbook-pro",  // optional
+  "project_dir": "/path"      // optional
+}
+```
+
+**Response:**
+```json
+{
+  "launcher_id": "lnch_abc123",
+  "poll_endpoint": "/launcher/jobs",
+  "poll_timeout_seconds": 30,
+  "heartbeat_interval_seconds": 60
+}
+```
+
+#### GET /launcher/jobs
+
+Long-poll for available jobs (used by launcher).
+
+**Query Parameters:**
+- `launcher_id` (required) - The registered launcher ID
+
+**Response (Job Available):**
+```json
+{
+  "job": {
+    "job_id": "job_abc123",
+    "type": "start_session",
+    "session_name": "my-task",
+    "prompt": "Do something",
+    ...
+  }
+}
+```
+
+**Response (No Jobs):** `204 No Content`
+
+**Response (Deregistered):**
+```json
+{
+  "deregistered": true
+}
+```
+
+**Notes:**
+- Holds connection open for up to `poll_timeout_seconds`
+- Returns immediately if job available
+- Returns `deregistered: true` if launcher has been deregistered
+
+#### POST /launcher/jobs/{job_id}/started
+
+Report that job execution has started.
+
+**Request Body:**
+```json
+{
+  "launcher_id": "lnch_abc123"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+#### POST /launcher/jobs/{job_id}/completed
+
+Report that job completed successfully.
+
+**Request Body:**
+```json
+{
+  "launcher_id": "lnch_abc123",
+  "status": "success"  // optional
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+#### POST /launcher/jobs/{job_id}/failed
+
+Report that job execution failed.
+
+**Request Body:**
+```json
+{
+  "launcher_id": "lnch_abc123",
+  "error": "Error message"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+#### POST /launcher/heartbeat
+
+Keep launcher registration alive.
+
+**Request Body:**
+```json
+{
+  "launcher_id": "lnch_abc123"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Notes:**
+- Launchers should send heartbeat every `heartbeat_interval_seconds`
+- Launcher is considered stale after `heartbeat_timeout_seconds` without heartbeat
+
+#### GET /launchers
+
+List all registered launchers with their status.
+
+**Response:**
+```json
+{
+  "launchers": [
+    {
+      "launcher_id": "lnch_abc123",
+      "registered_at": "2025-12-10T10:00:00Z",
+      "last_heartbeat": "2025-12-10T10:05:00Z",
+      "hostname": "macbook-pro",
+      "project_dir": "/path/to/project",
+      "status": "online",
+      "seconds_since_heartbeat": 15.5
+    }
+  ]
+}
+```
+
+**Launcher Status Values:**
+- `online` - Heartbeat within last 2 minutes
+- `stale` - No heartbeat for 2+ minutes (connection may be lost)
+
+#### DELETE /launchers/{launcher_id}
+
+Deregister a launcher.
+
+**Query Parameters:**
+- `self` (optional, default: false) - If true, launcher is deregistering itself
+
+**Response (External Deregistration):**
+```json
+{
+  "ok": true,
+  "message": "Launcher marked for deregistration",
+  "initiated_by": "external"
+}
+```
+
+**Response (Self-Deregistration):**
+```json
+{
+  "ok": true,
+  "message": "Launcher deregistered",
+  "initiated_by": "self"
+}
+```
+
+**Notes:**
+- External deregistration (dashboard): Marks launcher for deregistration, signals on next poll
+- Self-deregistration (launcher shutdown): Immediately removes from registry
+
+**Error:** `404 Not Found` if launcher doesn't exist.
+
+---
+
 ## Configuration
 
 **Environment Variables:**
@@ -277,6 +662,9 @@ See [Event model](DATA_MODELS.md#event)
 | `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | Agent Orchestrator API URL |
 | `DEBUG_LOGGING` | `false` | Enable verbose logging |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
+| `LAUNCHER_POLL_TIMEOUT` | `30` | Launcher job poll timeout in seconds |
+| `LAUNCHER_HEARTBEAT_INTERVAL` | `60` | Launcher heartbeat interval in seconds |
+| `LAUNCHER_HEARTBEAT_TIMEOUT` | `120` | Launcher heartbeat timeout in seconds |
 
 ---
 
