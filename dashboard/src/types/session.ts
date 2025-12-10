@@ -8,6 +8,7 @@ export interface Session {
   modified_at?: string;
   project_dir?: string;
   agent_name?: string;
+  parent_session_name?: string;
 }
 
 export interface SessionMetadataUpdate {

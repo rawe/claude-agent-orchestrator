@@ -1,7 +1,7 @@
 import { Session } from '@/types';
 import { StatusBadge, CopyButton } from '@/components/common';
 import { formatRelativeTime, formatAbsoluteTime, getLastPathSegment } from '@/utils/formatters';
-import { Folder, Trash2, Square, Bot } from 'lucide-react';
+import { Folder, Trash2, Square, Bot, CornerDownRight } from 'lucide-react';
 
 interface SessionCardProps {
   session: Session;
@@ -69,12 +69,20 @@ export function SessionCard({
           </div>
         )}
 
-        {/* Agent and Project - stacked vertically */}
+        {/* Agent, Parent, and Project - stacked vertically */}
         <div className="space-y-1 mb-2">
           {session.agent_name && (
             <div className="flex items-center gap-1.5 text-xs text-gray-600">
               <Bot className="w-3 h-3 text-gray-400" />
               <span className="truncate font-medium">{session.agent_name}</span>
+            </div>
+          )}
+          {session.parent_session_name && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <CornerDownRight className="w-3 h-3 text-gray-400" />
+              <span className="truncate" title={`Parent: ${session.parent_session_name}`}>
+                {session.parent_session_name}
+              </span>
             </div>
           )}
           {projectFolder && (
