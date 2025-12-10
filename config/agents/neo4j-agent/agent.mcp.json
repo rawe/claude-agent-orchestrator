@@ -1,8 +1,12 @@
 {
   "mcpServers": {
-    "neo4j-cypher": {
+    "neo4j-http": {
       "type": "http",
       "url": "http://localhost:9003/mcp/"
+    },
+    "context-store-http": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
     }
   }
 }

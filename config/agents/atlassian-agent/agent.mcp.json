@@ -3,6 +3,10 @@
     "mcp-atlassian-http": {
       "type": "http",
       "url": "http://localhost:9000/mcp"
+    },
+    "context-store-http": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
     }
   }
 }
