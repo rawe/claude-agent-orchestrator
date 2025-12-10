@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart logs clean status health clean-docs clean-sessions info urls open logs-dashboard logs-runtime logs-doc restart-dashboard restart-runtime restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-runtime restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all
 
 # Default target
 help:
@@ -10,8 +10,6 @@ help:
 	@echo "  make start-bg       - Start all services in background"
 	@echo "  make stop           - Stop all services"
 	@echo "  make restart        - Restart all services"
-	@echo "  make logs           - View logs from all services"
-	@echo "  make logs-f         - Follow logs from all services"
 	@echo "  make status         - Show status of all services"
 	@echo "  make health         - Check health of all services"
 	@echo "  make info           - Show service URLs and descriptions"
@@ -23,9 +21,6 @@ help:
 	@echo "  make clean-sessions - Remove ONLY the session storage volume"
 	@echo ""
 	@echo "Individual service commands:"
-	@echo "  make logs-dashboard - View dashboard logs"
-	@echo "  make logs-runtime   - View agent runtime logs"
-	@echo "  make logs-doc       - View context store logs"
 	@echo "  make restart-dashboard - Restart dashboard"
 	@echo "  make restart-runtime - Restart agent runtime"
 	@echo "  make restart-doc    - Restart context store"
@@ -39,6 +34,8 @@ help:
 	@echo "  make stop-mcp-atlassian           - Stop Atlassian MCP"
 	@echo "  make start-mcp-ado                - Start Azure DevOps MCP"
 	@echo "  make stop-mcp-ado                 - Stop Azure DevOps MCP"
+	@echo "  make start-mcp-neo4j              - Start Neo4j MCP"
+	@echo "  make stop-mcp-neo4j               - Stop Neo4j MCP"
 	@echo "  make start-mcps                   - Start all MCP servers"
 	@echo "  make stop-mcps                    - Stop all MCP servers"
 	@echo ""
@@ -64,7 +61,6 @@ start-bg:
 	@$(MAKE) --no-print-directory info
 	@echo ""
 	@echo "💡 Quick commands:"
-	@echo "   make logs-f    - Follow logs"
 	@echo "   make status    - Check status"
 	@echo "   make info      - Show this info again"
 
@@ -77,14 +73,6 @@ stop:
 restart:
 	@echo "Restarting all services..."
 	docker-compose restart
-
-# View logs
-logs:
-	docker-compose logs
-
-# Follow logs
-logs-f:
-	docker-compose logs -f
 
 # Show service status
 status:
@@ -199,16 +187,6 @@ clean-sessions:
 		echo "Cancelled."; \
 	fi
 
-# Individual service logs
-logs-dashboard:
-	docker-compose logs dashboard
-
-logs-runtime:
-	docker-compose logs agent-runtime
-
-logs-doc:
-	docker-compose logs context-store
-
 # Individual service restart
 restart-dashboard:
 	docker-compose restart dashboard
@@ -248,12 +226,27 @@ stop-mcp-ado:
 	@echo "Stopping Azure DevOps MCP server..."
 	@cd mcps/ado && docker compose down
 
+start-mcp-neo4j:
+	@echo "Starting Neo4j MCP server..."
+	@if [ ! -f mcps/neo4j/.env ]; then \
+		echo "⚠️  No .env file found. Copy the example and configure credentials:"; \
+		echo "   cp mcps/neo4j/.env.example mcps/neo4j/.env"; \
+		exit 1; \
+	fi
+	@cd mcps/neo4j && docker compose up -d
+	@echo "Neo4j MCP started: http://localhost:9003"
+
+stop-mcp-neo4j:
+	@echo "Stopping Neo4j MCP server..."
+	@cd mcps/neo4j && docker compose down
+
 start-mcps:
 	@echo "Starting all MCP servers..."
 	@$(MAKE) --no-print-directory start-mcp-agent-orchestrator
 	@$(MAKE) --no-print-directory start-mcp-context-store
 	@$(MAKE) --no-print-directory start-mcp-atlassian
 	@$(MAKE) --no-print-directory start-mcp-ado
+	@$(MAKE) --no-print-directory start-mcp-neo4j
 
 stop-mcps:
 	@echo "Stopping all MCP servers..."
@@ -261,6 +254,7 @@ stop-mcps:
 	@$(MAKE) --no-print-directory stop-mcp-context-store
 	@$(MAKE) --no-print-directory stop-mcp-atlassian
 	@$(MAKE) --no-print-directory stop-mcp-ado
+	@$(MAKE) --no-print-directory stop-mcp-neo4j
 
 # Agent Orchestrator MCP server (HTTP mode)
 # Loads configuration from .env file
