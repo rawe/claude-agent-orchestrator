@@ -1,4 +1,5 @@
 {
   "name": "atlassian-agent",
-  "description": "A very simple agent which has acess to confluence and jira, it should be used for simple interaction whith both tools."
+  "description": "A very simple agent which has acess to confluence and jira, it should be used for simple interaction whith both tools.",
+  "visibility": "internal"
 }

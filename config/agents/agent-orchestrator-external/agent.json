@@ -1,0 +1,5 @@
+{
+  "name": "agent-orchestrator-external",
+  "description": "Public facing agent able to spawn internal agents",
+  "visibility": "public"
+}
