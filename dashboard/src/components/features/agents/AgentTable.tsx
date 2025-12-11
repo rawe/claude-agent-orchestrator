@@ -11,7 +11,54 @@ import {
 import { Agent } from '@/types';
 import { Badge, StatusBadge, EmptyState, SkeletonLine } from '@/components/common';
 import { truncate } from '@/utils/formatters';
-import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag } from 'lucide-react';
+import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag, X } from 'lucide-react';
+
+// Tag filter component
+function TagFilter({
+  allTags,
+  selectedTags,
+  onTagToggle,
+  onClearAll,
+}: {
+  allTags: string[];
+  selectedTags: Set<string>;
+  onTagToggle: (tag: string) => void;
+  onClearAll: () => void;
+}) {
+  if (allTags.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-gray-500 font-medium">Filter by tag:</span>
+      {allTags.map((tag) => {
+        const isSelected = selectedTags.has(tag);
+        return (
+          <button
+            key={tag}
+            onClick={() => onTagToggle(tag)}
+            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full transition-colors ${
+              isSelected
+                ? 'bg-primary-100 text-primary-700 ring-1 ring-primary-300'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Tag className="w-2.5 h-2.5" />
+            {tag}
+          </button>
+        );
+      })}
+      {selectedTags.size > 0 && (
+        <button
+          onClick={onClearAll}
+          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <X className="w-3 h-3" />
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
 
 // Tags display component
 function TagsDisplay({ tags }: { tags: string[] }) {
@@ -20,21 +67,42 @@ function TagsDisplay({ tags }: { tags: string[] }) {
   }
 
   const displayTags = tags.slice(0, 3);
-  const remaining = tags.length - 3;
+  const hiddenTags = tags.slice(3);
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {displayTags.map((tag) => (
-        <span
-          key={tag}
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700"
-        >
-          <Tag className="w-2.5 h-2.5" />
-          {tag}
-        </span>
-      ))}
-      {remaining > 0 && (
-        <span className="px-2 py-0.5 text-xs text-gray-500">+{remaining}</span>
+    <div className="relative group">
+      <div className="flex flex-wrap gap-1">
+        {displayTags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700"
+          >
+            <Tag className="w-2.5 h-2.5" />
+            {tag}
+          </span>
+        ))}
+        {hiddenTags.length > 0 && (
+          <span className="px-2 py-0.5 text-xs text-gray-500 group-hover:hidden">
+            +{hiddenTags.length}
+          </span>
+        )}
+      </div>
+      {hiddenTags.length > 0 && (
+        <div className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-lg px-3 py-2">
+            <div className="flex flex-wrap gap-1 max-w-xs">
+              {hiddenTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700"
+                >
+                  <Tag className="w-2.5 h-2.5" />
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -64,16 +132,62 @@ export function AgentTable({
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'name', desc: false },
   ]);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [hideInactive, setHideInactive] = useState(false);
+
+  // Extract all unique tags from agents
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    agents.forEach((agent) => {
+      (agent.tags || []).forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [agents]);
+
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+      return next;
+    });
+  };
+
+  const handleClearTags = () => {
+    setSelectedTags(new Set());
+  };
 
   const filteredData = useMemo(() => {
-    if (!searchQuery) return agents;
-    const query = searchQuery.toLowerCase();
-    return agents.filter(
-      (agent) =>
-        agent.name.toLowerCase().includes(query) ||
-        agent.description.toLowerCase().includes(query)
-    );
-  }, [agents, searchQuery]);
+    let result = agents;
+
+    // Filter out inactive agents if toggle is on
+    if (hideInactive) {
+      result = result.filter((agent) => agent.status === 'active');
+    }
+
+    // Filter by selected tags (AND logic - agent must have ALL selected tags)
+    if (selectedTags.size > 0) {
+      result = result.filter((agent) => {
+        const agentTags = new Set(agent.tags || []);
+        return Array.from(selectedTags).every((tag) => agentTags.has(tag));
+      });
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (agent) =>
+          agent.name.toLowerCase().includes(query) ||
+          agent.description.toLowerCase().includes(query)
+      );
+    }
+
+    return result;
+  }, [agents, searchQuery, selectedTags, hideInactive]);
 
   const columns = useMemo(
     () => [
@@ -193,18 +307,43 @@ export function AgentTable({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search agents..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-          />
+      {/* Search and Tag Filter */}
+      <div className="p-4 border-b border-gray-200 space-y-3">
+        <div className="flex items-center gap-4">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search agents..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <button
+            onClick={() => setHideInactive(!hideInactive)}
+            className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none"
+          >
+            <div
+              className={`relative w-9 h-5 rounded-full transition-colors ${
+                hideInactive ? 'bg-primary-500' : 'bg-gray-300'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                  hideInactive ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </div>
+            <span>Hide inactive</span>
+          </button>
         </div>
+        <TagFilter
+          allTags={allTags}
+          selectedTags={selectedTags}
+          onTagToggle={handleTagToggle}
+          onClearAll={handleClearTags}
+        />
       </div>
 
       {/* Table */}
@@ -214,8 +353,8 @@ export function AgentTable({
             icon={<Settings className="w-12 h-12" />}
             title="No agents found"
             description={
-              searchQuery
-                ? 'Try adjusting your search'
+              searchQuery || selectedTags.size > 0
+                ? 'Try adjusting your search or tag filters'
                 : 'Create your first specialized agent to get started'
             }
           />
@@ -236,15 +375,21 @@ export function AgentTable({
               ))}
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 whitespace-nowrap">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {table.getRowModel().rows.map((row) => {
+                const isInactive = row.original.status === 'inactive';
+                return (
+                  <tr
+                    key={row.id}
+                    className={`hover:bg-gray-50 ${isInactive ? 'opacity-50' : ''}`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3 whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
