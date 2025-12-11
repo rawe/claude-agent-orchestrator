@@ -1,5 +1,5 @@
 {
   "name": "context-store-agent",
   "description": "agent interacting with context-store",
-  "visibility": "internal"
+  "tags": ["internal"]
 }

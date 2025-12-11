@@ -25,33 +25,32 @@ app = typer.Typer(add_completion=False)
 
 @app.command()
 def main(
-    context: str = typer.Option(
-        "internal",
-        "--context", "-c",
-        help="Visibility context: 'external' (public agents) or 'internal' (worker agents). Default: internal"
+    tags: str = typer.Option(
+        "",
+        "--tags", "-t",
+        help="Comma-separated tags to filter agents. Agents must have ALL specified tags. Empty = all agents."
     )
 ):
     """
-    List all available agent blueprints filtered by visibility context.
+    List all available agent blueprints filtered by tags.
 
     Displays: agent name, description
 
-    When called from within the orchestrator framework, defaults to 'internal'
-    context which shows worker/specialist agents (internal + all visibility).
-
     Examples:
-        ao-list-blueprints                    # List internal agents (default)
-        ao-list-blueprints --context external # List public agents
-        ao-list-blueprints -c internal        # List internal agents
+        ao-list-blueprints                    # List all agents (no filter)
+        ao-list-blueprints --tags internal    # List agents with 'internal' tag
+        ao-list-blueprints --tags external    # List agents with 'external' tag
+        ao-list-blueprints -t internal,jira   # List agents with BOTH tags
     """
     try:
-        agents = list_agents_api(context=context)
+        agents = list_agents_api(tags=tags if tags else None)
     except AgentAPIError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     if not agents:
-        print(f"No agent blueprints found for context '{context}'")
+        filter_msg = f"with tags '{tags}'" if tags else ""
+        print(f"No agent blueprints found {filter_msg}".strip())
         return
 
     # Display agents

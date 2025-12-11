@@ -40,12 +40,11 @@ interface CreateJobResponse {
 
 export const chatService = {
   /**
-   * List available agent blueprints for end users (external context).
-   * Returns only public + all visibility agents that are active.
+   * List available agent blueprints.
+   * Returns all active agents without filtering.
    */
   async listBlueprints(): Promise<BlueprintListResponse> {
-    // Use external context to filter to public + all visibility agents
-    const response = await agentOrchestratorApi.get<Agent[]>('/agents?context=external');
+    const response = await agentOrchestratorApi.get<Agent[]>('/agents');
     const agents = response.data;
     return {
       total: agents.length,

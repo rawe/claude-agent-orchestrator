@@ -1,5 +1,5 @@
 {
   "name": "bug-evaluator",
   "description": "Used to read the next bug-report and evaluates it. Providing a evaluation document in the end.",
-  "visibility": "public"
+  "tags": ["external"]
 }

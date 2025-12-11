@@ -27,8 +27,8 @@ HEADER_AGENT_SESSION_NAME = "X-Agent-Session-Name"
 # Environment variable for parent session (in stdio mode)
 ENV_AGENT_SESSION_NAME = "AGENT_SESSION_NAME"
 
-# HTTP Header for visibility context (in HTTP mode)
-HEADER_AGENT_VISIBILITY_CONTEXT = "X-Agent-Visibility-Context"
+# HTTP Header for tag filtering (in HTTP mode)
+HEADER_AGENT_TAGS = "X-Agent-Tags"
 
-# Environment variable for visibility context (in stdio mode)
-ENV_AGENT_VISIBILITY_CONTEXT = "AGENT_VISIBILITY_CONTEXT"
+# Environment variable for tag filtering (in stdio mode)
+ENV_AGENT_TAGS = "AGENT_TAGS"

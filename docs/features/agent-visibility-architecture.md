@@ -1,6 +1,17 @@
 # Agent Visibility Architecture
 
-> **Status: IMPLEMENTED**
+> **Status: DEPRECATED**
+>
+> This document describes the previous visibility system that has been replaced by the more flexible **Tags System**.
+> See [Agent Management](./agent-management.md) for the current architecture.
+>
+> **Migration:** `visibility: "public"` → `tags: ["external"]`, `visibility: "internal"` → `tags: ["internal"]`, `visibility: "all"` → `tags: ["external", "internal"]`
+
+---
+
+**HISTORICAL DOCUMENTATION BELOW**
+
+---
 
 This document describes the two-level agent visibility system that controls which agents are discoverable in different contexts (external clients vs. internal framework).
 

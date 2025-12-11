@@ -8,26 +8,35 @@ import {
   createColumnHelper,
   SortingState,
 } from '@tanstack/react-table';
-import { Agent, AgentVisibility } from '@/types';
+import { Agent } from '@/types';
 import { Badge, StatusBadge, EmptyState, SkeletonLine } from '@/components/common';
 import { truncate } from '@/utils/formatters';
-import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Globe, Lock, Layers } from 'lucide-react';
+import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag } from 'lucide-react';
 
-// Visibility badge component
-function VisibilityBadge({ visibility }: { visibility: AgentVisibility }) {
-  const config = {
-    public: { label: 'Public', icon: Globe, className: 'bg-blue-100 text-blue-700' },
-    internal: { label: 'Internal', icon: Lock, className: 'bg-orange-100 text-orange-700' },
-    all: { label: 'All', icon: Layers, className: 'bg-green-100 text-green-700' },
-  };
+// Tags display component
+function TagsDisplay({ tags }: { tags: string[] }) {
+  if (!tags || tags.length === 0) {
+    return <span className="text-gray-400 text-xs italic">No tags</span>;
+  }
 
-  const { label, icon: Icon, className } = config[visibility] || config.all;
+  const displayTags = tags.slice(0, 3);
+  const remaining = tags.length - 3;
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${className}`}>
-      <Icon className="w-3 h-3" />
-      {label}
-    </span>
+    <div className="flex flex-wrap gap-1">
+      {displayTags.map((tag) => (
+        <span
+          key={tag}
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700"
+        >
+          <Tag className="w-2.5 h-2.5" />
+          {tag}
+        </span>
+      ))}
+      {remaining > 0 && (
+        <span className="px-2 py-0.5 text-xs text-gray-500">+{remaining}</span>
+      )}
+    </div>
   );
 }
 
@@ -114,9 +123,9 @@ export function AgentTable({
           );
         },
       }),
-      columnHelper.accessor('visibility', {
-        header: 'Visibility',
-        cell: (info) => <VisibilityBadge visibility={info.getValue()} />,
+      columnHelper.accessor('tags', {
+        header: 'Tags',
+        cell: (info) => <TagsDisplay tags={info.getValue()} />,
       }),
       columnHelper.accessor('status', {
         header: 'Status',

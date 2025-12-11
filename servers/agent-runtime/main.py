@@ -385,19 +385,26 @@ def health_check():
 
 @app.get("/agents", response_model=list[Agent], response_model_exclude_none=True)
 def list_agents(
-    context: Optional[str] = Query(
+    tags: Optional[str] = Query(
         default=None,
-        description="Filter by visibility context: 'external' (public+all), 'internal' (internal+all), or None (all agents for management)"
+        description="Comma-separated tags. Returns agents that have ALL specified tags (AND logic). No tags = all agents."
     )
 ):
-    """List all agents, optionally filtered by visibility context."""
+    """
+    List all agents, optionally filtered by tags.
+
+    - No tags parameter: Returns all agents (for management UI)
+    - tags=foo: Returns agents with tag "foo"
+    - tags=foo,bar: Returns agents with BOTH "foo" AND "bar" tags
+    """
     agents = agent_storage.list_agents()
 
-    if context == "external":
-        agents = [a for a in agents if a.visibility in ("public", "all") and a.status == "active"]
-    elif context == "internal":
-        agents = [a for a in agents if a.visibility in ("internal", "all") and a.status == "active"]
-    # If context is None, return all agents (for management UI)
+    if tags:
+        # Parse comma-separated tags into a set
+        required_tags = set(tag.strip() for tag in tags.split(",") if tag.strip())
+        if required_tags:
+            # Filter: agent must have ALL required tags (subset check)
+            agents = [a for a in agents if required_tags.issubset(set(a.tags))]
 
     return agents
 

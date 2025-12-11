@@ -5,7 +5,7 @@
       "url": "http://localhost:9500/mcp",
       "headers": {
         "X-Agent-Session-Name": "${AGENT_SESSION_NAME}",
-        "X-Agent-Visibility-Context": "internal"
+        "X-Agent-Tags": "internal"
       }
     }
   }

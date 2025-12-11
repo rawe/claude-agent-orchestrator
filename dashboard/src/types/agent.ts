@@ -1,5 +1,4 @@
 export type AgentStatus = 'active' | 'inactive';
-export type AgentVisibility = 'public' | 'internal' | 'all';
 
 export interface MCPServerStdio {
   type?: 'stdio';
@@ -22,7 +21,7 @@ export interface Agent {
   system_prompt: string | null;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[] | null;
-  visibility: AgentVisibility;
+  tags: string[];
   status: AgentStatus;
   created_at: string;
   modified_at: string;
@@ -34,7 +33,7 @@ export interface AgentCreate {
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
-  visibility?: AgentVisibility;
+  tags?: string[];
 }
 
 export interface AgentUpdate {
@@ -42,15 +41,8 @@ export interface AgentUpdate {
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
-  visibility?: AgentVisibility;
+  tags?: string[];
 }
-
-// Visibility options for the UI
-export const VISIBILITY_OPTIONS = [
-  { value: 'all', label: 'All Contexts', description: 'Visible to both external clients and internal agents (default)' },
-  { value: 'public', label: 'External Only', description: 'Entry-point agent for Claude Desktop, MCP clients, users' },
-  { value: 'internal', label: 'Internal Only', description: 'Worker agent for the orchestrator framework' },
-] as const;
 
 // Predefined skills available for selection
 // Set disabled: true for skills not yet implemented

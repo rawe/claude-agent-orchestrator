@@ -96,6 +96,74 @@ Claude Desktop requires `AGENT_ORCHESTRATOR_PROJECT_DIR` and `PATH`:
 - Claude Desktop doesn't inherit shell PATH
 - Restart Claude Desktop after configuration changes
 
+## HTTP Mode Headers
+
+When using the MCP server in HTTP mode, these headers control agent behavior:
+
+| Header | Purpose | Example |
+|--------|---------|---------|
+| `X-Agent-Session-Name` | Identifies the calling agent for callbacks | `orchestrator-session` |
+| `X-Agent-Tags` | Filters which agent blueprints are visible | `internal,atlassian` |
+
+### X-Agent-Session-Name (Callbacks)
+
+Required for the callback feature. When an orchestrator spawns child agents with `callback: true`, the child agent sends results back to this session. See [Agent Callback Architecture](../../../docs/features/agent-callback-architecture.md) for the full callback mechanism.
+
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator-http": {
+      "type": "http",
+      "url": "http://localhost:9500/mcp",
+      "headers": {
+        "X-Agent-Session-Name": "${AGENT_SESSION_NAME}"
+      }
+    }
+  }
+}
+```
+
+The `${AGENT_SESSION_NAME}` placeholder is replaced at runtime by the launcher with the current session's name.
+
+### X-Agent-Tags (Blueprint Filtering)
+
+Restricts which agent blueprints are returned by `list_agent_blueprints`. Uses AND logic - agents must have ALL specified tags.
+
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator-http": {
+      "type": "http",
+      "url": "http://localhost:9500/mcp",
+      "headers": {
+        "X-Agent-Session-Name": "${AGENT_SESSION_NAME}",
+        "X-Agent-Tags": "internal,atlassian"
+      }
+    }
+  }
+}
+```
+
+**Note:** The `X-Agent-Tags` value must be hardcoded (e.g., `"internal,atlassian"`). Unlike `X-Agent-Session-Name`, there is no runtime placeholder substitution for tags.
+
+**Filtering Examples:**
+
+| Header Value | Returns Agents With |
+|--------------|---------------------|
+| `internal` | Tag `internal` |
+| `internal,research` | Tags `internal` AND `research` |
+| `internal,atlassian` | Tags `internal` AND `atlassian` |
+| *(not set)* | All active agents |
+
+### stdio Mode Equivalents
+
+For stdio mode, use environment variables instead of headers:
+
+| HTTP Header | Environment Variable |
+|-------------|---------------------|
+| `X-Agent-Session-Name` | `AGENT_SESSION_NAME` |
+| `X-Agent-Tags` | `AGENT_TAGS` |
+
 ## Per-Tool Project Directory Override
 
 All MCP tools accept an optional `project_dir` parameter to override the configured project directory for a single call:

@@ -1,5 +1,5 @@
 {
   "name": "simple-agent",
   "description": "a simple agent",
-  "visibility": "internal"
+  "tags": ["internal"]
 }

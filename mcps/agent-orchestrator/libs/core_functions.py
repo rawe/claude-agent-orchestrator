@@ -15,8 +15,8 @@ from constants import (
     CHARACTER_LIMIT,
     ENV_AGENT_SESSION_NAME,
     HEADER_AGENT_SESSION_NAME,
-    ENV_AGENT_VISIBILITY_CONTEXT,
-    HEADER_AGENT_VISIBILITY_CONTEXT,
+    ENV_AGENT_TAGS,
+    HEADER_AGENT_TAGS,
 )
 from logger import logger
 from types_models import ServerConfig
@@ -46,24 +46,24 @@ def get_parent_session_name(http_headers: Optional[dict] = None) -> Optional[str
     return os.environ.get(ENV_AGENT_SESSION_NAME)
 
 
-def get_visibility_context(http_headers: Optional[dict] = None) -> Optional[str]:
+def get_filter_tags(http_headers: Optional[dict] = None) -> Optional[str]:
     """
-    Get visibility context from environment or HTTP headers.
+    Get filter tags from environment or HTTP headers.
 
-    - stdio mode: reads from AGENT_VISIBILITY_CONTEXT env var
-    - HTTP mode: reads from X-Agent-Visibility-Context header
+    - stdio mode: reads from AGENT_TAGS env var
+    - HTTP mode: reads from X-Agent-Tags header
 
-    Returns: "external", "internal", or None (defaults to "external" if not set)
+    Returns: Comma-separated tag string or None if not set.
     """
     # Try HTTP header first (if provided)
     if http_headers:
-        header_key_lower = HEADER_AGENT_VISIBILITY_CONTEXT.lower()
-        context = http_headers.get(header_key_lower)
-        if context:
-            return context
+        header_key_lower = HEADER_AGENT_TAGS.lower()
+        tags = http_headers.get(header_key_lower)
+        if tags:
+            return tags
 
-    # Fall back to environment variable (default to "external" for external clients)
-    return os.environ.get(ENV_AGENT_VISIBILITY_CONTEXT, "external")
+    # Fall back to environment variable
+    return os.environ.get(ENV_AGENT_TAGS)
 
 
 def truncate_response(text: str) -> tuple[str, bool]:
@@ -80,17 +80,17 @@ async def list_agent_blueprints_impl(
     response_format: Literal["markdown", "json"] = "markdown",
     http_headers: Optional[dict] = None,
 ) -> str:
-    """List all available agent blueprints filtered by visibility context."""
+    """List all available agent blueprints filtered by tags."""
     logger.info("list_agent_blueprints called", {"response_format": response_format})
 
     try:
-        # Get visibility context from headers/env
-        context = get_visibility_context(http_headers)
+        # Get filter tags from headers/env
+        tags = get_filter_tags(http_headers)
 
         client = get_api_client(config)
-        agents = await client.list_agents(context=context)
+        agents = await client.list_agents(tags=tags)
 
-        # API already filters by context and status, but double-check for active only
+        # Filter to active agents only
         active_agents = [a for a in agents if a.get("status") == "active"]
 
         if response_format == "json":

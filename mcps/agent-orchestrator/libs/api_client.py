@@ -172,11 +172,11 @@ class APIClient:
     # Agents API
     # -------------------------------------------------------------------------
 
-    async def list_agents(self, context: Optional[str] = None) -> List[Dict[str, Any]]:
-        """List agent blueprints, optionally filtered by visibility context."""
+    async def list_agents(self, tags: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List agent blueprints, optionally filtered by tags."""
         path = "/agents"
-        if context:
-            path = f"/agents?context={context}"
+        if tags:
+            path = f"/agents?tags={tags}"
         return await self._request("GET", path)
 
     async def get_agent(self, agent_name: str) -> Optional[Dict[str, Any]]:
