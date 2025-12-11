@@ -40,7 +40,8 @@ interface CreateJobResponse {
 
 export const chatService = {
   /**
-   * List all available agent blueprints from agent-runtime
+   * List available agent blueprints.
+   * Returns all active agents without filtering.
    */
   async listBlueprints(): Promise<BlueprintListResponse> {
     const response = await agentOrchestratorApi.get<Agent[]>('/agents');

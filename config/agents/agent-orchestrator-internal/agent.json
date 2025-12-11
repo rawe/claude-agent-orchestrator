@@ -1,0 +1,9 @@
+{
+  "name": "agent-orchestrator-internal",
+  "description": "Internal facing agent able to spawn other internal agents",
+  "tags": [
+    "internal",
+    "orchestration",
+    "research"
+  ]
+}

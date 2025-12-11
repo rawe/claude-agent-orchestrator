@@ -48,6 +48,7 @@ export function AgentManager() {
           system_prompt: data.system_prompt,
           mcp_servers: data.mcp_servers,
           skills: data.skills,
+          tags: data.tags,
         });
         showSuccess('Agent updated successfully');
       } else {

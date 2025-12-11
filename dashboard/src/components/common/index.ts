@@ -7,3 +7,4 @@ export { CopyButton } from './CopyButton';
 export { JsonViewer } from './JsonViewer';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
+export { TagSelector } from './TagSelector';

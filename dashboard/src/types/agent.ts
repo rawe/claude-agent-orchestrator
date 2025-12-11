@@ -21,6 +21,7 @@ export interface Agent {
   system_prompt: string | null;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[] | null;
+  tags: string[];
   status: AgentStatus;
   created_at: string;
   modified_at: string;
@@ -32,6 +33,7 @@ export interface AgentCreate {
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
+  tags?: string[];
 }
 
 export interface AgentUpdate {
@@ -39,6 +41,7 @@ export interface AgentUpdate {
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
+  tags?: string[];
 }
 
 // Predefined skills available for selection

@@ -54,17 +54,24 @@ def _request(method: str, path: str, data: Optional[dict] = None) -> dict | list
         )
 
 
-def list_agents_api() -> list[dict]:
+def list_agents_api(tags: Optional[str] = None) -> list[dict]:
     """
-    List all active agents from API.
+    List agents from API filtered by tags.
+
+    Args:
+        tags: Comma-separated tags. Returns agents with ALL specified tags (AND logic).
+              None or empty string returns all agents.
 
     Returns:
-        List of active agent dictionaries (excludes inactive agents)
+        List of active agent dictionaries matching the tag filter
 
     Raises:
         AgentAPIError: If API is unavailable or returns error
     """
-    result = _request("GET", "/agents")
+    path = "/agents"
+    if tags:
+        path = f"/agents?tags={tags}"
+    result = _request("GET", path)
     if not result:
         return []
     # Filter to active agents only

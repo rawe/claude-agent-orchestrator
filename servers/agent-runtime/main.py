@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -383,9 +384,29 @@ def health_check():
 
 
 @app.get("/agents", response_model=list[Agent], response_model_exclude_none=True)
-def list_agents():
-    """List all agents."""
-    return agent_storage.list_agents()
+def list_agents(
+    tags: Optional[str] = Query(
+        default=None,
+        description="Comma-separated tags. Returns agents that have ALL specified tags (AND logic). No tags = all agents."
+    )
+):
+    """
+    List all agents, optionally filtered by tags.
+
+    - No tags parameter: Returns all agents (for management UI)
+    - tags=foo: Returns agents with tag "foo"
+    - tags=foo,bar: Returns agents with BOTH "foo" AND "bar" tags
+    """
+    agents = agent_storage.list_agents()
+
+    if tags:
+        # Parse comma-separated tags into a set
+        required_tags = set(tag.strip() for tag in tags.split(",") if tag.strip())
+        if required_tags:
+            # Filter: agent must have ALL required tags (subset check)
+            agents = [a for a in agents if required_tags.issubset(set(a.tags))]
+
+    return agents
 
 
 @app.get("/agents/{name}", response_model=Agent, response_model_exclude_none=True)

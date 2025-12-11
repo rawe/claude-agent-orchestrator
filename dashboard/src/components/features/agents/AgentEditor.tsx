@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { Modal, Button, Badge, Spinner } from '@/components/common';
+import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { Agent, AgentCreate, MCPServerConfig, SKILLS } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
-import { Eye, Code, X, AlertCircle } from 'lucide-react';
+import { Eye, Code, X, AlertCircle, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -22,6 +22,7 @@ interface FormData {
   system_prompt: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
+  tags: string[];
 }
 
 export function AgentEditor({
@@ -53,6 +54,7 @@ export function AgentEditor({
       system_prompt: '',
       mcp_servers: null,
       skills: [],
+      tags: [],
     },
   });
 
@@ -70,6 +72,7 @@ export function AgentEditor({
         system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
+        tags: agent.tags || [],
       });
     } else {
       reset({
@@ -78,6 +81,7 @@ export function AgentEditor({
         system_prompt: '',
         mcp_servers: null,
         skills: [],
+        tags: [],
       });
     }
     setNameAvailable(null);
@@ -126,7 +130,7 @@ export function AgentEditor({
     setSaving(true);
     try {
       // Convert form data to AgentCreate/AgentUpdate format
-      // Always send mcp_servers and skills so clearing them works on update
+      // Always send mcp_servers, skills, and tags so clearing them works on update
       // Empty object {} for mcp_servers means "clear/delete"
       const createData: AgentCreate = {
         name: data.name,
@@ -134,6 +138,7 @@ export function AgentEditor({
         system_prompt: data.system_prompt || undefined,
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
+        tags: data.tags,                       // empty array clears tags
       };
       await onSave(createData);
       onClose();
@@ -210,6 +215,34 @@ export function AgentEditor({
               {errors.description && (
                 <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>
               )}
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="label">Tags</label>
+              <Controller
+                name="tags"
+                control={control}
+                render={({ field }) => (
+                  <TagSelector
+                    value={field.value || []}
+                    onChange={field.onChange}
+                    placeholder="Add tags (e.g., internal, external, research)..."
+                  />
+                )}
+              />
+              <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p>Tags control which consumers can discover this agent:</p>
+                  <ul className="mt-1 ml-4 list-disc space-y-0.5">
+                    <li><strong>external:</strong> Entry-point for Claude Desktop, users</li>
+                    <li><strong>internal:</strong> Worker agent for orchestrator framework</li>
+                    <li>Add both tags for agents usable in either context</li>
+                    <li>Custom tags can be used for project-specific filtering</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 

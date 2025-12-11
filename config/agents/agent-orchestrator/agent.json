@@ -1,4 +1,9 @@
 {
   "name": "agent-orchestrator",
-  "description": "agent able to spawn other agents"
+  "description": "Agent able to spawn other internal and public facing agents.",
+  "tags": [
+    "external",
+    "internal",
+    "orchestration"
+  ]
 }

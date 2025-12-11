@@ -1,4 +1,10 @@
 {
   "name": "jira-researcher",
-  "description": "Conducts iterative Jira research to answer questions using JQL queries, generates concise answers with documented JSON sources. Should be run in async/background mode as it could be a long-running research task. Input: working_folder (optional, auto-generates research-results/[yyyy-mm-dd]-[topic] if not provided), question (research query)"
+  "description": "Conducts iterative Jira research to answer questions using JQL queries, generates concise answers with documented JSON sources. Should be run in async/background mode as it could be a long-running research task. Input: working_folder (optional, auto-generates research-results/[yyyy-mm-dd]-[topic] if not provided), question (research query)",
+  "tags": [
+    "internal",
+    "research",
+    "atlassian",
+    "jira"
+  ]
 }

@@ -3,10 +3,16 @@ import type { Agent, AgentCreate, AgentUpdate, AgentStatus } from '@/types';
 
 export const agentService = {
   /**
-   * Get all agents
+   * Get all agents, optionally filtered by tags
+   * @param tags - Optional comma-separated tags filter:
+   *   - undefined: Returns all agents (for management UI)
+   *   - 'external': Returns agents with 'external' tag (for end users)
+   *   - 'internal': Returns agents with 'internal' tag (for orchestrator)
+   *   - 'foo,bar': Returns agents with BOTH 'foo' AND 'bar' tags
    */
-  async getAgents(): Promise<Agent[]> {
-    const response = await agentOrchestratorApi.get<Agent[]>('/agents');
+  async getAgents(tags?: string): Promise<Agent[]> {
+    const params = tags ? `?tags=${encodeURIComponent(tags)}` : '';
+    const response = await agentOrchestratorApi.get<Agent[]>(`/agents${params}`);
     return response.data;
   },
 

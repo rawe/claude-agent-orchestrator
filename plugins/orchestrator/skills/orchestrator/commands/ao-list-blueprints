@@ -24,23 +24,33 @@ app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def main():
+def main(
+    tags: str = typer.Option(
+        "",
+        "--tags", "-t",
+        help="Comma-separated tags to filter agents. Agents must have ALL specified tags. Empty = all agents."
+    )
+):
     """
-    List all available agent blueprints.
+    List all available agent blueprints filtered by tags.
 
-    Displays: agent name, description, status
+    Displays: agent name, description
 
     Examples:
-        ao-list-blueprints
+        ao-list-blueprints                    # List all agents (no filter)
+        ao-list-blueprints --tags internal    # List agents with 'internal' tag
+        ao-list-blueprints --tags external    # List agents with 'external' tag
+        ao-list-blueprints -t internal,jira   # List agents with BOTH tags
     """
     try:
-        agents = list_agents_api()
+        agents = list_agents_api(tags=tags if tags else None)
     except AgentAPIError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     if not agents:
-        print("No agent blueprints found")
+        filter_msg = f"with tags '{tags}'" if tags else ""
+        print(f"No agent blueprints found {filter_msg}".strip())
         return
 
     # Display agents

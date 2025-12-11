@@ -68,6 +68,10 @@ async def list_agent_blueprints(
     Agent blueprints are reusable configurations (not running instances) that provide
     specialized capabilities (e.g., system architecture, code review, documentation writing).
 
+    The list is filtered by visibility context:
+    - External clients (Claude Desktop, end users): See public + all visibility agents
+    - Internal agents (orchestrator framework): See internal + all visibility agents
+
     Returns:
       For JSON format: Structured data with total count and agent details
       For Markdown format: Human-readable formatted list with agent names and descriptions
@@ -77,7 +81,9 @@ async def list_agent_blueprints(
       - Use when: "Show me the agent blueprints" -> List all agent blueprint capabilities
       - Don't use when: You want to see running sessions (use list_agent_sessions instead)
     """
-    return await list_agent_blueprints_impl(config, response_format)
+    # Get HTTP headers for visibility context filtering
+    http_headers = get_http_headers()
+    return await list_agent_blueprints_impl(config, response_format, http_headers)
 
 
 @mcp.tool()
