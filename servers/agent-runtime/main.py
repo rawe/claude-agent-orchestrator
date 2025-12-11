@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -383,9 +384,22 @@ def health_check():
 
 
 @app.get("/agents", response_model=list[Agent], response_model_exclude_none=True)
-def list_agents():
-    """List all agents."""
-    return agent_storage.list_agents()
+def list_agents(
+    context: Optional[str] = Query(
+        default=None,
+        description="Filter by visibility context: 'external' (public+all), 'internal' (internal+all), or None (all agents for management)"
+    )
+):
+    """List all agents, optionally filtered by visibility context."""
+    agents = agent_storage.list_agents()
+
+    if context == "external":
+        agents = [a for a in agents if a.visibility in ("public", "all") and a.status == "active"]
+    elif context == "internal":
+        agents = [a for a in agents if a.visibility in ("internal", "all") and a.status == "active"]
+    # If context is None, return all agents (for management UI)
+
+    return agents
 
 
 @app.get("/agents/{name}", response_model=Agent, response_model_exclude_none=True)

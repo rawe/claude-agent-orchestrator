@@ -79,6 +79,7 @@ class AgentCreate(AgentBase):
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
+    visibility: Optional[Literal["public", "internal", "all"]] = None
 
 
 class AgentUpdate(BaseModel):
@@ -88,6 +89,7 @@ class AgentUpdate(BaseModel):
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
+    visibility: Optional[Literal["public", "internal", "all"]] = None
 
 
 class Agent(AgentBase):
@@ -96,6 +98,7 @@ class Agent(AgentBase):
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
+    visibility: Literal["public", "internal", "all"] = "all"
     status: Literal["active", "inactive"] = "active"
     created_at: str
     modified_at: str

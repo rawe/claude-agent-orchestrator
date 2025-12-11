@@ -1,12 +1,19 @@
 import { agentOrchestratorApi } from './api';
 import type { Agent, AgentCreate, AgentUpdate, AgentStatus } from '@/types';
 
+export type VisibilityContext = 'external' | 'internal';
+
 export const agentService = {
   /**
-   * Get all agents
+   * Get all agents, optionally filtered by visibility context
+   * @param context - Optional visibility context filter:
+   *   - undefined: Returns all agents (for management UI)
+   *   - 'external': Returns public + all visibility agents (for end users)
+   *   - 'internal': Returns internal + all visibility agents (for orchestrator)
    */
-  async getAgents(): Promise<Agent[]> {
-    const response = await agentOrchestratorApi.get<Agent[]>('/agents');
+  async getAgents(context?: VisibilityContext): Promise<Agent[]> {
+    const params = context ? `?context=${context}` : '';
+    const response = await agentOrchestratorApi.get<Agent[]>(`/agents${params}`);
     return response.data;
   },
 

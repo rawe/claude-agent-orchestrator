@@ -22,7 +22,8 @@ function DropdownItem<T>({
 }) {
   const [showPopover, setShowPopover] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
-  const [popoverSide, setPopoverSide] = useState<'left' | 'right'>('left');
+  // Track popover side for potential future arrow/pointer indicator
+  const [_popoverSide, setPopoverSide] = useState<'left' | 'right'>('left');
   const itemRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

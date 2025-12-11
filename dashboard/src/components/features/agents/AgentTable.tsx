@@ -8,10 +8,28 @@ import {
   createColumnHelper,
   SortingState,
 } from '@tanstack/react-table';
-import { Agent } from '@/types';
+import { Agent, AgentVisibility } from '@/types';
 import { Badge, StatusBadge, EmptyState, SkeletonLine } from '@/components/common';
 import { truncate } from '@/utils/formatters';
-import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Globe, Lock, Layers } from 'lucide-react';
+
+// Visibility badge component
+function VisibilityBadge({ visibility }: { visibility: AgentVisibility }) {
+  const config = {
+    public: { label: 'Public', icon: Globe, className: 'bg-blue-100 text-blue-700' },
+    internal: { label: 'Internal', icon: Lock, className: 'bg-orange-100 text-orange-700' },
+    all: { label: 'All', icon: Layers, className: 'bg-green-100 text-green-700' },
+  };
+
+  const { label, icon: Icon, className } = config[visibility] || config.all;
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${className}`}>
+      <Icon className="w-3 h-3" />
+      {label}
+    </span>
+  );
+}
 
 interface AgentTableProps {
   agents: Agent[];
@@ -95,6 +113,10 @@ export function AgentTable({
             </div>
           );
         },
+      }),
+      columnHelper.accessor('visibility', {
+        header: 'Visibility',
+        cell: (info) => <VisibilityBadge visibility={info.getValue()} />,
       }),
       columnHelper.accessor('status', {
         header: 'Status',

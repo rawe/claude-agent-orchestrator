@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
-import { Agent, AgentCreate, MCPServerConfig, SKILLS } from '@/types';
+import { Agent, AgentCreate, AgentVisibility, MCPServerConfig, SKILLS, VISIBILITY_OPTIONS } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
-import { Eye, Code, X, AlertCircle } from 'lucide-react';
+import { Eye, Code, X, AlertCircle, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -22,6 +22,7 @@ interface FormData {
   system_prompt: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
+  visibility: AgentVisibility;
 }
 
 export function AgentEditor({
@@ -53,6 +54,7 @@ export function AgentEditor({
       system_prompt: '',
       mcp_servers: null,
       skills: [],
+      visibility: 'all',
     },
   });
 
@@ -70,6 +72,7 @@ export function AgentEditor({
         system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
+        visibility: agent.visibility || 'all',
       });
     } else {
       reset({
@@ -78,6 +81,7 @@ export function AgentEditor({
         system_prompt: '',
         mcp_servers: null,
         skills: [],
+        visibility: 'all',
       });
     }
     setNameAvailable(null);
@@ -134,6 +138,7 @@ export function AgentEditor({
         system_prompt: data.system_prompt || undefined,
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
+        visibility: data.visibility,
       };
       await onSave(createData);
       onClose();
@@ -210,6 +215,32 @@ export function AgentEditor({
               {errors.description && (
                 <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>
               )}
+            </div>
+
+            {/* Visibility */}
+            <div>
+              <label className="label">Visibility</label>
+              <select
+                {...register('visibility')}
+                className="input"
+              >
+                {VISIBILITY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p>Controls where this agent can be discovered:</p>
+                  <ul className="mt-1 ml-4 list-disc space-y-0.5">
+                    <li><strong>All Contexts:</strong> Visible everywhere (default)</li>
+                    <li><strong>External Only:</strong> Entry-point for Claude Desktop, users</li>
+                    <li><strong>Internal Only:</strong> Worker agent for orchestrator framework</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 

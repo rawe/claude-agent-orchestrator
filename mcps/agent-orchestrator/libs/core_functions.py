@@ -15,6 +15,8 @@ from constants import (
     CHARACTER_LIMIT,
     ENV_AGENT_SESSION_NAME,
     HEADER_AGENT_SESSION_NAME,
+    ENV_AGENT_VISIBILITY_CONTEXT,
+    HEADER_AGENT_VISIBILITY_CONTEXT,
 )
 from logger import logger
 from types_models import ServerConfig
@@ -44,6 +46,26 @@ def get_parent_session_name(http_headers: Optional[dict] = None) -> Optional[str
     return os.environ.get(ENV_AGENT_SESSION_NAME)
 
 
+def get_visibility_context(http_headers: Optional[dict] = None) -> Optional[str]:
+    """
+    Get visibility context from environment or HTTP headers.
+
+    - stdio mode: reads from AGENT_VISIBILITY_CONTEXT env var
+    - HTTP mode: reads from X-Agent-Visibility-Context header
+
+    Returns: "external", "internal", or None (defaults to "external" if not set)
+    """
+    # Try HTTP header first (if provided)
+    if http_headers:
+        header_key_lower = HEADER_AGENT_VISIBILITY_CONTEXT.lower()
+        context = http_headers.get(header_key_lower)
+        if context:
+            return context
+
+    # Fall back to environment variable (default to "external" for external clients)
+    return os.environ.get(ENV_AGENT_VISIBILITY_CONTEXT, "external")
+
+
 def truncate_response(text: str) -> tuple[str, bool]:
     """Truncate response if it exceeds character limit."""
     if len(text) <= CHARACTER_LIMIT:
@@ -56,15 +78,19 @@ def truncate_response(text: str) -> tuple[str, bool]:
 async def list_agent_blueprints_impl(
     config: ServerConfig,
     response_format: Literal["markdown", "json"] = "markdown",
+    http_headers: Optional[dict] = None,
 ) -> str:
-    """List all available agent blueprints."""
+    """List all available agent blueprints filtered by visibility context."""
     logger.info("list_agent_blueprints called", {"response_format": response_format})
 
     try:
-        client = get_api_client(config)
-        agents = await client.list_agents()
+        # Get visibility context from headers/env
+        context = get_visibility_context(http_headers)
 
-        # Filter to active agents only
+        client = get_api_client(config)
+        agents = await client.list_agents(context=context)
+
+        # API already filters by context and status, but double-check for active only
         active_agents = [a for a in agents if a.get("status") == "active"]
 
         if response_format == "json":

@@ -1,6 +1,6 @@
 # Agent Visibility Architecture
 
-> **Status: DRAFT - Not yet implemented**
+> **Status: IMPLEMENTED**
 
 This document describes the two-level agent visibility system that controls which agents are discoverable in different contexts (external clients vs. internal framework).
 

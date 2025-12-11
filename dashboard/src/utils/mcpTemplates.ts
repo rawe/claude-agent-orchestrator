@@ -26,6 +26,7 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
     url: 'http://localhost:9500/mcp',
     headers: {
       'X-Agent-Session-Name': '${AGENT_SESSION_NAME}',
+      'X-Agent-Visibility-Context': '${AGENT_VISIBILITY_CONTEXT}',
     },
   },
   'context-store-http': {

@@ -83,6 +83,9 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         # Read optional skills from agent.json
         skills = data.get("skills")
 
+        # Read visibility from agent.json (default: "all" for backward compatibility)
+        visibility = data.get("visibility", "all")
+
         # Check status via .disabled file
         status = "inactive" if (agent_dir / ".disabled").exists() else "active"
 
@@ -95,6 +98,7 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
             system_prompt=system_prompt,
             mcp_servers=mcp_servers,
             skills=skills,
+            visibility=visibility,
             status=status,
             created_at=created_at,
             modified_at=modified_at,
@@ -150,6 +154,8 @@ def create_agent(data: AgentCreate) -> Agent:
     agent_data = {"name": data.name, "description": data.description}
     if data.skills:
         agent_data["skills"] = data.skills
+    if data.visibility:
+        agent_data["visibility"] = data.visibility
 
     with open(agent_dir / "agent.json", "w", encoding="utf-8") as f:
         json.dump(agent_data, f, indent=2)
@@ -197,6 +203,9 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
             agent_data["skills"] = updates.skills
         else:
             agent_data.pop("skills", None)
+
+    if updates.visibility is not None:
+        agent_data["visibility"] = updates.visibility
 
     # Write updated agent.json
     with open(agent_json_path, "w", encoding="utf-8") as f:

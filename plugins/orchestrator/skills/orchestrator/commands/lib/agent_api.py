@@ -54,20 +54,25 @@ def _request(method: str, path: str, data: Optional[dict] = None) -> dict | list
         )
 
 
-def list_agents_api() -> list[dict]:
+def list_agents_api(context: str = "internal") -> list[dict]:
     """
-    List all active agents from API.
+    List agents from API filtered by visibility context.
+
+    Args:
+        context: Visibility context - "external" or "internal" (default: "internal")
+                 - "external": Returns public + all visibility agents (for Claude Desktop, users)
+                 - "internal": Returns internal + all visibility agents (for orchestrator framework)
 
     Returns:
-        List of active agent dictionaries (excludes inactive agents)
+        List of active agent dictionaries matching the visibility context
 
     Raises:
         AgentAPIError: If API is unavailable or returns error
     """
-    result = _request("GET", "/agents")
+    result = _request("GET", f"/agents?context={context}")
     if not result:
         return []
-    # Filter to active agents only
+    # API already filters by context and status, but double-check for active only
     return [a for a in result if a.get("status") == "active"]
 
 

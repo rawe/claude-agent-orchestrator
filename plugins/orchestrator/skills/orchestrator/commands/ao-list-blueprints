@@ -24,23 +24,34 @@ app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def main():
+def main(
+    context: str = typer.Option(
+        "internal",
+        "--context", "-c",
+        help="Visibility context: 'external' (public agents) or 'internal' (worker agents). Default: internal"
+    )
+):
     """
-    List all available agent blueprints.
+    List all available agent blueprints filtered by visibility context.
 
-    Displays: agent name, description, status
+    Displays: agent name, description
+
+    When called from within the orchestrator framework, defaults to 'internal'
+    context which shows worker/specialist agents (internal + all visibility).
 
     Examples:
-        ao-list-blueprints
+        ao-list-blueprints                    # List internal agents (default)
+        ao-list-blueprints --context external # List public agents
+        ao-list-blueprints -c internal        # List internal agents
     """
     try:
-        agents = list_agents_api()
+        agents = list_agents_api(context=context)
     except AgentAPIError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     if not agents:
-        print("No agent blueprints found")
+        print(f"No agent blueprints found for context '{context}'")
         return
 
     # Display agents
