@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 # Import job queue and launcher registry services
 from services.job_queue import job_queue, JobCreate, Job, JobStatus
 from services.launcher_registry import launcher_registry, LauncherInfo
+from services.stop_command_queue import stop_command_queue
 from services import callback_processor
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
@@ -38,6 +39,35 @@ LAUNCHER_HEARTBEAT_TIMEOUT = int(os.getenv("LAUNCHER_HEARTBEAT_TIMEOUT", "120"))
 
 # WebSocket connections (in-memory set)
 connections: set[WebSocket] = set()
+
+
+async def update_session_status_and_broadcast(session_id: str, status: str) -> dict | None:
+    """Update session status in DB and broadcast to WebSocket clients.
+
+    Args:
+        session_id: The session ID to update
+        status: New status ('running', 'stopping', 'stopped', 'finished')
+
+    Returns:
+        Updated session dict, or None if session not found
+    """
+    update_session_status(session_id, status)
+    updated_session = get_session_by_id(session_id)
+    if not updated_session:
+        return None
+
+    message = json.dumps({"type": "session_updated", "session": updated_session})
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    if DEBUG:
+        print(f"[DEBUG] Session {session_id} status updated to '{status}', broadcasted to clients", flush=True)
+
+    return updated_session
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -207,6 +237,146 @@ async def get_session_result_endpoint(session_id: str):
         raise HTTPException(status_code=404, detail="No result found")
 
     return {"result": result}
+
+
+async def _stop_job(job: Job) -> dict:
+    """Shared logic for stopping a job.
+
+    Args:
+        job: The job to stop (must be in stoppable state: PENDING, CLAIMED, or RUNNING)
+
+    Returns:
+        Response dict with ok, job_id, session_name, status, session_id (if found)
+
+    Raises:
+        HTTPException if job cannot be stopped
+    """
+    result = {
+        "ok": True,
+        "job_id": job.job_id,
+        "session_name": job.session_name,
+    }
+
+    # Handle PENDING jobs - not yet claimed by any launcher
+    if job.status == JobStatus.PENDING:
+        # Just mark as stopped directly - no launcher to signal
+        job_queue.update_job_status(job.job_id, JobStatus.STOPPED)
+        result["status"] = "stopped"
+        result["message"] = "Job cancelled before execution"
+
+        if DEBUG:
+            print(f"[DEBUG] Pending job {job.job_id} cancelled (session={job.session_name})", flush=True)
+
+        # Update session status if exists
+        session = get_session_by_name(job.session_name)
+        if session:
+            result["session_id"] = session["session_id"]
+            await update_session_status_and_broadcast(session["session_id"], "stopped")
+
+        return result
+
+    # Handle CLAIMED or RUNNING jobs - need to signal the launcher
+    if job.status not in (JobStatus.CLAIMED, JobStatus.RUNNING):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job cannot be stopped (status: {job.status})"
+        )
+
+    if not job.launcher_id:
+        raise HTTPException(status_code=400, detail="Job not claimed by any launcher")
+
+    # Queue the stop command (wakes up the launcher's poll immediately)
+    if not stop_command_queue.add_stop(job.launcher_id, job.job_id):
+        raise HTTPException(status_code=500, detail="Failed to queue stop command")
+
+    # Update job status to STOPPING
+    job_queue.update_job_status(job.job_id, JobStatus.STOPPING)
+    result["status"] = "stopping"
+
+    if DEBUG:
+        print(f"[DEBUG] Stop requested for job {job.job_id} (session={job.session_name}, launcher={job.launcher_id})", flush=True)
+
+    # Update session status to 'stopping' and broadcast to WebSocket clients
+    session = get_session_by_name(job.session_name)
+    if session:
+        result["session_id"] = session["session_id"]
+        await update_session_status_and_broadcast(session["session_id"], "stopping")
+
+    return result
+
+
+@app.post("/sessions/{session_id}/stop")
+async def stop_session(session_id: str):
+    """Stop a running session by signaling its launcher.
+
+    Finds the active job for this session and queues a stop command.
+    The launcher will receive the stop command on its next poll and terminate the process.
+
+    This endpoint is robust and handles various states:
+    - If session is 'stopping', returns success (already stopping)
+    - If session is 'stopped' or 'finished', returns appropriate message
+    - If no active job found but session exists, updates status accordingly
+    """
+    # Get session
+    session = get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session_status = session["status"]
+    session_name = session["session_name"]
+
+    # Handle already-stopped states
+    if session_status == "stopping":
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "session_name": session_name,
+            "status": "stopping",
+            "message": "Session is already being stopped"
+        }
+
+    if session_status in ("stopped", "finished"):
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "session_name": session_name,
+            "status": session_status,
+            "message": f"Session already {session_status}"
+        }
+
+    # Find the job for this session (check by session_name)
+    job = job_queue.get_job_by_session_name(session_name)
+
+    if not job:
+        # No active job - session might have finished or never started properly
+        # Update session status to reflect reality
+        if session_status == "running":
+            await update_session_status_and_broadcast(session_id, "stopped")
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "session_name": session_name,
+            "status": "stopped",
+            "message": "No active job found - session marked as stopped"
+        }
+
+    # Check if job is in a stoppable state
+    if job.status not in (JobStatus.PENDING, JobStatus.CLAIMED, JobStatus.RUNNING):
+        # Job already completed/stopped/failed
+        if session_status == "running":
+            await update_session_status_and_broadcast(session_id, "stopped")
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "session_name": session_name,
+            "job_id": job.job_id,
+            "status": "stopped",
+            "message": f"Job already in {job.status} state - session marked as stopped"
+        }
+
+    result = await _stop_job(job)
+    result["session_id"] = session_id
+    return result
 
 
 @app.get("/sessions/{session_id}/events")
@@ -494,6 +664,12 @@ class JobFailedRequest(BaseModel):
     error: str
 
 
+class JobStoppedRequest(BaseModel):
+    """Request body for job stopped report."""
+    launcher_id: str
+    signal: str = "SIGTERM"
+
+
 @app.post("/launcher/register")
 async def register_launcher(request: LauncherRegisterRequest | None = None):
     """Register a new launcher instance.
@@ -509,6 +685,9 @@ async def register_launcher(request: LauncherRegisterRequest | None = None):
         hostname=hostname,
         project_dir=project_dir,
     )
+
+    # Register with stop command queue for immediate wake-up on stop requests
+    stop_command_queue.register_launcher(launcher.launcher_id)
 
     if DEBUG:
         print(f"[DEBUG] Registered new launcher: {launcher.launcher_id}", flush=True)
@@ -527,17 +706,19 @@ async def register_launcher(request: LauncherRegisterRequest | None = None):
 
 @app.get("/launcher/jobs")
 async def poll_for_jobs(launcher_id: str = Query(..., description="The registered launcher ID")):
-    """Long-poll for available jobs.
+    """Long-poll for available jobs or stop commands.
 
     Holds the connection open for up to LAUNCHER_POLL_TIMEOUT seconds,
-    returning immediately if a job is available.
-    Returns 204 No Content if no jobs available after timeout.
+    returning immediately if a job or stop command is available.
+    Returns 204 No Content if nothing available after timeout.
     Returns {"deregistered": true} if launcher has been deregistered.
+    Returns {"stop_jobs": [...]} if there are jobs to stop.
     """
     # Check if launcher has been deregistered
     if launcher_registry.is_deregistered(launcher_id):
         # Confirm deregistration and remove from registry
         launcher_registry.confirm_deregistered(launcher_id)
+        stop_command_queue.unregister_launcher(launcher_id)
         if DEBUG:
             print(f"[DEBUG] Launcher {launcher_id} deregistered, signaling shutdown", flush=True)
         return {"deregistered": True}
@@ -546,25 +727,46 @@ async def poll_for_jobs(launcher_id: str = Query(..., description="The registere
     if not launcher_registry.get_launcher(launcher_id):
         raise HTTPException(status_code=401, detail="Launcher not registered")
 
+    # Get the event for this launcher (for immediate wake-up on stop commands)
+    event = stop_command_queue.get_event(launcher_id)
+
     # Poll for jobs with timeout
     poll_interval = 0.5  # Check every 500ms
     elapsed = 0.0
 
     while elapsed < LAUNCHER_POLL_TIMEOUT:
+        # Check for stop commands FIRST (highest priority)
+        stop_jobs = stop_command_queue.get_and_clear(launcher_id)
+        if stop_jobs:
+            if DEBUG:
+                print(f"[DEBUG] Launcher {launcher_id} received stop commands for jobs: {stop_jobs}", flush=True)
+            return {"stop_jobs": stop_jobs}
+
         # Check for deregistration during polling
         if launcher_registry.is_deregistered(launcher_id):
             launcher_registry.confirm_deregistered(launcher_id)
+            stop_command_queue.unregister_launcher(launcher_id)
             if DEBUG:
                 print(f"[DEBUG] Launcher {launcher_id} deregistered during poll, signaling shutdown", flush=True)
             return {"deregistered": True}
 
+        # Check for new jobs
         job = job_queue.claim_job(launcher_id)
         if job:
             if DEBUG:
                 print(f"[DEBUG] Launcher {launcher_id} claimed job {job.job_id}", flush=True)
             return {"job": job.model_dump()}
 
-        await asyncio.sleep(poll_interval)
+        # Wait with event for immediate wake-up on stop commands
+        if event:
+            try:
+                await asyncio.wait_for(event.wait(), timeout=poll_interval)
+                # Event was set - loop will check stop_jobs
+            except asyncio.TimeoutError:
+                pass
+        else:
+            await asyncio.sleep(poll_interval)
+
         elapsed += poll_interval
 
     # No jobs available after timeout
@@ -632,6 +834,32 @@ async def report_job_failed(job_id: str, request: JobFailedRequest):
 
     if DEBUG:
         print(f"[DEBUG] Job {job_id} failed: {request.error}", flush=True)
+
+    return {"ok": True}
+
+
+@app.post("/launcher/jobs/{job_id}/stopped")
+async def report_job_stopped(job_id: str, request: JobStoppedRequest):
+    """Report that job was stopped (terminated by stop command).
+
+    Called by launcher after terminating a process in response to a stop command.
+    Updates session status to 'stopped' and broadcasts to WebSocket clients.
+    """
+    # Verify launcher
+    if not launcher_registry.get_launcher(request.launcher_id):
+        raise HTTPException(status_code=401, detail="Launcher not registered")
+
+    job = job_queue.update_job_status(job_id, JobStatus.STOPPED)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if DEBUG:
+        print(f"[DEBUG] Job {job_id} stopped by launcher {request.launcher_id} (signal={request.signal})", flush=True)
+
+    # Update session status to 'stopped' and broadcast to WebSocket clients
+    session = get_session_by_name(job.session_name)
+    if session:
+        await update_session_status_and_broadcast(session["session_id"], "stopped")
 
     return {"ok": True}
 
@@ -714,6 +942,7 @@ async def deregister_launcher(
     if self_initiated:
         # Launcher is shutting down gracefully - remove immediately
         launcher_registry.remove_launcher(launcher_id)
+        stop_command_queue.unregister_launcher(launcher_id)
         if DEBUG:
             print(f"[DEBUG] Launcher {launcher_id} self-deregistered (graceful shutdown)", flush=True)
         return {"ok": True, "message": "Launcher deregistered", "initiated_by": "self"}
@@ -751,6 +980,20 @@ async def get_job(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     return job.model_dump()
+
+
+@app.post("/jobs/{job_id}/stop")
+async def stop_job(job_id: str):
+    """Stop a running job by signaling its launcher.
+
+    Queues a stop command for the launcher that will terminate the job's process.
+    The launcher will receive the stop command on its next poll and terminate the process.
+    """
+    job = job_queue.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return await _stop_job(job)
 
 
 if __name__ == "__main__":

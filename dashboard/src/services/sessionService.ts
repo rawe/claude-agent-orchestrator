@@ -1,5 +1,14 @@
+import axios from 'axios';
 import { agentOrchestratorApi } from './api';
 import type { Session, SessionMetadataUpdate, SessionEvent } from '@/types';
+
+interface StopSessionResponse {
+  ok: boolean;
+  session_id: string;
+  job_id: string;
+  session_name: string;
+  status: string;
+}
 
 export const sessionService = {
   /**
@@ -39,19 +48,26 @@ export const sessionService = {
 
   /**
    * Stop a running session
-   * NOTE: This endpoint is not yet implemented in the backend
-   * Will return a mock response for now
    */
-  async stopSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+  async stopSession(sessionId: string): Promise<{ success: boolean; message: string; job_id?: string }> {
     try {
-      const response = await agentOrchestratorApi.post(`/sessions/${sessionId}/stop`);
-      return response.data;
-    } catch {
-      // Mock response until backend is implemented
-      console.warn('Stop session endpoint not implemented, returning mock response');
+      const response = await agentOrchestratorApi.post<StopSessionResponse>(`/sessions/${sessionId}/stop`);
+      return {
+        success: response.data.ok,
+        message: `Session stop initiated`,
+        job_id: response.data.job_id,
+      };
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response) {
+        const detail = error.response.data?.detail || 'Failed to stop session';
+        return {
+          success: false,
+          message: detail,
+        };
+      }
       return {
         success: false,
-        message: 'Stop session feature is not yet implemented in the backend',
+        message: 'Failed to stop session',
       };
     }
   },

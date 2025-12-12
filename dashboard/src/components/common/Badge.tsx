@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, StopCircle, CircleDot, CircleOff, HelpCircle } from 'lucide-react';
+import { CheckCircle2, StopCircle, CircleDot, CircleOff, HelpCircle, Loader2 } from 'lucide-react';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray';
 type BadgeSize = 'sm' | 'md';
@@ -45,6 +45,8 @@ function StatusIcon({ status }: { status: string }) {
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
       );
+    case 'stopping':
+      return <Loader2 className="w-3 h-3 mr-1 animate-spin" />;
     case 'finished':
       return <CheckCircle2 className="w-3 h-3 mr-1" />;
     case 'stopped':
@@ -62,8 +64,9 @@ function StatusIcon({ status }: { status: string }) {
 export function StatusBadge({ status }: { status: string }) {
   const statusConfig: Record<string, { variant: BadgeVariant; label: string }> = {
     running: { variant: 'success', label: 'Running' },
+    stopping: { variant: 'warning', label: 'Stopping' },
     finished: { variant: 'info', label: 'Finished' },
-    stopped: { variant: 'warning', label: 'Stopped' },
+    stopped: { variant: 'danger', label: 'Stopped' },
     active: { variant: 'success', label: 'Active' },
     inactive: { variant: 'gray', label: 'Inactive' },
   };

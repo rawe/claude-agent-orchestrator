@@ -74,7 +74,7 @@ Common data structures used by the Agent Runtime.
   "prompt": "string",
   "project_dir": "string (optional)",
   "parent_session_name": "string (optional)",
-  "status": "pending | claimed | running | completed | failed",
+  "status": "pending | claimed | running | stopping | completed | failed | stopped",
   "launcher_id": "string (optional)",
   "error": "string (optional)",
   "created_at": "ISO 8601 string",
@@ -104,8 +104,10 @@ Common data structures used by the Agent Runtime.
 - `pending` - Job created, waiting for launcher
 - `claimed` - Launcher claimed the job
 - `running` - Job execution started
+- `stopping` - Stop requested, waiting for launcher to terminate process
 - `completed` - Job completed successfully
 - `failed` - Job execution failed
+- `stopped` - Job was stopped (terminated by stop command)
 
 ## Launcher
 

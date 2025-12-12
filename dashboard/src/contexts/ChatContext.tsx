@@ -247,7 +247,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setLinkedSessionId(session.session_id);
     setSessionName(session.session_name || null);
     setMode('linked');
-    setAgentStatus(session.status === 'running' ? 'running' : 'finished');
+    // Map session status to agent status
+    const statusMap: Record<string, string> = {
+      running: 'running',
+      stopping: 'stopping',
+      stopped: 'finished',
+      finished: 'finished',
+    };
+    setAgentStatus(statusMap[session.status] || 'finished');
     setIsLoading(false);
     setPendingMessageId(null);
     setCurrentToolCalls([]);
@@ -305,11 +312,51 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // Note: Callback resume is detected via session_start events, not status changes
         if (backendStatus === 'running') {
           setAgentStatus('running');
+        } else if (backendStatus === 'stopping') {
+          // Session is being stopped - clear pending state so user can send new messages
+          setAgentStatus('stopping');
+          if (currentPendingMessageId) {
+            // Get current tool calls to attach to the message
+            const toolCallsToAttach = [...currentToolCallsRef.current];
+            // Mark pending message as complete
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === currentPendingMessageId && msg.status === 'pending'
+                  ? {
+                      ...msg,
+                      content: msg.content || 'Session is being stopped...',
+                      status: 'complete' as const,
+                      toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+                    }
+                  : msg
+              )
+            );
+            setCurrentToolCalls([]);
+            setIsLoading(false);
+            setPendingMessageId(null);
+          }
         } else if (backendStatus === 'finished' || backendStatus === 'stopped') {
-          // Session is no longer running - update status but only if we don't have a pending message
-          // (the pending message handler will set finished when it receives the response)
-          if (!currentPendingMessageId) {
-            setAgentStatus('finished');
+          // Session is no longer running - mark as finished and clear pending state
+          setAgentStatus('finished');
+          if (currentPendingMessageId) {
+            // Get current tool calls to attach to the message
+            const toolCallsToAttach = [...currentToolCallsRef.current];
+            // Mark pending message as complete
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === currentPendingMessageId && msg.status === 'pending'
+                  ? {
+                      ...msg,
+                      content: msg.content || (backendStatus === 'stopped' ? 'Session stopped' : 'Session ended'),
+                      status: 'complete' as const,
+                      toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+                    }
+                  : msg
+              )
+            );
+            setCurrentToolCalls([]);
+            setIsLoading(false);
+            setPendingMessageId(null);
           }
         }
       }

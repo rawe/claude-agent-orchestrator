@@ -1,0 +1,321 @@
+# Session Stop Integration - Implementation TODO
+
+This document describes the remaining tasks to fully integrate the Session Stop Command feature with the dashboard.
+
+## Background
+
+The backend implementation for stopping sessions is **complete** (see `docs/features/session-stop-command.md`). However, the dashboard integration requires updates to properly use the new endpoint and handle the response format.
+
+## What Was Already Implemented
+
+In the previous coding session, the following backend components were implemented:
+
+### New Files Created
+- `servers/agent-runtime/services/stop_command_queue.py` - Thread-safe queue with asyncio Events
+
+### Modified Backend Files
+- `servers/agent-runtime/services/job_queue.py` - Added `STOPPING` and `STOPPED` job statuses
+- `servers/agent-runtime/main.py`:
+  - `POST /sessions/{session_id}/stop` endpoint
+  - Modified `GET /launcher/jobs` to return `stop_jobs` and wake up immediately
+  - `POST /launcher/jobs/{job_id}/stopped` endpoint
+  - Integrated stop command queue with launcher registration
+
+### Modified Launcher Files
+- `servers/agent-launcher/lib/api_client.py` - Added `stop_jobs` to `PollResult`, `report_stopped()` method
+- `servers/agent-launcher/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
+
+### Updated Documentation
+- `docs/agent-runtime/API.md` - New endpoints documented
+- `docs/agent-runtime/DATA_MODELS.md` - Updated job statuses
+- `docs/ARCHITECTURE.md` - Updated to reflect stop capability
+
+### Database Note
+The database schema uses TEXT for session status, so 'stopping' can be added without schema migration.
+See: `servers/agent-runtime/database.py` line 80-89 (`update_session_status` accepts any string).
+
+## Current State
+
+### Backend (Complete)
+- `POST /sessions/{session_id}/stop` - Stop by session ID (convenience endpoint)
+  - Returns: `{ ok, session_id, job_id, session_name, status: "stopping" }`
+- `POST /jobs/{job_id}/stop` - Stop by job ID (direct control)
+  - Returns: `{ ok, job_id, session_name, status: "stopping" }`
+- Both endpoints share `_stop_job()` helper function
+- Jobs transition: `RUNNING` → `STOPPING` → `STOPPED`
+- Stop commands wake up launcher immediately via asyncio Events
+
+### Dashboard (Needs Updates)
+- Has UI for stop button (works, shows on running sessions)
+- Has confirmation modal (works)
+- `sessionService.stopSession()` exists but expects different response format
+- Session type doesn't include `job_id` field
+- No visibility into job status for running sessions
+
+---
+
+## Tasks
+
+### Task 1: Update Session Service Response Handling
+
+**File:** `dashboard/src/services/sessionService.ts`
+
+**Current Code (lines 45-57):**
+```typescript
+async stopSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await agentOrchestratorApi.post(`/sessions/${sessionId}/stop`);
+    return response.data;
+  } catch {
+    // Mock response until backend is implemented
+    console.warn('Stop session endpoint not implemented, returning mock response');
+    return {
+      success: false,
+      message: 'Stop session feature is not yet implemented in the backend',
+    };
+  }
+}
+```
+
+**Required Changes:**
+1. Update return type to match backend response
+2. Map backend response to expected format
+3. Handle specific error cases (session not running, no job found, etc.)
+
+**New Implementation:**
+```typescript
+interface StopSessionResponse {
+  ok: boolean;
+  session_id: string;
+  job_id: string;
+  status: string;
+}
+
+async stopSession(sessionId: string): Promise<{ success: boolean; message: string; job_id?: string }> {
+  try {
+    const response = await agentOrchestratorApi.post<StopSessionResponse>(`/sessions/${sessionId}/stop`);
+    return {
+      success: response.data.ok,
+      message: `Session stop initiated (job: ${response.data.job_id})`,
+      job_id: response.data.job_id,
+    };
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error) && error.response) {
+      const detail = error.response.data?.detail || 'Failed to stop session';
+      return {
+        success: false,
+        message: detail,
+      };
+    }
+    return {
+      success: false,
+      message: 'Failed to stop session',
+    };
+  }
+}
+```
+
+---
+
+### Task 2: Add Job Info to Session Display (Optional Enhancement)
+
+To show users which job is running a session, we need to track job-session relationships.
+
+**Option A: Extend Session Type**
+
+**File:** `dashboard/src/types/session.ts`
+
+Add optional job_id field:
+```typescript
+export interface Session {
+  session_id: string;
+  session_name?: string;
+  status: SessionStatus;
+  created_at: string;
+  modified_at?: string;
+  project_dir?: string;
+  agent_name?: string;
+  parent_session_name?: string;
+  job_id?: string;  // NEW: Associated job ID for running sessions
+}
+```
+
+**Backend Change Required:**
+- `GET /sessions` would need to include `job_id` for running sessions
+- This requires looking up jobs by `session_name` for sessions with `status='running'`
+
+**Option B: Separate Job Lookup (Simpler)**
+
+Keep session and job separate, only fetch job info when needed (e.g., on stop action).
+
+---
+
+### Task 3: Handle Stop Status in UI
+
+When a session is being stopped, it transitions through `STOPPING` state. The UI should reflect this.
+
+**File:** `dashboard/src/types/session.ts`
+
+Update status type:
+```typescript
+export type SessionStatus = 'running' | 'stopping' | 'finished' | 'stopped';
+```
+
+**File:** `dashboard/src/components/features/sessions/SessionCard.tsx`
+
+Update status badge colors:
+- `running` → blue
+- `stopping` → amber (animated/pulsing)
+- `finished` → green
+- `stopped` → red/gray
+
+Update stop button visibility:
+```typescript
+// Don't show stop button for sessions already being stopped
+{session.status === 'running' && onStop && (
+  // ... stop button
+)}
+```
+
+**File:** `dashboard/src/hooks/useSessions.ts`
+
+Handle `session_updated` WebSocket messages to update status to 'stopping'.
+
+---
+
+### Task 4: Backend - Broadcast Session Status Change
+
+Currently, when `POST /sessions/{session_id}/stop` is called, the session status isn't updated in the database. We need to:
+
+**File:** `servers/agent-runtime/main.py`
+
+In `stop_session()` endpoint, after queueing the stop command:
+1. Update session status to 'stopping' (new status)
+2. Broadcast `session_updated` WebSocket message
+
+```python
+@app.post("/sessions/{session_id}/stop")
+async def stop_session(session_id: str):
+    # ... existing code ...
+
+    # Update session status to stopping
+    update_session_status(session_id, "stopping")
+
+    # Broadcast to WebSocket clients
+    updated_session = get_session_by_id(session_id)
+    message = json.dumps({"type": "session_updated", "session": updated_session})
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "job_id": job.job_id,
+        "status": "stopping"
+    }
+```
+
+**File:** `servers/agent-runtime/database.py`
+
+Ensure `update_session_status()` accepts 'stopping' as valid status.
+
+---
+
+### Task 5: Handle Session Stop Event from Launcher
+
+When the launcher terminates a process and reports `POST /launcher/jobs/{job_id}/stopped`, we need to:
+
+**File:** `servers/agent-runtime/main.py`
+
+In `report_job_stopped()` endpoint:
+1. Update session status to 'stopped'
+2. Broadcast `session_updated` WebSocket message
+3. Consider creating a `session_stop` event
+
+```python
+@app.post("/launcher/jobs/{job_id}/stopped")
+async def report_job_stopped(job_id: str, request: JobStoppedRequest):
+    # ... existing code ...
+
+    # Get session name from job and update session status
+    session = get_session_by_name(job.session_name)
+    if session:
+        update_session_status(session["session_id"], "stopped")
+
+        # Broadcast update
+        updated_session = get_session_by_id(session["session_id"])
+        message = json.dumps({"type": "session_updated", "session": updated_session})
+        for ws in connections.copy():
+            try:
+                await ws.send_text(message)
+            except:
+                connections.discard(ws)
+
+    return {"ok": True}
+```
+
+---
+
+## File Reference Summary
+
+### Backend Files
+| File | Purpose |
+|------|---------|
+| `servers/agent-runtime/main.py` | Stop endpoint, job stopped reporting |
+| `servers/agent-runtime/database.py` | Session status updates |
+| `servers/agent-runtime/services/job_queue.py` | Job status management |
+| `servers/agent-runtime/services/stop_command_queue.py` | Stop command queue (done) |
+
+### Dashboard Files
+| File | Purpose |
+|------|---------|
+| `dashboard/src/services/sessionService.ts` | API calls - update response handling |
+| `dashboard/src/types/session.ts` | Add 'stopping' status type |
+| `dashboard/src/components/features/sessions/SessionCard.tsx` | Status badge, stop button |
+| `dashboard/src/components/features/sessions/SessionList.tsx` | Filter for stopping status |
+| `dashboard/src/hooks/useSessions.ts` | WebSocket handling for status updates |
+| `dashboard/src/pages/AgentSessions.tsx` | Stop handler, success messages |
+
+### Documentation
+| File | Purpose |
+|------|---------|
+| `docs/features/session-stop-command.md` | Feature specification |
+| `docs/agent-runtime/API.md` | API documentation (updated) |
+| `docs/agent-runtime/DATA_MODELS.md` | Data models (updated) |
+| `docs/ARCHITECTURE.md` | Architecture overview (updated) |
+
+---
+
+## Implementation Order
+
+1. **Task 4: Backend - Broadcast Session Status** (Critical)
+   - Without this, dashboard won't see status changes
+
+2. **Task 5: Handle Session Stop Event** (Critical)
+   - Completes the stop flow
+
+3. **Task 3: Handle Stop Status in UI** (Required)
+   - Show 'stopping' state in dashboard
+
+4. **Task 1: Update Session Service** (Required)
+   - Fix response handling, remove mock code
+
+5. **Task 2: Add Job Info** (Optional Enhancement)
+   - Nice to have for visibility
+
+---
+
+## Testing Checklist
+
+- [ ] Stop button appears only on running sessions
+- [ ] Clicking stop shows confirmation modal
+- [ ] Confirming stop calls backend successfully
+- [ ] Session status changes to 'stopping' immediately
+- [ ] Status badge shows amber/pulsing for 'stopping'
+- [ ] After process terminates, status changes to 'stopped'
+- [ ] WebSocket broadcasts update dashboard in real-time
+- [ ] Error cases show appropriate messages (session not found, not running, etc.)
+- [ ] Multiple stop requests are deduplicated (backend handles this)

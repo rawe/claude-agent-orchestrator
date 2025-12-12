@@ -37,6 +37,11 @@ class PollResult:
     """Result from polling for jobs."""
     job: Optional[Job] = None
     deregistered: bool = False
+    stop_jobs: list[str] = None  # Job IDs to stop
+
+    def __post_init__(self):
+        if self.stop_jobs is None:
+            self.stop_jobs = []
 
 
 class RuntimeAPIClient:
@@ -92,11 +97,12 @@ class RuntimeAPIClient:
         )
 
     def poll_job(self, launcher_id: str) -> PollResult:
-        """Long-poll for a job to execute.
+        """Long-poll for a job to execute or stop commands.
 
         Returns PollResult with:
         - job: Job if available
         - deregistered: True if launcher has been deregistered externally
+        - stop_jobs: List of job IDs to stop
         """
         try:
             response = self._client.get(
@@ -114,6 +120,10 @@ class RuntimeAPIClient:
             # Check for deregistration signal
             if data.get("deregistered"):
                 return PollResult(deregistered=True)
+
+            # Check for stop commands
+            if "stop_jobs" in data:
+                return PollResult(stop_jobs=data["stop_jobs"])
 
             # Normal job response
             job_data = data["job"]
@@ -152,6 +162,14 @@ class RuntimeAPIClient:
         response = self._client.post(
             f"{self.base_url}/launcher/jobs/{job_id}/failed",
             json={"launcher_id": launcher_id, "error": error},
+        )
+        response.raise_for_status()
+
+    def report_stopped(self, launcher_id: str, job_id: str, signal: str = "SIGTERM") -> None:
+        """Report that job was stopped (terminated by stop command)."""
+        response = self._client.post(
+            f"{self.base_url}/launcher/jobs/{job_id}/stopped",
+            json={"launcher_id": launcher_id, "signal": signal},
         )
         response.raise_for_status()
 

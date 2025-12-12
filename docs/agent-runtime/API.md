@@ -163,6 +163,36 @@ Get the result text from the last assistant message.
 - `404 Not Found` - Session doesn't exist
 - `400 Bad Request` - Session not finished
 
+#### POST /sessions/{session_id}/stop
+
+Stop a running session by signaling its launcher.
+
+Finds the active job for this session and queues a stop command.
+
+**Response (Success):**
+```json
+{
+  "ok": true,
+  "session_id": "abc-123",
+  "job_id": "job_xyz789",
+  "session_name": "my-task",
+  "status": "stopping"
+}
+```
+
+**Error Responses:**
+- `404 Not Found` - Session not found
+- `400 Bad Request` - Session is not running
+- `404 Not Found` - No active job found for session
+- `400 Bad Request` - Job not claimed by any launcher / Job cannot be stopped
+
+**Notes:**
+- Convenience endpoint that looks up the job by session
+- For direct job control, use `POST /jobs/{job_id}/stop` instead
+- Queues a stop command for the launcher that will terminate the session's process
+- The launcher receives the stop command immediately (wakes up from long-poll)
+- Launcher sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
+
 #### PATCH /sessions/{session_id}/metadata
 
 Update session metadata.
@@ -450,10 +480,37 @@ Get job status and details.
 - `pending` - Job created, waiting for launcher
 - `claimed` - Launcher claimed the job
 - `running` - Job execution started
+- `stopping` - Stop requested, waiting for launcher to terminate process
 - `completed` - Job completed successfully
 - `failed` - Job execution failed
+- `stopped` - Job was stopped (terminated by stop command)
 
 **Error:** `404 Not Found` if job doesn't exist.
+
+#### POST /jobs/{job_id}/stop
+
+Stop a running job by signaling its launcher.
+
+**Response (Success):**
+```json
+{
+  "ok": true,
+  "job_id": "job_abc123",
+  "session_name": "my-task",
+  "status": "stopping"
+}
+```
+
+**Error Responses:**
+- `404 Not Found` - Job not found
+- `400 Bad Request` - Job cannot be stopped (not in `claimed` or `running` status)
+- `400 Bad Request` - Job not claimed by any launcher
+
+**Notes:**
+- Queues a stop command for the launcher that will terminate the job's process
+- The launcher receives the stop command immediately (wakes up from long-poll)
+- Launcher sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
+- Use `POST /sessions/{session_id}/stop` if you have session_id instead of job_id
 
 ---
 
@@ -485,7 +542,7 @@ Register a new launcher instance.
 
 #### GET /launcher/jobs
 
-Long-poll for available jobs (used by launcher).
+Long-poll for available jobs or stop commands (used by launcher).
 
 **Query Parameters:**
 - `launcher_id` (required) - The registered launcher ID
@@ -503,6 +560,13 @@ Long-poll for available jobs (used by launcher).
 }
 ```
 
+**Response (Stop Commands):**
+```json
+{
+  "stop_jobs": ["job_abc123", "job_def456"]
+}
+```
+
 **Response (No Jobs):** `204 No Content`
 
 **Response (Deregistered):**
@@ -514,7 +578,8 @@ Long-poll for available jobs (used by launcher).
 
 **Notes:**
 - Holds connection open for up to `poll_timeout_seconds`
-- Returns immediately if job available
+- Returns immediately if job or stop command available
+- Stop commands wake up the poll immediately (no waiting)
 - Returns `deregistered: true` if launcher has been deregistered
 
 #### POST /launcher/jobs/{job_id}/started
@@ -572,6 +637,29 @@ Report that job execution failed.
   "ok": true
 }
 ```
+
+#### POST /launcher/jobs/{job_id}/stopped
+
+Report that job was stopped (terminated by stop command).
+
+**Request Body:**
+```json
+{
+  "launcher_id": "lnch_abc123",
+  "signal": "SIGTERM"  // or "SIGKILL" if force killed
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Notes:**
+- Called by launcher after terminating a process in response to a stop command
+- Signal indicates which signal was used to terminate the process
 
 #### POST /launcher/heartbeat
 

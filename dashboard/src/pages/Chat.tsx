@@ -6,7 +6,7 @@ import { useSessions } from '@/hooks/useSessions';
 import { Button, Spinner, Dropdown } from '@/components/common';
 import type { DropdownOption } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
-import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
+import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ToolCall } from '@/contexts/ChatContext';
@@ -219,10 +219,11 @@ export function Chat() {
     isSessionActive,
   } = useChat();
 
-  const { sessions } = useSessions();
+  const { sessions, stopSession } = useSessions();
   const [blueprints, setBlueprints] = useState<Agent[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoadingBlueprints, setIsLoadingBlueprints] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -340,6 +341,33 @@ export function Chat() {
     setInputValue('');
     inputRef.current?.focus();
   };
+
+  // Handle stop session - robust implementation
+  const handleStopSession = async () => {
+    const sessionId = state.linkedSessionId || state.sessionId;
+    if (!sessionId || isStopping) return;
+
+    setIsStopping(true);
+    try {
+      const result = await stopSession(sessionId);
+      if (!result.success) {
+        showError(result.message);
+      }
+      // Note: UI state updates will come via WebSocket when session status changes
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to stop session';
+      showError(errorMessage);
+      console.error('Stop session error:', err);
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
+  // Determine if we can stop (agent is running and we have a session)
+  const canStop = isSessionActive() &&
+    (state.linkedSessionId || state.sessionId) &&
+    state.agentStatus !== 'stopping' &&
+    !isStopping;
 
   // Handle session selection from SessionSelector
   const handleSelectSession = async (session: Session) => {
@@ -543,13 +571,25 @@ export function Chat() {
               rows={3}
               className="w-full px-4 py-3 pr-14 text-sm rounded-xl resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
             />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || state.isLoading || !connected}
-              className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
-            >
-              {state.isLoading ? <Spinner size="sm" /> : <Send className="w-5 h-5" />}
-            </button>
+            {canStop ? (
+              <button
+                onClick={handleStopSession}
+                disabled={isStopping}
+                className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                title="Stop agent"
+              >
+                {isStopping ? <Spinner size="sm" /> : <Square className="w-4 h-4 fill-current" />}
+              </button>
+            ) : (
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || state.isLoading || !connected}
+                className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                title="Send message"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>

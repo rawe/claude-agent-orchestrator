@@ -31,15 +31,17 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 - Persists sessions and events in SQLite
 - Broadcasts real-time updates to dashboard
 - Agent blueprint registry (CRUD API for agent definitions)
-- Jobs API for asynchronous session start/resume
+- Jobs API for asynchronous session start/resume/stop
 - Launcher registry with health monitoring
 - Callback processor for parent-child session coordination
+- Stop command queue for immediate session termination
 
 **Agent Launcher** (`servers/agent-launcher/`)
-- Polls Agent Runtime for pending jobs
+- Polls Agent Runtime for pending jobs and stop commands
 - Executes jobs via framework-specific executors
 - Supports concurrent job execution
-- Reports job status (started, completed, failed)
+- Reports job status (started, completed, failed, stopped)
+- Handles stop commands by terminating running processes
 - Maintains heartbeat for health monitoring
 - Auto-exits after repeated connection failures
 
@@ -198,11 +200,12 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
 ### Launcher Lifecycle
 
 1. **Registration**: Launcher calls `POST /launcher/register` on startup
-2. **Polling**: Long-polls `GET /launcher/jobs` for pending jobs
+2. **Polling**: Long-polls `GET /launcher/jobs` for pending jobs or stop commands
 3. **Execution**: Spawns executor subprocess (e.g., `claude-code/ao-start`)
-4. **Reporting**: Reports job status (started, completed, failed)
-5. **Heartbeat**: Sends periodic heartbeat for health monitoring
-6. **Deregistration**: Graceful shutdown or auto-exit after connection failures
+4. **Reporting**: Reports job status (started, completed, failed, stopped)
+5. **Stop Handling**: Receives stop commands and terminates running processes
+6. **Heartbeat**: Sends periodic heartbeat for health monitoring
+7. **Deregistration**: Graceful shutdown or auto-exit after connection failures
 
 ### Callback Architecture
 

@@ -21,8 +21,10 @@ class JobStatus(str, Enum):
     PENDING = "pending"
     CLAIMED = "claimed"
     RUNNING = "running"
+    STOPPING = "stopping"  # Stop requested, waiting for launcher
     COMPLETED = "completed"
     FAILED = "failed"
+    STOPPED = "stopped"    # Successfully stopped
 
 
 class JobCreate(BaseModel):
@@ -127,7 +129,7 @@ class JobQueue:
 
             if status == JobStatus.RUNNING:
                 job.started_at = now
-            elif status in (JobStatus.COMPLETED, JobStatus.FAILED):
+            elif status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.STOPPED):
                 job.completed_at = now
                 if error:
                     job.error = error
@@ -145,13 +147,16 @@ class JobQueue:
             return list(self._jobs.values())
 
     def get_job_by_session_name(self, session_name: str) -> Optional[Job]:
-        """Find a running or claimed job by session_name.
+        """Find an active job by session_name.
 
-        Used to link job's parent_session_name to newly created sessions.
+        Used to link job's parent_session_name to newly created sessions,
+        and to find jobs for stop commands.
         """
         with self._lock:
             for job in self._jobs.values():
-                if job.session_name == session_name and job.status in (JobStatus.CLAIMED, JobStatus.RUNNING):
+                if job.session_name == session_name and job.status in (
+                    JobStatus.CLAIMED, JobStatus.RUNNING, JobStatus.STOPPING
+                ):
                     return job
         return None
 

@@ -15,10 +15,12 @@ function getStatusAccentColor(status: Session['status']): string {
   switch (status) {
     case 'running':
       return 'bg-emerald-500';
+    case 'stopping':
+      return 'bg-amber-500';
     case 'finished':
       return 'bg-gray-300';
     case 'stopped':
-      return 'bg-amber-500';
+      return 'bg-red-500';
     default:
       return 'bg-gray-300';
   }

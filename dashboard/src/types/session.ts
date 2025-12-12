@@ -1,4 +1,4 @@
-export type SessionStatus = 'running' | 'finished' | 'stopped';
+export type SessionStatus = 'running' | 'stopping' | 'finished' | 'stopped';
 
 export interface Session {
   session_id: string;

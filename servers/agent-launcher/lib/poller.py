@@ -88,6 +88,12 @@ class JobPoller:
                         self.on_deregistered()
                     return  # Exit poll loop
 
+                # Handle stop commands
+                if result.stop_jobs:
+                    for job_id in result.stop_jobs:
+                        self._handle_stop(job_id)
+                    continue  # Check for more commands
+
                 if result.job:
                     self._handle_job(result.job)
 
@@ -126,3 +132,42 @@ class JobPoller:
                 self.api_client.report_failed(self.launcher_id, job.job_id, str(e))
             except Exception:
                 logger.error(f"Failed to report job failure for {job.job_id}")
+
+    def _handle_stop(self, job_id: str) -> None:
+        """Stop a running job by terminating its process."""
+        running_job = self.registry.get_job(job_id)
+
+        if not running_job:
+            # Job not running (already completed or never started)
+            logger.debug(f"Stop command for job {job_id} ignored - job not running")
+            return
+
+        logger.info(f"Stopping job {job_id} (session={running_job.session_name}, pid={running_job.process.pid})")
+
+        signal_used = "SIGTERM"
+
+        try:
+            # Send SIGTERM first (graceful)
+            running_job.process.terminate()
+
+            # Wait briefly for graceful shutdown
+            try:
+                running_job.process.wait(timeout=5)
+            except Exception:
+                # Force kill if not responding
+                running_job.process.kill()
+                signal_used = "SIGKILL"
+                logger.warning(f"Job {job_id} did not respond to SIGTERM, sent SIGKILL")
+
+            # Remove from registry
+            self.registry.remove_job(job_id)
+
+            # Report stopped
+            try:
+                self.api_client.report_stopped(self.launcher_id, job_id, signal=signal_used)
+                logger.info(f"Job {job_id} stopped successfully (signal={signal_used})")
+            except Exception as e:
+                logger.error(f"Failed to report stopped for {job_id}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error stopping job {job_id}: {e}")
