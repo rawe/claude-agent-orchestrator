@@ -18,24 +18,36 @@ from invocation import SCHEMA_VERSION
 logger = logging.getLogger(__name__)
 
 
-def discover_commands_dir() -> Path:
-    """Auto-discover the ao-* commands directory.
+# Environment variable for executor path (relative to agent-launcher dir)
+ENV_EXECUTOR_PATH = "AGENT_EXECUTOR_PATH"
+DEFAULT_EXECUTOR_PATH = "claude-code/ao-exec"
 
-    Commands are in servers/agent-launcher/claude-code/
+
+def get_executor_path() -> Path:
+    """Get path to executor script.
+
+    Uses AGENT_EXECUTOR_PATH env var (relative to agent-launcher dir).
+    Default: claude-code/ao-exec
+
+    Examples:
+        AGENT_EXECUTOR_PATH=claude-code/ao-exec    (default)
+        AGENT_EXECUTOR_PATH=test-executor/test-exec
+        AGENT_EXECUTOR_PATH=openai/openai-exec
     """
-    # Start from this file's location (lib/executor.py)
-    # Go up to agent-launcher dir, then into claude-code/
+    executor_rel_path = os.environ.get(ENV_EXECUTOR_PATH, DEFAULT_EXECUTOR_PATH)
+
+    # Resolve relative to agent-launcher dir
     launcher_dir = Path(__file__).parent.parent.resolve()
-    commands_dir = launcher_dir / "claude-code"
+    executor_path = launcher_dir / executor_rel_path
 
-    if not commands_dir.exists():
-        raise RuntimeError(f"Commands directory not found: {commands_dir}")
+    if not executor_path.exists():
+        raise RuntimeError(f"Executor not found: {executor_path}")
 
-    return commands_dir
+    return executor_path
 
 
 class JobExecutor:
-    """Executes jobs by spawning ao-exec subprocess with JSON payload."""
+    """Executes jobs by spawning executor subprocess with JSON payload."""
 
     def __init__(self, default_project_dir: str):
         """Initialize executor.
@@ -44,9 +56,9 @@ class JobExecutor:
             default_project_dir: Default project directory if job doesn't specify one
         """
         self.default_project_dir = default_project_dir
-        self.commands_dir = discover_commands_dir()
+        self.executor_path = get_executor_path()
 
-        logger.debug(f"Commands directory: {self.commands_dir}")
+        logger.debug(f"Executor path: {self.executor_path}")
 
     def execute(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
         """Execute a job by spawning ao-exec with JSON payload via stdin.
@@ -95,7 +107,7 @@ class JobExecutor:
         return payload
 
     def _execute_with_payload(self, job: Job, mode: str) -> subprocess.Popen:
-        """Execute ao-exec with JSON payload via stdin.
+        """Execute executor with JSON payload via stdin.
 
         Args:
             job: The job to execute
@@ -104,14 +116,12 @@ class JobExecutor:
         Returns:
             The spawned subprocess.Popen object
         """
-        ao_exec = self.commands_dir / "ao-exec"
-
         # Build JSON payload
         payload = self._build_payload(job, mode)
         payload_json = json.dumps(payload)
 
-        # Build command (just the executor, no args)
-        cmd = [str(ao_exec)]
+        # Build command
+        cmd = [str(self.executor_path)]
 
         # Build environment
         env = os.environ.copy()

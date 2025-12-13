@@ -1,6 +1,6 @@
 # Agent Launcher
 
-The Agent Launcher is a standalone process that polls Agent Runtime for jobs and executes them as `ao-start` or `ao-resume` subprocesses. It enables callback-driven orchestration by allowing the framework to resume parent sessions when child agents complete.
+The Agent Launcher is a standalone process that polls Agent Runtime for jobs and executes them via a configurable executor. It enables callback-driven orchestration by allowing the framework to resume parent sessions when child agents complete.
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ The Agent Launcher is a standalone process that polls Agent Runtime for jobs and
 The launcher will:
 1. Register with Agent Runtime
 2. Start polling for jobs
-3. Execute jobs as subprocesses (`ao-start`, `ao-resume`)
+3. Execute jobs via the configured executor (default: `claude-code/ao-exec`)
 4. Report job status back to the runtime
 
 ### Stop the Launcher
@@ -39,10 +39,23 @@ Press `Ctrl+C` for graceful shutdown.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL to connect to |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL |
+| `AGENT_EXECUTOR_PATH` | `claude-code/ao-exec` | Executor script path (relative to agent-launcher dir) |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
-| `PROJECT_DIR` | Current directory | Default project directory for ao-* commands |
+| `PROJECT_DIR` | Current directory | Default project directory |
+
+#### Executor Selection
+
+Use `AGENT_EXECUTOR_PATH` to switch between executors:
+
+```bash
+# Claude SDK executor (default)
+AGENT_EXECUTOR_PATH=claude-code/ao-exec ./agent-launcher
+
+# Test/dummy executor (for testing)
+AGENT_EXECUTOR_PATH=test-executor/test-exec ./agent-launcher
+```
 
 ### CLI Options
 
@@ -74,10 +87,12 @@ Press `Ctrl+C` for graceful shutdown.
 
 ## Job Types
 
-| Type | Command | Parameters |
-|------|---------|------------|
-| `start_session` | `ao-start` | `session_name`, `agent_name`, `prompt`, `project_dir` |
-| `resume_session` | `ao-resume` | `session_name`, `prompt` |
+Jobs are passed to the executor as JSON via stdin:
+
+| Type | Mode | Parameters |
+|------|------|------------|
+| `start_session` | `start` | `session_name`, `agent_name`, `prompt`, `project_dir` |
+| `resume_session` | `resume` | `session_name`, `prompt` |
 
 ## How It Works
 
@@ -93,10 +108,10 @@ The launcher enables callback-driven orchestration:
 
 ```
 1. Dashboard creates job → Agent Runtime queues it
-2. Launcher picks up job → Spawns ao-start (sets AGENT_SESSION_NAME)
+2. Launcher picks up job → Spawns executor with mode=start (sets AGENT_SESSION_NAME)
 3. Orchestrator runs → Spawns child agents with callback=true
 4. Child completes → Runtime creates resume job
-5. Launcher picks up resume job → Spawns ao-resume
+5. Launcher picks up resume job → Spawns executor with mode=resume
 6. Orchestrator continues with callback notification
 ```
 
@@ -128,7 +143,7 @@ Use `-v` for debug-level logs.
 
 ### Subprocess failures
 
-- Check that `ao-start` and `ao-resume` commands are accessible
+- Check that the executor script exists at `AGENT_EXECUTOR_PATH`
 - Verify `PROJECT_DIR` points to a valid directory
 - Use `-v` flag for detailed subprocess output
 

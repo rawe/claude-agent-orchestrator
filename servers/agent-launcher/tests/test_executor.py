@@ -26,8 +26,11 @@ class TestBuildPayload:
 
     @pytest.fixture
     def executor(self, tmp_path):
-        """Create executor with mocked commands_dir."""
-        with patch("executor.discover_commands_dir", return_value=tmp_path):
+        """Create executor with mocked executor path."""
+        fake_exec = tmp_path / "test-exec"
+        fake_exec.write_text("#!/bin/bash\necho test")
+        fake_exec.chmod(0o755)
+        with patch("executor.get_executor_path", return_value=fake_exec):
             return JobExecutor(default_project_dir="/default/path")
 
     def test_start_payload_minimal(self, executor):
@@ -113,17 +116,16 @@ class TestExecuteWithPayload:
 
     @pytest.fixture
     def executor(self, tmp_path):
-        """Create executor with mocked commands_dir and ao-exec script."""
-        # Create fake ao-exec script
-        ao_exec = tmp_path / "ao-exec"
-        ao_exec.write_text("#!/bin/bash\necho test")
-        ao_exec.chmod(0o755)
+        """Create executor with mocked executor path."""
+        fake_exec = tmp_path / "test-exec"
+        fake_exec.write_text("#!/bin/bash\necho test")
+        fake_exec.chmod(0o755)
 
-        with patch("executor.discover_commands_dir", return_value=tmp_path):
+        with patch("executor.get_executor_path", return_value=fake_exec):
             return JobExecutor(default_project_dir="/default/path")
 
-    def test_execute_calls_ao_exec(self, executor):
-        """Execute calls ao-exec subprocess."""
+    def test_execute_calls_executor(self, executor):
+        """Execute calls executor subprocess."""
         job = Job(
             job_id="job-1",
             type="start_session",
@@ -140,11 +142,11 @@ class TestExecuteWithPayload:
 
             executor._execute_with_payload(job, "start")
 
-            # Should call Popen with ao-exec
+            # Should call Popen with executor
             mock_popen.assert_called_once()
             call_args = mock_popen.call_args
             cmd = call_args[0][0]
-            assert "ao-exec" in cmd[0]
+            assert "test-exec" in cmd[0]
 
     def test_execute_writes_json_to_stdin(self, executor):
         """Execute writes JSON payload to subprocess stdin."""
@@ -205,12 +207,12 @@ class TestExecute:
 
     @pytest.fixture
     def executor(self, tmp_path):
-        """Create executor with mocked commands_dir."""
-        ao_exec = tmp_path / "ao-exec"
-        ao_exec.write_text("#!/bin/bash\necho test")
-        ao_exec.chmod(0o755)
+        """Create executor with mocked executor path."""
+        fake_exec = tmp_path / "test-exec"
+        fake_exec.write_text("#!/bin/bash\necho test")
+        fake_exec.chmod(0o755)
 
-        with patch("executor.discover_commands_dir", return_value=tmp_path):
+        with patch("executor.get_executor_path", return_value=fake_exec):
             return JobExecutor(default_project_dir="/default/path")
 
     def test_execute_start_session(self, executor):
