@@ -571,10 +571,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }
 
   // Subscribe to WebSocket at context level
+  // Use a ref to ensure stable handler reference across StrictMode's double-effect behavior
+  const handleWebSocketMessageRef = useRef(handleWebSocketMessage);
+  handleWebSocketMessageRef.current = handleWebSocketMessage;
+
   useEffect(() => {
-    const unsubscribe = subscribe(handleWebSocketMessage);
+    // Create a stable wrapper that delegates to the ref
+    // This ensures we have ONE subscription even if effect runs twice
+    const stableHandler = (msg: WebSocketMessage) => handleWebSocketMessageRef.current(msg);
+    const unsubscribe = subscribe(stableHandler);
     return () => unsubscribe();
-  }, [subscribe, handleWebSocketMessage]);
+  }, [subscribe]);
 
   const state: ChatState = {
     messages,
