@@ -7,17 +7,27 @@ for delivery when the parent becomes idle.
 
 This solves the "lost callback" problem where callbacks were dropped when
 the parent was executing a blocking operation.
+
+Additionally, a "resume in-flight" lock prevents multiple concurrent callbacks
+from creating duplicate resume jobs. When a resume job is created, the parent
+is marked as "in-flight". Subsequent callbacks are queued until the parent
+session stops (meaning the resume was processed).
 """
 
 import threading
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
-# In-memory queue: parent_session_name -> [child_session_names]
+# In-memory queue: parent_session_name -> [(child_name, result, failed, error), ...]
 # Thread-safe access via lock
-_pending_notifications: Dict[str, List[str]] = {}
+_pending_notifications: Dict[str, List[tuple]] = {}
+
+# Track parents with pending resume jobs (not yet processed)
+# Prevents duplicate resume jobs when multiple callbacks arrive simultaneously
+_resume_in_flight: Set[str] = set()
+
 _lock = threading.Lock()
 
 
@@ -63,19 +73,35 @@ def on_child_completed(
         logger.warning(f"Skipping callback: session {child_session_name} is its own parent")
         return False
 
-    if parent_status == "finished":
-        # Parent is idle - deliver immediately
-        logger.info(f"Parent '{parent_session_name}' is idle, delivering callback from '{child_session_name}'")
-        _create_resume_job(
-            parent_session_name,
-            [(child_session_name, child_result, child_failed, child_error)]
-        )
+    callback_data = (child_session_name, child_result, child_failed, child_error)
+    should_create_job = False
+
+    with _lock:
+        # Check if a resume job is already pending for this parent
+        if parent_session_name in _resume_in_flight:
+            # Resume already in progress - queue this callback
+            logger.info(f"Parent '{parent_session_name}' has resume in-flight, queuing callback from '{child_session_name}'")
+            _pending_notifications.setdefault(parent_session_name, []).append(callback_data)
+            return False
+
+        if parent_status == "finished":
+            # Parent is idle and no resume in-flight - deliver immediately
+            # Mark as in-flight to prevent duplicate resume jobs
+            _resume_in_flight.add(parent_session_name)
+            should_create_job = True
+            logger.info(f"Parent '{parent_session_name}' is idle, delivering callback from '{child_session_name}' (marked in-flight)")
+        else:
+            # Parent is busy - queue for later
+            logger.info(f"Parent '{parent_session_name}' is busy (status={parent_status}), queuing callback from '{child_session_name}'")
+            _pending_notifications.setdefault(parent_session_name, []).append(callback_data)
+            return False
+
+    # Create job outside lock to avoid holding lock during I/O
+    if should_create_job:
+        _create_resume_job(parent_session_name, [callback_data])
         return True
-    else:
-        # Parent is busy - queue for later
-        logger.info(f"Parent '{parent_session_name}' is busy (status={parent_status}), queuing callback from '{child_session_name}'")
-        _queue_notification(parent_session_name, child_session_name, child_result, child_failed, child_error)
-        return False
+
+    return False
 
 
 def on_session_stopped(session_name: str, project_dir: Optional[str] = None) -> int:
@@ -84,6 +110,10 @@ def on_session_stopped(session_name: str, project_dir: Optional[str] = None) -> 
     Called when ANY session stops. If this session has pending child
     notifications queued, flush them now.
 
+    This also clears the "in-flight" flag since the resume has been processed.
+    If there are pending callbacks, a new resume job is created and the
+    in-flight flag is set again.
+
     Args:
         session_name: Name of the session that just stopped
         project_dir: Project directory of the session (for resume job)
@@ -91,14 +121,31 @@ def on_session_stopped(session_name: str, project_dir: Optional[str] = None) -> 
     Returns:
         Number of pending callbacks that were flushed
     """
+    pending = None
+    should_create_job = False
+
     with _lock:
+        # Clear in-flight flag - the resume (if any) has been processed
+        was_in_flight = session_name in _resume_in_flight
+        _resume_in_flight.discard(session_name)
+
+        if was_in_flight:
+            logger.debug(f"Cleared in-flight flag for '{session_name}'")
+
+        # Check for pending callbacks
         if session_name not in _pending_notifications:
             return 0
 
         pending = _pending_notifications.pop(session_name)
 
-    if pending:
-        logger.info(f"Session '{session_name}' stopped with {len(pending)} pending callbacks, flushing")
+        if pending:
+            # Set in-flight again for the new resume job
+            _resume_in_flight.add(session_name)
+            should_create_job = True
+            logger.info(f"Session '{session_name}' stopped with {len(pending)} pending callbacks, flushing (marked in-flight)")
+
+    # Create job outside lock
+    if should_create_job and pending:
         _create_resume_job(session_name, pending, project_dir)
         return len(pending)
 
@@ -203,12 +250,35 @@ def get_all_pending() -> Dict[str, int]:
 def clear_pending(parent_session_name: str) -> int:
     """Clear pending callbacks for a parent (e.g., if parent is deleted).
 
+    Also clears the in-flight flag if set.
+
     Returns the number of callbacks that were cleared.
     """
     with _lock:
+        # Clear in-flight flag
+        _resume_in_flight.discard(parent_session_name)
+
         if parent_session_name in _pending_notifications:
             count = len(_pending_notifications[parent_session_name])
             del _pending_notifications[parent_session_name]
             logger.info(f"Cleared {count} pending callbacks for deleted parent '{parent_session_name}'")
             return count
     return 0
+
+
+def is_resume_in_flight(parent_session_name: str) -> bool:
+    """Check if a resume job is pending for the given parent.
+
+    Useful for debugging and monitoring.
+    """
+    with _lock:
+        return parent_session_name in _resume_in_flight
+
+
+def get_all_in_flight() -> Set[str]:
+    """Get all parents with resume jobs in-flight.
+
+    Useful for debugging and monitoring.
+    """
+    with _lock:
+        return _resume_in_flight.copy()
