@@ -109,6 +109,7 @@ Agent blueprints define specialized agents with system prompts and MCP servers.
 - `03-session-with-agent.md` - Start a session with an agent blueprint
 - `04-child-agent-sync.md` - Child agent in sync mode (requires MCP server)
 - `05-child-agent-callback.md` - Child agent with callback (parent-child relationship)
+- `06-concurrent-callbacks.md` - Multiple child agents with concurrent callbacks (race condition detection)
 
 ### Category 2: Event Ordering & Content
 - Verify timestamps are sequential
