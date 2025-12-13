@@ -6,6 +6,7 @@ export interface Launcher {
   last_heartbeat: string;
   hostname: string | null;
   project_dir: string | null;
+  executor_type: string | null;
   status: LauncherStatus;
   seconds_since_heartbeat: number;
 }

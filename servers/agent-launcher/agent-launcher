@@ -40,7 +40,7 @@ import typer
 from config import LauncherConfig
 from api_client import RuntimeAPIClient
 from registry import RunningJobsRegistry
-from executor import JobExecutor, list_executors, resolve_executor_name
+from executor import JobExecutor, list_executors, resolve_executor_name, get_executor_type
 from poller import JobPoller
 from supervisor import JobSupervisor
 
@@ -124,17 +124,20 @@ class Launcher:
         """Register with Agent Runtime."""
         logger.info(f"Connecting to Agent Runtime at {self.config.agent_runtime_url}")
 
-        # Get machine hostname for registration metadata
+        # Get machine hostname and executor type for registration metadata
         hostname = socket.gethostname()
+        executor_type = get_executor_type()
 
         try:
             response = self.api_client.register(
                 hostname=hostname,
                 project_dir=self.config.project_dir,
+                executor_type=executor_type,
             )
             self.launcher_id = response.launcher_id
             logger.info(f"Registered as {self.launcher_id}")
             logger.info(f"  Hostname: {hostname}")
+            logger.info(f"  Executor type: {executor_type}")
             logger.info(f"  Poll timeout: {response.poll_timeout_seconds}s")
             logger.info(f"  Heartbeat interval: {response.heartbeat_interval_seconds}s")
             logger.info(f"  Project directory: {self.config.project_dir}")

@@ -117,7 +117,8 @@ Common data structures used by the Agent Runtime.
   "registered_at": "ISO 8601 string",
   "last_heartbeat": "ISO 8601 string",
   "hostname": "string (optional)",
-  "project_dir": "string (optional)"
+  "project_dir": "string (optional)",
+  "executor_type": "string (optional)"
 }
 ```
 
@@ -127,6 +128,7 @@ Common data structures used by the Agent Runtime.
 - `last_heartbeat` - Timestamp of the most recent heartbeat
 - `hostname` - Optional machine hostname where launcher is running
 - `project_dir` - Optional default project directory for this launcher
+- `executor_type` - Optional executor type (folder name, e.g., `claude-code`, `test-executor`)
 
 **Note:** When fetching launchers via GET /launchers, additional computed fields are included:
 - `status` - Computed status: `online`, `stale`, or `offline`

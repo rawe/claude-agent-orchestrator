@@ -66,12 +66,14 @@ class RuntimeAPIClient:
         self,
         hostname: Optional[str] = None,
         project_dir: Optional[str] = None,
+        executor_type: Optional[str] = None,
     ) -> RegistrationResponse:
         """Register this launcher with Agent Runtime.
 
         Args:
             hostname: The machine hostname where the launcher is running
             project_dir: The default project directory for this launcher
+            executor_type: The type of executor (folder name, e.g., 'claude-code')
 
         Returns registration info including launcher_id.
         """
@@ -81,6 +83,8 @@ class RuntimeAPIClient:
             metadata["hostname"] = hostname
         if project_dir:
             metadata["project_dir"] = project_dir
+        if executor_type:
+            metadata["executor_type"] = executor_type
 
         response = self._client.post(
             f"{self.base_url}/launcher/register",

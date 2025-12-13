@@ -3,7 +3,7 @@ import { launcherService } from '@/services';
 import { Launcher, LauncherStatus } from '@/types';
 import { ConfirmModal } from '@/components/common';
 import { formatRelativeTime, formatAbsoluteTime, getLastPathSegment } from '@/utils/formatters';
-import { RefreshCw, Server, Folder, Clock, Activity, Power, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Server, Folder, Clock, Activity, Power, AlertTriangle, Terminal } from 'lucide-react';
 
 interface LauncherCardProps {
   launcher: Launcher;
@@ -97,6 +97,14 @@ function LauncherCard({ launcher, isDeregistering, onDeregister }: LauncherCardP
             <span className="truncate" title={launcher.project_dir || undefined}>
               {projectFolder}
             </span>
+          </div>
+        )}
+
+        {/* Executor Type */}
+        {launcher.executor_type && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-2">
+            <Terminal className="w-3.5 h-3.5 text-gray-400" />
+            <span className="truncate">{launcher.executor_type}</span>
           </div>
         )}
 

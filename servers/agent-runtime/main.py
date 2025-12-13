@@ -637,6 +637,7 @@ class LauncherRegisterRequest(BaseModel):
     """Request body for launcher registration with metadata."""
     hostname: str | None = None
     project_dir: str | None = None
+    executor_type: str | None = None
 
 
 class LauncherRegisterResponse(BaseModel):
@@ -680,10 +681,12 @@ async def register_launcher(request: LauncherRegisterRequest | None = None):
     # Handle both empty body and JSON body
     hostname = request.hostname if request else None
     project_dir = request.project_dir if request else None
+    executor_type = request.executor_type if request else None
 
     launcher = launcher_registry.register_launcher(
         hostname=hostname,
         project_dir=project_dir,
+        executor_type=executor_type,
     )
 
     # Register with stop command queue for immediate wake-up on stop requests
@@ -695,6 +698,8 @@ async def register_launcher(request: LauncherRegisterRequest | None = None):
             print(f"[DEBUG]   hostname: {hostname}", flush=True)
         if project_dir:
             print(f"[DEBUG]   project_dir: {project_dir}", flush=True)
+        if executor_type:
+            print(f"[DEBUG]   executor_type: {executor_type}", flush=True)
 
     return LauncherRegisterResponse(
         launcher_id=launcher.launcher_id,
@@ -880,6 +885,7 @@ class LauncherWithStatus(BaseModel):
     last_heartbeat: str
     hostname: str | None = None
     project_dir: str | None = None
+    executor_type: str | None = None
     status: str  # "online", "stale", or "offline"
     seconds_since_heartbeat: float
 
@@ -913,6 +919,7 @@ async def list_launchers():
             last_heartbeat=launcher.last_heartbeat,
             hostname=launcher.hostname,
             project_dir=launcher.project_dir,
+            executor_type=launcher.executor_type,
             status=status,
             seconds_since_heartbeat=seconds,
         ))

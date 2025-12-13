@@ -105,6 +105,25 @@ def get_executor_path() -> Path:
     return executor_path
 
 
+def get_executor_type() -> str:
+    """Get executor type (folder name) from current executor path.
+
+    Extracts folder name from paths like:
+    - executors/claude-code/ao-claude-code-exec -> claude-code
+    - executors/test-executor/ao-test-exec -> test-executor
+
+    Returns:
+        Executor folder name, or 'unknown' if cannot be determined
+    """
+    try:
+        executor_path = get_executor_path()
+        # Path is: .../executors/<name>/ao-*-exec
+        # Parent is the executor folder
+        return executor_path.parent.name
+    except RuntimeError:
+        return "unknown"
+
+
 class JobExecutor:
     """Executes jobs by spawning executor subprocess with JSON payload."""
 

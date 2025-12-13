@@ -525,8 +525,9 @@ Register a new launcher instance.
 **Request Body:**
 ```json
 {
-  "hostname": "macbook-pro",  // optional
-  "project_dir": "/path"      // optional
+  "hostname": "macbook-pro",    // optional
+  "project_dir": "/path",       // optional
+  "executor_type": "claude-code" // optional - executor folder name
 }
 ```
 
@@ -697,6 +698,7 @@ List all registered launchers with their status.
       "last_heartbeat": "2025-12-10T10:05:00Z",
       "hostname": "macbook-pro",
       "project_dir": "/path/to/project",
+      "executor_type": "claude-code",
       "status": "online",
       "seconds_since_heartbeat": 15.5
     }

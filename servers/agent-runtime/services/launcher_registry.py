@@ -19,6 +19,7 @@ class LauncherInfo(BaseModel):
     # Metadata provided by the launcher
     hostname: Optional[str] = None
     project_dir: Optional[str] = None
+    executor_type: Optional[str] = None
 
 
 class LauncherRegistry:
@@ -34,12 +35,14 @@ class LauncherRegistry:
         self,
         hostname: Optional[str] = None,
         project_dir: Optional[str] = None,
+        executor_type: Optional[str] = None,
     ) -> LauncherInfo:
         """Register a new launcher and return its info.
 
         Args:
             hostname: The machine hostname where the launcher is running
             project_dir: The default project directory for this launcher
+            executor_type: The type of executor (folder name, e.g., 'claude-code')
         """
         launcher_id = f"lnch_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat()
@@ -50,6 +53,7 @@ class LauncherRegistry:
             last_heartbeat=now,
             hostname=hostname,
             project_dir=project_dir,
+            executor_type=executor_type,
         )
 
         with self._lock:
