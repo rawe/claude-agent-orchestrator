@@ -11,5 +11,21 @@
 - Only create a commit after receiving explicit confirmation from the user
 
 ## Python info
-* Use python instead of python3 for commands
-* use uv for packages instead of pip or pip3
+
+**CRITICAL: Always use `uv run` to execute Python scripts and commands.**
+
+* Use `uv run python` instead of `python` or `python3` directly
+* Use `uv run <script.py>` to run Python scripts - this ensures dependencies are available
+* NEVER use `pip`, `pip3`, or `uv sync` - the `uv run` command handles everything automatically
+* Examples:
+  - `uv run python -m main` (run a module)
+  - `uv run script.py --arg value` (run a script with arguments)
+  - `uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode` (run MCP server)
+
+## Testing
+
+Integration tests for Agent Runtime and Agent Launcher without UI. 
+
+Use SlashCommands `/tests/setup`, `/tests/case`, `/tests/run`, `/tests/teardown`. 
+
+See `tests/README.md`.

@@ -260,6 +260,12 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 | **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
 | **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 
+## Testing
+
+The framework includes an integration test suite for verifying Agent Runtime and Agent Launcher functionality. Tests can be run with either a deterministic test executor or the real Claude Code executor.
+
+See **[tests/README.md](./tests/README.md)** for setup and test case documentation.
+
 ## Documentation
 
 - **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
