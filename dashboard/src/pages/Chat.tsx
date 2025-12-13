@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { chatService } from '@/services/chatService';
 import type { Agent, Session } from '@/types';
-import { useNotification, useWebSocket, useChat } from '@/contexts';
-import { useSessions } from '@/hooks/useSessions';
+import { useNotification, useWebSocket, useChat, useSessions } from '@/contexts';
 import { Button, Spinner, Dropdown } from '@/components/common';
 import type { DropdownOption } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';

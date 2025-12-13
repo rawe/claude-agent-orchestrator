@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useSessions, useSessionEvents } from '@/hooks/useSessions';
+import { useSessionEvents } from '@/hooks/useSessions';
 import { SessionList, SessionHeader, EventTimeline } from '@/components/features/sessions';
 import { ConfirmModal, EmptyState, Button } from '@/components/common';
-import { useNotification } from '@/contexts';
+import { useNotification, useSessions } from '@/contexts';
 import { Activity, PanelLeftClose, PanelLeft, Trash2 } from 'lucide-react';
 
 export function AgentSessions() {

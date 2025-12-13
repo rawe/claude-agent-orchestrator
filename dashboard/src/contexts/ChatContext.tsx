@@ -183,18 +183,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [linkedSessionId, setLinkedSessionIdState] = useState<string | null>(initialState.linkedSessionId);
   const [mode, setMode] = useState<ChatMode>(initialState.mode);
   const [selectedBlueprint, setSelectedBlueprint] = useState<string>(initialState.selectedBlueprint);
-  const [agentStatus, setAgentStatus] = useState<string>(initialState.agentStatus);
-  const [isLoading, setIsLoading] = useState<boolean>(initialState.isLoading);
+  const [agentStatus, setAgentStatusState] = useState<string>(initialState.agentStatus);
+  const [isLoading, setIsLoadingState] = useState<boolean>(initialState.isLoading);
   const [pendingMessageId, setPendingMessageIdState] = useState<string | null>(initialState.pendingMessageId);
   const [currentToolCalls, setCurrentToolCalls] = useState<ToolCall[]>(initialState.currentToolCalls);
 
-  // Refs for WebSocket callbacks
+  // Refs for WebSocket callbacks - these must be updated synchronously to avoid race conditions
   const sessionNameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pendingMessageIdRef = useRef<string | null>(null);
   const linkedSessionIdRef = useRef<string | null>(null);
+  const agentStatusRef = useRef<string>(initialState.agentStatus);
+  const isLoadingRef = useRef<boolean>(initialState.isLoading);
 
-  // Wrapper to keep ref in sync with state
+  // Wrappers to keep refs in sync with state (synchronous updates for WebSocket handlers)
   const setSessionName = (name: string | null) => {
     setSessionNameState(name);
     sessionNameRef.current = name;
@@ -213,6 +215,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const setLinkedSessionId = (id: string | null) => {
     setLinkedSessionIdState(id);
     linkedSessionIdRef.current = id;
+  };
+
+  const setAgentStatus = (status: string) => {
+    setAgentStatusState(status);
+    agentStatusRef.current = status;
+  };
+
+  const setIsLoading = (loading: boolean) => {
+    setIsLoadingState(loading);
+    isLoadingRef.current = loading;
   };
 
   const resetChat = () => {
@@ -275,15 +287,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     currentToolCallsRef.current = currentToolCalls;
   }, [currentToolCalls]);
 
-  // Ref to track agent status for WebSocket callback (avoids stale closures)
-  const agentStatusRef = useRef<string>(agentStatus);
-
-  // Keep agentStatusRef in sync with state
-  useEffect(() => {
-    agentStatusRef.current = agentStatus;
-  }, [agentStatus]);
-
-
   // Handle WebSocket messages at context level so they're processed even when Chat tab is not active
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     const currentSessionName = sessionNameRef.current;
@@ -291,6 +294,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const currentLinkedSessionId = linkedSessionIdRef.current;
     const currentPendingMessageId = pendingMessageIdRef.current;
     const currentAgentStatus = agentStatusRef.current;
+    const currentIsLoading = isLoadingRef.current;
 
     // Capture session_id from session_created or session_updated events
     if ((message.type === 'session_created' || message.type === 'session_updated') && message.session) {
@@ -366,39 +370,58 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (message.type === 'event' && message.data) {
       const event = message.data;
 
-      // Check if this event is for our session (either by sessionId or linkedSessionId)
-      const isOurSession = currentSessionId
-        ? event.session_id === currentSessionId
-        : currentLinkedSessionId
-        ? event.session_id === currentLinkedSessionId
-        : false;
+      // Check if this event is for our session (by sessionId, linkedSessionId, or sessionName)
+      const matchesById = currentSessionId && event.session_id === currentSessionId;
+      const matchesByLinkedId = currentLinkedSessionId && event.session_id === currentLinkedSessionId;
+      const matchesByName = currentSessionName && event.session_name === currentSessionName;
+      const isOurSession = matchesById || matchesByLinkedId || matchesByName;
+
+      // If matched by name but we don't have sessionId yet, capture it
+      if (matchesByName && !currentSessionId && event.session_id) {
+        setSessionId(event.session_id);
+      }
 
       if (!isOurSession) return;
 
-      // Handle session_start event - this indicates session resumed (callback!)
+      // Handle session_start event - this indicates session resumed
       if (event.event_type === 'session_start') {
-        const wasFinished = currentAgentStatus === 'finished';
-
-        if (wasFinished && !currentPendingMessageId) {
-          // Callback resume detected - fetch updated messages
+        // Session resumed - update status to running
+        // Only set to 'running' if not already in a loading state (user might have just sent a message)
+        if (currentAgentStatus !== 'starting' && currentAgentStatus !== 'running') {
           setAgentStatus('running');
+        }
 
+        // If there's no pending message and not loading, this is a callback resume (external trigger)
+        // For callback resume, fetch updated messages from backend
+        if (!currentPendingMessageId && !currentIsLoading) {
           sessionService.getSessionEvents(event.session_id).then((events) => {
-            const updatedMessages = convertEventsToMessages(events);
+            const backendMessages = convertEventsToMessages(events);
 
-            // Add a pending message for the assistant response
-            const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-            setMessages([
-              ...updatedMessages,
-              {
-                id: newPendingId,
-                role: 'assistant',
-                content: '',
-                timestamp: new Date(),
-                status: 'pending',
-              },
-            ]);
-            setPendingMessageId(newPendingId);
+            setMessages((prevMessages) => {
+              // Check if there are any local messages that need to be preserved
+              // (pending messages or recent user messages not in backend)
+              const hasPendingMessage = prevMessages.some(m => m.status === 'pending');
+
+              // If there's already a pending message (user initiated), don't replace anything
+              // Just let the existing flow handle it
+              if (hasPendingMessage) {
+                return prevMessages;
+              }
+
+              // Pure callback resume - replace with backend messages and add pending
+              const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+              setPendingMessageId(newPendingId);
+              return [
+                ...backendMessages,
+                {
+                  id: newPendingId,
+                  role: 'assistant' as const,
+                  content: '',
+                  timestamp: new Date(),
+                  status: 'pending' as const,
+                },
+              ];
+            });
             setIsLoading(true);
             setCurrentToolCalls([]);
           });
@@ -468,28 +491,32 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // Also handle session_stop to mark completion if no message was received
-      if (event.event_type === 'session_stop' && currentPendingMessageId) {
-        // Get current tool calls to attach to the message
-        const toolCallsToAttach = [...currentToolCallsRef.current];
-
-        // Session ended - if we still have a pending message, mark it as complete
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === currentPendingMessageId && msg.status === 'pending'
-              ? {
-                  ...msg,
-                  content: msg.content || 'Session ended',
-                  status: 'complete' as const,
-                  toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
-                }
-              : msg
-          )
-        );
-        setCurrentToolCalls([]);
+      // Handle session_stop to mark completion
+      if (event.event_type === 'session_stop') {
+        // Always update agent status when session stops
         setAgentStatus('finished');
         setIsLoading(false);
-        setPendingMessageId(null);
+
+        // If we have a pending message, mark it as complete
+        if (currentPendingMessageId) {
+          // Get current tool calls to attach to the message
+          const toolCallsToAttach = [...currentToolCallsRef.current];
+
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === currentPendingMessageId && msg.status === 'pending'
+                ? {
+                    ...msg,
+                    content: msg.content || 'Session ended',
+                    status: 'complete' as const,
+                    toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+                  }
+                : msg
+            )
+          );
+          setCurrentToolCalls([]);
+          setPendingMessageId(null);
+        }
       }
     }
   }, []);
