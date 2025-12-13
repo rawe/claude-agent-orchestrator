@@ -73,71 +73,61 @@ const initialState: ChatState = {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
-// Helper function to convert SessionEvents to ChatMessages
+// ============================================================================
+// HELPER FUNCTIONS FOR MESSAGE HANDLING
+// ============================================================================
+
+/**
+ * Extract text content from event content blocks
+ */
+function extractTextContent(content: Array<{ type: string; text?: string }> | undefined): string {
+  if (!content) return '';
+  return content
+    .filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text)
+    .join('\n') || '';
+}
+
+/**
+ * Create a ChatMessage from a SessionEvent
+ */
+function createMessageFromEvent(event: SessionEvent): ChatMessage {
+  return {
+    id: `msg-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+    role: event.role as 'user' | 'assistant',
+    content: extractTextContent(event.content),
+    timestamp: new Date(event.timestamp),
+    status: 'complete',
+  };
+}
+
+/**
+ * Check if a message already exists in the messages array (deduplication)
+ * Matches by role, content, and timestamp proximity (within 2 seconds)
+ */
+function messageExists(messages: ChatMessage[], event: SessionEvent): boolean {
+  const eventContent = extractTextContent(event.content);
+  const eventTime = new Date(event.timestamp).getTime();
+
+  return messages.some(m => {
+    if (m.role !== event.role) return false;
+    if (m.content !== eventContent) return false;
+    // Within 2 seconds = same message
+    return Math.abs(m.timestamp.getTime() - eventTime) < 2000;
+  });
+}
+
+/**
+ * Convert SessionEvents to ChatMessages (used when loading session history)
+ * Handles tool call association with assistant messages
+ */
 function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
-  const messages: ChatMessage[] = [];
-  const toolCallsMap: Map<number, ToolCall[]> = new Map(); // Map message index to its tool calls
-
-  // First pass: collect all messages and build tool call associations
-  let currentAssistantMsgIndex = -1;
-  const pendingToolCalls: ToolCall[] = [];
-
-  for (const event of events) {
-    if (event.event_type === 'message' && event.role && event.content) {
-      // Flush pending tool calls to the previous assistant message
-      if (pendingToolCalls.length > 0 && currentAssistantMsgIndex >= 0) {
-        toolCallsMap.set(currentAssistantMsgIndex, [...pendingToolCalls]);
-        pendingToolCalls.length = 0;
-      }
-
-      // Extract text content from the message
-      const textContent = event.content
-        .filter((block) => block.type === 'text' && block.text)
-        .map((block) => block.text)
-        .join('\n') || '';
-
-      const msg: ChatMessage = {
-        id: `msg-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
-        role: event.role,
-        content: textContent,
-        timestamp: new Date(event.timestamp),
-        status: 'complete',
-      };
-
-      messages.push(msg);
-
-      if (event.role === 'assistant') {
-        currentAssistantMsgIndex = messages.length - 1;
-      }
-    } else if (event.event_type === 'post_tool' && event.tool_name) {
-      // Collect tool calls - they belong to the next assistant message or current one
-      pendingToolCalls.push({
-        id: `tool-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
-        name: event.tool_name,
-        status: event.error ? 'error' : 'completed',
-        timestamp: new Date(event.timestamp),
-        input: event.tool_input,
-        output: event.tool_output,
-        error: event.error,
-      });
-    }
-  }
-
-  // Flush any remaining tool calls to the last assistant message
-  if (pendingToolCalls.length > 0 && currentAssistantMsgIndex >= 0) {
-    toolCallsMap.set(currentAssistantMsgIndex, [...pendingToolCalls]);
-  }
-
-  // Second pass: attach tool calls to messages
-  // Tool calls should be attached to the assistant message that comes AFTER them
-  // We need to re-process: tool calls belong to the assistant message they precede
   const result: ChatMessage[] = [];
   let accumulatedToolCalls: ToolCall[] = [];
 
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i];
-
+  for (const event of events) {
     if (event.event_type === 'post_tool' && event.tool_name) {
+      // Accumulate tool calls - they'll be attached to the next assistant message
       accumulatedToolCalls.push({
         id: `tool-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
         name: event.tool_name,
@@ -148,10 +138,7 @@ function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
         error: event.error,
       });
     } else if (event.event_type === 'message' && event.role && event.content) {
-      const textContent = event.content
-        .filter((block) => block.type === 'text' && block.text)
-        .map((block) => block.text)
-        .join('\n') || '';
+      const textContent = extractTextContent(event.content);
 
       const msg: ChatMessage = {
         id: `msg-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
@@ -159,6 +146,7 @@ function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
         content: textContent,
         timestamp: new Date(event.timestamp),
         status: 'complete',
+        // Attach accumulated tool calls to assistant messages
         toolCalls: event.role === 'assistant' && accumulatedToolCalls.length > 0
           ? [...accumulatedToolCalls]
           : undefined,
@@ -287,8 +275,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     currentToolCallsRef.current = currentToolCalls;
   }, [currentToolCalls]);
 
-  // Handle WebSocket messages at context level so they're processed even when Chat tab is not active
+  // ============================================================================
+  // WEBSOCKET MESSAGE HANDLER
+  // ============================================================================
+  //
+  // This handler processes all WebSocket events for the chat.
+  //
+  // MESSAGE FLOW:
+  // 1. session_created/session_updated → Update session state
+  // 2. session_start → Handle session resume (callback or manual)
+  // 3. message (user OR assistant) → Add/update messages
+  // 4. post_tool → Track tool calls
+  // 5. session_stop → Mark session as finished
+  //
+  // KEY DESIGN: Both user AND assistant messages are processed uniformly.
+  // This handles callback mode where user messages come from the backend.
+  // ============================================================================
+
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
+    // Get current values from refs (avoids stale closures)
     const currentSessionName = sessionNameRef.current;
     const currentSessionId = sessionIdRef.current;
     const currentLinkedSessionId = linkedSessionIdRef.current;
@@ -296,230 +301,274 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const currentAgentStatus = agentStatusRef.current;
     const currentIsLoading = isLoadingRef.current;
 
-    // Capture session_id from session_created or session_updated events
+    // -------------------------------------------------------------------------
+    // HELPER: Check if this event/session belongs to our chat
+    // -------------------------------------------------------------------------
+    const isOurSessionById = (id: string) =>
+      (currentSessionId && id === currentSessionId) ||
+      (currentLinkedSessionId && id === currentLinkedSessionId);
+
+    const isOurSessionByName = (name: string) =>
+      currentSessionName && name === currentSessionName;
+
+    // -------------------------------------------------------------------------
+    // HANDLER: Session state changes (session_created / session_updated)
+    // -------------------------------------------------------------------------
     if ((message.type === 'session_created' || message.type === 'session_updated') && message.session) {
-      // Match by session_id (preferred) or session_name
-      const matchesById = currentSessionId && message.session.session_id === currentSessionId;
-      const matchesByLinkedId = currentLinkedSessionId && message.session.session_id === currentLinkedSessionId;
-      const matchesByName = currentSessionName && message.session.session_name === currentSessionName;
-      const isOurSession = matchesById || matchesByLinkedId || matchesByName;
-
-      if (isOurSession) {
-        setSessionId(message.session.session_id);
-
-        // Transition from 'new' to 'linked' mode once session is confirmed
-        setMode('linked');
-
-        const backendStatus = message.session.status;
-
-        // Update agent status based on backend session status
-        // Note: Callback resume is detected via session_start events, not status changes
-        if (backendStatus === 'running') {
-          setAgentStatus('running');
-        } else if (backendStatus === 'stopping') {
-          // Session is being stopped - clear pending state so user can send new messages
-          setAgentStatus('stopping');
-          if (currentPendingMessageId) {
-            // Get current tool calls to attach to the message
-            const toolCallsToAttach = [...currentToolCallsRef.current];
-            // Mark pending message as complete
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === currentPendingMessageId && msg.status === 'pending'
-                  ? {
-                      ...msg,
-                      content: msg.content || 'Session is being stopped...',
-                      status: 'complete' as const,
-                      toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
-                    }
-                  : msg
-              )
-            );
-            setCurrentToolCalls([]);
-            setIsLoading(false);
-            setPendingMessageId(null);
-          }
-        } else if (backendStatus === 'finished' || backendStatus === 'stopped') {
-          // Session is no longer running - mark as finished and clear pending state
-          setAgentStatus('finished');
-          if (currentPendingMessageId) {
-            // Get current tool calls to attach to the message
-            const toolCallsToAttach = [...currentToolCallsRef.current];
-            // Mark pending message as complete
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === currentPendingMessageId && msg.status === 'pending'
-                  ? {
-                      ...msg,
-                      content: msg.content || (backendStatus === 'stopped' ? 'Session stopped' : 'Session ended'),
-                      status: 'complete' as const,
-                      toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
-                    }
-                  : msg
-              )
-            );
-            setCurrentToolCalls([]);
-            setIsLoading(false);
-            setPendingMessageId(null);
-          }
-        }
-      }
-    }
-
-    // Handle message events - this is where we get the agent's response
-    if (message.type === 'event' && message.data) {
-      const event = message.data;
-
-      // Check if this event is for our session (by sessionId, linkedSessionId, or sessionName)
-      const matchesById = currentSessionId && event.session_id === currentSessionId;
-      const matchesByLinkedId = currentLinkedSessionId && event.session_id === currentLinkedSessionId;
-      const matchesByName = currentSessionName && event.session_name === currentSessionName;
-      const isOurSession = matchesById || matchesByLinkedId || matchesByName;
-
-      // If matched by name but we don't have sessionId yet, capture it
-      if (matchesByName && !currentSessionId && event.session_id) {
-        setSessionId(event.session_id);
-      }
+      const session = message.session;
+      const isOurSession =
+        isOurSessionById(session.session_id) ||
+        isOurSessionByName(session.session_name || '');
 
       if (!isOurSession) return;
 
-      // Handle session_start event - this indicates session resumed
+      // Capture session_id and transition to linked mode
+      setSessionId(session.session_id);
+      setMode('linked');
+
+      // Handle session status changes
+      const backendStatus = session.status;
+
+      if (backendStatus === 'running') {
+        setAgentStatus('running');
+      } else if (backendStatus === 'stopping') {
+        handleSessionStopping();
+      } else if (backendStatus === 'finished' || backendStatus === 'stopped') {
+        handleSessionFinished();
+      }
+      return;
+    }
+
+    // -------------------------------------------------------------------------
+    // HANDLER: Event messages (message, tool, lifecycle events)
+    // -------------------------------------------------------------------------
+    if (message.type === 'event' && message.data) {
+      const event = message.data;
+
+      // Check if this event is for our session
+      const isOurSession =
+        isOurSessionById(event.session_id) ||
+        isOurSessionByName(event.session_name || '');
+
+      if (!isOurSession) return;
+
+      // Capture session_id if we matched by name
+      if (!currentSessionId && event.session_id) {
+        setSessionId(event.session_id);
+      }
+
+      // --- SESSION RESUME (session_start) ---
+      // This fires when a session is resumed (e.g., callback mode)
+      // We set up pending state but DON'T return early - subsequent events need processing
       if (event.event_type === 'session_start') {
-        // Session resumed - update status to running
-        // Only set to 'running' if not already in a loading state (user might have just sent a message)
-        if (currentAgentStatus !== 'starting' && currentAgentStatus !== 'running') {
-          setAgentStatus('running');
-        }
-
-        // If there's no pending message and not loading, this is a callback resume (external trigger)
-        // For callback resume, fetch updated messages from backend
-        if (!currentPendingMessageId && !currentIsLoading) {
-          sessionService.getSessionEvents(event.session_id).then((events) => {
-            const backendMessages = convertEventsToMessages(events);
-
-            setMessages((prevMessages) => {
-              // Check if there are any local messages that need to be preserved
-              // (pending messages or recent user messages not in backend)
-              const hasPendingMessage = prevMessages.some(m => m.status === 'pending');
-
-              // If there's already a pending message (user initiated), don't replace anything
-              // Just let the existing flow handle it
-              if (hasPendingMessage) {
-                return prevMessages;
-              }
-
-              // Pure callback resume - replace with backend messages and add pending
-              const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-              setPendingMessageId(newPendingId);
-              return [
-                ...backendMessages,
-                {
-                  id: newPendingId,
-                  role: 'assistant' as const,
-                  content: '',
-                  timestamp: new Date(),
-                  status: 'pending' as const,
-                },
-              ];
-            });
-            setIsLoading(true);
-            setCurrentToolCalls([]);
-          });
-        }
-        return; // Don't process session_start as a regular event
+        handleSessionResume(currentAgentStatus, currentPendingMessageId, currentIsLoading);
+        // NO RETURN - let subsequent message events be processed
       }
 
-      // Handle assistant messages
-      if (event.event_type === 'message' && event.role === 'assistant' && currentPendingMessageId) {
-        // Extract text content from the message
-        const textContent = event.content
-          ?.filter((block: { type: string; text?: string }) => block.type === 'text' && block.text)
-          .map((block: { type: string; text?: string }) => block.text)
-          .join('\n') || '';
-
-        if (textContent) {
-          // Get current tool calls to attach to the message
-          const toolCallsToAttach = [...currentToolCallsRef.current];
-
-          // Update the pending message with the response AND attach tool calls
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === currentPendingMessageId
-                ? {
-                    ...msg,
-                    content: textContent,
-                    status: 'complete' as const,
-                    toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
-                  }
-                : msg
-            )
-          );
-          // Clear current tool calls (they're now attached to the message)
-          setCurrentToolCalls([]);
-          setAgentStatus('finished');
-          setIsLoading(false);
-          setPendingMessageId(null);
-        }
-      }
-
-      // Handle post_tool events - tool completed
-      if (event.event_type === 'post_tool' && event.tool_name) {
-        const toolName = event.tool_name;
-        const toolInput = event.tool_input;
-        const toolOutput = event.tool_output;
-        const toolError = event.error;
-        const now = Date.now();
-        setCurrentToolCalls((prev) => {
-          // Deduplicate: check if same tool was added in last 500ms
-          const recentDuplicate = prev.some(
-            (tc) => tc.name === toolName && now - tc.timestamp.getTime() < 500
-          );
-          if (recentDuplicate) return prev;
-
-          return [
-            ...prev,
-            {
-              id: `tool-${now}-${Math.random().toString(36).substring(2, 6)}`,
-              name: toolName,
-              status: toolError ? 'error' : 'completed',
-              timestamp: new Date(now),
-              input: toolInput,
-              output: toolOutput,
-              error: toolError,
-            },
-          ];
-        });
-      }
-
-      // Handle session_stop to mark completion
+      // --- SESSION STOP ---
       if (event.event_type === 'session_stop') {
-        // Always update agent status when session stops
-        setAgentStatus('finished');
-        setIsLoading(false);
+        handleSessionStop(currentPendingMessageId);
+        return;
+      }
 
-        // If we have a pending message, mark it as complete
-        if (currentPendingMessageId) {
-          // Get current tool calls to attach to the message
-          const toolCallsToAttach = [...currentToolCallsRef.current];
+      // --- MESSAGE EVENTS (user AND assistant) ---
+      // This is the unified handler for both roles
+      // Read pendingMessageId fresh from ref (not captured value) to get latest state
+      if (event.event_type === 'message' && event.role && event.content) {
+        handleMessageEvent(event, pendingMessageIdRef.current);
+        return;
+      }
 
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === currentPendingMessageId && msg.status === 'pending'
-                ? {
-                    ...msg,
-                    content: msg.content || 'Session ended',
-                    status: 'complete' as const,
-                    toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
-                  }
-                : msg
-            )
-          );
-          setCurrentToolCalls([]);
-          setPendingMessageId(null);
-        }
+      // --- TOOL EVENTS ---
+      if (event.event_type === 'post_tool' && event.tool_name) {
+        handleToolEvent(event);
+        return;
       }
     }
   }, []);
+
+  // -------------------------------------------------------------------------
+  // HANDLER FUNCTIONS (separated for clarity)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Handle session being stopped (user clicked stop)
+   * Note: Only updates status. Pending message will be completed by session_stop event.
+   */
+  function handleSessionStopping() {
+    setAgentStatus('stopping');
+    // DON'T clear pending message here - let session_stop event handle it
+  }
+
+  /**
+   * Handle session status changed to finished or stopped
+   *
+   * IMPORTANT: "finished" means agent's turn ended, NOT "session is done forever".
+   * All sessions are resumable. Only update status to enable user input.
+   * Let message events and session_stop handle pending message completion.
+   */
+  function handleSessionFinished() {
+    setAgentStatus('finished');
+    // DON'T clear pending message here!
+    // - Message events will update it with actual content
+    // - session_stop event will complete it if still pending
+  }
+
+  /**
+   * Handle session resume (callback mode or manual resume)
+   * Sets up pending assistant message for incoming response
+   */
+  function handleSessionResume(
+    currentAgentStatus: string,
+    currentPendingMessageId: string | null,
+    currentIsLoading: boolean
+  ) {
+    // Update status to running if not already in a loading state
+    if (currentAgentStatus !== 'starting' && currentAgentStatus !== 'running') {
+      setAgentStatus('running');
+    }
+
+    // If this is a callback resume (no pending message, not loading),
+    // set up state for incoming messages
+    if (!currentPendingMessageId && !currentIsLoading) {
+      const newPendingId = `msg-callback-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      setPendingMessageId(newPendingId);
+      setIsLoading(true);
+      setCurrentToolCalls([]);
+
+      // Add pending assistant message placeholder
+      setMessages(prev => [...prev, {
+        id: newPendingId,
+        role: 'assistant' as const,
+        content: '',
+        timestamp: new Date(),
+        status: 'pending' as const,
+      }]);
+    }
+  }
+
+  /**
+   * Handle session stop event
+   */
+  function handleSessionStop(pendingMessageId: string | null) {
+    setAgentStatus('finished');
+    setIsLoading(false);
+
+    if (pendingMessageId) {
+      completePendingMessage(pendingMessageId, 'Session ended');
+    }
+  }
+
+  /**
+   * UNIFIED MESSAGE HANDLER - processes both user AND assistant messages
+   * This is the key fix: callback user messages are now handled here
+   */
+  function handleMessageEvent(event: SessionEvent, pendingMessageId: string | null) {
+    const textContent = extractTextContent(event.content);
+    if (!textContent) return;
+
+    // --- USER MESSAGE ---
+    // User messages from WebSocket are typically callback results
+    // They should be inserted BEFORE the pending assistant message
+    if (event.role === 'user') {
+      setMessages(prev => {
+        // Deduplication: skip if message already exists
+        if (messageExists(prev, event)) return prev;
+
+        const newMsg = createMessageFromEvent(event);
+
+        // Find pending assistant message and insert user message before it
+        const pendingIdx = prev.findIndex(m => m.status === 'pending');
+        if (pendingIdx >= 0) {
+          return [...prev.slice(0, pendingIdx), newMsg, ...prev.slice(pendingIdx)];
+        }
+        return [...prev, newMsg];
+      });
+      return;
+    }
+
+    // --- ASSISTANT MESSAGE ---
+    if (event.role === 'assistant') {
+      if (pendingMessageId) {
+        // Update the pending message with the response
+        const toolCallsToAttach = [...currentToolCallsRef.current];
+        setMessages(prev => prev.map(msg =>
+          msg.id === pendingMessageId
+            ? {
+                ...msg,
+                content: textContent,
+                status: 'complete' as const,
+                toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+              }
+            : msg
+        ));
+        setCurrentToolCalls([]);
+        setAgentStatus('finished');
+        setIsLoading(false);
+        setPendingMessageId(null);
+      } else {
+        // No pending message - add as new complete message
+        setMessages(prev => {
+          if (messageExists(prev, event)) return prev;
+          return [...prev, createMessageFromEvent(event)];
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle tool call events
+   */
+  function handleToolEvent(event: SessionEvent) {
+    const toolName = event.tool_name!;
+    const toolInput = event.tool_input;
+    const toolOutput = event.tool_output;
+    const toolError = event.error;
+    const now = Date.now();
+
+    setCurrentToolCalls(prev => {
+      // Deduplicate: check if same tool was added in last 500ms
+      const recentDuplicate = prev.some(
+        tc => tc.name === toolName && now - tc.timestamp.getTime() < 500
+      );
+      if (recentDuplicate) return prev;
+
+      return [
+        ...prev,
+        {
+          id: `tool-${now}-${Math.random().toString(36).substring(2, 6)}`,
+          name: toolName,
+          status: toolError ? 'error' : 'completed',
+          timestamp: new Date(now),
+          input: toolInput,
+          output: toolOutput,
+          error: toolError,
+        },
+      ];
+    });
+  }
+
+  /**
+   * Complete a pending message with content
+   */
+  function completePendingMessage(pendingMessageId: string, fallbackContent: string) {
+    const toolCallsToAttach = [...currentToolCallsRef.current];
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === pendingMessageId && msg.status === 'pending'
+          ? {
+              ...msg,
+              content: msg.content || fallbackContent,
+              status: 'complete' as const,
+              toolCalls: toolCallsToAttach.length > 0 ? toolCallsToAttach : undefined,
+            }
+          : msg
+      )
+    );
+    setCurrentToolCalls([]);
+    setIsLoading(false);
+    setPendingMessageId(null);
+  }
 
   // Subscribe to WebSocket at context level
   useEffect(() => {
