@@ -1,8 +1,8 @@
 """
-Job Executor - spawns ao-exec subprocess with JSON payload via stdin.
+Job Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
 
 Maps job types to execution modes and handles subprocess spawning.
-Uses unified ao-exec entrypoint with structured JSON payloads.
+Uses unified ao-*-exec entrypoint with structured JSON payloads.
 """
 
 import json
@@ -20,24 +20,83 @@ logger = logging.getLogger(__name__)
 
 # Environment variable for executor path (relative to agent-launcher dir)
 ENV_EXECUTOR_PATH = "AGENT_EXECUTOR_PATH"
-DEFAULT_EXECUTOR_PATH = "claude-code/ao-exec"
+DEFAULT_EXECUTOR_PATH = "executors/claude-code/ao-claude-code-exec"
+
+
+def get_launcher_dir() -> Path:
+    """Get the agent-launcher directory."""
+    return Path(__file__).parent.parent.resolve()
+
+
+def get_executors_dir() -> Path:
+    """Get the executors directory."""
+    return get_launcher_dir() / "executors"
+
+
+def list_executors() -> list[str]:
+    """List available executor names (folder names in executors/).
+
+    Returns:
+        List of executor folder names sorted alphabetically
+    """
+    executors_dir = get_executors_dir()
+    if not executors_dir.exists():
+        return []
+
+    return sorted([
+        d.name for d in executors_dir.iterdir()
+        if d.is_dir() and not d.name.startswith(".")
+    ])
+
+
+def resolve_executor_name(name: str) -> str:
+    """Resolve executor name to full relative path.
+
+    Looks for ao-*-exec file inside executors/<name>/ directory.
+
+    Args:
+        name: Executor folder name (e.g., 'claude-code', 'test-executor')
+
+    Returns:
+        Relative path string (e.g., 'executors/claude-code/ao-claude-code-exec')
+
+    Raises:
+        RuntimeError: If executor folder or script not found
+    """
+    executor_dir = get_executors_dir() / name
+
+    if not executor_dir.exists():
+        available = ", ".join(list_executors()) or "none"
+        raise RuntimeError(
+            f"Executor '{name}' not found. Available: {available}"
+        )
+
+    # Find ao-*-exec file in the directory
+    exec_files = list(executor_dir.glob("ao-*-exec"))
+    if not exec_files:
+        raise RuntimeError(
+            f"No ao-*-exec script found in executors/{name}/"
+        )
+    if len(exec_files) > 1:
+        raise RuntimeError(
+            f"Multiple ao-*-exec scripts found in executors/{name}/: "
+            f"{[f.name for f in exec_files]}"
+        )
+
+    # Return relative path string
+    return f"executors/{name}/{exec_files[0].name}"
 
 
 def get_executor_path() -> Path:
     """Get path to executor script.
 
     Uses AGENT_EXECUTOR_PATH env var (relative to agent-launcher dir).
-    Default: claude-code/ao-exec
-
-    Examples:
-        AGENT_EXECUTOR_PATH=claude-code/ao-exec    (default)
-        AGENT_EXECUTOR_PATH=test-executor/test-exec
-        AGENT_EXECUTOR_PATH=openai/openai-exec
+    Default: executors/claude-code/ao-claude-code-exec
     """
     executor_rel_path = os.environ.get(ENV_EXECUTOR_PATH, DEFAULT_EXECUTOR_PATH)
 
     # Resolve relative to agent-launcher dir
-    launcher_dir = Path(__file__).parent.parent.resolve()
+    launcher_dir = get_launcher_dir()
     executor_path = launcher_dir / executor_rel_path
 
     if not executor_path.exists():
@@ -61,7 +120,7 @@ class JobExecutor:
         logger.debug(f"Executor path: {self.executor_path}")
 
     def execute(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
-        """Execute a job by spawning ao-exec with JSON payload via stdin.
+        """Execute a job by spawning ao-*-exec with JSON payload via stdin.
 
         Args:
             job: The job to execute
@@ -81,7 +140,7 @@ class JobExecutor:
         return self._execute_with_payload(job, mode)
 
     def _build_payload(self, job: Job, mode: str) -> dict:
-        """Build JSON payload for ao-exec.
+        """Build JSON payload for ao-*-exec.
 
         Args:
             job: The job to execute
@@ -129,7 +188,7 @@ class JobExecutor:
         # Set AGENT_SESSION_NAME so the session knows its own identity.
         # This allows MCP servers to include the session name in HTTP headers
         # for callback support (X-Agent-Session-Name header).
-        # Flow: Launcher sets env → ao-exec replaces ${AGENT_SESSION_NAME} in MCP config
+        # Flow: Launcher sets env → ao-*-exec replaces ${AGENT_SESSION_NAME} in MCP config
         #       → Claude sends X-Agent-Session-Name header → MCP server reads it
         env["AGENT_SESSION_NAME"] = job.session_name
 
@@ -143,7 +202,7 @@ class JobExecutor:
             logger.info(f"Resuming session: {job.session_name}")
 
         logger.debug(
-            f"Executing ao-exec: mode={mode} session={job.session_name} "
+            f"Executing ao-*-exec: mode={mode} session={job.session_name} "
             f"prompt_len={len(job.prompt)}"
         )
 

@@ -26,7 +26,7 @@ The Agent Launcher is a standalone process that polls Agent Runtime for jobs and
 The launcher will:
 1. Register with Agent Runtime
 2. Start polling for jobs
-3. Execute jobs via the configured executor (default: `claude-code/ao-exec`)
+3. Execute jobs via the configured executor (default: `executors/claude-code/ao-claude-code-exec`)
 4. Report job status back to the runtime
 
 ### Stop the Launcher
@@ -40,29 +40,64 @@ Press `Ctrl+C` for graceful shutdown.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL |
-| `AGENT_EXECUTOR_PATH` | `claude-code/ao-exec` | Executor script path (relative to agent-launcher dir) |
+| `AGENT_EXECUTOR_PATH` | `executors/claude-code/ao-claude-code-exec` | Executor script path (relative to agent-launcher dir) |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
 | `PROJECT_DIR` | Current directory | Default project directory |
 
 #### Executor Selection
 
-Use `AGENT_EXECUTOR_PATH` to switch between executors:
+Use `--executor` / `-x` to switch between executors by name:
 
 ```bash
-# Claude SDK executor (default)
-AGENT_EXECUTOR_PATH=claude-code/ao-exec ./agent-launcher
+# List available executors
+./agent-launcher --executor-list
 
-# Test/dummy executor (for testing)
-AGENT_EXECUTOR_PATH=test-executor/test-exec ./agent-launcher
+# Use Claude SDK executor (default)
+./agent-launcher -x claude-code
+
+# Use test executor
+./agent-launcher -x test-executor
+```
+
+Or use environment variable with full path:
+
+```bash
+AGENT_EXECUTOR_PATH=executors/test-executor/ao-test-exec ./agent-launcher
 ```
 
 ### CLI Options
 
 ```
---runtime-url, -r    Agent Runtime URL (overrides AGENT_ORCHESTRATOR_API_URL)
---project-dir, -p    Default project directory (overrides PROJECT_DIR)
---verbose, -v        Enable verbose logging
+--runtime-url, -r     Agent Runtime URL (overrides AGENT_ORCHESTRATOR_API_URL)
+--executor, -x        Executor name (e.g., 'claude-code', 'test-executor')
+--executor-path, -e   Full executor script path (overrides AGENT_EXECUTOR_PATH)
+--executor-list, -l   List available executors and exit
+--project-dir, -p     Default project directory (overrides PROJECT_DIR)
+--verbose, -v         Enable verbose logging
+```
+
+Note: `--executor` and `--executor-path` are mutually exclusive.
+
+## Directory Structure
+
+```
+servers/agent-launcher/
+├── agent-launcher           # Main launcher script (uv script)
+├── lib/                     # Shared libraries
+│   ├── config.py            # LauncherConfig
+│   ├── executor_config.py   # Executor Config (for ao-*-exec scripts)
+│   ├── invocation.py        # JSON payload schema
+│   ├── session_client.py    # Session API client
+│   ├── agent_api.py         # Agent blueprints API client
+│   └── ...
+├── executors/               # Executor implementations
+│   ├── claude-code/         # Claude SDK executor
+│   │   ├── ao-claude-code-exec
+│   │   └── lib/claude_client.py
+│   └── test-executor/       # Test/dummy executor
+│       └── ao-test-exec
+└── tests/                   # Unit tests
 ```
 
 ## Architecture

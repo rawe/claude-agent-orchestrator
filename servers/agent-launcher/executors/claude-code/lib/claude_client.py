@@ -3,16 +3,13 @@ Claude SDK Integration
 
 Wrapper around Claude Agent SDK for session creation and resumption.
 Uses SessionClient for API-based session management.
+
+NOTE: This module expects the launcher lib to already be in sys.path.
+      The parent executor (ao-claude-code-exec) is responsible for
+      setting up the path before importing this module.
 """
 
-import sys
 from pathlib import Path
-
-# Add launcher lib to path for shared modules (session_client, etc.)
-_launcher_lib = Path(__file__).parent.parent.parent / "lib"
-if str(_launcher_lib) not in sys.path:
-    sys.path.insert(0, str(_launcher_lib))
-
 from typing import Optional
 import asyncio
 import copy

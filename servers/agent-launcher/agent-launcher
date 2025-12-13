@@ -9,8 +9,8 @@
 """
 Agent Launcher - Connects to Agent Runtime and executes jobs.
 
-The launcher polls for jobs from Agent Runtime and executes them as
-ao-start or ao-resume subprocesses. It supports concurrent job execution
+The launcher polls for jobs from Agent Runtime and spawns executor
+subprocesses to handle them. It supports concurrent job execution
 and reports job status back to the runtime.
 
 Usage:
@@ -18,11 +18,13 @@ Usage:
 
 Environment Variables:
     AGENT_ORCHESTRATOR_API_URL - Agent Runtime URL (default: http://localhost:8765)
+    AGENT_EXECUTOR_PATH  - Executor script path (default: executors/claude-code/ao-claude-code-exec)
     POLL_TIMEOUT         - Long-poll timeout in seconds (default: 30)
     HEARTBEAT_INTERVAL   - Heartbeat interval in seconds (default: 60)
     PROJECT_DIR          - Default project directory (default: cwd)
 """
 
+import os
 import sys
 import signal
 import socket
@@ -38,7 +40,7 @@ import typer
 from config import LauncherConfig
 from api_client import RuntimeAPIClient
 from registry import RunningJobsRegistry
-from executor import JobExecutor
+from executor import JobExecutor, list_executors, resolve_executor_name
 from poller import JobPoller
 from supervisor import JobSupervisor
 
@@ -55,7 +57,7 @@ logger = logging.getLogger("agent-launcher")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-app = typer.Typer()
+app = typer.Typer(add_completion=False)
 
 
 class HeartbeatThread:
@@ -214,6 +216,24 @@ def main(
         "-r",
         help="Agent Runtime URL (env: AGENT_ORCHESTRATOR_API_URL)",
     ),
+    executor: str = typer.Option(
+        None,
+        "--executor",
+        "-x",
+        help="Executor name (e.g., 'claude-code', 'test-executor')",
+    ),
+    executor_path: str = typer.Option(
+        None,
+        "--executor-path",
+        "-e",
+        help="Full executor script path (env: AGENT_EXECUTOR_PATH)",
+    ),
+    executor_list: bool = typer.Option(
+        False,
+        "--executor-list",
+        "-l",
+        help="List available executors and exit",
+    ),
     project_dir: str = typer.Option(
         None,
         "--project-dir",
@@ -230,9 +250,25 @@ def main(
     """
     Agent Launcher - Execute jobs from Agent Runtime.
 
-    Polls Agent Runtime for jobs and executes them as ao-start or ao-resume
-    subprocesses. Supports concurrent job execution.
+    Polls Agent Runtime for jobs and spawns executor subprocesses to handle them.
+    Supports concurrent job execution.
     """
+    # Handle --executor-list
+    if executor_list:
+        executors = list_executors()
+        if executors:
+            print("Available executors:")
+            for name in executors:
+                print(f"  {name}")
+        else:
+            print("No executors found in executors/ directory")
+        raise typer.Exit(0)
+
+    # Validate mutual exclusivity of --executor and --executor-path
+    if executor and executor_path:
+        logger.error("Cannot use both --executor and --executor-path")
+        raise typer.Exit(1)
+
     # Load config
     config = LauncherConfig.from_env()
 
@@ -241,6 +277,18 @@ def main(
         config.agent_runtime_url = runtime_url
     if project_dir:
         config.project_dir = project_dir
+
+    # Set executor path via env var (executor.py reads from env)
+    if executor:
+        # Resolve name to full path
+        try:
+            resolved_path = resolve_executor_name(executor)
+            os.environ["AGENT_EXECUTOR_PATH"] = resolved_path
+        except RuntimeError as e:
+            logger.error(str(e))
+            raise typer.Exit(1)
+    elif executor_path:
+        os.environ["AGENT_EXECUTOR_PATH"] = executor_path
 
     # Set log level
     if verbose:

@@ -12,7 +12,7 @@ Echoes prompts back as responses. Does not use any AI SDK.
 Stores session data in local .test-executor-data/ folder.
 
 Usage:
-    echo '{"schema_version":"1.0","mode":"start","session_name":"test","prompt":"Hello"}' | uv run test-exec
+    echo '{"schema_version":"1.0","mode":"start","session_name":"test","prompt":"Hello"}' | uv run ao-test-exec
 """
 
 import json
@@ -22,12 +22,12 @@ from pathlib import Path
 from datetime import datetime, UTC
 
 # Add launcher lib to path for shared modules
-launcher_lib = Path(__file__).parent.parent / "lib"
+launcher_lib = Path(__file__).parent.parent.parent / "lib"
 sys.path.insert(0, str(launcher_lib))
 
 from invocation import ExecutorInvocation
 from session_client import SessionClient, SessionClientError
-from config import get_api_url
+from executor_config import get_api_url
 
 # Storage directory (git-ignored)
 DATA_DIR = Path(__file__).parent / ".test-executor-data"

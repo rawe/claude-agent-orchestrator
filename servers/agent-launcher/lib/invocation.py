@@ -1,7 +1,7 @@
 """
 Executor Invocation Payload
 
-Handles parsing and validation of JSON payloads for the unified ao-exec entrypoint.
+Handles parsing and validation of JSON payloads for the unified ao-*-exec entrypoint.
 Replaces individual CLI arguments with a structured, versioned schema.
 
 Schema version: 1.0
@@ -25,7 +25,7 @@ SUPPORTED_VERSIONS = {SCHEMA_VERSION}
 INVOCATION_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "ExecutorInvocation",
-    "description": "Payload schema for ao-exec unified executor",
+    "description": "Payload schema for ao-*-exec unified executor",
     "type": "object",
     "required": ["schema_version", "mode", "session_name", "prompt"],
     "properties": {
@@ -68,7 +68,7 @@ INVOCATION_SCHEMA = {
 @dataclass
 class ExecutorInvocation:
     """
-    Structured payload for ao-exec unified executor.
+    Structured payload for ao-*-exec unified executor.
 
     Attributes:
         schema_version: Schema version for forward compatibility

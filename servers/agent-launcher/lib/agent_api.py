@@ -12,7 +12,7 @@ import urllib.error
 import json
 from typing import Optional
 
-from config import get_api_url
+from executor_config import get_api_url
 
 
 class AgentAPIError(Exception):

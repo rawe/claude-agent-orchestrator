@@ -15,10 +15,10 @@ payload received via stdin. It replaces the separate ao-start and ao-resume
 commands with a single unified entrypoint.
 
 Usage:
-    echo '<json>' | uv run ao-exec
-    uv run ao-exec < payload.json
-    uv run ao-exec --help
-    uv run ao-exec --schema
+    echo '<json>' | uv run ao-claude-code-exec
+    uv run ao-claude-code-exec < payload.json
+    uv run ao-claude-code-exec --help
+    uv run ao-claude-code-exec --schema
 
 Configuration:
     AGENT_SESSION_NAME: Session name for MCP headers
@@ -32,7 +32,7 @@ from pathlib import Path
 
 # Add launcher lib to path for shared invocation module
 # This allows all executor types (claude-code, openai, etc.) to share the schema
-launcher_lib = Path(__file__).parent.parent / "lib"
+launcher_lib = Path(__file__).parent.parent.parent / "lib"
 sys.path.insert(0, str(launcher_lib))
 
 # Add local lib to path for executor-specific modules
@@ -46,12 +46,12 @@ app = typer.Typer(add_completion=False)
 
 
 HELP_TEXT = """
-ao-exec - Unified Claude SDK executor for Agent Orchestrator
+ao-claude-code-exec - Unified Claude SDK executor for Agent Orchestrator
 
 USAGE:
-    <json-payload> | uv run ao-exec
-    uv run ao-exec < payload.json
-    uv run ao-exec --help | --version | --schema
+    <json-payload> | uv run ao-claude-code-exec
+    uv run ao-claude-code-exec < payload.json
+    uv run ao-claude-code-exec --help | --version | --schema
 
 DESCRIPTION:
     Executes a Claude agent session (start or resume) based on a JSON
@@ -71,10 +71,10 @@ JSON PAYLOAD FORMAT:
 
 EXAMPLES:
     # Start a new session
-    echo '{"schema_version":"1.0","mode":"start","session_name":"s1","prompt":"Hello"}' | uv run ao-exec
+    echo '{"schema_version":"1.0","mode":"start","session_name":"s1","prompt":"Hello"}' | uv run ao-claude-code-exec
 
     # Resume an existing session
-    echo '{"schema_version":"1.0","mode":"resume","session_name":"s1","prompt":"Continue"}' | uv run ao-exec
+    echo '{"schema_version":"1.0","mode":"resume","session_name":"s1","prompt":"Continue"}' | uv run ao-claude-code-exec
 
 EXIT CODES:
     0    Success
@@ -111,7 +111,7 @@ def main(
         raise typer.Exit(0)
 
     if version:
-        print(f"ao-exec schema versions: {', '.join(sorted(SUPPORTED_VERSIONS))}")
+        print(f"ao-claude-code-exec schema versions: {', '.join(sorted(SUPPORTED_VERSIONS))}")
         raise typer.Exit(0)
 
     if schema:
@@ -119,7 +119,7 @@ def main(
         raise typer.Exit(0)
 
     # DEBUG LOGGING - Command entry
-    debug_log("COMMAND - ao-exec", {
+    debug_log("COMMAND - ao-claude-code-exec", {
         "cwd": str(Path.cwd()),
         "argv": sys.argv,
     })
@@ -134,7 +134,7 @@ def main(
         error_exit(f"Unexpected error parsing input: {e}")
 
     # DEBUG LOGGING - Parsed invocation
-    debug_log("COMMAND - ao-exec parsed", {
+    debug_log("COMMAND - ao-claude-code-exec parsed", {
         "mode": invocation.mode,
         "session_name": invocation.session_name,
         "agent_name": invocation.agent_name or "None",
@@ -168,7 +168,7 @@ def run_start(inv: ExecutorInvocation):
     3. Load agent blueprint if specified
     4. Run Claude session
     """
-    from config import load_config
+    from executor_config import load_config
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
@@ -221,7 +221,7 @@ def run_start(inv: ExecutorInvocation):
             mcp_servers = mcp_servers_data
 
     # DEBUG LOGGING
-    debug_log("ao-exec run_start", {
+    debug_log("ao-claude-code-exec run_start", {
         "session_name": inv.session_name,
         "project_dir": str(config.project_dir),
         "agent_name": agent_name or "None",
@@ -253,7 +253,7 @@ def run_resume(inv: ExecutorInvocation):
     3. Load agent MCP config if session has agent
     4. Run Claude session with resume
     """
-    from config import get_api_url
+    from executor_config import get_api_url
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
@@ -310,7 +310,7 @@ def run_resume(inv: ExecutorInvocation):
         mcp_servers = agent_data.get("mcp_servers")
 
     # DEBUG LOGGING
-    debug_log("ao-exec run_resume", {
+    debug_log("ao-claude-code-exec run_resume", {
         "session_name": inv.session_name,
         "session_id": resume_session_id,
         "project_dir": str(session_project_dir),
