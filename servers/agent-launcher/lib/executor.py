@@ -1,9 +1,11 @@
 """
-Job Executor - spawns ao-start and ao-resume subprocesses.
+Job Executor - spawns ao-exec subprocess with JSON payload via stdin.
 
-Maps job types to commands and handles subprocess spawning.
+Maps job types to execution modes and handles subprocess spawning.
+Uses unified ao-exec entrypoint with structured JSON payloads.
 """
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -11,6 +13,7 @@ from typing import Optional
 import logging
 
 from api_client import Job
+from invocation import SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ def discover_commands_dir() -> Path:
 
 
 class JobExecutor:
-    """Executes jobs by spawning ao-* subprocess commands."""
+    """Executes jobs by spawning ao-exec subprocess with JSON payload."""
 
     def __init__(self, default_project_dir: str):
         """Initialize executor.
@@ -46,7 +49,7 @@ class JobExecutor:
         logger.debug(f"Commands directory: {self.commands_dir}")
 
     def execute(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
-        """Execute a job by spawning the appropriate subprocess.
+        """Execute a job by spawning ao-exec with JSON payload via stdin.
 
         Args:
             job: The job to execute
@@ -55,29 +58,60 @@ class JobExecutor:
         Returns:
             The spawned subprocess.Popen object
         """
+        # Map job type to execution mode
         if job.type == "start_session":
-            return self._execute_start_session(job, parent_session_name)
+            mode = "start"
         elif job.type == "resume_session":
-            return self._execute_resume_session(job, parent_session_name)
+            mode = "resume"
         else:
             raise ValueError(f"Unknown job type: {job.type}")
 
-    def _execute_start_session(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
-        """Execute a start_session job via ao-start."""
-        ao_start = self.commands_dir / "ao-start"
+        return self._execute_with_payload(job, mode)
 
-        # Build command
-        cmd = [
-            str(ao_start),
-            job.session_name,
-            "--prompt", job.prompt,
-        ]
+    def _build_payload(self, job: Job, mode: str) -> dict:
+        """Build JSON payload for ao-exec.
 
-        if job.agent_name:
-            cmd.extend(["--agent", job.agent_name])
+        Args:
+            job: The job to execute
+            mode: Execution mode ('start' or 'resume')
 
-        project_dir = job.project_dir or self.default_project_dir
-        cmd.extend(["--project-dir", project_dir])
+        Returns:
+            Dictionary payload for JSON serialization
+        """
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "mode": mode,
+            "session_name": job.session_name,
+            "prompt": job.prompt,
+        }
+
+        # Add optional fields for start mode
+        if mode == "start":
+            if job.agent_name:
+                payload["agent_name"] = job.agent_name
+            project_dir = job.project_dir or self.default_project_dir
+            payload["project_dir"] = project_dir
+
+        return payload
+
+    def _execute_with_payload(self, job: Job, mode: str) -> subprocess.Popen:
+        """Execute ao-exec with JSON payload via stdin.
+
+        Args:
+            job: The job to execute
+            mode: Execution mode ('start' or 'resume')
+
+        Returns:
+            The spawned subprocess.Popen object
+        """
+        ao_exec = self.commands_dir / "ao-exec"
+
+        # Build JSON payload
+        payload = self._build_payload(job, mode)
+        payload_json = json.dumps(payload)
+
+        # Build command (just the executor, no args)
+        cmd = [str(ao_exec)]
 
         # Build environment
         env = os.environ.copy()
@@ -85,49 +119,36 @@ class JobExecutor:
         # Set AGENT_SESSION_NAME so the session knows its own identity.
         # This allows MCP servers to include the session name in HTTP headers
         # for callback support (X-Agent-Session-Name header).
-        # Flow: Launcher sets env → ao-start replaces ${AGENT_SESSION_NAME} in MCP config
+        # Flow: Launcher sets env → ao-exec replaces ${AGENT_SESSION_NAME} in MCP config
         #       → Claude sends X-Agent-Session-Name header → MCP server reads it
         env["AGENT_SESSION_NAME"] = job.session_name
 
-        logger.info(f"Starting session: {job.session_name}" + (f" (agent={job.agent_name})" if job.agent_name else ""))
+        # Log action (don't log full payload - prompt may be large/sensitive)
+        if mode == "start":
+            logger.info(
+                f"Starting session: {job.session_name}"
+                + (f" (agent={job.agent_name})" if job.agent_name else "")
+            )
+        else:
+            logger.info(f"Resuming session: {job.session_name}")
 
-        # Spawn subprocess
+        logger.debug(
+            f"Executing ao-exec: mode={mode} session={job.session_name} "
+            f"prompt_len={len(job.prompt)}"
+        )
+
+        # Spawn subprocess with stdin pipe
         process = subprocess.Popen(
             cmd,
-            env=env,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
             text=True,
         )
 
-        return process
-
-    def _execute_resume_session(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
-        """Execute a resume_session job via ao-resume."""
-        ao_resume = self.commands_dir / "ao-resume"
-
-        # Build command
-        cmd = [
-            str(ao_resume),
-            job.session_name,
-            "--prompt", job.prompt,
-        ]
-
-        # Build environment
-        env = os.environ.copy()
-
-        # Set AGENT_SESSION_NAME so the session knows its own identity (same as start)
-        env["AGENT_SESSION_NAME"] = job.session_name
-
-        logger.info(f"Resuming session: {job.session_name}")
-
-        # Spawn subprocess
-        process = subprocess.Popen(
-            cmd,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        # Write payload to stdin and close
+        process.stdin.write(payload_json)
+        process.stdin.close()
 
         return process
