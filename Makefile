@@ -240,13 +240,17 @@ stop-mcp-neo4j:
 	@echo "Stopping Neo4j MCP server..."
 	@cd mcps/neo4j && docker compose down
 
+# Start all MCP servers
+# - Agent Orchestrator and Context Store are REQUIRED (no prefix, will abort on failure)
+# - Atlassian, ADO, Neo4j are OPTIONAL and need external credentials (- prefix ignores failures)
+#   The "-" prefix tells Make to continue even if the command fails, showing warnings but not stopping
 start-mcps:
 	@echo "Starting all MCP servers..."
 	@$(MAKE) --no-print-directory start-mcp-agent-orchestrator
 	@$(MAKE) --no-print-directory start-mcp-context-store
-	@$(MAKE) --no-print-directory start-mcp-atlassian
-	@$(MAKE) --no-print-directory start-mcp-ado
-	@$(MAKE) --no-print-directory start-mcp-neo4j
+	-@$(MAKE) --no-print-directory start-mcp-atlassian
+	-@$(MAKE) --no-print-directory start-mcp-ado
+	-@$(MAKE) --no-print-directory start-mcp-neo4j
 
 stop-mcps:
 	@echo "Stopping all MCP servers..."
