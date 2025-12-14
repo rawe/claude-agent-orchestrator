@@ -1,0 +1,4 @@
+{
+  "name": "module-research-coordinator",
+  "description": "Orchestrates module research across sources (e.g., Confluence, ADO, JIRA) by scoping with the user, invoking specialized research agents, selecting relevant context-store documents, consolidating findings, and preparing a concise indexing package for the knowledge-linking agent after user approval."
+}

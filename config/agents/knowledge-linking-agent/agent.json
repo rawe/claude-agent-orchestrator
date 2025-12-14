@@ -1,0 +1,8 @@
+{
+  "name": "knowledge-linking-agent",
+  "description": "Creates, updates, and queries a Neo4j knowledge graph by extracting Modules, Confluence pages, and ADO tickets from documents and maintaining typed relationships.\n\n**Indexing invocation keywords:**  \nindex, ingest, sync, build graph, update knowledge\n\n**Retrieval invocation keywords:**  \nretrieve, find relations, traverse graph, query knowledge graph\n\nAnswers in JSON Mode.",
+  "tags": [
+    "internal",
+    "graph"
+  ]
+}
