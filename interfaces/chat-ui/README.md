@@ -1,0 +1,32 @@
+# Chat UI
+
+Customer-facing chat interface for the Agent Runtime.
+
+## Quick Start
+
+```bash
+npm install
+npm run dev  # http://localhost:3010
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | Agent Runtime API (default: `http://localhost:8765`) |
+| `VITE_WS_URL` | WebSocket endpoint (default: `ws://localhost:8765/ws`) |
+| `VITE_AGENT_BLUEPRINT` | Agent to use for sessions |
+| `VITE_APP_TITLE` | Header title |
+
+## Requirements
+
+Agent Runtime must be running. See `docs/agent-runtime/API.md` for API details.
+
+## Build
+
+```bash
+npm run build    # Output in dist/
+npm run preview  # Preview production build
+```
