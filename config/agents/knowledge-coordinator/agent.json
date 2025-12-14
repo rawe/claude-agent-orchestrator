@@ -1,0 +1,4 @@
+{
+  "name": "knowledge-coordinator",
+  "description": "Coordinates knowledge indexing and querying by guiding users, selecting appropriate sub-agents, consolidating research results, and orchestrating both knowledge graph construction and retrieval through specialized agents."
+}

@@ -4,8 +4,7 @@
       "type": "http",
       "url": "http://localhost:9500/mcp",
       "headers": {
-        "X-Agent-Session-Name": "${AGENT_SESSION_NAME}",
-        "X-Agent-Tags": "<your-tags>"
+        "X-Agent-Session-Name": "${AGENT_SESSION_NAME}"
       }
     },
     "context-store-http": {
