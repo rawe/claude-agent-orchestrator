@@ -1,7 +1,29 @@
-# Development docker-compose for semantic search dependencies
+# Development docker-compose for context-store dependencies
 # Start with: docker compose up -d
 
 services:
+  # Neo4j graph database
+  neo4j:
+    container_name: context-store-neo4j-dev
+    image: neo4j:5-community
+    environment:
+      - NEO4J_AUTH=neo4j/context-store-secret
+      - NEO4J_PLUGINS=[]
+      - NEO4J_server_memory_heap_initial__size=256m
+      - NEO4J_server_memory_heap_max__size=512m
+    ports:
+      - "7474:7474"  # HTTP (browser interface)
+      - "7687:7687"  # Bolt protocol
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Elasticsearch for semantic search (optional)
   elasticsearch:
     container_name: context-store-elasticsearch-dev
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
@@ -21,6 +43,9 @@ services:
       start_period: 30s
 
 volumes:
+  neo4j-data:
+    name: context-store-neo4j-data-dev
+    driver: local
   es-data:
     name: context-store-es-data-dev
     driver: local
