@@ -1,0 +1,9 @@
+{
+  "name": "knowledge-project-context-agent",
+  "description": "Retrieves and initializes project context from the Neo4j knowledge base. Returns project metadata (name, description, configured systems like Confluence/JIRA/ADO) on request. Creates the project entity when none exists.\n\n**Retrieval keywords:** project context, get project, project info\n\n**Initialization keywords:** initialize project, setup project, create project\n\nAnswers in JSON mode. Fast, minimal operations.",
+  "tags": [
+    "internal",
+    "graph",
+    "context"
+  ]
+}
