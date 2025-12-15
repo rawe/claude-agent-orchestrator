@@ -41,7 +41,11 @@ Before starting services, reset the database for a clean state:
 ./tests/scripts/reset-db
 ```
 
-### 2. Start Agent Runtime
+### 2. Copy Agent Blueprints (if needed)
+
+For tests that require agent blueprints (test cases 03-07), copy them **before** starting the Agent Runtime. See [Agent Blueprints](#agent-blueprints) section for details.
+
+### 3. Start Agent Runtime
 
 In a terminal (or background process):
 
@@ -56,7 +60,7 @@ The server runs on `http://localhost:8765`. Verify with:
 curl http://localhost:8765/health
 ```
 
-### 3. Start Agent Launcher
+### 4. Start Agent Launcher
 
 In another terminal (or background process):
 
@@ -68,7 +72,7 @@ In another terminal (or background process):
 ./servers/agent-launcher/agent-launcher -x claude-code
 ```
 
-### 4. Start WebSocket Monitor
+### 5. Start WebSocket Monitor
 
 In another terminal (or background process):
 
@@ -84,10 +88,43 @@ With services running, follow the steps in each test case under `integration/`.
 
 ### Slash Commands (for Claude Code)
 
-- `/tests/setup` - Start all services
-- `/tests/case <name>` - Run a specific test case
-- `/tests/run` - Run all tests with setup/teardown
-- `/tests/teardown` - Stop all services
+Commands are located in `.claude/commands/tests/` and provide automated test execution.
+
+| Command | Description |
+|---------|-------------|
+| `/tests:setup [executor]` | Start core services (Runtime, Launcher, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
+| `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct executor, handles test-specific setup |
+| `/tests:run` | Run all tests sequentially with automatic setup and teardown |
+| `/tests:teardown` | Stop all services and cleanup |
+
+**Typical usage:**
+```bash
+# Run a single test case (handles all setup automatically)
+/tests:case 7
+
+# Or manual control
+/tests:setup claude-code    # Start services with claude-code executor
+/tests:teardown             # Stop everything when done
+```
+
+### Documentation Scoping
+
+To avoid redundancy and maintain clarity, documentation is organized by scope:
+
+| Scope | Location | Contains |
+|-------|----------|----------|
+| **README** | `tests/README.md` | Common setup procedures, shared prerequisites (agent blueprints, MCP server), tool references |
+| **Slash Commands** | `.claude/commands/tests/*.md` | Execution flow, which services to start, how to invoke other commands |
+| **Test Cases** | `tests/integration/*.md` | Test-specific prerequisites, test steps, expected behavior, verification checklist |
+
+**Principles:**
+- **README**: "How to do X" (e.g., how to copy blueprints, how to start MCP server)
+- **Commands**: "What to do and in which order" (orchestration logic)
+- **Test Cases**: "What this test needs and verifies" (references README for how-to)
+
+Test cases reference the README for common procedures rather than duplicating instructions. For example:
+- Test case says: `agent-orchestrator` blueprint copied (see `tests/README.md` → "Agent Blueprints")
+- README explains the copy command and verification
 
 ## Agent Blueprints
 
@@ -95,30 +132,62 @@ Agent blueprints define specialized agents with system prompts and MCP servers.
 
 **Storage locations:**
 - Dockerized runtime: `config/agents/`
-- Local runtime: `.agent-orchestrator/agents/`
+- Local runtime: `servers/agent-runtime/.agent-orchestrator/agents/` (relative to Agent Runtime's working directory)
 
 **For testing:**
 - Simple agents: Create via `POST /agents` API (see `docs/agent-runtime/API.md` → Agents API)
-- Complex agents (with MCP servers): Copy the needed agent directory from `config/agents/<agent-name>/` to `.agent-orchestrator/agents/`
+- Complex agents (with MCP servers): **Copy** from `config/agents/` to `servers/agent-runtime/.agent-orchestrator/agents/`
 
-## Test Categories
+**Important**: Agent blueprints must be copied **before** starting the Agent Runtime, as blueprints are only discovered on startup.
+
+**Copying agent blueprints:**
+
+Complex agents that require MCP servers (like `agent-orchestrator`) must be copied from the central config directory to the runtime's local agents folder. Do NOT create these files manually.
+
+```bash
+# Create the agents directory if it doesn't exist
+mkdir -p servers/agent-runtime/.agent-orchestrator/agents
+
+# Copy a specific agent blueprint (e.g., agent-orchestrator)
+cp -r config/agents/agent-orchestrator servers/agent-runtime/.agent-orchestrator/agents/
+```
+
+The Agent Runtime discovers blueprints in `.agent-orchestrator/agents/` (relative to its working directory) on startup. Verify with:
+
+```bash
+curl -s http://localhost:8765/agents | grep agent-orchestrator
+```
+
+## Agent Orchestrator MCP Server
+
+Test cases 04-07 require the Agent Orchestrator MCP server for spawning child agents.
+
+**Starting the MCP server:**
+
+```bash
+uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
+```
+
+**Verify it's running:**
+
+```bash
+curl -s http://localhost:9500/mcp
+```
+
+The MCP server must be started **before** running test cases that use the `agent-orchestrator` blueprint.
+
+## Test Case
 
 ### Category 1: Basic Session Lifecycle
 - `01-basic-session-start.md` - Start a new session, verify events
 - `02-session-resume.md` - Resume an existing session
 - `03-session-with-agent.md` - Start a session with an agent blueprint
 - `04-child-agent-sync.md` - Child agent in sync mode (requires MCP server)
+
+### Category 2: Callback Feature
 - `05-child-agent-callback.md` - Child agent with callback (parent-child relationship)
 - `06-concurrent-callbacks.md` - Multiple child agents with concurrent callbacks (race condition detection)
-
-### Category 2: Event Ordering & Content
-- Verify timestamps are sequential
-- Verify session_id/session_name consistency
-- Verify message content matches expected format
-
-### Category 3: Callback Feature (Future)
-- Parent-child session coordination
-- Callback notifications on child completion
+- `07-callback-on-child-failure.md` - Parent receives failure callback when child agent fails
 
 ## Tools Reference
 

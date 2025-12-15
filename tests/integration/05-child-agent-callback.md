@@ -4,12 +4,14 @@ Verify that an orchestrator agent can spawn a child agent in callback mode with 
 
 ## Prerequisites
 
-Same as `04-child-agent-sync.md`:
 - Agent Runtime running
 - Agent Launcher running with `claude-code` executor
 - ws-monitor running
-- Agent Orchestrator MCP server running on port 9500
-- `agent-orchestrator` blueprint in `.agent-orchestrator/agents/`
+- Agent Orchestrator MCP server running on port 9500:
+  ```bash
+  uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
+  ```
+- `agent-orchestrator` blueprint copied (see `tests/README.md` → "Agent Blueprints")
 
 ## Test Steps
 

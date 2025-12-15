@@ -7,24 +7,11 @@ Verify that an orchestrator agent can spawn a child agent in synchronous mode.
 - Agent Runtime running
 - Agent Launcher running with `claude-code` executor
 - ws-monitor running
-- **Agent Orchestrator MCP server** running in HTTP mode on port 9500
-- `agent-orchestrator` blueprint copied to local agents folder
-
-## Setup
-
-### 1. Copy agent blueprint
-
-```bash
-cp -r config/agents/agent-orchestrator .agent-orchestrator/agents/
-```
-
-### 2. Start MCP server (before other services)
-
-```bash
-uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
-```
-
-Verify: Server logs should show it's listening on port 9500.
+- Agent Orchestrator MCP server running on port 9500:
+  ```bash
+  uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
+  ```
+- `agent-orchestrator` blueprint copied (see `tests/README.md` → "Agent Blueprints")
 
 ## Test Steps
 
@@ -55,7 +42,6 @@ curl -X POST http://localhost:8765/jobs \
 Watch ws-monitor for:
 1. Parent session events (test-orchestrator-001)
 2. Child session events (test-child-001)
-3. Callback/resume events when child completes
 
 ## Expected Events
 
@@ -74,17 +60,11 @@ Watch ws-monitor for:
 {"type": "event", "data": {"event_type": "session_stop", "session_name": "test-child-001", "exit_code": 0, ...}}
 ```
 
-### Parent Session Resumed (callback)
-```json
-{"type": "event", "data": {"event_type": "session_start", "session_name": "test-orchestrator-001", ...}}
-```
-
 ## Verification Checklist
 
 - [ ] Parent session created with `agent_name: "agent-orchestrator"`
 - [ ] Child session created with `parent_session_name` set to parent
 - [ ] Child session completes successfully
-- [ ] Parent session receives callback (resumes after child completes)
 - [ ] Parent session completes successfully
 
 ## Troubleshooting
@@ -94,7 +74,7 @@ Watch ws-monitor for:
 - Check port matches `agent.mcp.json` config (9500)
 
 ### Agent blueprint not found
-- Verify copied to `.agent-orchestrator/agents/agent-orchestrator/`
+- Verify blueprint is copied (see `tests/README.md` → "Agent Blueprints")
 - Check runtime logs for agent loading errors
 
 ### Child agent not starting
