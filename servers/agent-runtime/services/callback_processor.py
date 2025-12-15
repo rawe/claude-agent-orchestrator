@@ -31,7 +31,7 @@ _resume_in_flight: Set[str] = set()
 _lock = threading.Lock()
 
 
-# Callback resume prompt template
+# Callback resume prompt templates
 CALLBACK_PROMPT_TEMPLATE = """The child agent session "{child_session}" has completed.
 
 ## Child Result
@@ -39,6 +39,14 @@ CALLBACK_PROMPT_TEMPLATE = """The child agent session "{child_session}" has comp
 {child_result}
 
 Please continue with the orchestration based on this result."""
+
+CALLBACK_FAILED_PROMPT_TEMPLATE = """The child agent session "{child_session}" has failed.
+
+## Error
+
+{child_error}
+
+Please handle this failure and continue with the orchestration."""
 
 AGGREGATED_CALLBACK_PROMPT_TEMPLATE = """Multiple child agent sessions have completed.
 
@@ -192,24 +200,27 @@ def _create_resume_job(
     if len(children) == 1:
         child_name, result, failed, error = children[0]
         if failed:
-            child_result = f"Error: Child session failed.\n\n{error or 'Unknown error'}"
+            prompt = CALLBACK_FAILED_PROMPT_TEMPLATE.format(
+                child_session=child_name,
+                child_error=error or "Unknown error",
+            )
         else:
-            child_result = result or "(No result available)"
-
-        prompt = CALLBACK_PROMPT_TEMPLATE.format(
-            child_session=child_name,
-            child_result=child_result,
-        )
+            prompt = CALLBACK_PROMPT_TEMPLATE.format(
+                child_session=child_name,
+                child_result=result or "(No result available)",
+            )
     else:
         # Multiple children - aggregate results
         results_parts = []
         for child_name, result, failed, error in children:
             if failed:
-                child_result = f"Error: {error or 'Unknown error'}"
+                status = "FAILED"
+                child_result = error or "Unknown error"
             else:
+                status = "completed"
                 child_result = result or "(No result available)"
 
-            results_parts.append(f"### Child: {child_name}\n\n{child_result}")
+            results_parts.append(f"### Child: {child_name} ({status})\n\n{child_result}")
 
         prompt = AGGREGATED_CALLBACK_PROMPT_TEMPLATE.format(
             children_results="\n\n---\n\n".join(results_parts)

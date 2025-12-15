@@ -24,7 +24,7 @@ from validation import validate_agent_name
 from datetime import datetime, timezone
 
 # Import job queue and launcher registry services
-from services.job_queue import job_queue, JobCreate, Job, JobStatus
+from services.job_queue import job_queue, JobCreate, Job, JobStatus, JobType
 from services.launcher_registry import launcher_registry, LauncherInfo
 from services.stop_command_queue import stop_command_queue
 from services import callback_processor
@@ -840,6 +840,23 @@ async def report_job_failed(job_id: str, request: JobFailedRequest):
     if DEBUG:
         print(f"[DEBUG] Job {job_id} failed: {request.error}", flush=True)
 
+    # Notify parent if this was a callback job
+    if job.parent_session_name:
+        parent_session = get_session_by_name(job.parent_session_name)
+        parent_status = parent_session["status"] if parent_session else "not_found"
+
+        if DEBUG:
+            print(f"[DEBUG] Job failed for child '{job.session_name}', notifying parent '{job.parent_session_name}'", flush=True)
+
+        callback_processor.on_child_completed(
+            child_session_name=job.session_name,
+            parent_session_name=job.parent_session_name,
+            parent_status=parent_status,
+            child_result=None,
+            child_failed=True,
+            child_error=request.error,
+        )
+
     return {"ok": True}
 
 
@@ -971,6 +988,15 @@ async def create_job(job_create: JobCreate):
 
     Used by Dashboard and future ao-start to queue work.
     """
+    # For start jobs, reject if session name already exists
+    if job_create.type == JobType.START_SESSION:
+        existing = get_session_by_name(job_create.session_name)
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Session '{job_create.session_name}' already exists"
+            )
+
     job = job_queue.add_job(job_create)
 
     if DEBUG:
