@@ -7,7 +7,7 @@ import { ChatInput } from './ChatInput';
 import { config } from '../config';
 
 export function Chat() {
-  const { state, sendMessage, stopAgent, resetChat } = useChat();
+  const { state, sendMessage, stopAgent, resetChat, initializeChat } = useChat();
   const { connected } = useWebSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -74,19 +74,47 @@ export function Chat() {
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
-        {!hasMessages ? (
-          // Empty state
+        {!state.isInitialized ? (
+          // Uninitialized state - show prominent Start button
           <div className="flex flex-col items-center justify-center h-full px-4 text-center">
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center mb-6">
               <MessageSquare className="w-10 h-10 text-blue-500" />
             </div>
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              Start a conversation
+              Welcome to {config.appTitle}
             </h2>
-            <p className="text-gray-500 max-w-md">
-              Send a message to begin chatting with the AI assistant.
-              Your conversation will be processed in real-time.
+            <p className="text-gray-500 max-w-md mb-8">
+              Click the button below to start a new conversation with the AI assistant.
             </p>
+            <button
+              onClick={initializeChat}
+              disabled={!connected}
+              className={`
+                flex items-center gap-3 px-8 py-4 rounded-xl
+                text-lg font-semibold
+                transition-all duration-200
+                ${connected
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 hover:-translate-y-0.5'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+              `}
+            >
+              <Plus className="w-6 h-6" />
+              <span>Start New Chat</span>
+            </button>
+            {!connected && (
+              <p className="mt-4 text-sm text-gray-400">
+                Waiting for connection...
+              </p>
+            )}
+          </div>
+        ) : !hasMessages ? (
+          // Initialized but no messages yet (brief loading state)
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center mb-6">
+              <MessageSquare className="w-10 h-10 text-blue-500" />
+            </div>
+            <p className="text-gray-500">Initializing session...</p>
           </div>
         ) : (
           // Messages list
@@ -124,7 +152,8 @@ export function Chat() {
         onSend={sendMessage}
         onStop={stopAgent}
         isLoading={state.isLoading}
-        disabled={!connected}
+        disabled={!connected || !state.isInitialized}
+        placeholder={!state.isInitialized ? "Click 'Start New Chat' to begin..." : "Type your message..."}
       />
     </div>
   );

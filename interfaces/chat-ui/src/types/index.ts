@@ -86,7 +86,7 @@ export interface ToolCall {
 // Chat message for display (UI only)
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
   status: 'pending' | 'complete' | 'error';

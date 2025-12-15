@@ -26,7 +26,7 @@ function extractTextContent(content: ContentBlock[] | undefined): string {
 // Matches by role, content, and timestamp proximity (within 2 seconds)
 function messageExists(
   messages: ChatMessage[],
-  role: 'user' | 'assistant',
+  role: 'user' | 'assistant' | 'system',
   content: string,
   timestamp: Date
 ): boolean {
@@ -49,6 +49,7 @@ interface ChatState {
   pendingMessageId: string | null;
   currentToolCalls: ToolCall[];
   error: string | null;
+  isInitialized: boolean;
 }
 
 // Actions
@@ -58,6 +59,8 @@ type ChatAction =
   | { type: 'UPDATE_ASSISTANT_MESSAGE'; content: string }
   | { type: 'COMPLETE_ASSISTANT_MESSAGE' }
   | { type: 'ADD_ASSISTANT_MESSAGE'; message: ChatMessage }
+  | { type: 'ADD_SYSTEM_MESSAGE'; message: ChatMessage }
+  | { type: 'REMOVE_SYSTEM_MESSAGES' }
   | { type: 'ADD_TOOL_CALL'; tool: ToolCall }
   | { type: 'UPDATE_TOOL_CALL'; id: string; updates: Partial<ToolCall> }
   | { type: 'SET_SESSION'; sessionName: string; sessionId: string }
@@ -65,6 +68,7 @@ type ChatAction =
   | { type: 'SET_AGENT_STATUS'; status: AgentStatus }
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null }
+  | { type: 'SET_INITIALIZED'; initialized: boolean }
   | { type: 'RESET_CHAT' };
 
 // Initial state
@@ -77,6 +81,7 @@ const initialState: ChatState = {
   pendingMessageId: null,
   currentToolCalls: [],
   error: null,
+  isInitialized: false,
 };
 
 // Reducer
@@ -141,6 +146,24 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         messages: [...state.messages, action.message],
+      };
+
+    case 'ADD_SYSTEM_MESSAGE':
+      return {
+        ...state,
+        messages: [...state.messages, action.message],
+      };
+
+    case 'REMOVE_SYSTEM_MESSAGES':
+      return {
+        ...state,
+        messages: state.messages.filter((msg) => msg.role !== 'system'),
+      };
+
+    case 'SET_INITIALIZED':
+      return {
+        ...state,
+        isInitialized: action.initialized,
       };
 
     case 'ADD_TOOL_CALL':
@@ -212,6 +235,7 @@ interface ChatContextValue {
   sendMessage: (prompt: string) => Promise<void>;
   stopAgent: () => Promise<void>;
   resetChat: () => void;
+  initializeChat: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -255,6 +279,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     pendingMessageIdRef.current = null;
     dispatch({ type: 'RESET_CHAT' });
   }, []);
+
+  // Initialize chat - sends hidden "start" prompt to begin session
+  const initializeChat = useCallback(async () => {
+    dispatch({ type: 'SET_ERROR', error: null });
+    dispatch({ type: 'SET_INITIALIZED', initialized: true });
+
+    // Add system message "Session initializing..."
+    const systemMessage: ChatMessage = {
+      id: generateId(),
+      role: 'system',
+      content: 'Session initializing...',
+      timestamp: new Date(),
+      status: 'pending',
+    };
+    dispatch({ type: 'ADD_SYSTEM_MESSAGE', message: systemMessage });
+
+    // Add pending assistant message for agent response
+    const assistantMessageId = generateId();
+    addPendingAssistantMessage(assistantMessageId);
+
+    dispatch({ type: 'SET_AGENT_STATUS', status: 'starting' });
+
+    try {
+      const { sessionName } = await chatService.startSession('start');
+      setSession(sessionName, '');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize session';
+      dispatch({ type: 'SET_ERROR', error: errorMessage });
+      completeAssistantMessage();
+    }
+  }, [addPendingAssistantMessage, setSession, completeAssistantMessage]);
 
   // Handle WebSocket messages
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -351,6 +406,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           if (event.role === 'assistant' && event.content) {
             const textContent = extractTextContent(event.content);
             if (textContent) {
+              // Remove "Session initializing..." system message when agent responds
+              dispatch({ type: 'REMOVE_SYSTEM_MESSAGES' });
+
               if (pendingMessageIdRef.current) {
                 // Update existing pending message
                 dispatch({ type: 'UPDATE_ASSISTANT_MESSAGE', content: textContent });
@@ -437,13 +495,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [state.sessionId]);
 
-  // Reset chat
-  const resetChat = useCallback(() => {
+  // Reset chat and auto-initialize (for header "New Chat" button)
+  const resetChat = useCallback(async () => {
     resetChatState();
-  }, [resetChatState]);
+    await initializeChat();
+  }, [resetChatState, initializeChat]);
 
   return (
-    <ChatContext.Provider value={{ state, sendMessage, stopAgent, resetChat }}>
+    <ChatContext.Provider value={{ state, sendMessage, stopAgent, resetChat, initializeChat }}>
       {children}
     </ChatContext.Provider>
   );

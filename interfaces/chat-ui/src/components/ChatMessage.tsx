@@ -12,8 +12,31 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, currentToolCalls = [] }: ChatMessageProps) {
   const isUser = message.role === 'user';
+  const isSystem = message.role === 'system';
   const isPending = message.status === 'pending';
   const toolCalls = isPending ? currentToolCalls : message.toolCalls || [];
+
+  // System messages render centered without avatar
+  if (isSystem) {
+    return (
+      <div className="flex justify-center message-enter">
+        <div
+          className={`
+            inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm
+            ${isPending
+              ? 'bg-blue-50 text-blue-600 border border-blue-200'
+              : 'bg-gray-100 text-gray-600 border border-gray-200'
+            }
+          `}
+        >
+          {isPending && (
+            <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          )}
+          {message.content}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex gap-3 message-enter ${isUser ? 'flex-row-reverse' : ''}`}>

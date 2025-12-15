@@ -6,9 +6,10 @@ interface ChatInputProps {
   onStop: () => void;
   isLoading: boolean;
   disabled?: boolean;
+  placeholder?: string;
 }
 
-export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isLoading, disabled, placeholder }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -52,7 +53,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message..."
+          placeholder={placeholder || "Type your message..."}
           disabled={disabled}
           rows={1}
           className={`
