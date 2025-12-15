@@ -100,6 +100,33 @@ services:
         condition: service_healthy
 
   # ============================================================================
+  # NEO4J (Graph Database)
+  # ============================================================================
+  neo4j:
+    container_name: agent-orchestrator-neo4j
+    image: neo4j:5-community
+    ports:
+      - "7475:7474"  # HTTP browser (offset to avoid Neo4j Desktop conflict)
+      - "7688:7687"  # Bolt protocol (offset to avoid Neo4j Desktop conflict)
+    volumes:
+      - neo4j-data:/data
+    environment:
+      - NEO4J_AUTH=neo4j/agent-orchestrator
+      - NEO4J_PLUGINS=["apoc"]
+      # APOC configuration - required for apoc.meta.schema and other procedures
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ============================================================================
   # ELASTICSEARCH (for semantic search)
   # ============================================================================
   elasticsearch:
@@ -143,4 +170,7 @@ volumes:
     driver: local
   es-data:
     name: context-store-es-data
+    driver: local
+  neo4j-data:
+    name: agent-orchestrator-neo4j-data
     driver: local

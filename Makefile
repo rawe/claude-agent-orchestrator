@@ -94,6 +94,9 @@ health:
 	@echo ""
 	@echo "Context Store (port 8766):"
 	@curl -s http://localhost:8766/health || echo "  ❌ Not responding"
+	@echo ""
+	@echo "Neo4j (port 7475):"
+	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:7475 || echo "  ❌ Not responding"
 
 # Show service information
 info:
@@ -115,6 +118,12 @@ info:
 	@echo "   URL:         http://localhost:8766"
 	@echo "   Purpose:     Document storage and retrieval"
 	@echo "   Endpoints:   /health, /documents, /upload, /download"
+	@echo ""
+	@echo "🔗 NEO4J"
+	@echo "   Browser:     http://localhost:7475"
+	@echo "   Bolt:        bolt://localhost:7688"
+	@echo "   Credentials: neo4j / agent-orchestrator"
+	@echo "   Purpose:     Graph database for knowledge graphs"
 	@echo ""
 	@echo "────────────────────────────────────────────────────────────────────────────"
 	@echo "👉 To open the Dashboard in your browser:"
@@ -144,12 +153,13 @@ clean:
 	docker-compose down
 
 # Clean up everything including volumes
-# This removes: sessions, documents, and elasticsearch semantic search index
+# This removes: sessions, documents, elasticsearch index, and neo4j data
 clean-all:
 	@echo "Cleaning up everything including volumes..."
 	@echo "  - Session data (agent-orchestrator-runtime-data)"
 	@echo "  - Document storage (agent-orchestrator-document-data)"
 	@echo "  - Elasticsearch index (context-store-es-data)"
+	@echo "  - Neo4j graph data (agent-orchestrator-neo4j-data)"
 	@read -p "This will delete all persistent data. Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
