@@ -744,6 +744,50 @@ The Agent Launcher enables the following callback flow:
    └─► Can call ao-get-result to retrieve child's output
 ```
 
+## Callback Trigger Implementation
+
+This section documents where callback notifications to parent agents are triggered in the codebase.
+
+### Trigger Locations
+
+| Event | Trigger Location | Endpoint/Handler | Notes |
+|-------|------------------|------------------|-------|
+| **Success** | `main.py:406-438` | `POST /sessions/{session_id}/events` | Triggered when `session_stop` event is received |
+| **Failure** | `main.py:843-858` | `POST /launcher/jobs/{job_id}/failed` | Triggered when launcher reports job failure |
+| **Stopped** | `main.py:881-896` | `POST /launcher/jobs/{job_id}/stopped` | Triggered when launcher reports job was stopped |
+
+### Implementation Details
+
+**Success Callback** (`POST /sessions/{session_id}/events`):
+- Triggered by: Claude Code executor posting `session_stop` event via Sessions API
+- Flow: Event received → session status updated to `finished` → checks for `parent_session_name` → calls `callback_processor.on_child_completed()`
+- Result passed: Yes (retrieves child result via `get_session_result()`)
+
+**Failure Callback** (`POST /launcher/jobs/{job_id}/failed`):
+- Triggered by: Agent Launcher calling `report_failed()` when subprocess exits with error
+- Flow: Job marked as `FAILED` → checks `job.parent_session_name` → calls `callback_processor.on_child_completed(child_failed=True)`
+- Error passed: Yes (error from launcher's `request.error`)
+
+**Stopped Callback** (`POST /launcher/jobs/{job_id}/stopped`):
+- Triggered by: Agent Launcher calling `report_stopped()` after terminating a process
+- Flow: Job marked as `STOPPED` → checks `job.parent_session_name` → calls `callback_processor.on_child_completed(child_failed=True)`
+- Error passed: Yes (hardcoded message: "Session was manually stopped")
+
+### Architectural Note
+
+> **TODO: Unify Success Callback Trigger**
+>
+> Currently, success callbacks use a different pattern than failure/stopped callbacks:
+> - **Success**: Triggered via Sessions API (`POST /sessions/{id}/events`) when `session_stop` event arrives
+> - **Failure/Stopped**: Triggered via Launcher API (`POST /launcher/jobs/{id}/failed|stopped`)
+>
+> For architectural consistency, consider moving the success callback trigger to `POST /launcher/jobs/{job_id}/completed`. This would:
+> 1. Unify all callback triggers in the Launcher API endpoints
+> 2. Make the callback flow consistent across all completion types
+> 3. Simplify understanding of the callback architecture
+>
+> The current approach works because the executor posts `session_stop` events before exiting, but the Launcher also reports `completed` after the process exits. Moving the success callback to the `/completed` endpoint would create a uniform pattern.
+
 ## Implementation Plan
 
 ### Phase 1: Launcher API in Agent Runtime

@@ -416,6 +416,9 @@ async def add_session_event(session_id: str, event: Event):
                 connections.discard(ws)
 
         # Callback processing: handle child completion and pending notifications
+        # TODO: REMOVE - Move success callback to POST /launcher/jobs/{job_id}/completed
+        # This callback logic should be unified with failure/stopped callbacks in the Launcher API.
+        # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
         session_name = updated_session.get("session_name")
         parent_session_name = updated_session.get("parent_session_name")
 
@@ -436,6 +439,7 @@ async def add_session_event(session_id: str, event: Event):
                 parent_status=parent_status,
                 child_result=child_result,
             )
+        # END TODO: REMOVE
 
         # Check if this session has pending child callbacks to flush
         project_dir = updated_session.get("project_dir")
@@ -823,6 +827,29 @@ async def report_job_completed(job_id: str, request: JobCompletedRequest):
     if DEBUG:
         print(f"[DEBUG] Job {job_id} completed by launcher {request.launcher_id}", flush=True)
 
+    # TODO: ADD - Move success callback here from POST /sessions/{session_id}/events
+    # This will unify callback triggers with failure/stopped callbacks.
+    # Implementation pattern (same as report_job_failed and report_job_stopped):
+    #
+    # if job.parent_session_name:
+    #     parent_session = get_session_by_name(job.parent_session_name)
+    #     parent_status = parent_session["status"] if parent_session else "not_found"
+    #     child_session = get_session_by_name(job.session_name)
+    #     child_result = get_session_result(child_session["session_id"]) if child_session else None
+    #
+    #     if DEBUG:
+    #         print(f"[DEBUG] Job completed for child '{job.session_name}', notifying parent '{job.parent_session_name}'", flush=True)
+    #
+    #     callback_processor.on_child_completed(
+    #         child_session_name=job.session_name,
+    #         parent_session_name=job.parent_session_name,
+    #         parent_status=parent_status,
+    #         child_result=child_result,
+    #     )
+    #
+    # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
+    # END TODO: ADD
+
     return {"ok": True}
 
 
@@ -877,6 +904,23 @@ async def report_job_stopped(job_id: str, request: JobStoppedRequest):
 
     if DEBUG:
         print(f"[DEBUG] Job {job_id} stopped by launcher {request.launcher_id} (signal={request.signal})", flush=True)
+
+    # Notify parent if this was a callback job (treat as failure)
+    if job.parent_session_name:
+        parent_session = get_session_by_name(job.parent_session_name)
+        parent_status = parent_session["status"] if parent_session else "not_found"
+
+        if DEBUG:
+            print(f"[DEBUG] Job stopped for child '{job.session_name}', notifying parent '{job.parent_session_name}'", flush=True)
+
+        callback_processor.on_child_completed(
+            child_session_name=job.session_name,
+            parent_session_name=job.parent_session_name,
+            parent_status=parent_status,
+            child_result=None,
+            child_failed=True,
+            child_error="Session was manually stopped",
+        )
 
     # Update session status to 'stopped' and broadcast to WebSocket clients
     session = get_session_by_name(job.session_name)
@@ -994,7 +1038,7 @@ async def create_job(job_create: JobCreate):
         if existing:
             raise HTTPException(
                 status_code=409,
-                detail=f"Session '{job_create.session_name}' already exists"
+                detail=f"Session '{job_create.session_name}' already exists. Please use a different session name."
             )
 
     job = job_queue.add_job(job_create)
