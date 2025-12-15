@@ -22,6 +22,23 @@ function extractTextContent(content: ContentBlock[] | undefined): string {
     .join('\n') || '';
 }
 
+// Helper: Check if message already exists (deduplication for StrictMode double-mount)
+// Matches by role, content, and timestamp proximity (within 2 seconds)
+function messageExists(
+  messages: ChatMessage[],
+  role: 'user' | 'assistant',
+  content: string,
+  timestamp: Date
+): boolean {
+  const eventTime = timestamp.getTime();
+  return messages.some((m) => {
+    if (m.role !== role) return false;
+    if (m.content !== content) return false;
+    // Within 2 seconds = same message
+    return Math.abs(m.timestamp.getTime() - eventTime) < 2000;
+  });
+}
+
 // State interface
 interface ChatState {
   messages: ChatMessage[];
@@ -112,6 +129,15 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
     case 'ADD_ASSISTANT_MESSAGE':
       // Add a complete assistant message (for messages arriving after session_stop)
+      // Deduplication: skip if message already exists (StrictMode safeguard)
+      if (messageExists(
+        state.messages,
+        action.message.role,
+        action.message.content,
+        action.message.timestamp
+      )) {
+        return state;
+      }
       return {
         ...state,
         messages: [...state.messages, action.message],
@@ -195,16 +221,40 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const { subscribe } = useWebSocket();
 
   // Refs to avoid stale closures in WebSocket handler
+  // These are updated SYNCHRONOUSLY to prevent race conditions in StrictMode
   const sessionNameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pendingMessageIdRef = useRef<string | null>(null);
 
-  // Keep refs in sync with state
-  useEffect(() => {
-    sessionNameRef.current = state.sessionName;
-    sessionIdRef.current = state.sessionId;
-    pendingMessageIdRef.current = state.pendingMessageId;
-  }, [state.sessionName, state.sessionId, state.pendingMessageId]);
+  // Wrapper functions that update refs synchronously with dispatch
+  // This prevents StrictMode double-mount issues where refs lag behind state
+  const setSession = useCallback((sessionName: string, sessionId: string) => {
+    sessionNameRef.current = sessionName;
+    sessionIdRef.current = sessionId;
+    dispatch({ type: 'SET_SESSION', sessionName, sessionId });
+  }, []);
+
+  const setSessionId = useCallback((sessionId: string) => {
+    sessionIdRef.current = sessionId;
+    dispatch({ type: 'SET_SESSION_ID', sessionId });
+  }, []);
+
+  const addPendingAssistantMessage = useCallback((id: string) => {
+    pendingMessageIdRef.current = id;
+    dispatch({ type: 'ADD_PENDING_ASSISTANT_MESSAGE', id });
+  }, []);
+
+  const completeAssistantMessage = useCallback(() => {
+    pendingMessageIdRef.current = null;
+    dispatch({ type: 'COMPLETE_ASSISTANT_MESSAGE' });
+  }, []);
+
+  const resetChatState = useCallback(() => {
+    sessionNameRef.current = null;
+    sessionIdRef.current = null;
+    pendingMessageIdRef.current = null;
+    dispatch({ type: 'RESET_CHAT' });
+  }, []);
 
   // Handle WebSocket messages
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -231,7 +281,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (message.type === 'session_created' || message.type === 'session_updated') {
       const session = message.session;
       if (session.session_id && !sessionIdRef.current) {
-        dispatch({ type: 'SET_SESSION_ID', sessionId: session.session_id });
+        setSessionId(session.session_id);
       }
 
       // Update status based on session status
@@ -258,7 +308,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         case 'session_stop':
           dispatch({ type: 'SET_AGENT_STATUS', status: 'finished' });
-          dispatch({ type: 'COMPLETE_ASSISTANT_MESSAGE' });
+          completeAssistantMessage();
           break;
 
         case 'pre_tool':
@@ -323,7 +373,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           break;
       }
     }
-  }, []);
+  }, [setSessionId, completeAssistantMessage]);
 
   // Subscribe to WebSocket - use ref pattern to avoid re-subscription
   const handlerRef = useRef(handleWebSocketMessage);
@@ -353,7 +403,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     // Add pending assistant message
     const assistantMessageId = generateId();
-    dispatch({ type: 'ADD_PENDING_ASSISTANT_MESSAGE', id: assistantMessageId });
+    addPendingAssistantMessage(assistantMessageId);
 
     // Set status to starting
     dispatch({ type: 'SET_AGENT_STATUS', status: 'starting' });
@@ -362,7 +412,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (!state.sessionName) {
         // First message: start new session
         const { sessionName } = await chatService.startSession(prompt);
-        dispatch({ type: 'SET_SESSION', sessionName, sessionId: '' });
+        setSession(sessionName, '');
       } else {
         // Session exists (status=finished means idle, ready to resume)
         await chatService.resumeSession(state.sessionName, prompt);
@@ -370,9 +420,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       dispatch({ type: 'SET_ERROR', error: errorMessage });
-      dispatch({ type: 'COMPLETE_ASSISTANT_MESSAGE' });
+      completeAssistantMessage();
     }
-  }, [state.sessionName]);
+  }, [state.sessionName, addPendingAssistantMessage, setSession, completeAssistantMessage]);
 
   // Stop agent
   const stopAgent = useCallback(async () => {
@@ -389,8 +439,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Reset chat
   const resetChat = useCallback(() => {
-    dispatch({ type: 'RESET_CHAT' });
-  }, []);
+    resetChatState();
+  }, [resetChatState]);
 
   return (
     <ChatContext.Provider value={{ state, sendMessage, stopAgent, resetChat }}>
