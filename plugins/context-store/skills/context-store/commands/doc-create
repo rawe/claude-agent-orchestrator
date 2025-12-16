@@ -1,0 +1,63 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Create a placeholder document in the Context Store."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+from client import DocumentClient
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    name: str = typer.Option(..., "--name", help="Document filename (e.g., 'notes.md')"),
+    tags: str = typer.Option(None, "--tags", help="Comma-separated list of tags"),
+    description: str = typer.Option(None, "--description", help="Description of the document"),
+):
+    """Create a placeholder document without content.
+
+    Creates an empty document with metadata. Use doc-write to add content later.
+    This two-phase approach lets you reserve document IDs before generating content.
+    """
+    try:
+        # Parse tags from comma-separated string
+        parsed_tags = None
+        if tags:
+            parsed_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+
+        # Create client and create placeholder
+        config = Config()
+        client = DocumentClient(config)
+
+        result = client.create_document(
+            filename=name,
+            tags=parsed_tags,
+            description=description
+        )
+
+        # Output success result as JSON
+        print(json.dumps(result, indent=2))
+
+    except Exception as e:
+        # Output error as JSON to stderr
+        error = {"error": str(e)}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()

@@ -66,7 +66,9 @@ CONTEXT_STORE_MCP_HOST=127.0.0.1
 
 | Tool | Description |
 |------|-------------|
-| `doc_push` | Upload a document with tags/metadata |
+| `doc_create` | Create placeholder document (returns ID, use with `doc_write`) |
+| `doc_write` | Write content to existing document (full replacement) |
+| `doc_push` | Upload a file with tags/metadata |
 | `doc_query` | Query documents by name pattern and/or tags |
 | `doc_search` | Semantic search by natural language |
 | `doc_info` | Get document metadata and relations |
@@ -74,6 +76,15 @@ CONTEXT_STORE_MCP_HOST=127.0.0.1
 | `doc_pull` | Download document to filesystem |
 | `doc_delete` | Delete a document |
 | `doc_link` | Manage document relations (parent-child, peer links) |
+
+### Two-Phase Document Creation
+
+For agent-generated content, use the two-phase approach:
+
+```
+doc_create(filename="doc.md", tags="design") → returns document ID
+doc_write(document_id="doc_xxx", content="# Content...") → fills content
+```
 
 ## Client Configuration
 

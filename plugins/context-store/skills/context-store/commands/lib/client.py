@@ -503,3 +503,85 @@ class DocumentClient:
             raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
+
+    # =====================
+    # Document Create/Write API
+    # =====================
+
+    def create_document(
+        self,
+        filename: str,
+        tags: Optional[list[str]] = None,
+        description: Optional[str] = None
+    ) -> dict:
+        """Create a placeholder document without content.
+
+        Args:
+            filename: Document filename (used for content-type inference)
+            tags: List of tags for categorization
+            description: Human-readable description
+
+        Returns:
+            JSON response with document metadata including generated ID
+
+        Raises:
+            Exception: On network or HTTP errors
+        """
+        payload = {
+            "filename": filename,
+            "tags": tags or [],
+            "metadata": {}
+        }
+
+        if description:
+            payload["metadata"]["description"] = description
+
+        try:
+            response = httpx.post(
+                f"{self.base_url}/documents",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def write_document_content(
+        self,
+        document_id: str,
+        content: str | bytes
+    ) -> dict:
+        """Write content to an existing document.
+
+        Args:
+            document_id: ID of the document to write to
+            content: Content to write (string or bytes)
+
+        Returns:
+            JSON response with updated document metadata
+
+        Raises:
+            Exception: On network/HTTP errors, 404 if document not found
+        """
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+
+        try:
+            response = httpx.put(
+                f"{self.base_url}/documents/{document_id}/content",
+                content=content,
+                headers={"Content-Type": "application/octet-stream"},
+                timeout=60.0  # Longer timeout for large content
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Document not found: {document_id}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")

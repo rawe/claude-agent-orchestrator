@@ -115,3 +115,48 @@
 - Simulate multiple clients
 - Verify no race conditions
 - Check data integrity
+
+## Document Create/Write Operations
+
+### TC-16: Create Placeholder Document
+- POST /documents with JSON body (Content-Type: application/json)
+- Body: `{"filename": "test.md", "tags": ["test"]}`
+- Verify document ID returned
+- Verify size_bytes = 0
+- Verify checksum is null
+- Verify content_type inferred from filename
+
+### TC-17: Create Placeholder with Metadata
+- Create placeholder with tags and description
+- Body: `{"filename": "doc.md", "tags": ["a", "b"], "metadata": {"description": "..."}}`
+- Verify tags preserved in response
+- Verify metadata preserved in response
+
+### TC-18: Write Content to Placeholder
+- Create placeholder document via POST /documents (JSON)
+- PUT content to /documents/{id}/content
+- Verify size_bytes updated (> 0)
+- Verify checksum computed (not null)
+- Download and verify content matches
+
+### TC-19: Write Updates Existing Content
+- Upload document with initial content (multipart)
+- Write new content via PUT /documents/{id}/content
+- Verify old content replaced completely
+- Verify new checksum differs from old
+
+### TC-20: Write to Non-existent Document
+- PUT content to /documents/{invalid-id}/content
+- Verify 404 response
+
+### TC-21: Full Create-Write-Read Workflow
+- Step 1: Create placeholder document (size=0, checksum=null)
+- Step 2: Write content via PUT (size>0, checksum set)
+- Step 3: Read content back via GET
+- Verify content matches what was written
+
+### TC-22: Checksum Field in Response
+- Upload document and verify checksum in response
+- Get metadata and verify checksum present
+- Query documents and verify checksum in list items
+- Verify checksum consistency across endpoints

@@ -78,7 +78,11 @@ curl http://localhost:8766/health
 
 ### POST /documents
 
-Upload a new document with optional tags and metadata.
+Create a new document. Supports two modes based on `Content-Type` header:
+
+#### Mode 1: Upload File (multipart/form-data)
+
+Upload a file with content and optional metadata.
 
 - **Request format**: `multipart/form-data`
 - **Parameters**:
@@ -95,13 +99,53 @@ curl -X POST http://localhost:8766/documents \
   -F "metadata={\"description\":\"API usage guide for the authentication module\"}"
 ```
 
-**Response**:
+#### Mode 2: Create Placeholder (application/json)
+
+Create an empty document with metadata. Use `PUT /documents/{id}/content` to add content later.
+This is useful for agent workflows where you need to know the document ID before generating content.
+
+- **Request format**: `application/json`
+- **Body**:
+  - `filename` (required): Document filename (used for content-type inference)
+  - `tags` (optional): Array of tags
+  - `metadata` (optional): Key-value pairs
+- **Response**: 201 Created with `DocumentResponse` (size_bytes=0, checksum=null)
+
+**Example**:
+```bash
+curl -X POST http://localhost:8766/documents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "architecture.md",
+    "tags": ["design", "mvp"],
+    "metadata": {"description": "System architecture overview"}
+  }'
+```
+
+**Response** (placeholder):
+```json
+{
+  "id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+  "filename": "architecture.md",
+  "content_type": "text/markdown",
+  "size_bytes": 0,
+  "checksum": null,
+  "created_at": "2025-11-22T12:34:56.789012",
+  "updated_at": "2025-11-22T12:34:56.789012",
+  "tags": ["design", "mvp"],
+  "metadata": {"description": "System architecture overview"},
+  "url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2"
+}
+```
+
+**Response** (file upload):
 ```json
 {
   "id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2",
   "filename": "example.md",
   "content_type": "text/markdown",
   "size_bytes": 1234,
+  "checksum": "a1b2c3d4e5f6...",
   "created_at": "2025-11-22T12:34:56.789012",
   "updated_at": "2025-11-22T12:34:56.789012",
   "tags": ["documentation", "example"],
@@ -110,7 +154,67 @@ curl -X POST http://localhost:8766/documents \
 }
 ```
 
-The server generates a unique document ID, calculates a SHA256 checksum for integrity verification, detects the MIME type automatically, and provides a fully qualified URL for document retrieval.
+The server generates a unique document ID, detects the MIME type from the filename, and provides a fully qualified URL for document retrieval.
+
+### PUT /documents/{document_id}/content
+
+Write or replace content of an existing document. Use after creating a placeholder with `POST /documents` (JSON mode).
+
+- **Path parameter**: `document_id` - The document's unique identifier
+- **Request body**: Raw content (any content type)
+- **Response**: 200 OK with `DocumentResponse`
+
+**Example**:
+```bash
+# Write content to a placeholder document
+curl -X PUT http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2/content \
+  -H "Content-Type: text/plain" \
+  -d '# Architecture Overview
+
+This document describes the system architecture...'
+```
+
+**Response**:
+```json
+{
+  "id": "doc_a1b2c3d4e5f6a7b8c9d0e1f2",
+  "filename": "architecture.md",
+  "content_type": "text/markdown",
+  "size_bytes": 67,
+  "checksum": "a1b2c3d4e5f6...",
+  "created_at": "2025-11-22T12:34:56.789012",
+  "updated_at": "2025-11-22T12:35:00.123456",
+  "tags": ["design", "mvp"],
+  "metadata": {"description": "System architecture overview"},
+  "url": "http://localhost:8766/documents/doc_a1b2c3d4e5f6a7b8c9d0e1f2"
+}
+```
+
+**Behavior**:
+- Replaces the entire document content (full replacement, not append)
+- Calculates SHA256 checksum of new content
+- Updates `size_bytes` and `updated_at`
+- Re-indexes for semantic search if enabled
+- Preserves `filename`, `content_type`, `tags`, `metadata`, `created_at`
+
+**Error Responses**:
+- `404`: Document not found
+- `500`: Storage write failure
+
+**Two-Phase Workflow**:
+```bash
+# 1. Create placeholder (get ID immediately)
+curl -X POST http://localhost:8766/documents \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "report.md", "tags": ["report"]}'
+# Returns: {"id": "doc_abc123", ...}
+
+# 2. Generate content (agent work happens here)
+
+# 3. Write content to the document
+curl -X PUT http://localhost:8766/documents/doc_abc123/content \
+  -d '# Report Content...'
+```
 
 ### GET /documents
 

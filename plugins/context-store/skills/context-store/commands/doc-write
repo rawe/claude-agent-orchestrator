@@ -1,0 +1,66 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Write content to a document in the Context Store."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+from client import DocumentClient
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    document_id: str = typer.Argument(..., help="Document ID to write to"),
+    content: str = typer.Option(None, "--content", help="Content to write (alternative to stdin)"),
+):
+    """Write content to an existing document (full replacement).
+
+    Content can be provided via --content argument or piped via stdin.
+
+    Examples:
+        doc-write doc_abc123 --content "# My content"
+        echo "# Content" | doc-write doc_abc123
+        doc-write doc_abc123 < content.md
+    """
+    try:
+        # Get content from argument or stdin
+        if content is None:
+            # Read from stdin
+            if sys.stdin.isatty():
+                error = {"error": "No content provided. Use --content or pipe content via stdin."}
+                print(json.dumps(error), file=sys.stderr)
+                raise typer.Exit(1)
+            content = sys.stdin.read()
+
+        # Create client and write content
+        config = Config()
+        client = DocumentClient(config)
+
+        result = client.write_document_content(document_id, content)
+
+        # Output success result as JSON
+        print(json.dumps(result, indent=2))
+
+    except Exception as e:
+        # Output error as JSON to stderr
+        error = {"error": str(e)}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()

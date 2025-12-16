@@ -26,7 +26,7 @@ class DocumentDatabase:
                 filename TEXT NOT NULL,
                 content_type TEXT NOT NULL,
                 size_bytes INTEGER NOT NULL,
-                checksum TEXT NOT NULL,
+                checksum TEXT,
                 storage_path TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -223,6 +223,55 @@ class DocumentDatabase:
         """Delete document metadata. CASCADE automatically deletes tags and relations."""
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        self.conn.commit()
+
+        return cursor.rowcount > 0
+
+    def update_document(
+        self,
+        doc_id: str,
+        size_bytes: Optional[int] = None,
+        checksum: Optional[str] = None,
+        updated_at: Optional[datetime] = None
+    ) -> bool:
+        """Update document metadata fields.
+
+        Args:
+            doc_id: Document ID to update
+            size_bytes: New size in bytes (optional)
+            checksum: New checksum value (optional)
+            updated_at: New updated timestamp (optional, defaults to now)
+
+        Returns:
+            True if document was updated, False if not found
+        """
+        # Build dynamic update query based on provided fields
+        updates = []
+        params = []
+
+        if size_bytes is not None:
+            updates.append("size_bytes = ?")
+            params.append(size_bytes)
+
+        if checksum is not None:
+            updates.append("checksum = ?")
+            params.append(checksum)
+
+        # Always update updated_at
+        updates.append("updated_at = ?")
+        if updated_at is not None:
+            params.append(updated_at.isoformat())
+        else:
+            params.append(datetime.now().isoformat())
+
+        if not updates:
+            return False
+
+        params.append(doc_id)
+        query = f"UPDATE documents SET {', '.join(updates)} WHERE id = ?"
+
+        cursor = self.conn.cursor()
+        cursor.execute(query, params)
         self.conn.commit()
 
         return cursor.rowcount > 0

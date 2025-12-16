@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 
 
 class DocumentMetadata(BaseModel):
@@ -9,7 +10,7 @@ class DocumentMetadata(BaseModel):
     filename: str
     content_type: str
     size_bytes: int
-    checksum: str = ""  # SHA256 checksum for integrity verification
+    checksum: Optional[str] = None  # SHA256 checksum, None for placeholder documents
     storage_path: str
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -21,6 +22,13 @@ class DocumentUploadRequest(BaseModel):
     """Request model for document upload."""
     filename: str
     content_type: str = "text/markdown"
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class DocumentCreateRequest(BaseModel):
+    """Request for creating a placeholder document without content."""
+    filename: str
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
 
@@ -47,6 +55,7 @@ class DocumentResponse(BaseModel):
     filename: str
     content_type: str
     size_bytes: int
+    checksum: Optional[str] = None  # SHA256 checksum, None for placeholder documents
     created_at: datetime
     updated_at: datetime
     tags: list[str]

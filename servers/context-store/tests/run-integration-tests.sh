@@ -391,6 +391,205 @@ test_metadata_upload() {
     fi
 }
 
+# ==================== Document Create/Write Tests ====================
+
+# TC-16: Create Placeholder Document
+test_create_placeholder() {
+    log_test "TC-16: Create Placeholder Document"
+
+    response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "placeholder.md", "tags": ["test", "placeholder"]}')
+
+    doc_id=$(echo "$response" | jq -r '.id')
+    size_bytes=$(echo "$response" | jq -r '.size_bytes')
+    checksum=$(echo "$response" | jq -r '.checksum')
+    filename=$(echo "$response" | jq -r '.filename')
+
+    if [ -n "$doc_id" ] && [ "$doc_id" != "null" ] && \
+       [ "$size_bytes" = "0" ] && \
+       [ "$checksum" = "null" ] && \
+       [ "$filename" = "placeholder.md" ]; then
+        log_pass "Placeholder created: id=$doc_id, size=0, checksum=null"
+        echo "$doc_id" > /tmp/test_placeholder_id.txt
+    else
+        log_fail "Failed to create placeholder (id=$doc_id, size=$size_bytes, checksum=$checksum)"
+    fi
+}
+
+# TC-17: Create Placeholder with Metadata
+test_create_placeholder_with_metadata() {
+    log_test "TC-17: Create Placeholder with Metadata"
+
+    response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "with-meta.md", "tags": ["design", "mvp"], "metadata": {"description": "Test document", "author": "tester"}}')
+
+    doc_id=$(echo "$response" | jq -r '.id')
+    tags=$(echo "$response" | jq -r '.tags | join(",")')
+    description=$(echo "$response" | jq -r '.metadata.description')
+
+    if [ -n "$doc_id" ] && [ "$doc_id" != "null" ] && \
+       [ "$tags" = "design,mvp" ] && \
+       [ "$description" = "Test document" ]; then
+        log_pass "Placeholder with metadata created successfully"
+    else
+        log_fail "Metadata not preserved correctly (tags=$tags, desc=$description)"
+    fi
+}
+
+# TC-18: Write Content to Placeholder
+test_write_content_to_placeholder() {
+    log_test "TC-18: Write Content to Placeholder"
+
+    # Create placeholder
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "write-test.md", "tags": ["write-test"]}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    # Write content
+    content="# Test Document
+
+This is test content for the write operation."
+
+    write_response=$(curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "$content")
+
+    size_bytes=$(echo "$write_response" | jq -r '.size_bytes')
+    checksum=$(echo "$write_response" | jq -r '.checksum')
+
+    # Verify content can be read back
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$size_bytes" -gt 0 ] && \
+       [ "$checksum" != "null" ] && [ -n "$checksum" ] && \
+       [ "$read_content" = "$content" ]; then
+        log_pass "Content written successfully (size=$size_bytes, checksum set)"
+    else
+        log_fail "Write failed (size=$size_bytes, checksum=$checksum)"
+    fi
+}
+
+# TC-19: Write Updates Existing Content
+test_write_updates_content() {
+    log_test "TC-19: Write Updates Existing Content"
+
+    # Upload document with initial content
+    echo "Initial content" > /tmp/initial.txt
+    upload_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -F "file=@/tmp/initial.txt")
+    doc_id=$(echo "$upload_response" | jq -r '.id')
+    rm /tmp/initial.txt
+
+    # Write new content
+    new_content="Completely new content that replaces the old"
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "$new_content" > /dev/null
+
+    # Read back and verify
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$read_content" = "$new_content" ]; then
+        log_pass "Content updated successfully (old content replaced)"
+    else
+        log_fail "Content not updated correctly"
+    fi
+}
+
+# TC-20: Write to Non-existent Document
+test_write_nonexistent() {
+    log_test "TC-20: Write to Non-existent Document"
+
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X PUT "${SERVER_URL}/documents/nonexistent-doc-12345/content" \
+        -H "Content-Type: text/plain" \
+        -d "Some content")
+
+    if [ "$http_code" = "404" ]; then
+        log_pass "Correctly returned 404 for write to non-existent document"
+    else
+        log_fail "Expected 404, got $http_code"
+    fi
+}
+
+# TC-21: Full Create-Write-Read Workflow
+test_create_write_read_workflow() {
+    log_test "TC-21: Full Create-Write-Read Workflow"
+
+    # Step 1: Create placeholder
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "workflow-test.md", "tags": ["workflow"]}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+    initial_size=$(echo "$create_response" | jq -r '.size_bytes')
+
+    if [ "$initial_size" != "0" ]; then
+        log_fail "Step 1 failed: initial size should be 0"
+        return
+    fi
+
+    # Step 2: Write content
+    content="# Workflow Test
+
+This document tests the full create-write-read workflow.
+
+## Section 1
+Some content here.
+
+## Section 2
+More content here."
+
+    write_response=$(curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "$content")
+    written_size=$(echo "$write_response" | jq -r '.size_bytes')
+
+    if [ "$written_size" -eq 0 ]; then
+        log_fail "Step 2 failed: size should be > 0 after write"
+        return
+    fi
+
+    # Step 3: Read content back
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$read_content" = "$content" ]; then
+        log_pass "Full workflow completed: create($initial_size) -> write($written_size) -> read(verified)"
+    else
+        log_fail "Step 3 failed: read content doesn't match written content"
+    fi
+}
+
+# TC-22: Checksum Field in Response
+test_checksum_in_response() {
+    log_test "TC-22: Checksum Field in Response"
+
+    # Upload a document
+    echo "Checksum test content" > /tmp/checksum_test.txt
+    upload_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -F "file=@/tmp/checksum_test.txt")
+    doc_id=$(echo "$upload_response" | jq -r '.id')
+    upload_checksum=$(echo "$upload_response" | jq -r '.checksum')
+    rm /tmp/checksum_test.txt
+
+    # Get metadata
+    metadata_response=$(curl -s "${SERVER_URL}/documents/${doc_id}/metadata")
+    metadata_checksum=$(echo "$metadata_response" | jq -r '.checksum')
+
+    # Query documents
+    query_response=$(curl -s "${SERVER_URL}/documents?limit=1")
+    query_checksum=$(echo "$query_response" | jq -r '.[0].checksum')
+
+    if [ -n "$upload_checksum" ] && [ "$upload_checksum" != "null" ] && \
+       [ "$metadata_checksum" = "$upload_checksum" ]; then
+        log_pass "Checksum field present in responses (checksum=$upload_checksum)"
+    else
+        log_fail "Checksum field missing or inconsistent"
+    fi
+}
+
 # Summary
 print_summary() {
     echo -e "\n${YELLOW}========================================${NC}"
@@ -445,6 +644,15 @@ main() {
     test_delete_nonexistent
     test_query_with_filters
     test_metadata_upload
+
+    # Document Create/Write tests
+    test_create_placeholder
+    test_create_placeholder_with_metadata
+    test_write_content_to_placeholder
+    test_write_updates_content
+    test_write_nonexistent
+    test_create_write_read_workflow
+    test_checksum_in_response
 
     # Cleanup and print summary
     cleanup

@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from fastmcp import FastMCP
-from pydantic import Field, field_validator
+from pydantic import Field
 
 # Auto-discover commands directory if not set
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -63,6 +63,27 @@ async def run_command(command: str, args: list[str]) -> tuple[str, str, int]:
     return stdout.decode(), stderr.decode(), process.returncode or 0
 
 
+async def run_command_with_stdin(
+    command: str,
+    args: list[str],
+    stdin_data: Optional[str] = None
+) -> tuple[str, str, int]:
+    """Execute a doc-* command with optional stdin input."""
+    cmd_path = COMMAND_PATH / command
+    full_args = ["uv", "run", str(cmd_path)] + args
+
+    process = await asyncio.create_subprocess_exec(
+        *full_args,
+        stdin=subprocess.PIPE if stdin_data else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate(
+        input=stdin_data.encode() if stdin_data else None
+    )
+    return stdout.decode(), stderr.decode(), process.returncode or 0
+
+
 def format_response(stdout: str, stderr: str, exit_code: int) -> str:
     """Format command output as response string."""
     if exit_code != 0:
@@ -77,12 +98,17 @@ mcp = FastMCP(
     instructions="""Context Store MCP Server - Document management system.
 
 Use this server to:
-- Store documents with metadata and tags
+- Create placeholder documents (doc_create) and write content later (doc_write)
+- Store documents with metadata and tags (doc_push for files)
 - Query documents by name or tags
 - Semantic search for documents by meaning
 - Read document content (full or partial)
 - Download documents to local filesystem
 - Manage document relations (parent-child, peer links)
+
+Workflow for agent-generated content:
+1. doc_create(filename="doc.md", tags="...") -> returns document ID
+2. doc_write(document_id="doc_xxx", content="...") -> fills the content
 """,
 )
 
@@ -128,6 +154,76 @@ async def doc_push(
         args.extend(["--description", description])
 
     stdout, stderr, code = await run_command("doc-push", args)
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_create(
+    filename: str = Field(
+        description="Document filename (e.g., 'notes.md'). Used to infer content type.",
+    ),
+    tags: Optional[str] = Field(
+        default=None,
+        description="Comma-separated tags for categorization",
+    ),
+    description: Optional[str] = Field(
+        default=None,
+        description="Human-readable description of the document",
+    ),
+) -> str:
+    """Create a placeholder document in the Context Store.
+
+    Creates an empty document with metadata. Use doc_write to add content later.
+    This two-phase approach lets you reserve document IDs before generating content.
+
+    Returns:
+        JSON with document metadata: id, filename, content_type, size_bytes (0), url
+
+    Example:
+        doc_create(filename="architecture.md", tags="design,mvp", description="System overview")
+    """
+    args = ["--name", filename]
+    if tags:
+        args.extend(["--tags", tags])
+    if description:
+        args.extend(["--description", description])
+
+    stdout, stderr, code = await run_command("doc-create", args)
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
+async def doc_write(
+    document_id: str = Field(
+        description="The document ID to write to",
+    ),
+    content: str = Field(
+        description="The full content to write (replaces existing content)",
+    ),
+) -> str:
+    """Write content to an existing document (full replacement).
+
+    Replaces the entire content of a document. Use after doc_create to fill
+    placeholder documents, or to update existing document content.
+
+    Returns:
+        JSON with updated document metadata: id, filename, size_bytes, checksum
+
+    Example:
+        doc_write(document_id="doc_abc123", content="# My Document\\n\\nContent here...")
+    """
+    LARGE_CONTENT_THRESHOLD = 100_000  # 100KB
+
+    if len(content) > LARGE_CONTENT_THRESHOLD:
+        # Use stdin for large content
+        stdout, stderr, code = await run_command_with_stdin(
+            "doc-write", [document_id], stdin_data=content
+        )
+    else:
+        # Use --content argument for small content
+        args = [document_id, "--content", content]
+        stdout, stderr, code = await run_command("doc-write", args)
+
     return format_response(stdout, stderr, code)
 
 

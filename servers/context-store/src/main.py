@@ -1,7 +1,9 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Form, Response
+from fastapi import FastAPI, HTTPException, Query, Response, Request
+from starlette.datastructures import UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+from datetime import datetime
 import uvicorn
 import os
 import json
@@ -138,20 +140,100 @@ async def search_documents_endpoint(
 
 
 @app.post("/documents", response_model=DocumentResponse, status_code=201)
-async def upload_document(
-    file: UploadFile = File(...),
-    tags: Optional[str] = Form(None),
-    metadata: Optional[str] = Form(None)
-):
-    """Upload a new document with optional tags and metadata."""
+async def create_document(request: Request):
+    """Create a new document.
+
+    Two modes based on Content-Type header:
+    1. application/json: Create placeholder document without content
+       - Body: {"filename": "doc.md", "tags": ["tag1"], "metadata": {"key": "value"}}
+    2. multipart/form-data: Upload file with content (existing behavior)
+       - file: The file to upload
+       - tags: Comma-separated tags (optional)
+       - metadata: JSON metadata string (optional)
+    """
+    content_type_header = request.headers.get("content-type", "")
+
+    if "application/json" in content_type_header:
+        # Placeholder creation mode
+        return await _create_placeholder_document(request)
+    else:
+        # Multipart file upload mode (existing behavior)
+        return await _upload_document_file(request)
+
+
+async def _create_placeholder_document(request: Request) -> JSONResponse:
+    """Create a placeholder document without content."""
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    # Validate required fields
+    if "filename" not in body:
+        raise HTTPException(status_code=400, detail="filename is required")
+
+    filename = body["filename"]
+    tags = body.get("tags", [])
+    metadata = body.get("metadata", {})
+
+    # Validate types
+    if not isinstance(filename, str):
+        raise HTTPException(status_code=400, detail="filename must be a string")
+    if not isinstance(tags, list):
+        raise HTTPException(status_code=400, detail="tags must be a list")
+    if not isinstance(metadata, dict):
+        raise HTTPException(status_code=400, detail="metadata must be an object")
+
+    # Create placeholder document in storage
+    doc_metadata = storage.create_placeholder(filename)
+
+    # Add tags and metadata
+    doc_metadata.tags = tags
+    doc_metadata.metadata = metadata
+
+    # Insert into database
+    db.insert_document(doc_metadata)
+
+    # Do NOT index for semantic search - placeholder has no content
+
+    # Return response
+    response = DocumentResponse(
+        id=doc_metadata.id,
+        filename=doc_metadata.filename,
+        content_type=doc_metadata.content_type,
+        size_bytes=doc_metadata.size_bytes,
+        checksum=doc_metadata.checksum,
+        created_at=doc_metadata.created_at,
+        updated_at=doc_metadata.updated_at,
+        tags=doc_metadata.tags,
+        metadata=doc_metadata.metadata,
+        url=get_document_url(doc_metadata.id)
+    )
+
+    return JSONResponse(status_code=201, content=response.model_dump(mode="json"))
+
+
+async def _upload_document_file(request: Request) -> JSONResponse:
+    """Upload a document file with content (original behavior)."""
+    form = await request.form()
+
+    # Get file from form
+    file = form.get("file")
+    if not file or not isinstance(file, UploadFile):
+        raise HTTPException(status_code=400, detail="file is required")
+
     # Parse tags from comma-separated string
-    parsed_tags = [tag.strip() for tag in tags.split(",")] if tags else []
+    tags_str = form.get("tags")
+    parsed_tags = []
+    if tags_str and isinstance(tags_str, str):
+        parsed_tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()]
 
     # Parse metadata from JSON string
     parsed_metadata = {}
-    if metadata:
+    metadata_str = form.get("metadata")
+    if metadata_str and isinstance(metadata_str, str):
         try:
-            parsed_metadata = json.loads(metadata)
+            parsed_metadata = json.loads(metadata_str)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid JSON in metadata parameter")
 
@@ -184,6 +266,7 @@ async def upload_document(
         filename=doc_metadata.filename,
         content_type=doc_metadata.content_type,
         size_bytes=doc_metadata.size_bytes,
+        checksum=doc_metadata.checksum,
         created_at=doc_metadata.created_at,
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
@@ -209,6 +292,7 @@ async def get_document_metadata(document_id: str):
         filename=doc_metadata.filename,
         content_type=doc_metadata.content_type,
         size_bytes=doc_metadata.size_bytes,
+        checksum=doc_metadata.checksum,
         created_at=doc_metadata.created_at,
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
@@ -296,6 +380,73 @@ async def get_document(
     )
 
 
+@app.put("/documents/{document_id}/content", response_model=DocumentResponse)
+async def write_document_content(document_id: str, request: Request):
+    """Write or replace content of an existing document.
+
+    The request body is the raw content to write (full replacement).
+    Use after doc-create to fill placeholder documents, or to update existing content.
+
+    Returns:
+        Updated document metadata including new size_bytes and checksum
+
+    Raises:
+        404: Document not found
+        500: Storage write failure
+    """
+    # 1. Verify document exists
+    doc_metadata = db.get_document(document_id)
+    if not doc_metadata:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Read raw body content
+    content = await request.body()
+
+    # 3. Write to storage
+    try:
+        size_bytes, checksum = storage.write_document_content(document_id, content)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Storage write failed: {str(e)}")
+
+    # 4. Update database
+    now = datetime.now()
+    db.update_document(
+        document_id,
+        size_bytes=size_bytes,
+        checksum=checksum,
+        updated_at=now
+    )
+
+    # 5. Re-index for semantic search if enabled
+    if semantic_config.enabled:
+        from .semantic.indexer import delete_document_index, index_document
+
+        # Delete old chunks first
+        delete_document_index(document_id)
+
+        # Index new content (only for text types with content)
+        if doc_metadata.content_type.startswith("text/") and len(content) > 0:
+            text_content = content.decode("utf-8", errors="ignore")
+            index_document(document_id, text_content)
+
+    # 6. Fetch and return updated metadata
+    updated_metadata = db.get_document(document_id)
+    return DocumentResponse(
+        id=updated_metadata.id,
+        filename=updated_metadata.filename,
+        content_type=updated_metadata.content_type,
+        size_bytes=updated_metadata.size_bytes,
+        checksum=updated_metadata.checksum,
+        created_at=updated_metadata.created_at,
+        updated_at=updated_metadata.updated_at,
+        tags=updated_metadata.tags,
+        metadata=updated_metadata.metadata,
+        url=get_document_url(updated_metadata.id)
+    )
+
+
 def _group_relations_for_response(relations: list[dict]) -> dict[str, list[RelationInfo]]:
     """Group relation dicts by relation_type and convert to RelationInfo."""
     grouped: dict[str, list[RelationInfo]] = {}
@@ -349,6 +500,7 @@ async def list_documents(
             filename=doc.filename,
             content_type=doc.content_type,
             size_bytes=doc.size_bytes,
+            checksum=doc.checksum,
             created_at=doc.created_at,
             updated_at=doc.updated_at,
             tags=doc.tags,

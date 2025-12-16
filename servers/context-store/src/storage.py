@@ -29,6 +29,19 @@ def _init_custom_mime_types():
 _init_custom_mime_types()
 
 
+def infer_content_type(filename: str) -> str:
+    """Infer MIME type from filename extension.
+
+    Args:
+        filename: Document filename
+
+    Returns:
+        MIME type string (defaults to application/octet-stream if unknown)
+    """
+    content_type = mimetypes.guess_type(filename)[0]
+    return content_type if content_type else "application/octet-stream"
+
+
 class DocumentStorage:
     """Manages document storage on the filesystem."""
 
@@ -97,3 +110,62 @@ class DocumentStorage:
         except ValueError:
             # Path traversal attempt
             return False
+
+    def create_placeholder(self, filename: str, content_type: str | None = None) -> DocumentMetadata:
+        """Create an empty placeholder document.
+
+        Args:
+            filename: Document filename (used for content-type inference if not provided)
+            content_type: Optional MIME type (inferred from filename if not provided)
+
+        Returns:
+            DocumentMetadata with generated ID, empty file, checksum=None, size_bytes=0
+        """
+        # Generate unique document ID
+        doc_id = f"doc_{secrets.token_hex(12)}"
+
+        # Infer content type from filename if not provided
+        if not content_type:
+            content_type = infer_content_type(filename)
+
+        # Create empty file (0 bytes)
+        file_path = self.base_dir / doc_id
+        file_path.touch()
+
+        # Return metadata with checksum=None to indicate placeholder
+        return DocumentMetadata(
+            id=doc_id,
+            filename=filename,
+            content_type=content_type,
+            size_bytes=0,
+            checksum=None,
+            storage_path=str(file_path)
+        )
+
+    def write_document_content(self, doc_id: str, content: bytes) -> tuple[int, str]:
+        """Write content to an existing document file.
+
+        Args:
+            doc_id: Document ID
+            content: Content bytes to write
+
+        Returns:
+            Tuple of (size_bytes, checksum)
+
+        Raises:
+            ValueError: If document path is invalid (path traversal)
+            FileNotFoundError: If document file doesn't exist
+        """
+        file_path = self.get_document_path(doc_id)
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"Document file not found: {doc_id}")
+
+        # Write content (full replacement)
+        file_path.write_bytes(content)
+
+        # Calculate checksum and size
+        checksum = hashlib.sha256(content).hexdigest()
+        size_bytes = len(content)
+
+        return size_bytes, checksum
