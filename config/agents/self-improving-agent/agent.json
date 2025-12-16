@@ -1,0 +1,4 @@
+{
+  "name": "self-improving-agent",
+  "description": "An agent which can improve himself by updating his system prompt. "
+}
