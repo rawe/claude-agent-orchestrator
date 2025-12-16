@@ -590,6 +590,314 @@ test_checksum_in_response() {
     fi
 }
 
+# ==================== Document Edit Tests ====================
+
+# TC-23: String Replacement - Unique Match
+test_edit_string_unique() {
+    log_test "TC-23: String Replacement - Unique Match"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-test.md", "tags": ["edit"]}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    # Write initial content
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "Hello world, hello universe" > /dev/null
+
+    # Edit: replace "world" with "planet"
+    edit_response=$(curl -s -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"old_string": "world", "new_string": "planet"}')
+
+    replacements=$(echo "$edit_response" | jq -r '.replacements_made')
+
+    # Read back and verify
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$replacements" = "1" ] && [ "$read_content" = "Hello planet, hello universe" ]; then
+        log_pass "String replacement successful (replacements_made=1)"
+    else
+        log_fail "String replacement failed (replacements=$replacements, content=$read_content)"
+    fi
+}
+
+# TC-24: String Replacement - Replace All
+test_edit_string_replace_all() {
+    log_test "TC-24: String Replacement - Replace All"
+
+    # Create document with repeated content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-all.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    # Write content with multiple occurrences
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "TODO: item1, TODO: item2, TODO: item3" > /dev/null
+
+    # Edit: replace all "TODO" with "DONE"
+    edit_response=$(curl -s -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"old_string": "TODO", "new_string": "DONE", "replace_all": true}')
+
+    replacements=$(echo "$edit_response" | jq -r '.replacements_made')
+
+    # Read back and verify
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$replacements" = "3" ] && [ "$read_content" = "DONE: item1, DONE: item2, DONE: item3" ]; then
+        log_pass "Replace all successful (replacements_made=3)"
+    else
+        log_fail "Replace all failed (replacements=$replacements)"
+    fi
+}
+
+# TC-25: String Replacement - Not Found Error
+test_edit_string_not_found() {
+    log_test "TC-25: String Replacement - Not Found Error"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-notfound.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "Hello world" > /dev/null
+
+    # Try to replace non-existent string
+    http_code=$(curl -s -o /tmp/edit_response.json -w "%{http_code}" \
+        -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"old_string": "missing", "new_string": "replacement"}')
+
+    if [ "$http_code" = "400" ]; then
+        log_pass "Correctly returned 400 for string not found"
+    else
+        log_fail "Expected 400, got $http_code"
+    fi
+}
+
+# TC-26: String Replacement - Ambiguous Match Error
+test_edit_string_ambiguous() {
+    log_test "TC-26: String Replacement - Ambiguous Match Error"
+
+    # Create document with repeated content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-ambiguous.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "the the the" > /dev/null
+
+    # Try to replace without replace_all
+    http_code=$(curl -s -o /tmp/edit_response.json -w "%{http_code}" \
+        -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"old_string": "the", "new_string": "a"}')
+
+    if [ "$http_code" = "400" ]; then
+        log_pass "Correctly returned 400 for ambiguous match"
+    else
+        log_fail "Expected 400, got $http_code"
+    fi
+}
+
+# TC-27: Offset Insert (length=0)
+test_edit_offset_insert() {
+    log_test "TC-27: Offset Insert (length=0)"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-insert.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "ABCDEF" > /dev/null
+
+    # Insert "XYZ" at position 3
+    edit_response=$(curl -s -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"offset": 3, "new_string": "XYZ"}')
+
+    edit_offset=$(echo "$edit_response" | jq -r '.edit_range.offset')
+    old_length=$(echo "$edit_response" | jq -r '.edit_range.old_length')
+    new_length=$(echo "$edit_response" | jq -r '.edit_range.new_length')
+
+    # Read back and verify
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$read_content" = "ABCXYZDEF" ] && [ "$edit_offset" = "3" ] && [ "$old_length" = "0" ] && [ "$new_length" = "3" ]; then
+        log_pass "Offset insert successful (ABCDEF -> ABCXYZDEF)"
+    else
+        log_fail "Offset insert failed (content=$read_content)"
+    fi
+}
+
+# TC-28: Offset Replace (length > 0)
+test_edit_offset_replace() {
+    log_test "TC-28: Offset Replace (length > 0)"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-replace.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "ABCDEF" > /dev/null
+
+    # Replace 2 chars at position 2 with "XY"
+    edit_response=$(curl -s -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"offset": 2, "length": 2, "new_string": "XY"}')
+
+    # Read back and verify
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$read_content" = "ABXYEF" ]; then
+        log_pass "Offset replace successful (ABCDEF -> ABXYEF)"
+    else
+        log_fail "Offset replace failed (content=$read_content)"
+    fi
+}
+
+# TC-29: Offset Delete (empty new_string)
+test_edit_offset_delete() {
+    log_test "TC-29: Offset Delete (empty new_string)"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-delete.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "ABCDEF" > /dev/null
+
+    # Delete 2 chars at position 2
+    edit_response=$(curl -s -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"offset": 2, "length": 2, "new_string": ""}')
+
+    # Read back and verify
+    read_content=$(curl -s "${SERVER_URL}/documents/${doc_id}")
+
+    if [ "$read_content" = "ABEF" ]; then
+        log_pass "Offset delete successful (ABCDEF -> ABEF)"
+    else
+        log_fail "Offset delete failed (content=$read_content)"
+    fi
+}
+
+# TC-30: Offset Out of Bounds Error
+test_edit_offset_bounds() {
+    log_test "TC-30: Offset Out of Bounds Error"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-bounds.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "ABCDEF" > /dev/null
+
+    # Try offset beyond document length
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"offset": 100, "new_string": "X"}')
+
+    if [ "$http_code" = "400" ]; then
+        log_pass "Correctly returned 400 for offset out of bounds"
+    else
+        log_fail "Expected 400, got $http_code"
+    fi
+}
+
+# TC-31: Edit Non-existent Document
+test_edit_nonexistent() {
+    log_test "TC-31: Edit Non-existent Document"
+
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X PATCH "${SERVER_URL}/documents/nonexistent-doc-12345/content" \
+        -H "Content-Type: application/json" \
+        -d '{"old_string": "x", "new_string": "y"}')
+
+    if [ "$http_code" = "404" ]; then
+        log_pass "Correctly returned 404 for edit of non-existent document"
+    else
+        log_fail "Expected 404, got $http_code"
+    fi
+}
+
+# TC-34: Mode Validation - Mixed Parameters
+test_edit_mixed_mode() {
+    log_test "TC-34: Mode Validation - Mixed Parameters"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-mixed.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "test content" > /dev/null
+
+    # Try to use both old_string and offset
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"old_string": "test", "offset": 0, "new_string": "new"}')
+
+    if [ "$http_code" = "400" ]; then
+        log_pass "Correctly returned 400 for mixed mode parameters"
+    else
+        log_fail "Expected 400, got $http_code"
+    fi
+}
+
+# TC-35: Mode Validation - Missing Parameters
+test_edit_missing_mode() {
+    log_test "TC-35: Mode Validation - Missing Parameters"
+
+    # Create document with content
+    create_response=$(curl -s -X POST "${SERVER_URL}/documents" \
+        -H "Content-Type: application/json" \
+        -d '{"filename": "edit-missing.md"}')
+    doc_id=$(echo "$create_response" | jq -r '.id')
+
+    curl -s -X PUT "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: text/plain" \
+        -d "test content" > /dev/null
+
+    # Try without old_string or offset
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X PATCH "${SERVER_URL}/documents/${doc_id}/content" \
+        -H "Content-Type: application/json" \
+        -d '{"new_string": "replacement"}')
+
+    if [ "$http_code" = "400" ]; then
+        log_pass "Correctly returned 400 for missing mode parameters"
+    else
+        log_fail "Expected 400, got $http_code"
+    fi
+}
+
 # Summary
 print_summary() {
     echo -e "\n${YELLOW}========================================${NC}"
@@ -653,6 +961,19 @@ main() {
     test_write_nonexistent
     test_create_write_read_workflow
     test_checksum_in_response
+
+    # Document Edit tests
+    test_edit_string_unique
+    test_edit_string_replace_all
+    test_edit_string_not_found
+    test_edit_string_ambiguous
+    test_edit_offset_insert
+    test_edit_offset_replace
+    test_edit_offset_delete
+    test_edit_offset_bounds
+    test_edit_nonexistent
+    test_edit_mixed_mode
+    test_edit_missing_mode
 
     # Cleanup and print summary
     cleanup

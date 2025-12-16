@@ -169,3 +169,107 @@ class DocumentStorage:
         size_bytes = len(content)
 
         return size_bytes, checksum
+
+    def edit_document_content(
+        self,
+        doc_id: str,
+        old_string: str | None = None,
+        new_string: str = "",
+        replace_all: bool = False,
+        offset: int | None = None,
+        length: int | None = None
+    ) -> tuple[int, str, dict]:
+        """Edit content in an existing document.
+
+        Two modes:
+        1. String replacement (old_string provided): Find and replace text
+        2. Offset-based (offset provided): Insert/replace/delete at position
+
+        Args:
+            doc_id: Document ID
+            old_string: Text to find and replace (string mode)
+            new_string: Replacement text or text to insert
+            replace_all: Replace all occurrences (string mode only)
+            offset: Character position for offset mode
+            length: Characters to replace at offset (0 = insert)
+
+        Returns:
+            Tuple of (size_bytes, checksum, edit_info)
+            edit_info contains: replacements_made (string mode) or edit_range (offset mode)
+
+        Raises:
+            ValueError: If document path is invalid, mode validation fails,
+                       string not found, or ambiguous match
+            FileNotFoundError: If document file doesn't exist
+        """
+        file_path = self.get_document_path(doc_id)
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"Document file not found: {doc_id}")
+
+        # Read current content as UTF-8
+        content = file_path.read_text(encoding="utf-8")
+        edit_info = {}
+
+        # Determine mode based on which parameters are provided
+        has_old_string = old_string is not None
+        has_offset = offset is not None
+
+        if has_old_string and has_offset:
+            raise ValueError("Cannot mix old_string and offset modes")
+
+        if not has_old_string and not has_offset:
+            raise ValueError("Must provide old_string or offset")
+
+        if has_old_string:
+            # String replacement mode
+            count = content.count(old_string)
+
+            if count == 0:
+                raise ValueError("old_string not found in document")
+
+            if count > 1 and not replace_all:
+                raise ValueError(
+                    f"old_string matches {count} times; use replace_all=true or provide more context"
+                )
+
+            if replace_all:
+                new_content = content.replace(old_string, new_string)
+                edit_info["replacements_made"] = count
+            else:
+                new_content = content.replace(old_string, new_string, 1)
+                edit_info["replacements_made"] = 1
+
+        else:
+            # Offset-based mode
+            content_length = len(content)
+            edit_length = length if length is not None else 0
+
+            if offset < 0:
+                raise ValueError("offset must be non-negative")
+
+            if offset > content_length:
+                raise ValueError(f"offset {offset} exceeds document length {content_length}")
+
+            if edit_length > 0 and (offset + edit_length) > content_length:
+                raise ValueError(
+                    f"range exceeds document length (offset={offset}, length={edit_length}, doc_length={content_length})"
+                )
+
+            # Perform operation: content[0:offset] + new_string + content[offset+length:]
+            new_content = content[:offset] + new_string + content[offset + edit_length:]
+            edit_info["edit_range"] = {
+                "offset": offset,
+                "old_length": edit_length,
+                "new_length": len(new_string)
+            }
+
+        # Write modified content
+        content_bytes = new_content.encode("utf-8")
+        file_path.write_bytes(content_bytes)
+
+        # Calculate checksum and size
+        checksum = hashlib.sha256(content_bytes).hexdigest()
+        size_bytes = len(content_bytes)
+
+        return size_bytes, checksum, edit_info

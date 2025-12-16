@@ -160,3 +160,77 @@
 - Get metadata and verify checksum present
 - Query documents and verify checksum in list items
 - Verify checksum consistency across endpoints
+
+## Document Edit Operations
+
+### TC-23: String Replacement - Unique Match
+- Create document with content "Hello world, hello universe"
+- PATCH with `{"old_string": "world", "new_string": "planet"}`
+- Verify content is "Hello planet, hello universe"
+- Verify `replacements_made: 1` in response
+- Verify checksum updated
+
+### TC-24: String Replacement - Replace All
+- Create document with content "TODO: item1\nTODO: item2\nTODO: item3"
+- PATCH with `{"old_string": "TODO", "new_string": "DONE", "replace_all": true}`
+- Verify all occurrences replaced
+- Verify `replacements_made: 3` in response
+
+### TC-25: String Replacement - Not Found Error
+- Create document with content "Hello world"
+- PATCH with `{"old_string": "missing", "new_string": "replacement"}`
+- Verify 400 response with "old_string not found" error
+
+### TC-26: String Replacement - Ambiguous Match Error
+- Create document with content "the the the"
+- PATCH with `{"old_string": "the", "new_string": "a"}`
+- Verify 400 response with "matches N times" error
+- Verify content unchanged
+
+### TC-27: Offset Insert (length=0 or omitted)
+- Create document with content "ABCDEF"
+- PATCH with `{"offset": 3, "new_string": "XYZ"}`
+- Verify content is "ABCXYZDEF"
+- Verify `edit_range: {offset: 3, old_length: 0, new_length: 3}`
+
+### TC-28: Offset Replace (length > 0)
+- Create document with content "ABCDEF"
+- PATCH with `{"offset": 2, "length": 2, "new_string": "XY"}`
+- Verify content is "ABXYEF"
+- Verify `edit_range: {offset: 2, old_length: 2, new_length: 2}`
+
+### TC-29: Offset Delete (empty new_string)
+- Create document with content "ABCDEF"
+- PATCH with `{"offset": 2, "length": 2, "new_string": ""}`
+- Verify content is "ABEF"
+- Verify `edit_range: {offset: 2, old_length: 2, new_length: 0}`
+
+### TC-30: Offset Out of Bounds Error
+- Create document with content "ABCDEF" (6 chars)
+- PATCH with `{"offset": 10, "new_string": "X"}`
+- Verify 400 response with "exceeds document length" error
+- Verify content unchanged
+
+### TC-31: Edit Non-existent Document
+- PATCH with invalid document ID
+- Verify 404 response
+
+### TC-32: Edit Binary Content Type Error
+- Upload binary file (e.g., image)
+- PATCH with edit request
+- Verify 400 response with "text content types" error
+
+### TC-33: Edit Triggers Semantic Re-indexing
+- Enable semantic search
+- Create and write document with content "original content about cats"
+- Edit to "updated content about dogs"
+- Search for "dogs" - should find document
+- Search for "cats" - should NOT find document (re-indexed)
+
+### TC-34: Mode Validation - Mixed Parameters
+- PATCH with `{"old_string": "x", "offset": 0, "new_string": "y"}`
+- Verify 400 response with "cannot mix" error
+
+### TC-35: Mode Validation - Missing Parameters
+- PATCH with `{"new_string": "y"}` (no old_string or offset)
+- Verify 400 response with "must provide" error

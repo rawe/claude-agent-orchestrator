@@ -447,6 +447,114 @@ async def write_document_content(document_id: str, request: Request):
     )
 
 
+@app.patch("/documents/{document_id}/content")
+async def edit_document_content(document_id: str, request: Request):
+    """Edit content of an existing document (surgical updates).
+
+    Two modes based on request body:
+    1. String replacement: {"old_string": "...", "new_string": "...", "replace_all": false}
+    2. Offset-based: {"offset": N, "length": M, "new_string": "..."}
+
+    String replacement follows Claude Edit semantics:
+    - old_string must be found in document
+    - old_string must be unique unless replace_all=true
+
+    Returns:
+        Updated document metadata with edit details (replacements_made or edit_range)
+
+    Raises:
+        400: Invalid request (mode validation, string not found, ambiguous match, offset bounds)
+        404: Document not found
+        500: Storage write failure
+    """
+    # 1. Verify document exists
+    doc_metadata = db.get_document(document_id)
+    if not doc_metadata:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Only allow edits on text content types
+    if not doc_metadata.content_type.startswith("text/"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Edit only supported for text content types (got: {doc_metadata.content_type})"
+        )
+
+    # 3. Parse JSON body
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    # 4. Extract parameters
+    old_string = body.get("old_string")
+    new_string = body.get("new_string", "")
+    replace_all = body.get("replace_all", False)
+    offset = body.get("offset")
+    length = body.get("length")
+
+    # 5. Validate new_string is provided
+    if "new_string" not in body:
+        raise HTTPException(status_code=400, detail="new_string is required")
+
+    # 6. Perform edit in storage
+    try:
+        size_bytes, checksum, edit_info = storage.edit_document_content(
+            document_id,
+            old_string=old_string,
+            new_string=new_string,
+            replace_all=replace_all,
+            offset=offset,
+            length=length
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Storage edit failed: {str(e)}")
+
+    # 7. Update database
+    now = datetime.now()
+    db.update_document(
+        document_id,
+        size_bytes=size_bytes,
+        checksum=checksum,
+        updated_at=now
+    )
+
+    # 8. Re-index for semantic search if enabled
+    if semantic_config.enabled:
+        from .semantic.indexer import delete_document_index, index_document
+
+        # Delete old chunks first
+        delete_document_index(document_id)
+
+        # Index new content (only if non-empty)
+        if size_bytes > 0:
+            file_path = storage.get_document_path(document_id)
+            text_content = file_path.read_text(encoding="utf-8")
+            index_document(document_id, text_content)
+
+    # 9. Fetch and return updated metadata with edit info
+    updated_metadata = db.get_document(document_id)
+    response_data = {
+        "id": updated_metadata.id,
+        "filename": updated_metadata.filename,
+        "content_type": updated_metadata.content_type,
+        "size_bytes": updated_metadata.size_bytes,
+        "checksum": updated_metadata.checksum,
+        "created_at": updated_metadata.created_at.isoformat() if hasattr(updated_metadata.created_at, 'isoformat') else str(updated_metadata.created_at),
+        "updated_at": updated_metadata.updated_at.isoformat() if hasattr(updated_metadata.updated_at, 'isoformat') else str(updated_metadata.updated_at),
+        "tags": updated_metadata.tags,
+        "metadata": updated_metadata.metadata,
+        "url": get_document_url(updated_metadata.id),
+    }
+    # Add edit-specific info
+    response_data.update(edit_info)
+
+    return JSONResponse(content=response_data)
+
+
 def _group_relations_for_response(relations: list[dict]) -> dict[str, list[RelationInfo]]:
     """Group relation dicts by relation_type and convert to RelationInfo."""
     grouped: dict[str, list[RelationInfo]] = {}

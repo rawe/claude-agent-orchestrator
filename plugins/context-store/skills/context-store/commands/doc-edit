@@ -1,0 +1,118 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+#     "typer",
+# ]
+# ///
+
+"""Edit document content surgically in the Context Store."""
+
+import typer
+from pathlib import Path
+import json
+import sys
+
+# Add lib directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from config import Config
+from client import DocumentClient
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    document_id: str = typer.Argument(..., help="Document ID to edit"),
+    old_string: str = typer.Option(None, "--old-string", help="Text to find and replace (string mode)"),
+    new_string: str = typer.Option(None, "--new-string", help="Replacement text or text to insert"),
+    replace_all: bool = typer.Option(False, "--replace-all", help="Replace all occurrences (string mode)"),
+    offset: int = typer.Option(None, "--offset", help="Character position (offset mode)"),
+    length: int = typer.Option(None, "--length", help="Characters to replace at offset (0 = insert)"),
+    json_input: bool = typer.Option(False, "--json", help="Read edit spec from stdin as JSON"),
+):
+    """Edit document content surgically without full replacement.
+
+    Two modes:
+    1. String replacement: --old-string "text" --new-string "new"
+    2. Offset-based: --offset N --new-string "text" [--length M]
+
+    Examples:
+        # Simple replacement (must be unique match)
+        doc-edit doc_abc123 --old-string "old text" --new-string "new text"
+
+        # Replace all occurrences
+        doc-edit doc_abc123 --old-string "TODO" --new-string "DONE" --replace-all
+
+        # Insert at position
+        doc-edit doc_abc123 --offset 100 --new-string "inserted text"
+
+        # Replace range
+        doc-edit doc_abc123 --offset 100 --length 50 --new-string "replacement"
+
+        # Delete range
+        doc-edit doc_abc123 --offset 100 --length 50 --new-string ""
+
+        # Multi-line via JSON stdin
+        echo '{"old_string": "old", "new_string": "new"}' | doc-edit doc_abc123 --json
+    """
+    try:
+        # Handle JSON input mode
+        if json_input:
+            if sys.stdin.isatty():
+                error = {"error": "No JSON input provided. Pipe JSON via stdin with --json flag."}
+                print(json.dumps(error), file=sys.stderr)
+                raise typer.Exit(1)
+
+            try:
+                payload = json.loads(sys.stdin.read())
+            except json.JSONDecodeError as e:
+                error = {"error": f"Invalid JSON input: {str(e)}"}
+                print(json.dumps(error), file=sys.stderr)
+                raise typer.Exit(1)
+
+            # Extract params from JSON
+            old_string = payload.get("old_string")
+            new_string = payload.get("new_string", "")
+            replace_all = payload.get("replace_all", False)
+            offset = payload.get("offset")
+            length = payload.get("length")
+
+        # Validate: need either old_string or offset
+        if old_string is None and offset is None:
+            error = {"error": "Must provide --old-string (string mode) or --offset (offset mode)"}
+            print(json.dumps(error), file=sys.stderr)
+            raise typer.Exit(1)
+
+        # Validate: new_string is required
+        if new_string is None:
+            error = {"error": "--new-string is required"}
+            print(json.dumps(error), file=sys.stderr)
+            raise typer.Exit(1)
+
+        # Create client and perform edit
+        config = Config()
+        client = DocumentClient(config)
+
+        result = client.edit_document_content(
+            document_id,
+            new_string=new_string,
+            old_string=old_string,
+            replace_all=replace_all,
+            offset=offset,
+            length=length
+        )
+
+        # Output success result as JSON
+        print(json.dumps(result, indent=2))
+
+    except Exception as e:
+        # Output error as JSON to stderr
+        error = {"error": str(e)}
+        print(json.dumps(error), file=sys.stderr)
+        raise typer.Exit(1)
+
+
+if __name__ == "__main__":
+    app()

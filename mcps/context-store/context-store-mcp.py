@@ -228,6 +228,98 @@ async def doc_write(
 
 
 @mcp.tool()
+async def doc_edit(
+    document_id: str = Field(
+        description="The document ID to edit",
+    ),
+    new_string: str = Field(
+        description="Replacement text, or text to insert (offset mode)",
+    ),
+    old_string: Optional[str] = Field(
+        default=None,
+        description="Text to find and replace (string replacement mode)",
+    ),
+    replace_all: bool = Field(
+        default=False,
+        description="Replace all occurrences (only for string replacement mode)",
+    ),
+    offset: Optional[int] = Field(
+        default=None,
+        description="Character position for offset-based edit",
+    ),
+    length: Optional[int] = Field(
+        default=None,
+        description="Characters to replace at offset (0 = insert)",
+    ),
+) -> str:
+    """Edit document content surgically without full replacement.
+
+    Two modes:
+    1. String replacement: Provide old_string + new_string (like Claude's Edit tool)
+    2. Offset-based: Provide offset + new_string (+ optional length)
+
+    String replacement follows Claude Edit semantics:
+    - old_string must be found in document (error if not)
+    - old_string must be unique unless replace_all=true (error if ambiguous)
+
+    Returns:
+        JSON with updated document metadata and edit details (replacements_made or edit_range)
+
+    Examples:
+        # String replacement (unique match required)
+        doc_edit(document_id="doc_abc", old_string="old text", new_string="new text")
+
+        # Replace all occurrences
+        doc_edit(document_id="doc_abc", old_string="TODO", new_string="DONE", replace_all=True)
+
+        # Insert at position
+        doc_edit(document_id="doc_abc", offset=100, new_string="inserted text")
+
+        # Replace range
+        doc_edit(document_id="doc_abc", offset=100, length=50, new_string="replacement")
+
+        # Delete range
+        doc_edit(document_id="doc_abc", offset=100, length=50, new_string="")
+    """
+    import json as json_module
+
+    LARGE_CONTENT_THRESHOLD = 100_000  # 100KB
+
+    # Check if content is large enough to require stdin
+    content_size = len(new_string) + (len(old_string) if old_string else 0)
+
+    if content_size > LARGE_CONTENT_THRESHOLD:
+        # Build JSON payload and pass via stdin
+        payload = {"new_string": new_string}
+        if old_string is not None:
+            payload["old_string"] = old_string
+            payload["replace_all"] = replace_all
+        else:
+            payload["offset"] = offset
+            if length is not None:
+                payload["length"] = length
+
+        stdout, stderr, code = await run_command_with_stdin(
+            "doc-edit", [document_id, "--json"], stdin_data=json_module.dumps(payload)
+        )
+    else:
+        # Use arguments for small content
+        args = [document_id, "--new-string", new_string]
+        if old_string is not None:
+            args.extend(["--old-string", old_string])
+            if replace_all:
+                args.append("--replace-all")
+        elif offset is not None:
+            args.extend(["--offset", str(offset)])
+            if length is not None:
+                args.extend(["--length", str(length)])
+
+        stdout, stderr, code = await run_command("doc-edit", args)
+
+    return format_response(stdout, stderr, code)
+
+
+@mcp.tool()
 async def doc_query(
     name: Optional[str] = Field(
         default=None,

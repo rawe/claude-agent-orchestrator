@@ -216,6 +216,131 @@ curl -X PUT http://localhost:8766/documents/doc_abc123/content \
   -d '# Report Content...'
 ```
 
+### PATCH /documents/{document_id}/content
+
+Edit content of an existing document surgically without full replacement. Supports two modes:
+
+1. **String Replacement Mode**: Find and replace text (like Claude's Edit tool)
+2. **Offset-Based Mode**: Insert, replace, or delete at a specific character position
+
+- **Path parameter**: `document_id` - The document's unique identifier
+- **Request body**: JSON with edit parameters
+- **Response**: 200 OK with `DocumentResponse` plus edit details
+
+#### Mode 1: String Replacement
+
+Find and replace text within the document. Follows Claude Edit semantics:
+- `old_string` must be found in document (error if not)
+- `old_string` must be unique unless `replace_all=true` (error if ambiguous)
+
+**Request Body**:
+```json
+{
+  "old_string": "text to find",
+  "new_string": "replacement text",
+  "replace_all": false
+}
+```
+
+**Examples**:
+```bash
+# Simple replacement (must be unique match)
+curl -X PATCH http://localhost:8766/documents/doc_abc123/content \
+  -H "Content-Type: application/json" \
+  -d '{"old_string": "TODO", "new_string": "DONE"}'
+
+# Replace all occurrences
+curl -X PATCH http://localhost:8766/documents/doc_abc123/content \
+  -H "Content-Type: application/json" \
+  -d '{"old_string": "TODO", "new_string": "DONE", "replace_all": true}'
+```
+
+**Response** (string replacement):
+```json
+{
+  "id": "doc_abc123",
+  "filename": "notes.md",
+  "content_type": "text/markdown",
+  "size_bytes": 1250,
+  "checksum": "b2c3d4e5f6...",
+  "created_at": "2025-12-16T10:00:00",
+  "updated_at": "2025-12-16T10:10:00",
+  "tags": ["notes"],
+  "metadata": {},
+  "url": "http://localhost:8766/documents/doc_abc123",
+  "replacements_made": 3
+}
+```
+
+#### Mode 2: Offset-Based
+
+Insert, replace, or delete content at a specific character position.
+
+**Request Body**:
+```json
+{
+  "offset": 100,
+  "length": 50,
+  "new_string": "replacement text"
+}
+```
+
+| `length` | `new_string` | Operation |
+|----------|--------------|-----------|
+| 0 or omitted | non-empty | **Insert** at offset |
+| > 0 | non-empty | **Replace** characters [offset, offset+length) |
+| > 0 | empty `""` | **Delete** characters [offset, offset+length) |
+
+**Examples**:
+```bash
+# Insert at position 100
+curl -X PATCH http://localhost:8766/documents/doc_abc123/content \
+  -H "Content-Type: application/json" \
+  -d '{"offset": 100, "new_string": "inserted text"}'
+
+# Replace characters 100-150
+curl -X PATCH http://localhost:8766/documents/doc_abc123/content \
+  -H "Content-Type: application/json" \
+  -d '{"offset": 100, "length": 50, "new_string": "replacement"}'
+
+# Delete characters 100-150
+curl -X PATCH http://localhost:8766/documents/doc_abc123/content \
+  -H "Content-Type: application/json" \
+  -d '{"offset": 100, "length": 50, "new_string": ""}'
+```
+
+**Response** (offset-based):
+```json
+{
+  "id": "doc_abc123",
+  "filename": "notes.md",
+  "content_type": "text/markdown",
+  "size_bytes": 1300,
+  "checksum": "c3d4e5f6...",
+  "created_at": "2025-12-16T10:00:00",
+  "updated_at": "2025-12-16T10:15:00",
+  "tags": ["notes"],
+  "metadata": {},
+  "url": "http://localhost:8766/documents/doc_abc123",
+  "edit_range": {
+    "offset": 100,
+    "old_length": 50,
+    "new_length": 11
+  }
+}
+```
+
+**Error Responses**:
+- `400`: `old_string` not found in document
+- `400`: `old_string` matches multiple times (use `replace_all=true`)
+- `400`: Cannot mix `old_string` and `offset` modes
+- `400`: Must provide `old_string` or `offset`
+- `400`: Offset out of bounds
+- `400`: Edit only supported for text content types
+- `404`: Document not found
+
+**Note**: The edit endpoint only supports text content types (`text/*`). Attempting to edit binary files will return a 400 error.
+
 ### GET /documents
 
 Query documents with optional filtering by filename and/or tags.

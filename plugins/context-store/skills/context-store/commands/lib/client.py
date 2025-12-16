@@ -585,3 +585,64 @@ class DocumentClient:
             raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
+
+    def edit_document_content(
+        self,
+        document_id: str,
+        new_string: str,
+        old_string: Optional[str] = None,
+        replace_all: bool = False,
+        offset: Optional[int] = None,
+        length: Optional[int] = None
+    ) -> dict:
+        """Edit document content surgically without full replacement.
+
+        Two modes:
+        1. String replacement: Provide old_string + new_string
+        2. Offset-based: Provide offset + new_string (+ optional length)
+
+        Args:
+            document_id: ID of the document to edit
+            new_string: Replacement text or text to insert
+            old_string: Text to find and replace (string mode)
+            replace_all: Replace all occurrences (string mode only)
+            offset: Character position for offset mode
+            length: Characters to replace at offset (0 = insert)
+
+        Returns:
+            JSON response with updated document metadata and edit details
+
+        Raises:
+            Exception: On network/HTTP errors, 400 for validation errors, 404 if not found
+        """
+        payload = {"new_string": new_string}
+
+        if old_string is not None:
+            payload["old_string"] = old_string
+            payload["replace_all"] = replace_all
+        elif offset is not None:
+            payload["offset"] = offset
+            if length is not None:
+                payload["length"] = length
+
+        try:
+            response = httpx.patch(
+                f"{self.base_url}/documents/{document_id}/content",
+                json=payload,
+                timeout=60.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Document not found: {document_id}")
+            if e.response.status_code == 400:
+                # Parse error detail from response
+                try:
+                    detail = e.response.json().get("detail", e.response.text)
+                except Exception:
+                    detail = e.response.text
+                raise Exception(f"Edit failed: {detail}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
