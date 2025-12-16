@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-runtime restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-runtime restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-chat-ui-docker stop-chat-ui-docker
 
 # Default target
 help:
@@ -42,6 +42,12 @@ help:
 	@echo "All services:"
 	@echo "  make start-all      - Start core services + all MCP servers"
 	@echo "  make stop-all       - Stop everything"
+	@echo ""
+	@echo "Applications (interfaces/):"
+	@echo "  make start-chat-ui         - Start Chat UI (npm/vite preview)"
+	@echo "  make stop-chat-ui          - Stop Chat UI (npm)"
+	@echo "  make start-chat-ui-docker  - Start Chat UI (Docker/nginx)"
+	@echo "  make stop-chat-ui-docker   - Stop Chat UI (Docker)"
 
 # Build all images
 build:
@@ -380,3 +386,69 @@ stop-all:
 	@echo "============================================"
 	@echo "All services stopped!"
 	@echo "============================================"
+
+# ============================================================================
+# Applications using Agent Orchestrator Framework (interfaces/)
+# ============================================================================
+
+# Chat UI - npm-based (vite preview)
+CHAT_UI_DIR := interfaces/chat-ui
+CHAT_UI_PID_FILE := .chat-ui.pid
+
+start-chat-ui:
+	@echo "Starting Chat UI (npm/vite preview)..."
+	@if [ -f $(CHAT_UI_PID_FILE) ] && kill -0 $$(cat $(CHAT_UI_PID_FILE)) 2>/dev/null; then \
+		echo "Chat UI already running (PID: $$(cat $(CHAT_UI_PID_FILE)))"; \
+		exit 1; \
+	fi
+	@if [ ! -f $(CHAT_UI_DIR)/.env ]; then \
+		echo "No .env file found. Copying from .env.example..."; \
+		cp $(CHAT_UI_DIR)/.env.example $(CHAT_UI_DIR)/.env; \
+		echo "Created $(CHAT_UI_DIR)/.env - edit if needed"; \
+	fi
+	@echo "Installing dependencies..."
+	@cd $(CHAT_UI_DIR) && npm install
+	@echo "Building application..."
+	@cd $(CHAT_UI_DIR) && npm run build
+	@echo "Starting preview server..."
+	@cd $(CHAT_UI_DIR) && npm run preview & \
+	echo $$! > $(CHAT_UI_PID_FILE)
+	@sleep 2
+	@echo ""
+	@echo "Chat UI started (PID: $$(cat $(CHAT_UI_PID_FILE)))"
+	@echo "URL: http://localhost:3010"
+
+stop-chat-ui:
+	@echo "Stopping Chat UI (npm)..."
+	@if [ -f $(CHAT_UI_PID_FILE) ]; then \
+		PID=$$(cat $(CHAT_UI_PID_FILE)); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID; \
+			echo "Chat UI stopped (PID: $$PID)"; \
+		else \
+			echo "Chat UI not running (stale PID file)"; \
+		fi; \
+		rm -f $(CHAT_UI_PID_FILE); \
+	else \
+		echo "No PID file found. Trying to find and kill process..."; \
+		pkill -f "vite preview" 2>/dev/null && echo "Chat UI stopped" || echo "No Chat UI process found"; \
+	fi
+
+# Chat UI - Docker-based (nginx)
+start-chat-ui-docker:
+	@echo "Starting Chat UI (Docker/nginx)..."
+	@if [ ! -f $(CHAT_UI_DIR)/.env ]; then \
+		echo "No .env file found. Copying from .env.example..."; \
+		cp $(CHAT_UI_DIR)/.env.example $(CHAT_UI_DIR)/.env; \
+		echo "Created $(CHAT_UI_DIR)/.env - edit if needed"; \
+	fi
+	@echo "Building and starting Docker container..."
+	@cd $(CHAT_UI_DIR) && docker compose up -d --build
+	@echo ""
+	@echo "Chat UI started (Docker)"
+	@echo "URL: http://localhost:3010"
+
+stop-chat-ui-docker:
+	@echo "Stopping Chat UI (Docker)..."
+	@cd $(CHAT_UI_DIR) && docker compose down
+	@echo "Chat UI stopped (Docker)"
