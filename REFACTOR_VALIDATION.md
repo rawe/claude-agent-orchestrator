@@ -35,21 +35,57 @@ The following checks were performed to verify the refactoring at code level:
 
 ---
 
-## Runtime Validation TODO
+## Validation Strategy
 
-The static checks confirm code correctness. The following runtime validation is still needed:
+**Approach:** One phase per session to ensure thorough validation and easy rollback if issues are found.
 
-### 1. Docker Compose Full Stack
-```bash
-make build
-make start
-make health
-```
-- Verify all containers start without errors
-- Check health endpoints respond correctly
-- Verify inter-service communication works
+**Sessions:**
+- Session 1: Docker Compose Full Stack (Phase 1)
+- Session 2: Integration Tests (Phase 2)
+- Session 3: Manual Service Verification (Phase 3)
+- Session 4: Dashboard Verification (Phase 4)
 
-### 2. Integration Tests
+Each phase is documented with results before proceeding to the next session.
+
+---
+
+## Runtime Validation
+
+The static checks confirm code correctness. The following runtime validation is tracked below:
+
+### Phase 1: Docker Compose Full Stack ✅ PASSED
+
+**Session Date:** 2025-12-17
+
+| Step | Command | Result |
+|------|---------|--------|
+| Build | `make build` | All 3 images built successfully |
+| Start | `make start` | All 5 containers started |
+| Health | `make health` | All health endpoints returned 200 |
+
+**Container Status:**
+
+| Container | Status | Port |
+|-----------|--------|------|
+| agent-coordinator | healthy | 8765 |
+| dashboard | up | 3000 |
+| neo4j | healthy | 7475/7688 |
+| context-store | healthy | 8766 |
+| elasticsearch | healthy | 9200 |
+
+**API Endpoint Verification:**
+
+| Test | Result |
+|------|--------|
+| `GET /runners` | ✅ Returns `{"runners": []}` |
+| `GET /sessions` | ✅ Returns session list |
+| `GET /jobs` (old) | ✅ Returns 404 (removed) |
+| `GET /launchers` (old) | ✅ Returns 404 (removed) |
+| Dashboard static | ✅ Returns 200 |
+| Context Store | ✅ Health + documents working |
+
+### Phase 2: Integration Tests (TODO)
+
 ```bash
 /tests:setup
 /tests:run
@@ -59,7 +95,8 @@ make health
 - Verify agent runs execute correctly
 - Check session lifecycle works end-to-end
 
-### 3. Manual Service Verification
+### Phase 3: Manual Service Verification (TODO)
+
 ```bash
 # Start Agent Coordinator
 cd servers/agent-coordinator && uv run python main.py
@@ -72,7 +109,8 @@ curl http://localhost:8765/runs
 curl http://localhost:8765/runners
 ```
 
-### 4. Dashboard Verification
+### Phase 4: Dashboard Verification (TODO)
+
 - Navigate to http://localhost:3000
 - Check `/runners` page shows connected runners
 - Verify sessions can be created and monitored
