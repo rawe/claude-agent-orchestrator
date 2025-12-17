@@ -15,8 +15,8 @@ See `tests/README.md` for full documentation.
 1. **Reset the database**: `./tests/scripts/reset-db`
 
 2. **Start services** in background:
-   - Agent Runtime: `cd servers/agent-runtime && uv run python -m main`
-   - Agent Launcher: `./servers/agent-launcher/agent-launcher -x test-executor`
+   - Agent Coordinator: `cd servers/agent-coordinator && uv run python -m main`
+   - Agent Runner: `./servers/agent-runner/agent-runner -x test-executor`
    - WebSocket Monitor: `./tests/tools/ws-monitor`
 
 3. **Verify** all services are running and healthy
@@ -31,11 +31,11 @@ For each test case in `tests/integration/` (in alphabetical order):
 4. Verify against expected events checklist
 5. Record pass/fail for each verification item
 
-**Note**: Tests run sequentially in the same database. The database cannot be reset while services are running (runtime creates tables on startup).
+**Note**: Tests run sequentially in the same database. The database cannot be reset while services are running (coordinator creates tables on startup).
 
 ### Phase 3: Teardown
 
-1. Stop all background processes (runtime, launcher, ws-monitor)
+1. Stop all background processes (coordinator, runner, ws-monitor)
 2. Final database cleanup: `./tests/scripts/reset-db`
 
 ### Phase 4: Report

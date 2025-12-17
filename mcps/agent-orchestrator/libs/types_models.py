@@ -41,4 +41,4 @@ class SessionInfo(BaseModel):
 class ServerConfig(BaseModel):
     """Server configuration"""
 
-    api_url: str = Field(description="Agent Runtime API URL")
+    api_url: str = Field(description="Agent Coordinator API URL")

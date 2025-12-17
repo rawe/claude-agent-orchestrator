@@ -4,8 +4,8 @@ Verify that when a child agent fails, the parent receives a failure callback wit
 
 ## Prerequisites
 
-- Agent Runtime running
-- Agent Launcher running with `claude-code` executor
+- Agent Coordinator running
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
@@ -18,7 +18,7 @@ Verify that when a child agent fails, the parent receives a failure callback wit
 ### Step 1: Start parent orchestrator with instruction to spawn failing child
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -35,7 +35,7 @@ Note: `super-fancy-unicorn-agent` does not exist and will cause the child to fai
 
 The parent will:
 1. Call MCP tool `start_agent_session` with non-existent blueprint
-2. Child job is created
+2. Child run is created
 3. Executor fails (agent blueprint not found)
 4. Parent receives failure callback
 
@@ -44,7 +44,7 @@ The parent will:
 Resume the parent session to ask about the failure:
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
@@ -56,9 +56,9 @@ curl -X POST http://localhost:8765/jobs \
 
 ## Expected Behavior
 
-1. Child job created successfully (job creation passes)
+1. Child run created successfully (run creation passes)
 2. Executor fails (blueprint not found → exit code 1)
-3. `report_job_failed` called by launcher
+3. `report_run_failed` called by runner
 4. Callback triggered to parent with failure message
 5. Parent receives resume with prompt containing:
    - `"test-child-fail" has failed`
@@ -66,7 +66,7 @@ curl -X POST http://localhost:8765/jobs \
 
 ## Verification Checklist
 
-- [ ] Child job shows status `failed` in `/jobs/{job_id}`
+- [ ] Child run shows status `failed` in `/runs/{run_id}`
 - [ ] Parent session was resumed automatically after child failure
 - [ ] Parent can explain what error occurred
 - [ ] Error message mentions the non-existent agent blueprint

@@ -6,8 +6,8 @@ Verify that resuming an existing session produces the correct sequence of WebSoc
 
 - Complete test `01-basic-session-start` first (need existing session)
 - OR create a session using Step 0 below
-- Agent Runtime running
-- Agent Launcher running with `-x test-executor`
+- Agent Coordinator running
+- Agent Runner running with `-x test-executor`
 - ws-monitor running
 
 ## Test Steps
@@ -17,7 +17,7 @@ Verify that resuming an existing session produces the correct sequence of WebSoc
 Skip this if you just completed `01-basic-session-start` with session "test-basic-001".
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -27,12 +27,12 @@ curl -X POST http://localhost:8765/jobs \
   }'
 ```
 
-Wait for the job to complete (watch launcher logs).
+Wait for the run to complete (watch runner logs).
 
-### Step 1: Create a resume_session job
+### Step 1: Create a resume_session run
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
@@ -43,14 +43,14 @@ curl -X POST http://localhost:8765/jobs \
 
 Expected response:
 ```json
-{"job_id":"job_...","status":"pending","message":"Job queued"}
+{"run_id":"run_...","status":"pending","message":"Run queued"}
 ```
 
 ### Step 2: Wait for execution
 
-Watch the launcher terminal for:
+Watch the runner terminal for:
 ```
-[INFO] poller: Received job job_... (resume_session)
+[INFO] poller: Received run run_... (resume_session)
 [INFO] executor: Resuming session test-basic-001
 ```
 
@@ -101,7 +101,7 @@ Watch the ws-monitor output.
 Check the test executor's local data to verify message history:
 
 ```bash
-cat servers/agent-launcher/executors/test-executor/.test-executor-data/test-basic-001.json | python -m json.tool
+cat servers/agent-runner/executors/test-executor/.test-executor-data/test-basic-001.json | python -m json.tool
 ```
 
 Expected: Should show all messages (from both start and resume).

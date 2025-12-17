@@ -1,0 +1,17 @@
+[project]
+name = "agent-coordinator"
+version = "0.2.0"
+description = "Unified Agent Coordinator server for session management, real-time observability, and agent blueprint registry"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

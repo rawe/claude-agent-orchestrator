@@ -9,7 +9,7 @@
 """
 Resume an existing agent orchestrator session.
 
-This command creates a job to resume a previous session with a new prompt.
+This command creates a run to resume a previous session with a new prompt.
 
 Configuration:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
@@ -39,7 +39,7 @@ def main(
         cat additional-requirements.md | ao-resume mysession
     """
     from config import get_api_url
-    from job_client import JobClient, JobClientError, JobFailedError, JobTimeoutError
+    from run_client import RunClient, RunClientError, RunFailedError, RunTimeoutError
     from utils import (
         get_prompt_from_args_and_stdin,
         error_exit,
@@ -52,9 +52,9 @@ def main(
         # 2. Get prompt (from -p and/or stdin)
         user_prompt = get_prompt_from_args_and_stdin(prompt)
 
-        # 3. Create resume job and wait for result
-        job_client = JobClient(api_url)
-        result = job_client.resume_session(
+        # 3. Create resume run and wait for result
+        run_client = RunClient(api_url)
+        result = run_client.resume_session(
             session_name=session_name,
             prompt=user_prompt,
         )
@@ -62,11 +62,11 @@ def main(
         # 4. Print result to stdout
         print(result)
 
-    except JobFailedError as e:
+    except RunFailedError as e:
         error_exit(str(e))
-    except JobTimeoutError as e:
+    except RunTimeoutError as e:
         error_exit(str(e))
-    except JobClientError as e:
+    except RunClientError as e:
         error_exit(str(e))
     except ValueError as e:
         # Prompt errors, etc.

@@ -7,7 +7,7 @@ This guide explains how to use the centralized Docker setup for the Agent Orches
 The Agent Orchestrator Framework consists of three main Docker services:
 
 1. **Dashboard** (Port 3000) - React-based UI for agent management, session monitoring, and document management
-2. **Agent Runtime** (Port 8765) - FastAPI server for agent session management, observability, and agent blueprint registry
+2. **Agent Coordinator** (Port 8765) - FastAPI server for agent session management, observability, and agent blueprint registry
 3. **Context Store** (Port 8766) - Python-based document storage and retrieval service
 
 ## Architecture
@@ -24,7 +24,7 @@ The Agent Orchestrator Framework consists of three main Docker services:
 │                                          │                  │            │
 │                                          ▼                  ▼            │
 │               ┌───────────────────────────────┐ ┌───────────────────┐    │
-│               │      Agent Runtime            │ │  Context Store    │    │
+│               │      Agent Coordinator            │ │  Context Store    │    │
 │               │       (Port 8765)             │ │    (Port 8766)    │    │
 │               │  - Session management         │ │                   │    │
 │               │  - Agent blueprint registry   │ │                   │    │
@@ -73,7 +73,7 @@ docker-compose logs -f
 
 ## Custom Agent Directory Configuration
 
-By default, the Agent Runtime service looks for agent blueprints in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
+By default, the Agent Coordinator service looks for agent blueprints in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
 
 ### Option 1: Using a `.env` file (Simplest)
 
@@ -103,7 +103,7 @@ Edit `docker-compose.override.yml`:
 
 ```yaml
 services:
-  agent-runtime:
+  agent-coordinator:
     volumes:
       - /path/to/your/agents:/data/agents
 ```
@@ -144,7 +144,7 @@ Run `make help` to see all available commands:
 |---------|-------------|
 | `make logs` | View logs from all services |
 | `make logs-f` | Follow logs from all services |
-| `make logs-runtime` | View agent runtime logs only |
+| `make logs-coordinator` | View agent coordinator logs only |
 | `make logs-doc` | View context store server logs only |
 
 ### Cleanup
@@ -160,7 +160,7 @@ Run `make help` to see all available commands:
 
 | Command | Description |
 |---------|-------------|
-| `make restart-runtime` | Restart agent runtime |
+| `make restart-coordinator` | Restart agent coordinator |
 | `make restart-doc` | Restart context store server |
 
 ## Service Details
@@ -178,13 +178,13 @@ Run `make help` to see all available commands:
 - Document Management (upload, tag, preview)
 - Agent Manager (create/edit agent blueprints)
 
-### Agent Runtime
+### Agent Coordinator
 
 - **Port:** 8765
 - **Technology:** Python 3.11 + FastAPI + WebSockets
 - **Purpose:** Session management, agent blueprint registry, and real-time event capture
 - **Health Check:** http://localhost:8765/health
-- **Code Location:** `./servers/agent-runtime`
+- **Code Location:** `./servers/agent-coordinator`
 
 **API Endpoints:**
 - `/sessions/*` - Session management
@@ -228,9 +228,9 @@ The centralized `docker-compose.yml` was designed to minimize redundancy while k
 Instead of duplicating Dockerfile content, the centralized compose file references the existing Dockerfiles in subdirectories:
 
 ```yaml
-agent-runtime:
+agent-coordinator:
   build:
-    context: ./servers/agent-runtime
+    context: ./servers/agent-coordinator
     dockerfile: Dockerfile
 ```
 
@@ -245,7 +245,7 @@ All paths are relative to the project root:
 
 ```yaml
 volumes:
-  - ./servers/agent-runtime:/app
+  - ./servers/agent-coordinator:/app
 ```
 
 **Benefits:**
@@ -273,8 +273,8 @@ networks:
 The individual services can be started independently if needed:
 
 ```bash
-# Start only agent runtime
-docker-compose up agent-runtime
+# Start only agent coordinator
+docker-compose up agent-coordinator
 ```
 
 **Benefits:**
@@ -309,8 +309,8 @@ docker-compose build --no-cache
 # Build only dashboard
 docker-compose build dashboard
 
-# Build only agent runtime
-docker-compose build agent-runtime
+# Build only agent coordinator
+docker-compose build agent-coordinator
 
 # Build only context store
 docker-compose build context-store
@@ -326,7 +326,7 @@ The build process for each service:
 3. Builds production bundle with Vite
 4. Serves via nginx on port 80
 
-**Agent Runtime:**
+**Agent Coordinator:**
 1. Uses `python:3.11-slim` base image
 2. Installs `uv` package manager
 3. Copies `pyproject.toml` and installs dependencies
@@ -347,7 +347,7 @@ Check if ports are already in use:
 ```bash
 # Check if ports are occupied
 lsof -i :3000  # Dashboard
-lsof -i :8765  # Agent Runtime
+lsof -i :8765  # Agent Coordinator
 lsof -i :8766  # Context Store
 ```
 
@@ -363,7 +363,7 @@ Or manually:
 
 ```bash
 curl http://localhost:3000       # Dashboard
-curl http://localhost:8765/health  # Agent Runtime
+curl http://localhost:8765/health  # Agent Coordinator
 curl http://localhost:8766/health  # Context Store
 ```
 
@@ -374,7 +374,7 @@ curl http://localhost:8766/health  # Context Store
 make logs-f
 
 # Individual service
-docker-compose logs -f agent-runtime
+docker-compose logs -f agent-coordinator
 docker-compose logs -f context-store
 ```
 
@@ -398,7 +398,7 @@ If you encounter permission issues with volumes:
 
 ```bash
 # Fix ownership (Linux/macOS)
-sudo chown -R $USER:$USER ./servers/agent-runtime
+sudo chown -R $USER:$USER ./servers/agent-coordinator
 sudo chown -R $USER:$USER ./servers/context-store
 ```
 
@@ -412,9 +412,9 @@ Both the document server and session data use named Docker volumes for persisten
 - **Location in Container:** `/app/data`
 - **Contains:** SQLite database + uploaded files
 
-### Session Data (Agent Runtime)
+### Session Data (Agent Coordinator)
 
-- **Volume Name:** `agent-orchestrator-runtime-data`
+- **Volume Name:** `agent-orchestrator-coordinator-data`
 - **Location in Container:** `/app/.agent-orchestrator`
 - **Contains:** SQLite database with session history and events
 
@@ -425,7 +425,7 @@ Both the document server and session data use named Docker volumes for persisten
 docker run --rm -v agent-orchestrator-document-data:/data -v $(pwd):/backup alpine tar czf /backup/document-data-backup.tar.gz /data
 
 # Backup sessions
-docker run --rm -v agent-orchestrator-runtime-data:/data -v $(pwd):/backup alpine tar czf /backup/session-data-backup.tar.gz /data
+docker run --rm -v agent-orchestrator-coordinator-data:/data -v $(pwd):/backup alpine tar czf /backup/session-data-backup.tar.gz /data
 ```
 
 ### Clearing Data
@@ -505,11 +505,11 @@ You can start specific services:
 # Only context store
 docker-compose up context-store
 
-# Only agent runtime
-docker-compose up agent-runtime
+# Only agent coordinator
+docker-compose up agent-coordinator
 
 # Dashboard with all backends
-docker-compose up dashboard agent-runtime context-store
+docker-compose up dashboard agent-coordinator context-store
 ```
 
 ## Service Architecture
@@ -517,7 +517,7 @@ docker-compose up dashboard agent-runtime context-store
 The centralized setup manages all services through a unified `docker-compose.yml`:
 
 - All services started with: `make start-bg` from project root
-- Individual services can be targeted: `docker-compose up agent-runtime`
+- Individual services can be targeted: `docker-compose up agent-coordinator`
 - Single network for inter-service communication
 
 **Recommendation:** Use the centralized setup for running the full system. For individual service development, you can start just that service with docker-compose.

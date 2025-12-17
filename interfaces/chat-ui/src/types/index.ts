@@ -1,6 +1,6 @@
 /**
- * Types matching Agent Runtime API models
- * See: docs/agent-runtime/DATA_MODELS.md
+ * Types matching Agent Coordinator API models
+ * See: docs/agent-coordinator/DATA_MODELS.md
  */
 
 // Message content block
@@ -56,8 +56,8 @@ export type WebSocketMessage =
   | { type: 'session_deleted'; session_id: string }
   | { type: 'event'; data: SessionEvent };
 
-// Job request (POST /jobs)
-export interface JobRequest {
+// Run request (POST /runs)
+export interface RunRequest {
   type: 'start_session' | 'resume_session';
   session_name: string;
   prompt: string;
@@ -66,9 +66,9 @@ export interface JobRequest {
   parent_session_name?: string;
 }
 
-// Job response
-export interface JobResponse {
-  job_id: string;
+// Run response
+export interface RunResponse {
+  run_id: string;
   status: string;
 }
 

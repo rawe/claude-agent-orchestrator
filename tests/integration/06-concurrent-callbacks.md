@@ -4,8 +4,8 @@ Verify that multiple child agents completing in rapid succession all have their 
 
 ## Prerequisites
 
-- Agent Runtime running
-- Agent Launcher running with `claude-code` executor
+- Agent Coordinator running
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
@@ -32,7 +32,7 @@ curl -s http://localhost:8765/agents | grep agent-orchestrator
 ### Step 2: Start parent orchestrator session
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -64,7 +64,7 @@ All 5 sleeper-agent sessions should show as completed.
 This is the critical verification step. Resume the parent session and ask it to check its own conversation history:
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
@@ -139,4 +139,4 @@ Note which callbacks are missing. If Wave 1 agents (001-003) are affected more t
 
 ### Cannot determine callback status
 - Check parent session's full conversation via logs
-- Look at Agent Launcher logs for callback delivery attempts
+- Look at Agent Runner logs for callback delivery attempts

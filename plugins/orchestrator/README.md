@@ -17,7 +17,7 @@ The plugin uses a **thin-client architecture** where the `ao-*` commands are HTT
 
 ```
 ┌─────────────────┐     HTTP      ┌───────────────────┐
-│  ao-* commands  │ ──────────▶  │  Agent Runtime    │
+│  ao-* commands  │ ──────────▶  │  Agent Coordinator│
 │  (thin clients) │              │  (Port 8765)      │
 └─────────────────┘              │  - Sessions       │
                                  │  - Events         │
@@ -65,7 +65,7 @@ Comprehensive skill definition with usage instructions and examples.
 
 - **Python**: ≥3.11 for running the `ao-*` commands
 - **uv**: Python package manager ([uv documentation](https://docs.astral.sh/uv/))
-- **Backend services**: Agent Runtime and Agent Registry must be running
+- **Backend services**: Agent Coordinator and Agent Registry must be running
 
 ## Quick Start
 
@@ -97,21 +97,21 @@ uv run skills/orchestrator/commands/ao-list-blueprints
 ## Key Concepts
 
 ### Agent Blueprints
-Reusable configurations stored in the Agent Runtime that define specialized agent behavior:
+Reusable configurations stored in the Agent Coordinator that define specialized agent behavior:
 - Custom system prompts
 - MCP server configurations
 - Capability descriptions
 
-Managed via the Agent Runtime API (port 8765) or the Dashboard UI.
+Managed via the Agent Coordinator API (port 8765) or the Dashboard UI.
 
 ### Sessions
-Running agent conversations managed by the Agent Runtime:
+Running agent conversations managed by the Agent Coordinator:
 - Unique session names for easy reference
 - Persistent conversation history
 - Real-time status and event tracking
 
 ### API-Based Architecture
-All state is managed by the Agent Runtime backend server (port 8765):
+All state is managed by the Agent Coordinator backend server (port 8765):
 - Blueprint CRUD operations
 - Session lifecycle, events, results
 

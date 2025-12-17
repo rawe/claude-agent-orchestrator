@@ -12,14 +12,14 @@ The orchestrator uses a **thin-client architecture**:
 
 ```
 ┌─────────────────┐         ┌───────────────────┐         ┌─────────────────┐
-│  ao-* commands  │──HTTP──▶│   Agent Runtime   │◀──────▶│ Claude Agent SDK│
+│  ao-* commands  │──HTTP──▶│ Agent Coordinator │◀──────▶│ Claude Agent SDK│
 │  (thin clients) │         │   (Port 8765)     │         │                 │
 └─────────────────┘         └───────────────────┘         └─────────────────┘
 ```
 
 **Components:**
 - **ao-* commands**: Stateless CLI tools that call backend APIs
-- **Agent Runtime** (port 8765): Unified service for session management, event tracking, and agent blueprint registry
+- **Agent Coordinator** (port 8765): Unified service for session management, event tracking, and agent blueprint registry
 
 ## Core Concepts
 
@@ -38,7 +38,7 @@ Think of sessions as individual workstreams you can delegate tasks to and check 
 
 An **agent blueprint** is a reusable configuration that defines the behavior, expertise, and capabilities for sessions. Blueprints are optional - you can create generic sessions without them, or use blueprints to create specialized sessions with predefined behavior.
 
-Blueprints are managed by the **Agent Runtime** and can include:
+Blueprints are managed by the **Agent Coordinator** and can include:
 - **Name**: Unique identifier
 - **Description**: Human-readable description
 - **System Prompt**: Role definition and behavioral guidelines
@@ -48,7 +48,7 @@ Blueprints are managed by the **Agent Runtime** and can include:
 
 Blueprints can be managed via:
 1. **Dashboard UI** at http://localhost:3000
-2. **Agent Runtime API** at http://localhost:8765
+2. **Agent Coordinator API** at http://localhost:8765
 3. **ao-list-blueprints** command to view available blueprints
 
 ### Session States

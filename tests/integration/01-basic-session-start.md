@@ -5,16 +5,16 @@ Verify that starting a new session produces the correct sequence of WebSocket ev
 ## Prerequisites
 
 - Database reset: `./tests/scripts/reset-db`
-- Agent Runtime running
-- Agent Launcher running with `-x test-executor`
+- Agent Coordinator running
+- Agent Runner running with `-x test-executor`
 - ws-monitor running
 
 ## Test Steps
 
-### Step 1: Create a start_session job
+### Step 1: Create a start_session run
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -26,14 +26,14 @@ curl -X POST http://localhost:8765/jobs \
 
 Expected response:
 ```json
-{"job_id":"job_...","status":"pending","message":"Job queued"}
+{"run_id":"run_...","status":"pending","message":"Run queued"}
 ```
 
 ### Step 2: Wait for execution
 
-The launcher should pick up the job within a few seconds. Watch the launcher terminal for:
+The runner should pick up the run within a few seconds. Watch the runner terminal for:
 ```
-[INFO] poller: Received job job_... (start_session)
+[INFO] poller: Received run run_... (start_session)
 [INFO] executor: Starting session test-basic-001 with agent test-agent
 ```
 
@@ -83,7 +83,7 @@ Watch the ws-monitor output.
 ## Cleanup
 
 The session data is stored in:
-- Database: `servers/agent-runtime/.agent-orchestrator/observability.db`
-- Test executor: `servers/agent-launcher/executors/test-executor/.test-executor-data/test-basic-001.json`
+- Database: `servers/agent-coordinator/.agent-orchestrator/observability.db`
+- Test executor: `servers/agent-runner/executors/test-executor/.test-executor-data/test-basic-001.json`
 
 Run `./tests/scripts/reset-db` before the next test.

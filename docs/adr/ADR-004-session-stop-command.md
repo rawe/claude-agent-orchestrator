@@ -6,12 +6,12 @@
 
 ## Context
 
-Once a session is claimed by a launcher, there's no way to stop it. Users need to:
+Once a session is claimed by a runner, there's no way to stop it. Users need to:
 - Cancel long-running tasks
 - Stop stuck sessions
-- Free launcher capacity
+- Free runner capacity
 
-The challenge: launchers use long-polling (30s timeout), creating latency for stop commands.
+The challenge: runners use long-polling (30s timeout), creating latency for stop commands.
 
 ## Decision
 
@@ -19,7 +19,7 @@ The challenge: launchers use long-polling (30s timeout), creating latency for st
 
 ### Architecture
 
-- **StopCommandQueue**: Per-launcher stop command queues with `asyncio.Event`
+- **StopCommandQueue**: Per-runner stop command queues with `asyncio.Event`
 - **New statuses**: `STOPPING` (requested), `STOPPED` (terminated)
 - **Graceful shutdown**: SIGTERM (5s) → SIGKILL
 
@@ -28,9 +28,9 @@ The challenge: launchers use long-polling (30s timeout), creating latency for st
 ```
 POST /sessions/{id}/stop → StopCommandQueue.add_stop()
                          → event.set() (wake poll)
-                         → Launcher receives stop_jobs
+                         → Runner receives stop_runs
                          → SIGTERM → SIGKILL
-                         → POST /jobs/{id}/stopped
+                         → POST /runs/{id}/stopped
 ```
 
 ## Rationale

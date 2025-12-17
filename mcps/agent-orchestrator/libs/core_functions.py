@@ -1,7 +1,7 @@
 """
 Core functions for Agent Orchestrator MCP Server.
 
-These functions implement the actual logic by calling the Agent Runtime API.
+These functions implement the actual logic by calling the Agent Coordinator API.
 They are used by both the MCP tools and the REST API.
 """
 
@@ -185,10 +185,10 @@ async def start_agent_session_impl(
             if not parent_session_name:
                 logger.warn("callback=true but no parent session name available")
 
-        # Create job
-        # Note: If project_dir is None, the Agent Runtime/Launcher decides the default
-        job_id = await client.create_job(
-            job_type="start_session",
+        # Create agent run
+        # Note: If project_dir is None, the Agent Coordinator/Runner decides the default
+        run_id = await client.create_run(
+            run_type="start_session",
             session_name=session_name,
             prompt=prompt,
             agent_name=agent_blueprint_name,
@@ -196,13 +196,13 @@ async def start_agent_session_impl(
             parent_session_name=parent_session_name,
         )
 
-        logger.info(f"Created job {job_id} for session {session_name}")
+        logger.info(f"Created run {run_id} for session {session_name}")
 
         if async_mode:
             # Return immediately
             response = {
                 "session_name": session_name,
-                "job_id": job_id,
+                "run_id": run_id,
                 "status": "running",
                 "message": "Agent started in background. Use get_agent_session_status to poll for completion.",
             }
@@ -211,13 +211,13 @@ async def start_agent_session_impl(
             return json.dumps(response, indent=2)
 
         # Synchronous: wait for completion
-        logger.info(f"Waiting for job {job_id} to complete...")
-        await client.wait_for_job(job_id)
+        logger.info(f"Waiting for run {run_id} to complete...")
+        await client.wait_for_run(run_id)
 
         # Get result from session
         session = await client.get_session_by_name(session_name)
         if not session:
-            return f"Error: Session '{session_name}' not found after job completed"
+            return f"Error: Session '{session_name}' not found after run completed"
 
         result = await client.get_session_result(session["session_id"])
         text, truncated = truncate_response(result)
@@ -258,20 +258,20 @@ async def resume_agent_session_impl(
             if not parent_session_name:
                 logger.warn("callback=true but no parent session name available")
 
-        # Create resume job
-        job_id = await client.create_job(
-            job_type="resume_session",
+        # Create resume run
+        run_id = await client.create_run(
+            run_type="resume_session",
             session_name=session_name,
             prompt=prompt,
             parent_session_name=parent_session_name,
         )
 
-        logger.info(f"Created resume job {job_id} for session {session_name}")
+        logger.info(f"Created resume run {run_id} for session {session_name}")
 
         if async_mode:
             response = {
                 "session_name": session_name,
-                "job_id": job_id,
+                "run_id": run_id,
                 "status": "running",
                 "message": "Agent resumed in background. Use get_agent_session_status to poll for completion.",
             }
@@ -280,12 +280,12 @@ async def resume_agent_session_impl(
             return json.dumps(response, indent=2)
 
         # Synchronous: wait for completion
-        await client.wait_for_job(job_id)
+        await client.wait_for_run(run_id)
 
         # Get result
         session = await client.get_session_by_name(session_name)
         if not session:
-            return f"Error: Session '{session_name}' not found after job completed"
+            return f"Error: Session '{session_name}' not found after run completed"
 
         result = await client.get_session_result(session["session_id"])
         text, _ = truncate_response(result)

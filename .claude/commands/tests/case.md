@@ -29,7 +29,7 @@ Test case to run: `$ARGUMENTS`
 
 3. **Copy agent blueprints** if the test case prerequisites mention blueprints:
    - See `tests/README.md` → "Agent Blueprints" for copy instructions
-   - Blueprints must be copied BEFORE starting the Agent Runtime
+   - Blueprints must be copied BEFORE starting the Agent Coordinator
 
 ### Phase 3: Setup Services
 

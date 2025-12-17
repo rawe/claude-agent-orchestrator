@@ -10,7 +10,7 @@ DEFAULT_API_URL = "http://127.0.0.1:8765"
 
 
 def get_api_url() -> str:
-    """Get Agent Runtime API URL from environment or default."""
+    """Get Agent Coordinator API URL from environment or default."""
     return os.environ.get(ENV_API_URL, DEFAULT_API_URL)
 
 

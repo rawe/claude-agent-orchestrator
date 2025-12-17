@@ -4,8 +4,8 @@ Verify that starting a session with a specific agent blueprint works correctly.
 
 ## Prerequisites
 
-- Agent Runtime running
-- Agent Launcher running
+- Agent Coordinator running
+- Agent Runner running
 - ws-monitor running
 - At least one agent blueprint registered (for `claude-code` executor)
 
@@ -40,12 +40,12 @@ curl -X POST http://localhost:8765/agents \
   }'
 ```
 
-### Step 2: Create a start_session job with agent_name
+### Step 2: Create a start_session run with agent_name
 
 Use an agent name from Step 1:
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -58,12 +58,12 @@ curl -X POST http://localhost:8765/jobs \
 
 Expected response:
 ```json
-{"job_id":"job_...","status":"pending"}
+{"run_id":"run_...","status":"pending"}
 ```
 
 ### Step 3: Wait for execution
 
-Watch the launcher terminal for:
+Watch the runner terminal for:
 ```
 [INFO] executor: Starting session: test-agent-001 (agent=<agent-name>)
 ```
@@ -126,10 +126,10 @@ Watch the ws-monitor output.
 
 If the agent doesn't exist:
 ```
-[ERROR] supervisor: Job job_... failed: Process exited with code 1
+[ERROR] supervisor: Run run_... failed: Process exited with code 1
 ```
 
-Runtime logs will show:
+Coordinator logs will show:
 ```
 GET /agents/<agent-name> HTTP/1.1" 404 Not Found
 ```

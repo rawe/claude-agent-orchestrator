@@ -20,29 +20,29 @@ services:
       - agent-orchestrator-network
     restart: unless-stopped
     depends_on:
-      - agent-runtime
+      - agent-coordinator
       - context-store
 
   # ============================================================================
-  # AGENT RUNTIME (includes agent registry functionality)
+  # AGENT COORDINATOR (includes agent registry functionality)
   # ============================================================================
-  agent-runtime:
-    container_name: agent-orchestrator-agent-runtime
+  agent-coordinator:
+    container_name: agent-orchestrator-agent-coordinator
     build:
-      context: ./servers/agent-runtime
+      context: ./servers/agent-coordinator
       dockerfile: Dockerfile
     ports:
       - "8765:8765"
     volumes:
-      - ./servers/agent-runtime:/app
-      - runtime-data:/app/.agent-orchestrator
+      - ./servers/agent-coordinator:/app
+      - coordinator-data:/app/.agent-orchestrator
       - ${AGENT_DIR:-./config/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
       # Enable verbose debug logging for troubleshooting (set to true to enable)
       - DEBUG_LOGGING=false
       - CORS_ORIGINS=*
-      # Agent registry configuration (merged into runtime)
+      # Agent registry configuration (merged into coordinator)
       - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
     networks:
       - agent-orchestrator-network
@@ -165,8 +165,8 @@ volumes:
   document-data:
     name: agent-orchestrator-document-data
     driver: local
-  runtime-data:
-    name: agent-orchestrator-runtime-data
+  coordinator-data:
+    name: agent-orchestrator-coordinator-data
     driver: local
   es-data:
     name: context-store-es-data

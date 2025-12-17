@@ -20,7 +20,7 @@ Both have limitations: blocking or constant polling overhead.
 
 1. Orchestrator spawns child with `callback=true`
 2. Child completes, triggers `session_stop` event
-3. Agent Runtime checks parent idle status:
+3. Agent Coordinator checks parent idle status:
    - **If idle**: Resumes immediately with callback
    - **If busy**: Queues notification for later delivery
 
@@ -30,8 +30,8 @@ Both have limitations: blocking or constant polling overhead.
 |-----------|---------------|
 | **MCP Server** | Propagates `AGENT_SESSION_NAME` when `callback=true` |
 | **Sessions API** | Tracks `parent_session_name` for parent-child relationships |
-| **Callback Processor** | Monitors completion, creates resume jobs |
-| **Agent Launcher** | Executes resume jobs |
+| **Callback Processor** | Monitors completion, creates resume runs |
+| **Agent Runner** | Executes resume runs |
 
 ## Rationale
 
@@ -43,7 +43,7 @@ Both have limitations: blocking or constant polling overhead.
 
 ### Constraints
 
-Callbacks only work when parent is started by the framework (Dashboard → Job API → Launcher).
+Callbacks only work when parent is started by the framework (Dashboard → Run API → Runner).
 
 ## Consequences
 

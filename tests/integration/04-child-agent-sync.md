@@ -4,8 +4,8 @@ Verify that an orchestrator agent can spawn a child agent in synchronous mode.
 
 ## Prerequisites
 
-- Agent Runtime running
-- Agent Launcher running with `claude-code` executor
+- Agent Coordinator running
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
@@ -26,7 +26,7 @@ Should include `agent-orchestrator` in the list.
 ### Step 2: Create orchestrator session
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -75,7 +75,7 @@ Watch ws-monitor for:
 
 ### Agent blueprint not found
 - Verify blueprint is copied (see `tests/README.md` → "Agent Blueprints")
-- Check runtime logs for agent loading errors
+- Check coordinator logs for agent loading errors
 
 ### Child agent not starting
 - Check MCP server logs for errors

@@ -7,7 +7,7 @@ import type { Session, WebSocketMessage } from '@/types';
 interface SessionsContextValue {
   sessions: Session[];
   loading: boolean;
-  stopSession: (sessionId: string) => Promise<{ success: boolean; message: string; job_id?: string }>;
+  stopSession: (sessionId: string) => Promise<{ success: boolean; message: string; run_id?: string }>;
   deleteSession: (sessionId: string) => Promise<void>;
   deleteAllSessions: () => Promise<void>;
   refreshSessions: () => Promise<void>;

@@ -11,46 +11,46 @@ The backend implementation for stopping sessions is **complete** (see `docs/feat
 In the previous coding session, the following backend components were implemented:
 
 ### New Files Created
-- `servers/agent-runtime/services/stop_command_queue.py` - Thread-safe queue with asyncio Events
+- `servers/agent-coordinator/services/stop_command_queue.py` - Thread-safe queue with asyncio Events
 
 ### Modified Backend Files
-- `servers/agent-runtime/services/job_queue.py` - Added `STOPPING` and `STOPPED` job statuses
-- `servers/agent-runtime/main.py`:
+- `servers/agent-coordinator/services/run_queue.py` - Added `STOPPING` and `STOPPED` run statuses
+- `servers/agent-coordinator/main.py`:
   - `POST /sessions/{session_id}/stop` endpoint
-  - Modified `GET /launcher/jobs` to return `stop_jobs` and wake up immediately
-  - `POST /launcher/jobs/{job_id}/stopped` endpoint
-  - Integrated stop command queue with launcher registration
+  - Modified `GET /runner/runs` to return `stop_runs` and wake up immediately
+  - `POST /runner/runs/{run_id}/stopped` endpoint
+  - Integrated stop command queue with runner registration
 
-### Modified Launcher Files
-- `servers/agent-launcher/lib/api_client.py` - Added `stop_jobs` to `PollResult`, `report_stopped()` method
-- `servers/agent-launcher/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
+### Modified Runner Files
+- `servers/agent-runner/lib/api_client.py` - Added `stop_runs` to `PollResult`, `report_stopped()` method
+- `servers/agent-runner/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
 
 ### Updated Documentation
-- `docs/agent-runtime/API.md` - New endpoints documented
-- `docs/agent-runtime/DATA_MODELS.md` - Updated job statuses
+- `docs/agent-coordinator/API.md` - New endpoints documented
+- `docs/agent-coordinator/DATA_MODELS.md` - Updated run statuses
 - `docs/ARCHITECTURE.md` - Updated to reflect stop capability
 
 ### Database Note
 The database schema uses TEXT for session status, so 'stopping' can be added without schema migration.
-See: `servers/agent-runtime/database.py` line 80-89 (`update_session_status` accepts any string).
+See: `servers/agent-coordinator/database.py` line 80-89 (`update_session_status` accepts any string).
 
 ## Current State
 
 ### Backend (Complete)
 - `POST /sessions/{session_id}/stop` - Stop by session ID (convenience endpoint)
-  - Returns: `{ ok, session_id, job_id, session_name, status: "stopping" }`
-- `POST /jobs/{job_id}/stop` - Stop by job ID (direct control)
-  - Returns: `{ ok, job_id, session_name, status: "stopping" }`
-- Both endpoints share `_stop_job()` helper function
-- Jobs transition: `RUNNING` → `STOPPING` → `STOPPED`
-- Stop commands wake up launcher immediately via asyncio Events
+  - Returns: `{ ok, session_id, run_id, session_name, status: "stopping" }`
+- `POST /runs/{run_id}/stop` - Stop by run ID (direct control)
+  - Returns: `{ ok, run_id, session_name, status: "stopping" }`
+- Both endpoints share `_stop_run()` helper function
+- Runs transition: `RUNNING` → `STOPPING` → `STOPPED`
+- Stop commands wake up runner immediately via asyncio Events
 
 ### Dashboard (Needs Updates)
 - Has UI for stop button (works, shows on running sessions)
 - Has confirmation modal (works)
 - `sessionService.stopSession()` exists but expects different response format
-- Session type doesn't include `job_id` field
-- No visibility into job status for running sessions
+- Session type doesn't include `run_id` field
+- No visibility into run status for running sessions
 
 ---
 
@@ -80,24 +80,24 @@ async stopSession(sessionId: string): Promise<{ success: boolean; message: strin
 **Required Changes:**
 1. Update return type to match backend response
 2. Map backend response to expected format
-3. Handle specific error cases (session not running, no job found, etc.)
+3. Handle specific error cases (session not running, no run found, etc.)
 
 **New Implementation:**
 ```typescript
 interface StopSessionResponse {
   ok: boolean;
   session_id: string;
-  job_id: string;
+  run_id: string;
   status: string;
 }
 
-async stopSession(sessionId: string): Promise<{ success: boolean; message: string; job_id?: string }> {
+async stopSession(sessionId: string): Promise<{ success: boolean; message: string; run_id?: string }> {
   try {
     const response = await agentOrchestratorApi.post<StopSessionResponse>(`/sessions/${sessionId}/stop`);
     return {
       success: response.data.ok,
-      message: `Session stop initiated (job: ${response.data.job_id})`,
-      job_id: response.data.job_id,
+      message: `Session stop initiated (run: ${response.data.run_id})`,
+      run_id: response.data.run_id,
     };
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
@@ -117,15 +117,15 @@ async stopSession(sessionId: string): Promise<{ success: boolean; message: strin
 
 ---
 
-### Task 2: Add Job Info to Session Display (Optional Enhancement)
+### Task 2: Add Run Info to Session Display (Optional Enhancement)
 
-To show users which job is running a session, we need to track job-session relationships.
+To show users which run is running a session, we need to track run-session relationships.
 
 **Option A: Extend Session Type**
 
 **File:** `dashboard/src/types/session.ts`
 
-Add optional job_id field:
+Add optional run_id field:
 ```typescript
 export interface Session {
   session_id: string;
@@ -136,17 +136,17 @@ export interface Session {
   project_dir?: string;
   agent_name?: string;
   parent_session_name?: string;
-  job_id?: string;  // NEW: Associated job ID for running sessions
+  run_id?: string;  // NEW: Associated run ID for running sessions
 }
 ```
 
 **Backend Change Required:**
-- `GET /sessions` would need to include `job_id` for running sessions
-- This requires looking up jobs by `session_name` for sessions with `status='running'`
+- `GET /sessions` would need to include `run_id` for running sessions
+- This requires looking up runs by `session_name` for sessions with `status='running'`
 
-**Option B: Separate Job Lookup (Simpler)**
+**Option B: Separate Run Lookup (Simpler)**
 
-Keep session and job separate, only fetch job info when needed (e.g., on stop action).
+Keep session and run separate, only fetch run info when needed (e.g., on stop action).
 
 ---
 
@@ -187,7 +187,7 @@ Handle `session_updated` WebSocket messages to update status to 'stopping'.
 
 Currently, when `POST /sessions/{session_id}/stop` is called, the session status isn't updated in the database. We need to:
 
-**File:** `servers/agent-runtime/main.py`
+**File:** `servers/agent-coordinator/main.py`
 
 In `stop_session()` endpoint, after queueing the stop command:
 1. Update session status to 'stopping' (new status)
@@ -213,35 +213,35 @@ async def stop_session(session_id: str):
     return {
         "ok": True,
         "session_id": session_id,
-        "job_id": job.job_id,
+        "run_id": run.run_id,
         "status": "stopping"
     }
 ```
 
-**File:** `servers/agent-runtime/database.py`
+**File:** `servers/agent-coordinator/database.py`
 
 Ensure `update_session_status()` accepts 'stopping' as valid status.
 
 ---
 
-### Task 5: Handle Session Stop Event from Launcher
+### Task 5: Handle Session Stop Event from Runner
 
-When the launcher terminates a process and reports `POST /launcher/jobs/{job_id}/stopped`, we need to:
+When the runner terminates a process and reports `POST /runner/runs/{run_id}/stopped`, we need to:
 
-**File:** `servers/agent-runtime/main.py`
+**File:** `servers/agent-coordinator/main.py`
 
-In `report_job_stopped()` endpoint:
+In `report_run_stopped()` endpoint:
 1. Update session status to 'stopped'
 2. Broadcast `session_updated` WebSocket message
 3. Consider creating a `session_stop` event
 
 ```python
-@app.post("/launcher/jobs/{job_id}/stopped")
-async def report_job_stopped(job_id: str, request: JobStoppedRequest):
+@app.post("/runner/runs/{run_id}/stopped")
+async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     # ... existing code ...
 
-    # Get session name from job and update session status
-    session = get_session_by_name(job.session_name)
+    # Get session name from run and update session status
+    session = get_session_by_name(run.session_name)
     if session:
         update_session_status(session["session_id"], "stopped")
 
@@ -264,10 +264,10 @@ async def report_job_stopped(job_id: str, request: JobStoppedRequest):
 ### Backend Files
 | File | Purpose |
 |------|---------|
-| `servers/agent-runtime/main.py` | Stop endpoint, job stopped reporting |
-| `servers/agent-runtime/database.py` | Session status updates |
-| `servers/agent-runtime/services/job_queue.py` | Job status management |
-| `servers/agent-runtime/services/stop_command_queue.py` | Stop command queue (done) |
+| `servers/agent-coordinator/main.py` | Stop endpoint, run stopped reporting |
+| `servers/agent-coordinator/database.py` | Session status updates |
+| `servers/agent-coordinator/services/run_queue.py` | Run status management |
+| `servers/agent-coordinator/services/stop_command_queue.py` | Stop command queue (done) |
 
 ### Dashboard Files
 | File | Purpose |
@@ -283,8 +283,8 @@ async def report_job_stopped(job_id: str, request: JobStoppedRequest):
 | File | Purpose |
 |------|---------|
 | `docs/features/session-stop-command.md` | Feature specification |
-| `docs/agent-runtime/API.md` | API documentation (updated) |
-| `docs/agent-runtime/DATA_MODELS.md` | Data models (updated) |
+| `docs/agent-coordinator/API.md` | API documentation (updated) |
+| `docs/agent-coordinator/DATA_MODELS.md` | Data models (updated) |
 | `docs/ARCHITECTURE.md` | Architecture overview (updated) |
 
 ---
@@ -303,7 +303,7 @@ async def report_job_stopped(job_id: str, request: JobStoppedRequest):
 4. **Task 1: Update Session Service** (Required)
    - Fix response handling, remove mock code
 
-5. **Task 2: Add Job Info** (Optional Enhancement)
+5. **Task 2: Add Run Info** (Optional Enhancement)
    - Nice to have for visibility
 
 ---

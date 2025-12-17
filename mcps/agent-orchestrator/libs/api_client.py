@@ -1,8 +1,8 @@
 """
-HTTP client for Agent Runtime API.
+HTTP client for Agent Coordinator API.
 
 This module provides an async HTTP client using httpx to communicate
-with the Agent Runtime API for job management and session operations.
+with the Agent Coordinator API for agent run management and session operations.
 """
 
 import asyncio
@@ -22,7 +22,7 @@ class APIError(Exception):
 
 
 class APIClient:
-    """Async HTTP client for Agent Runtime API."""
+    """Async HTTP client for Agent Coordinator API."""
 
     DEFAULT_TIMEOUT = 10.0
     DEFAULT_POLL_INTERVAL = 2.0
@@ -73,21 +73,21 @@ class APIClient:
                 raise APIError(f"HTTP error: {e}")
 
     # -------------------------------------------------------------------------
-    # Jobs API
+    # Agent Runs API
     # -------------------------------------------------------------------------
 
-    async def create_job(
+    async def create_run(
         self,
-        job_type: str,
+        run_type: str,
         session_name: str,
         prompt: str,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
         parent_session_name: Optional[str] = None,
     ) -> str:
-        """Create a job. Returns job_id."""
+        """Create an agent run. Returns run_id."""
         data: Dict[str, Any] = {
-            "type": job_type,
+            "type": run_type,
             "session_name": session_name,
             "prompt": prompt,
         }
@@ -98,38 +98,38 @@ class APIClient:
         if parent_session_name:
             data["parent_session_name"] = parent_session_name
 
-        result = await self._request("POST", "/jobs", data)
-        return result["job_id"]
+        result = await self._request("POST", "/runs", data)
+        return result["run_id"]
 
-    async def get_job(self, job_id: str) -> Dict[str, Any]:
-        """Get job status."""
-        return await self._request("GET", f"/jobs/{job_id}")
+    async def get_run(self, run_id: str) -> Dict[str, Any]:
+        """Get agent run status."""
+        return await self._request("GET", f"/runs/{run_id}")
 
-    async def wait_for_job(
+    async def wait_for_run(
         self,
-        job_id: str,
+        run_id: str,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
         timeout: float = DEFAULT_COMPLETION_TIMEOUT,
     ) -> Dict[str, Any]:
-        """Poll job until completed or failed."""
+        """Poll agent run until completed or failed."""
         elapsed = 0.0
 
         while elapsed < timeout:
-            job = await self.get_job(job_id)
-            status = job.get("status")
+            run = await self.get_run(run_id)
+            status = run.get("status")
 
-            logger.debug(f"Job {job_id} status: {status}", {"elapsed": elapsed})
+            logger.debug(f"Run {run_id} status: {status}", {"elapsed": elapsed})
 
             if status == "completed":
-                return job
+                return run
             elif status == "failed":
-                error = job.get("error", "Unknown error")
-                raise APIError(f"Job failed: {error}")
+                error = run.get("error", "Unknown error")
+                raise APIError(f"Run failed: {error}")
 
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
 
-        raise APIError(f"Job {job_id} timed out after {timeout}s")
+        raise APIError(f"Run {run_id} timed out after {timeout}s")
 
     # -------------------------------------------------------------------------
     # Sessions API

@@ -4,8 +4,8 @@ Verify that an orchestrator agent can spawn a child agent in callback mode with 
 
 ## Prerequisites
 
-- Agent Runtime running
-- Agent Launcher running with `claude-code` executor
+- Agent Coordinator running
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
@@ -24,7 +24,7 @@ curl -s http://localhost:8765/agents | grep agent-orchestrator
 ### Step 2: Create orchestrator session with callback mode
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",

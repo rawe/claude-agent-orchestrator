@@ -5,7 +5,7 @@ import type { Session, SessionMetadataUpdate, SessionEvent } from '@/types';
 interface StopSessionResponse {
   ok: boolean;
   session_id: string;
-  job_id: string;
+  run_id: string;
   session_name: string;
   status: string;
 }
@@ -49,13 +49,13 @@ export const sessionService = {
   /**
    * Stop a running session
    */
-  async stopSession(sessionId: string): Promise<{ success: boolean; message: string; job_id?: string }> {
+  async stopSession(sessionId: string): Promise<{ success: boolean; message: string; run_id?: string }> {
     try {
       const response = await agentOrchestratorApi.post<StopSessionResponse>(`/sessions/${sessionId}/stop`);
       return {
         success: response.data.ok,
         message: `Session stop initiated`,
-        job_id: response.data.job_id,
+        run_id: response.data.run_id,
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response) {

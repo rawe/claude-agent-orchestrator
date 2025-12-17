@@ -123,7 +123,7 @@ Required for the callback feature. When an orchestrator spawns child agents with
 }
 ```
 
-The `${AGENT_SESSION_NAME}` placeholder is replaced at runtime by the launcher with the current session's name.
+The `${AGENT_SESSION_NAME}` placeholder is replaced at runtime by the runner with the current session's name.
 
 ### X-Agent-Tags (Blueprint Filtering)
 
