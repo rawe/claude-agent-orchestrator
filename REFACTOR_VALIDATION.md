@@ -84,16 +84,41 @@ The static checks confirm code correctness. The following runtime validation is 
 | Dashboard static | ✅ Returns 200 |
 | Context Store | ✅ Health + documents working |
 
-### Phase 2: Integration Tests (TODO)
+### Phase 2: Integration Tests ✅ PASSED
 
-```bash
-/tests:setup
-/tests:run
-/tests:teardown
-```
-- Run full integration test suite
-- Verify agent runs execute correctly
-- Check session lifecycle works end-to-end
+**Session Date:** 2025-12-17
+
+All 7 integration test cases passed successfully.
+
+| Test | Name | Result | Notes |
+|------|------|--------|-------|
+| 01 | basic-session-start | ✅ PASS | Session created, all 5 events received correctly |
+| 02 | session-resume | ✅ PASS | Session resumed, message history persisted |
+| 03 | session-with-agent | ✅ PASS | Agent blueprint applied correctly |
+| 04 | child-agent-sync | ✅ PASS | MCP tool call, child spawned and returned result |
+| 05 | child-agent-callback | ✅ PASS | Callback mode, parent_session_name set correctly |
+| 06 | concurrent-callbacks | ✅ PASS | All 5 concurrent callbacks received, no race conditions |
+| 07 | callback-on-child-failure | ✅ PASS | Failure callback received with error details |
+
+**Test Categories Verified:**
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Session Lifecycle | 01-04 | ✅ All passed |
+| Callback Feature | 05-07 | ✅ All passed |
+
+**API Endpoints Verified During Tests:**
+
+| Endpoint | Method | Status |
+|----------|--------|--------|
+| `/runs` | POST | ✅ Creates runs correctly |
+| `/runners` | GET | ✅ Shows registered runners |
+| `/sessions` | GET | ✅ Returns session list |
+| `/agents` | GET | ✅ Returns agent blueprints |
+
+**Minor Notes:**
+- `last_resumed_at` not propagated to coordinator DB (tracked in executor only)
+- `parent_session_name` null in sync mode (expected, only set in callback mode)
 
 ### Phase 3: Manual Service Verification (TODO)
 
