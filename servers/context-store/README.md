@@ -1074,6 +1074,8 @@ If you're running Ollama on a different host or port, set `OLLAMA_BASE_URL` acco
 OLLAMA_BASE_URL=http://192.168.1.100:11434 docker-compose up -d
 ```
 
+For detailed architecture and implementation details, see [Semantic Search Architecture](./docs/architecture-semantic-search.md).
+
 ## Docker Operations
 
 ### Docker Commands

@@ -151,6 +151,12 @@ The `config/agents/` folder contains example agent blueprints.
 | `web-researcher` | Web research | None (built-in) |
 | `browser-tester` | Playwright automation | Playwright (npx) |
 
+## Context Store
+
+The Context Store server provides document storage and retrieval for sharing context between agents and sessions. Documents can be tagged, queried, and organized with parent-child relationships.
+
+**Optional: Semantic Search** - Search documents by meaning using vector embeddings. Requires [Ollama](https://ollama.com/) running locally with an embedding model. See [Context Store README](./servers/context-store/README.md) for setup instructions.
+
 ## Core Concepts
 
 ### Agent Blueprints
@@ -200,6 +206,7 @@ See **[tests/README.md](./tests/README.md)** for setup and test case documentati
 - **[Getting Started Guide](./docs/GETTING_STARTED.md)** - Detailed setup and configuration
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
 - **[Agent Launcher](./servers/agent-launcher/README.md)** - Job execution bridge details
+- **[Context Store](./servers/context-store/README.md)** - Document storage server with semantic search
 - **[MCP Servers Overview](./mcps/README.md)** - All available MCP servers
 - **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - MCP server for agent orchestration
 - **[Context Store MCP](./mcps/context-store/README.md)** - MCP server for document management
