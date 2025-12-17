@@ -120,19 +120,27 @@ All 7 integration test cases passed successfully.
 - `last_resumed_at` not propagated to coordinator DB (tracked in executor only)
 - `parent_session_name` null in sync mode (expected, only set in callback mode)
 
-### Phase 3: Manual Service Verification (TODO)
+### Phase 3: Manual Service Verification ✅ PASSED
 
-```bash
-# Start Agent Coordinator
-cd servers/agent-coordinator && uv run python main.py
+**Session Date:** 2025-12-17
 
-# Start Agent Runner (separate terminal)
-./servers/agent-runner/agent-runner
+| Step | Command | Result |
+|------|---------|--------|
+| Start Coordinator | `uv run python main.py` | Started, health endpoint returned 200 |
+| Start Runner | `./servers/agent-runner/agent-runner` | Registered as `rnr_d6fcc02198f5` |
+| Verify /runners | `curl http://localhost:8765/runners` | ✅ Returns runner with new fields |
+| Verify POST /runs | `curl -X POST /runs` | ✅ Works (validation error as expected) |
+| Verify old /jobs | `curl http://localhost:8765/jobs` | ✅ Returns 404 (removed) |
+| Verify old /launchers | `curl http://localhost:8765/launchers` | ✅ Returns 404 (removed) |
 
-# Verify new API endpoints
-curl http://localhost:8765/runs
-curl http://localhost:8765/runners
-```
+**New Field Names Verified:**
+
+| Field | Example Value |
+|-------|---------------|
+| `runner_id` | `rnr_d6fcc02198f5` |
+| `runners` | Array in response |
+| `executor_type` | `claude-code` |
+| `status` | `online` |
 
 ### Phase 4: Dashboard Verification (TODO)
 
