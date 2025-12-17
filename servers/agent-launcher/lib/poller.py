@@ -1,5 +1,5 @@
 """
-Poll Thread - continuously polls Agent Runtime for new jobs.
+Poll Thread - continuously polls Agent Coordinator for new jobs.
 
 Runs in a background thread, spawning subprocesses for each job.
 """
@@ -9,7 +9,7 @@ import time
 import logging
 from typing import Callable, Optional
 
-from api_client import RuntimeAPIClient, Job, PollResult
+from api_client import CoordinatorAPIClient, Job, PollResult
 from executor import JobExecutor
 from registry import RunningJobsRegistry
 
@@ -24,7 +24,7 @@ class JobPoller:
 
     def __init__(
         self,
-        api_client: RuntimeAPIClient,
+        api_client: CoordinatorAPIClient,
         executor: JobExecutor,
         registry: RunningJobsRegistry,
         launcher_id: str,
@@ -33,7 +33,7 @@ class JobPoller:
         """Initialize the poller.
 
         Args:
-            api_client: HTTP client for Agent Runtime
+            api_client: HTTP client for Agent Coordinator
             executor: Job executor for spawning subprocesses
             registry: Registry for tracking running jobs
             launcher_id: This launcher's ID
@@ -83,7 +83,7 @@ class JobPoller:
 
                 # Check for deregistration signal
                 if result.deregistered:
-                    logger.warning("Received deregistration signal from Agent Runtime")
+                    logger.warning("Received deregistration signal from Agent Coordinator")
                     if self.on_deregistered:
                         self.on_deregistered()
                     return  # Exit poll loop
@@ -102,7 +102,7 @@ class JobPoller:
                 logger.error(f"Poll error ({consecutive_failures}/{MAX_CONNECTION_RETRIES}): {e}")
 
                 if consecutive_failures >= MAX_CONNECTION_RETRIES:
-                    logger.error(f"Agent Runtime unreachable after {MAX_CONNECTION_RETRIES} attempts - shutting down")
+                    logger.error(f"Agent Coordinator unreachable after {MAX_CONNECTION_RETRIES} attempts - shutting down")
                     if self.on_deregistered:
                         self.on_deregistered()
                     return  # Exit poll loop

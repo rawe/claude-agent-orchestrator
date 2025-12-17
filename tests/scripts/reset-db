@@ -1,5 +1,5 @@
 #!/bin/bash
-# Reset the Agent Runtime SQLite database for clean test runs.
+# Reset the Agent Coordinator SQLite database for clean test runs.
 #
 # Usage:
 #   ./tests/scripts/reset-db
@@ -10,15 +10,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Database paths
-RUNTIME_DB="$PROJECT_ROOT/servers/agent-runtime/.agent-orchestrator/observability.db"
+COORDINATOR_DB="$PROJECT_ROOT/servers/agent-coordinator/.agent-orchestrator/observability.db"
 TEST_EXECUTOR_DATA="$PROJECT_ROOT/servers/agent-launcher/executors/test-executor/.test-executor-data"
 
 echo "Resetting test environment..."
 
-# Remove Agent Runtime database
-if [ -f "$RUNTIME_DB" ]; then
-    rm "$RUNTIME_DB"
-    echo "  Removed: $RUNTIME_DB"
+# Remove Agent Coordinator database
+if [ -f "$COORDINATOR_DB" ]; then
+    rm "$COORDINATOR_DB"
+    echo "  Removed: $COORDINATOR_DB"
 else
     echo "  (no database to remove)"
 fi

@@ -1,6 +1,6 @@
 # Database Schema
 
-SQLite database schema used by the Agent Runtime server.
+SQLite database schema used by the Agent Coordinator server.
 
 ## Database Location
 

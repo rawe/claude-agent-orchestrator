@@ -9,7 +9,7 @@
 """
 Start a new agent orchestrator session.
 
-This command creates a job to start a new Claude AI session via the Agent Runtime.
+This command creates a job to start a new Claude AI session via the Agent Coordinator.
 
 Configuration:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)

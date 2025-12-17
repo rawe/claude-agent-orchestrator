@@ -1,6 +1,6 @@
 /**
- * Types matching Agent Runtime API models
- * See: docs/agent-runtime/DATA_MODELS.md
+ * Types matching Agent Coordinator API models
+ * See: docs/agent-coordinator/DATA_MODELS.md
  */
 
 // Message content block

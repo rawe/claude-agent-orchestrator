@@ -60,4 +60,4 @@ Single-job execution would defeat async patterns.
 ## References
 
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md)
-- [JOB_EXECUTION_FLOW.md](../agent-runtime/JOB_EXECUTION_FLOW.md)
+- [JOB_EXECUTION_FLOW.md](../agent-coordinator/JOB_EXECUTION_FLOW.md)

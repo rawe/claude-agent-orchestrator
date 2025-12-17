@@ -223,7 +223,7 @@ This should work with existing `session_updated` event type.
 ### Environment Variables
 
 ```bash
-# Agent Runtime (unified service - sessions + agent blueprints)
+# Agent Coordinator (unified service - sessions + agent blueprints)
 AGENT_ORCHESTRATOR_PROJECT_DIR=/path/to/project
 ```
 
@@ -251,7 +251,7 @@ While these backend features are being implemented, the frontend will:
    - Metadata editing: Disabled in V1 anyway
 
 3. **Agent Manager Tab:**
-   - Uses Agent Runtime API at port 8765
+   - Uses Agent Coordinator API at port 8765
    - All CRUD operations functional
 
 ---

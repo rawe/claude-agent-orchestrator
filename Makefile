@@ -1,4 +1,4 @@
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-runtime restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-chat-ui-docker stop-chat-ui-docker
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-chat-ui-docker stop-chat-ui-docker
 
 # Default target
 help:
@@ -22,7 +22,7 @@ help:
 	@echo ""
 	@echo "Individual service commands:"
 	@echo "  make restart-dashboard - Restart dashboard"
-	@echo "  make restart-runtime - Restart agent runtime"
+	@echo "  make restart-coordinator - Restart agent coordinator"
 	@echo "  make restart-doc    - Restart context store"
 	@echo ""
 	@echo "MCP servers (mcps/):"
@@ -95,7 +95,7 @@ health:
 	@echo "Dashboard (port 3000):"
 	@curl -s -o /dev/null -w "  Status: %{http_code}\n" http://localhost:3000 || echo "  ❌ Not responding"
 	@echo ""
-	@echo "Agent Runtime (port 8765):"
+	@echo "Agent Coordinator (port 8765):"
 	@curl -s http://localhost:8765/health || echo "  ❌ Not responding"
 	@echo ""
 	@echo "Context Store (port 8766):"
@@ -115,7 +115,7 @@ info:
 	@echo "   Purpose:     Unified UI for agent management, sessions, and documents"
 	@echo "   Action:      Open this URL in your browser"
 	@echo ""
-	@echo "⚙️  AGENT RUNTIME"
+	@echo "⚙️  AGENT COORDINATOR"
 	@echo "   URL:         http://localhost:8765"
 	@echo "   Purpose:     Session management, observability, and agent blueprints"
 	@echo "   Endpoints:   /health, /sessions, /events/{id}, /ws, /agents"
@@ -162,7 +162,7 @@ clean:
 # This removes: sessions, documents, elasticsearch index, and neo4j data
 clean-all:
 	@echo "Cleaning up everything including volumes..."
-	@echo "  - Session data (agent-orchestrator-runtime-data)"
+	@echo "  - Session data (agent-orchestrator-coordinator-data)"
 	@echo "  - Document storage (agent-orchestrator-document-data)"
 	@echo "  - Elasticsearch index (context-store-es-data)"
 	@echo "  - Neo4j graph data (agent-orchestrator-neo4j-data)"
@@ -196,9 +196,9 @@ clean-sessions:
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose stop agent-runtime; \
-		docker volume rm agent-orchestrator-runtime-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
-		echo "Session storage cleaned! Restart agent-runtime to create fresh storage."; \
+		docker-compose stop agent-coordinator; \
+		docker volume rm agent-orchestrator-coordinator-data 2>/dev/null || echo "Volume already removed or doesn't exist"; \
+		echo "Session storage cleaned! Restart agent-coordinator to create fresh storage."; \
 	else \
 		echo "Cancelled."; \
 	fi
@@ -207,8 +207,8 @@ clean-sessions:
 restart-dashboard:
 	docker-compose restart dashboard
 
-restart-runtime:
-	docker-compose restart agent-runtime
+restart-coordinator:
+	docker-compose restart agent-coordinator
 
 restart-doc:
 	docker-compose restart context-store

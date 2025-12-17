@@ -4,7 +4,7 @@ Verify that multiple child agents completing in rapid succession all have their 
 
 ## Prerequisites
 
-- Agent Runtime running
+- Agent Coordinator running
 - Agent Launcher running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:

@@ -42,7 +42,7 @@ In-memory registry (ephemeral by design).
 ## Consequences
 
 ### Positive
-- Runtime knows which launchers are active
+- Coordinator knows which launchers are active
 - Crashed launchers detected within 120s
 - Graceful shutdown support
 
@@ -53,4 +53,4 @@ In-memory registry (ephemeral by design).
 ## References
 
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md)
-- [JOBS_API.md](../agent-runtime/JOBS_API.md)
+- [JOBS_API.md](../agent-coordinator/JOBS_API.md)

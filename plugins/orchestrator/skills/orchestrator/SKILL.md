@@ -24,7 +24,7 @@ description: Use this skill when you need to orchestrate specialized Claude agen
 - Sessions can be resumed (even after finished)
 
 **Prerequisites**:
-- Backend services must be running (Agent Runtime and Agent Registry)
+- Backend services must be running (Agent Coordinator and Agent Registry)
 
 ---
 
@@ -166,7 +166,7 @@ uv run commands/ao-delete-all
 
 ### Blueprints vs Sessions
 - **Blueprint**: Reusable configuration (system prompt + MCP tools) stored in Agent Registry
-- **Session**: Running conversation instance managed by Agent Runtime
+- **Session**: Running conversation instance managed by Agent Coordinator
 - One blueprint can be used by multiple sessions
 - Sessions can run without blueprints (general purpose)
 
@@ -179,7 +179,7 @@ uv run commands/ao-delete-all
 3. **Prompt input**: Use stdin (pipe) OR `-p` flag, not both (stdin takes precedence)
 4. **Get result** only works on `finished` sessions - check status first
 5. **Blueprints** - list them with `ao-list-blueprints` before using `--agent`
-6. **Sessions are persistent** - stored in Agent Runtime database
+6. **Sessions are persistent** - stored in Agent Coordinator database
 7. **Command location** - Always use commands from this skill's `commands/` folder
 8. **Async execution** - Sessions run in Claude Code, commands return immediately after submission
 
@@ -191,7 +191,7 @@ Common errors and solutions:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| "Cannot connect to Agent Runtime" | Backend not running | Ask the user to the backend. |
+| "Cannot connect to Agent Coordinator" | Backend not running | Ask the user to the backend. |
 | "Cannot connect to Agent Registry" | Backend not running | Ask the user to the backend. |
 | "Session already exists" | Creating duplicate session | Use `ao-resume` or choose different name |
 | "Session not found" | Wrong name or doesn't exist | Check `ao-list-sessions` |

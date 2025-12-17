@@ -130,7 +130,7 @@ Long-polling with 500ms check intervals requires sub-millisecond claim operation
 - Two data models to maintain
 - ~40% field duplication
 - Requires `session_name` lookup to correlate job ↔ session
-- Jobs lost on Agent Runtime restart (acceptable trade-off)
+- Jobs lost on Agent Coordinator restart (acceptable trade-off)
 
 ### Neutral
 - Developers must understand both concepts
@@ -148,11 +148,11 @@ class PersistentJobQueue:
         self._db = SQLite("jobs.db")     # Persistence layer
 ```
 
-This would survive Agent Runtime restarts without sacrificing polling performance.
+This would survive Agent Coordinator restarts without sacrificing polling performance.
 
 ## References
 
-- [JOBS_API.md](../agent-runtime/JOBS_API.md) - Jobs API documentation
-- [JOB_EXECUTION_FLOW.md](../agent-runtime/JOB_EXECUTION_FLOW.md) - Execution sequence diagrams
+- [JOBS_API.md](../agent-coordinator/JOBS_API.md) - Jobs API documentation
+- [JOB_EXECUTION_FLOW.md](../agent-coordinator/JOB_EXECUTION_FLOW.md) - Execution sequence diagrams
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview
 - Git commit `3b98e8f` - Introduction of Jobs API (2025-12-08)

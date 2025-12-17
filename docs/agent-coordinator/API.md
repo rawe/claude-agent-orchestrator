@@ -1,6 +1,6 @@
-# Agent Runtime API
+# Agent Coordinator API
 
-API documentation for the Agent Runtime server.
+API documentation for the Agent Coordinator server.
 
 **Base URL:** `http://127.0.0.1:8765`
 
@@ -516,7 +516,7 @@ Stop a running job by signaling its launcher.
 
 ### Launcher API
 
-Endpoints for launcher instances to communicate with the Agent Runtime.
+Endpoints for launcher instances to communicate with the Agent Coordinator.
 
 #### POST /launcher/register
 

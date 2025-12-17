@@ -33,7 +33,7 @@ make start-all
 
 This starts:
 - **Dashboard** at http://localhost:3000
-- **Agent Runtime** at http://localhost:8765
+- **Agent Coordinator** at http://localhost:8765
 - **Context Store** at http://localhost:8766
 - **Neo4j** at http://localhost:7475
 - **MCP Servers** (Agent Orchestrator, Context Store, Neo4j)
@@ -49,7 +49,7 @@ cd /path/to/your/project
 /path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
 ```
 
-The launcher connects to Agent Runtime and waits for jobs. Keep it running while using the framework.
+The launcher connects to Agent Coordinator and waits for jobs. Keep it running while using the framework.
 
 ### 3. Open the Dashboard
 
@@ -82,11 +82,11 @@ agent-orchestrator-framework/
 │
 ├── docs/                              # Documentation
 │   ├── ARCHITECTURE.md                # System architecture overview
-│   └── agent-runtime/                 # Agent Runtime server docs
+│   └── agent-coordinator/             # Agent Coordinator server docs
 │
 ├── servers/                           # Backend servers
-│   ├── agent-runtime/                 # Session management + event capture + agent registry
-│   ├── agent-launcher/                # Job executor (polls runtime, runs Claude Code)
+│   ├── agent-coordinator/             # Session management + event capture + agent registry
+│   ├── agent-launcher/                # Job executor (polls coordinator, runs Claude Code)
 │   └── context-store/                 # Document storage
 │
 ├── mcps/                              # MCP servers (agent capabilities)
@@ -163,7 +163,7 @@ The Context Store server provides document storage and retrieval for sharing con
 Reusable configurations that define specialized agent behavior. Each blueprint can include a custom system prompt, instructions, and MCP server configurations. Managed via the Agent Registry server or stored in `.agent-orchestrator/agents/`.
 
 ### Sessions
-Isolated Claude Code sessions for individual agents. Each session has a unique ID and configuration. Session data is persisted in the Agent Runtime server (SQLite).
+Isolated Claude Code sessions for individual agents. Each session has a unique ID and configuration. Session data is persisted in the Agent Coordinator server (SQLite).
 
 ### MCP Configuration
 Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
@@ -177,7 +177,7 @@ The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) ar
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
-| Agent Runtime | http://localhost:8765 | Session management, WebSocket events, Blueprint API |
+| Agent Coordinator | http://localhost:8765 | Session management, WebSocket events, Blueprint API |
 | Context Store | http://localhost:8766 | Document storage API |
 | Neo4j Browser | http://localhost:7475 | Graph database UI (neo4j/agent-orchestrator) |
 
@@ -187,16 +187,16 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 
 | Term | Definition |
 |------|------------|
-| **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Runtime. |
+| **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Coordinator. |
 | **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
-| **Agent Runtime** | Backend server (port 8765) that manages session lifecycle, queues jobs, captures events, and stores agent blueprints. |
-| **Agent Launcher** | Standalone process that polls Agent Runtime for jobs and executes them as Claude Code sessions. Must run in your project directory. |
+| **Agent Coordinator** | Backend server (port 8765) that manages session lifecycle, queues jobs, captures events, and stores agent blueprints. |
+| **Agent Launcher** | Standalone process that polls Agent Coordinator for jobs and executes them as Claude Code sessions. Must run in your project directory. |
 | **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
 | **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 
 ## Testing
 
-The framework includes an integration test suite for verifying Agent Runtime and Agent Launcher functionality. Tests can be run with either a deterministic test executor or the real Claude Code executor.
+The framework includes an integration test suite for verifying Agent Coordinator and Agent Launcher functionality. Tests can be run with either a deterministic test executor or the real Claude Code executor.
 
 See **[tests/README.md](./tests/README.md)** for setup and test case documentation.
 

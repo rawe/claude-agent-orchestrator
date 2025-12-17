@@ -1,7 +1,7 @@
 """
 Core functions for Agent Orchestrator MCP Server.
 
-These functions implement the actual logic by calling the Agent Runtime API.
+These functions implement the actual logic by calling the Agent Coordinator API.
 They are used by both the MCP tools and the REST API.
 """
 
@@ -186,7 +186,7 @@ async def start_agent_session_impl(
                 logger.warn("callback=true but no parent session name available")
 
         # Create job
-        # Note: If project_dir is None, the Agent Runtime/Launcher decides the default
+        # Note: If project_dir is None, the Agent Coordinator/Launcher decides the default
         job_id = await client.create_job(
             job_type="start_session",
             session_name=session_name,

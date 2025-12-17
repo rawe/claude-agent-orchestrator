@@ -45,7 +45,7 @@ Orchestrator ──start──► Child Agent ──runs──► completes
     └──becomes idle (session ends)                │
                                                   │
                       ┌───────────────────────────┘
-                      │ Agent Runtime detects completion
+                      │ Agent Coordinator detects completion
                       │ Checks: is orchestrator idle?
                       ▼
            ┌─────────────────────┐
@@ -87,12 +87,12 @@ For the POC, callbacks use an **immediate strategy with aggregation**:
 
 This naturally handles parallel spawns - if an orchestrator spawns 5 agents and continues working, it receives one resume message listing all children that completed while it was busy.
 
-**Implementation Note:** The notification queue is stored as an **in-memory dict** within the Callback Processor service, keyed by parent session name. This means pending notifications are lost if Agent Runtime restarts - acceptable for POC.
+**Implementation Note:** The notification queue is stored as an **in-memory dict** within the Callback Processor service, keyed by parent session name. This means pending notifications are lost if Agent Coordinator restarts - acceptable for POC.
 
 ## Goals
 
 1. **Replace Agent Control API** - Eliminate the current MCP-server-based control API
-2. **Enable Callbacks** - Provide the infrastructure for Agent Runtime to resume orchestrator sessions
+2. **Enable Callbacks** - Provide the infrastructure for Agent Coordinator to resume orchestrator sessions
 3. **Minimal Implementation** - Simplest path to a working POC
 4. **Foundation for Future** - Design that can evolve (multiple launchers, direct SDK integration)
 
@@ -259,7 +259,7 @@ The parent session name is passed via a custom HTTP header when Claude Code conn
    - Sets AGENT_SESSION_NAME=orchestrator in environment
    - Provides optional agent name to the ao-start/ao-resume command
 
-MCP Config (retrieved from agent-runtime endpoints):
+MCP Config (retrieved from agent-coordinator endpoints):
    {
      "mcpServers": {
        "agent-orchestrator": {
@@ -273,7 +273,7 @@ MCP Config (retrieved from agent-runtime endpoints):
    }
 
 3. ao-start/ao-resume builds MCP config:
-   - Fetches agent blueprint from Agent Runtime (includes MCP config with placeholder, see example above)
+   - Fetches agent blueprint from Agent Coordinator (includes MCP config with placeholder, see example above)
    - Reads AGENT_SESSION_NAME from environment
    - Replaces ${AGENT_SESSION_NAME} → e.g. with "orchestrator"
    - Passes resolved config to Claude Agent SDK
@@ -296,7 +296,7 @@ MCP Config (retrieved from agent-runtime endpoints):
 The Launcher sets the `AGENT_SESSION_NAME` environment variable before spawning `ao-start`/`ao-resume`. The **ao-* commands** then:
 
 1. Read the environment variable
-2. Fetch the agent blueprint from Agent Runtime (which contains MCP config with `${AGENT_SESSION_NAME}` placeholder)
+2. Fetch the agent blueprint from Agent Coordinator (which contains MCP config with `${AGENT_SESSION_NAME}` placeholder)
 3. Replace the placeholder with the actual session name (done in `agent_api.py` which understands the MCP config model)
 4. Pass the resolved config to the Claude Agent Python SDK
 
@@ -343,14 +343,14 @@ export interface MCPServerHttp {
 
 | Term | Definition | Lifecycle | Persistence |
 |------|------------|-----------|-------------|
-| **Session** | A Claude Code agent conversation with its own ID, state, events, and result. Represents the agent's ongoing work and context. | Long-lived: `started` → `running` → `finished`/`error` | Persisted in Agent Runtime database |
+| **Session** | A Claude Code agent conversation with its own ID, state, events, and result. Represents the agent's ongoing work and context. | Long-lived: `started` → `running` → `finished`/`error` | Persisted in Agent Coordinator database |
 | **Job** | A discrete command for the launcher to execute. Represents a single operation request. | Short-lived: `pending` → `running` → `completed`/`failed` | Transient (in-memory queue) |
 
 **Relationship:**
 - A Job triggers Session operations
 - Job types: `start_session`, `resume_session`
 - One Session may be acted upon by multiple Jobs over time (start once, resume many times)
-- Jobs are consumed by the Launcher; Sessions are tracked by the Runtime
+- Jobs are consumed by the Launcher; Sessions are tracked by the Coordinator
 
 ```
 Job: "start_session"     →  Creates Session "task-1"
@@ -364,7 +364,7 @@ Job: "resume_session"    →  Resumes Session "task-1" (another callback)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    Agent Runtime (Docker) :8765                          │
+│                    Agent Coordinator (Docker) :8765                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
 │  │  Sessions API   │  │  Callbacks API  │  │     Launcher API        │  │
 │  │  (existing)     │  │  (NEW)          │  │     (NEW)               │  │
@@ -435,7 +435,7 @@ The launcher **must** support concurrent job execution. This is required because
 | **Poll Thread** | Continuously polls for new jobs, spawns subprocess for each |
 | **Running Jobs Registry** | In-memory dict tracking `job_id → subprocess` |
 | **Supervisor Thread** | Monitors subprocesses, detects completion/failure, reports status |
-| **Heartbeat Thread** | Sends periodic heartbeats to Agent Runtime |
+| **Heartbeat Thread** | Sends periodic heartbeats to Agent Coordinator |
 
 **Subprocess Management:**
 
@@ -466,10 +466,10 @@ For POC, we can allow unlimited concurrent jobs (practical limit ~10-20 based on
 
 ### Registration Flow
 
-On startup, the launcher registers with the Agent Runtime to receive a unique identifier.
+On startup, the launcher registers with the Agent Coordinator to receive a unique identifier.
 
 ```
-Launcher                              Agent Runtime
+Launcher                              Agent Coordinator
    │                                       │
    │  POST /launcher/register              │
    │  { }                                  │
@@ -490,7 +490,7 @@ Launcher                              Agent Runtime
 The launcher continuously polls for jobs. The server holds the connection open until a job is available or timeout occurs.
 
 ```
-Launcher                              Agent Runtime
+Launcher                              Agent Coordinator
    │                                       │
    │  GET /launcher/jobs?launcher_id=X     │
    │  (blocks up to 30 seconds)            │
@@ -521,7 +521,7 @@ Launcher                              Agent Runtime
 ### Job Execution Flow
 
 ```
-Launcher                              Agent Runtime
+Launcher                              Agent Coordinator
    │                                       │
    │  (receives job from poll)             │
    │                                       │
@@ -570,7 +570,7 @@ ao-resume orchestrator-main -p "Child session completed..."
 
 ## API Specification
 
-### Launcher API Endpoints (New in Agent Runtime)
+### Launcher API Endpoints (New in Agent Coordinator)
 
 #### POST /launcher/register
 
@@ -790,9 +790,9 @@ This section documents where callback notifications to parent agents are trigger
 
 ## Implementation Plan
 
-### Phase 1: Launcher API in Agent Runtime
+### Phase 1: Launcher API in Agent Coordinator
 
-**Files to modify:** `servers/agent-runtime/`
+**Files to modify:** `servers/agent-coordinator/`
 
 1. **Add Job queue (in-memory, thread-safe)**
    - Use `threading.Lock` to protect concurrent access
@@ -872,7 +872,7 @@ This section documents where callback notifications to parent agents are trigger
 - `plugins/orchestrator/skills/orchestrator/commands/ao-start`
 - `plugins/orchestrator/skills/orchestrator/commands/ao-resume`
 - `plugins/orchestrator/skills/orchestrator/commands/lib/`
-- `servers/agent-runtime/` (sessions API)
+- `servers/agent-coordinator/` (sessions API)
 
 1. **Extend Sessions API**
    - Add `parent_session_name` field to session creation/update
@@ -894,7 +894,7 @@ This section documents where callback notifications to parent agents are trigger
 
 ### Phase 5: Callback Integration
 
-**Files to modify:** `servers/agent-runtime/`
+**Files to modify:** `servers/agent-coordinator/`
 
 1. **Implement Callback Processor**
    - Called directly from Sessions API when `session_stop` event is received (synchronous function call)
@@ -913,7 +913,7 @@ This section documents where callback notifications to parent agents are trigger
 
 ```
 ├── servers/
-│   ├── agent-runtime/
+│   ├── agent-coordinator/
 │   │   ├── routers/
 │   │   │   ├── launcher.py          # NEW: Launcher API endpoints
 │   │   │   ├── jobs.py              # NEW: Job management endpoints
@@ -932,10 +932,10 @@ This section documents where callback notifications to parent agents are trigger
 │           ├── __init__.py
 │           ├── config.py            # Configuration
 │           ├── registry.py          # Running Jobs Registry (thread-safe)
-│           ├── poller.py            # Poll Thread - fetches jobs from runtime
+│           ├── poller.py            # Poll Thread - fetches jobs from Agent Coordinator
 │           ├── supervisor.py        # Supervisor Thread - monitors subprocesses
 │           ├── executor.py          # Job execution (subprocess spawning)
-│           └── api_client.py        # HTTP client for Agent Runtime API
+│           └── api_client.py        # HTTP client for Agent Coordinator API
 ```
 
 ### Agent Launcher Script Pattern
@@ -952,7 +952,7 @@ Following the same pattern as `ao-start` and `ao-resume`:
 #     "typer",
 # ]
 # ///
-"""Agent Launcher - Connects to Agent Runtime and executes jobs."""
+"""Agent Launcher - Connects to Agent Coordinator and executes jobs."""
 
 import sys
 from pathlib import Path
@@ -964,7 +964,7 @@ from config import LauncherConfig
 from registry import RunningJobsRegistry
 from poller import JobPoller
 from supervisor import JobSupervisor
-from api_client import RuntimeAPIClient
+from api_client import CoordinatorAPIClient
 
 # ... main implementation
 ```
@@ -983,12 +983,12 @@ from api_client import RuntimeAPIClient
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL to connect to |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Coordinator URL to connect to |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
 | `PROJECT_DIR` | cwd | Default project directory for ao-* commands |
 
-### Agent Runtime
+### Agent Coordinator
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -997,7 +997,7 @@ from api_client import RuntimeAPIClient
 
 ## Migration Path
 
-1. **Implement Launcher API** in Agent Runtime (no breaking changes)
+1. **Implement Launcher API** in Agent Coordinator (no breaking changes)
 2. **Create Agent Launcher** process
 3. **Update Dashboard** to use `/jobs` endpoint
 4. **Deprecate Agent Control API** - stop using/documenting
@@ -1005,7 +1005,7 @@ from api_client import RuntimeAPIClient
 
 ## Success Criteria (POC)
 
-- [ ] Launcher registers with Agent Runtime
+- [ ] Launcher registers with Agent Coordinator
 - [ ] Dashboard can start sessions via `/jobs` endpoint
 - [ ] Launcher executes `ao-start` and reports completion
 - [ ] Launcher executes `ao-resume` and reports completion
@@ -1084,4 +1084,4 @@ delivered successfully?
 ## Related Documents
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - Overall system architecture
-- [DATABASE_SCHEMA.md](../agent-runtime/DATABASE_SCHEMA.md) - Current database schema
+- [DATABASE_SCHEMA.md](../agent-coordinator/DATABASE_SCHEMA.md) - Current database schema

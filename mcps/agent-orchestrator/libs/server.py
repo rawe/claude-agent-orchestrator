@@ -3,7 +3,7 @@
 Agent Orchestrator MCP Server
 
 This MCP server provides tools to orchestrate specialized Claude Code agents
-through the Agent Runtime API. It enables:
+through the Agent Coordinator API. It enables:
 - Listing available agent blueprints
 - Managing agent sessions (create, resume, list, clean)
 - Executing long-running tasks in specialized agent contexts
@@ -317,7 +317,7 @@ def run_server(
     )
 
     print("Agent Orchestrator MCP Server", file=sys.stderr)
-    print(f"Agent Runtime API: {config.api_url}", file=sys.stderr)
+    print(f"Agent Coordinator API: {config.api_url}", file=sys.stderr)
     print(f"Transport: {transport}", file=sys.stderr)
 
     if transport == "stdio":

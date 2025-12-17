@@ -1,10 +1,10 @@
 # Feature: Session Stop Command
 
-Stop running agent sessions from the Agent Runtime, with immediate propagation to the Agent Launcher via the long-poll mechanism.
+Stop running agent sessions from the Agent Coordinator, with immediate propagation to the Agent Launcher via the long-poll mechanism.
 
 ## Motivation
 
-Currently, once a job is started, there's no way to stop it from the Agent Runtime. Users may need to:
+Currently, once a job is started, there's no way to stop it from the Agent Coordinator. Users may need to:
 - Cancel long-running tasks that are no longer needed
 - Stop sessions that are stuck or behaving unexpectedly
 - Free up launcher capacity for higher-priority work
@@ -12,7 +12,7 @@ Currently, once a job is started, there's no way to stop it from the Agent Runti
 ## Overview
 
 ```
-Dashboard/API                Agent Runtime              Agent Launcher
+Dashboard/API                Agent Coordinator              Agent Launcher
       │                            │                          │
       │ POST /sessions/{id}/stop   │                          │
       │───────────────────────────►│                          │
@@ -43,7 +43,7 @@ Dashboard/API                Agent Runtime              Agent Launcher
 
 A new service to manage pending stop commands with asyncio Events for immediate wake-up.
 
-**File:** `servers/agent-runtime/services/stop_command_queue.py`
+**File:** `servers/agent-coordinator/services/stop_command_queue.py`
 
 ```python
 import asyncio
@@ -119,7 +119,7 @@ stop_command_queue = StopCommandQueue()
 
 #### 2. New Job Status: STOPPED
 
-**File:** `servers/agent-runtime/services/job_queue.py`
+**File:** `servers/agent-coordinator/services/job_queue.py`
 
 ```python
 class JobStatus(str, Enum):
@@ -207,9 +207,9 @@ POST /launcher/jobs/{job_id}/stopped
 
 ### Implementation Details
 
-#### Agent Runtime: Modified Poll Endpoint
+#### Agent Coordinator: Modified Poll Endpoint
 
-**File:** `servers/agent-runtime/main.py`
+**File:** `servers/agent-coordinator/main.py`
 
 ```python
 @app.get("/launcher/jobs")
@@ -261,9 +261,9 @@ async def poll_for_jobs(launcher_id: str = Query(...)):
     return Response(status_code=204)
 ```
 
-#### Agent Runtime: Stop Session Endpoint
+#### Agent Coordinator: Stop Session Endpoint
 
-**File:** `servers/agent-runtime/main.py`
+**File:** `servers/agent-coordinator/main.py`
 
 ```python
 @app.post("/sessions/{session_id}/stop")
@@ -389,7 +389,7 @@ def report_stopped(self, launcher_id: str, job_id: str, signal: str = "SIGTERM")
 ```mermaid
 sequenceDiagram
     participant Client as Client
-    participant Runtime as Agent Runtime
+    participant Coordinator as Agent Coordinator
     participant Queue as StopCommandQueue
     participant Poll as Poll Endpoint<br/>(waiting)
     participant Launcher as Agent Launcher
@@ -397,16 +397,16 @@ sequenceDiagram
 
     Note over Launcher,Poll: Launcher is in long-poll wait
 
-    Client->>+Runtime: POST /sessions/{id}/stop
-    Runtime->>Runtime: get_session(session_id)
-    Runtime->>Runtime: job_queue.get_job_by_session_name()
-    Runtime->>Queue: add_stop(launcher_id, job_id)
+    Client->>+Coordinator: POST /sessions/{id}/stop
+    Coordinator->>Coordinator: get_session(session_id)
+    Coordinator->>Coordinator: job_queue.get_job_by_session_name()
+    Coordinator->>Queue: add_stop(launcher_id, job_id)
     Queue->>Queue: pending_stops.add(job_id)
     Queue->>Poll: event.set()
 
     Note over Poll: Wait interrupted!
 
-    Runtime-->>-Client: {ok: true, status: "stopping"}
+    Coordinator-->>-Client: {ok: true, status: "stopping"}
 
     Poll->>Queue: get_and_clear(launcher_id)
     Queue-->>Poll: ["job_123"]
@@ -415,9 +415,9 @@ sequenceDiagram
     Launcher->>Process: SIGTERM
     Process-->>Launcher: (exits)
 
-    Launcher->>+Runtime: POST /jobs/{id}/stopped
-    Runtime->>Runtime: job_queue.update_status(STOPPED)
-    Runtime-->>-Launcher: {ok: true}
+    Launcher->>+Coordinator: POST /jobs/{id}/stopped
+    Coordinator->>Coordinator: job_queue.update_status(STOPPED)
+    Coordinator-->>-Launcher: {ok: true}
 ```
 
 ## Error Handling
@@ -491,14 +491,14 @@ class JobStatus(str, Enum):
 
 | File | Changes |
 |------|---------|
-| `servers/agent-runtime/services/stop_command_queue.py` | NEW: StopCommandQueue service |
-| `servers/agent-runtime/services/job_queue.py` | Add STOPPING, STOPPED status |
-| `servers/agent-runtime/main.py` | Add stop endpoint, modify poll endpoint |
+| `servers/agent-coordinator/services/stop_command_queue.py` | NEW: StopCommandQueue service |
+| `servers/agent-coordinator/services/job_queue.py` | Add STOPPING, STOPPED status |
+| `servers/agent-coordinator/main.py` | Add stop endpoint, modify poll endpoint |
 | `servers/agent-launcher/lib/api_client.py` | Add stop_jobs to PollResult, report_stopped() |
 | `servers/agent-launcher/lib/poller.py` | Handle stop commands |
 | `servers/agent-launcher/lib/supervisor.py` | Add get_running_job() method |
-| `docs/agent-runtime/API.md` | Document new endpoints |
-| `docs/agent-runtime/DATA_MODELS.md` | Document new job statuses |
+| `docs/agent-coordinator/API.md` | Document new endpoints |
+| `docs/agent-coordinator/DATA_MODELS.md` | Document new job statuses |
 
 ## Future Enhancements
 

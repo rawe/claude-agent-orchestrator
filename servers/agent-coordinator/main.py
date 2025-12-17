@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
             pass
 
 app = FastAPI(
-    title="Agent Runtime",
+    title="Agent Coordinator",
     description="Unified service for agent session management and agent blueprint registry",
     version="0.2.0",
     lifespan=lifespan

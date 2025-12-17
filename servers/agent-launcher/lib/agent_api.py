@@ -1,7 +1,7 @@
 """
 HTTP client for Agent API (agent blueprints).
 
-The agent registry is now merged into the agent-runtime service.
+The agent registry is now merged into the agent-coordinator service.
 
 Environment variables:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
@@ -49,7 +49,7 @@ def _request(method: str, path: str, data: Optional[dict] = None) -> dict | list
     except urllib.error.URLError as e:
         raise AgentAPIError(
             f"Cannot connect to Agent API at {get_api_url()}\n"
-            f"Ensure the agent-runtime service is running: make start-bg\n"
+            f"Ensure the agent-coordinator service is running: make start-bg\n"
             f"Error: {e.reason}"
         )
 

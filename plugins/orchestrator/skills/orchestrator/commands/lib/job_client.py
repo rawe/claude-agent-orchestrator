@@ -1,7 +1,7 @@
 """
 Job Client
 
-HTTP client for Agent Runtime Jobs API.
+HTTP client for Agent Coordinator Jobs API.
 Creates jobs and polls for completion.
 """
 

@@ -4,7 +4,7 @@ Manual integration tests for the Agent Orchestrator framework.
 
 ## Overview
 
-Tests verify the Agent Runtime and Agent Launcher work correctly together. Two executor options:
+Tests verify the Agent Coordinator and Agent Launcher work correctly together. Two executor options:
 - `test-executor` - Simple echo executor for fast, deterministic tests
 - `claude-code` - Real Claude AI executor for end-to-end validation
 
@@ -12,7 +12,7 @@ Tests verify the Agent Runtime and Agent Launcher work correctly together. Two e
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) installed
-- No other instance of Agent Runtime running on port 8765
+- No other instance of Agent Coordinator running on port 8765
 
 ## Directory Structure
 
@@ -31,7 +31,7 @@ tests/
 
 ## Test Environment Setup
 
-**Important**: The database can only be reset when services are stopped. The `reset-db` script deletes the SQLite file, and the Agent Runtime creates tables on startup. If you need a fresh database, you must restart all services.
+**Important**: The database can only be reset when services are stopped. The `reset-db` script deletes the SQLite file, and the Agent Coordinator creates tables on startup. If you need a fresh database, you must restart all services.
 
 ### 1. Reset Database
 
@@ -43,14 +43,14 @@ Before starting services, reset the database for a clean state:
 
 ### 2. Copy Agent Blueprints (if needed)
 
-For tests that require agent blueprints (test cases 03-07), copy them **before** starting the Agent Runtime. See [Agent Blueprints](#agent-blueprints) section for details.
+For tests that require agent blueprints (test cases 03-07), copy them **before** starting the Agent Coordinator. See [Agent Blueprints](#agent-blueprints) section for details.
 
-### 3. Start Agent Runtime
+### 3. Start Agent Coordinator
 
 In a terminal (or background process):
 
 ```bash
-cd servers/agent-runtime
+cd servers/agent-coordinator
 uv run python -m main
 ```
 
@@ -92,7 +92,7 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 
 | Command | Description |
 |---------|-------------|
-| `/tests:setup [executor]` | Start core services (Runtime, Launcher, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
+| `/tests:setup [executor]` | Start core services (Coordinator, Launcher, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
 | `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct executor, handles test-specific setup |
 | `/tests:run` | Run all tests sequentially with automatic setup and teardown |
 | `/tests:teardown` | Stop all services and cleanup |
@@ -131,28 +131,28 @@ Test cases reference the README for common procedures rather than duplicating in
 Agent blueprints define specialized agents with system prompts and MCP servers.
 
 **Storage locations:**
-- Dockerized runtime: `config/agents/`
-- Local runtime: `servers/agent-runtime/.agent-orchestrator/agents/` (relative to Agent Runtime's working directory)
+- Dockerized coordinator: `config/agents/`
+- Local coordinator: `servers/agent-coordinator/.agent-orchestrator/agents/` (relative to Agent Coordinator's working directory)
 
 **For testing:**
-- Simple agents: Create via `POST /agents` API (see `docs/agent-runtime/API.md` → Agents API)
-- Complex agents (with MCP servers): **Copy** from `config/agents/` to `servers/agent-runtime/.agent-orchestrator/agents/`
+- Simple agents: Create via `POST /agents` API (see `docs/agent-coordinator/API.md` → Agents API)
+- Complex agents (with MCP servers): **Copy** from `config/agents/` to `servers/agent-coordinator/.agent-orchestrator/agents/`
 
-**Important**: Agent blueprints must be copied **before** starting the Agent Runtime, as blueprints are only discovered on startup.
+**Important**: Agent blueprints must be copied **before** starting the Agent Coordinator, as blueprints are only discovered on startup.
 
 **Copying agent blueprints:**
 
-Complex agents that require MCP servers (like `agent-orchestrator`) must be copied from the central config directory to the runtime's local agents folder. Do NOT create these files manually.
+Complex agents that require MCP servers (like `agent-orchestrator`) must be copied from the central config directory to the coordinator's local agents folder. Do NOT create these files manually.
 
 ```bash
 # Create the agents directory if it doesn't exist
-mkdir -p servers/agent-runtime/.agent-orchestrator/agents
+mkdir -p servers/agent-coordinator/.agent-orchestrator/agents
 
 # Copy a specific agent blueprint (e.g., agent-orchestrator)
-cp -r config/agents/agent-orchestrator servers/agent-runtime/.agent-orchestrator/agents/
+cp -r config/agents/agent-orchestrator servers/agent-coordinator/.agent-orchestrator/agents/
 ```
 
-The Agent Runtime discovers blueprints in `.agent-orchestrator/agents/` (relative to its working directory) on startup. Verify with:
+The Agent Coordinator discovers blueprints in `.agent-orchestrator/agents/` (relative to its working directory) on startup. Verify with:
 
 ```bash
 curl -s http://localhost:8765/agents | grep agent-orchestrator
@@ -211,14 +211,14 @@ Removes the SQLite database and test-executor session data:
 
 ## Stopping Services
 
-- **Agent Runtime**: `Ctrl+C` in terminal or kill process
+- **Agent Coordinator**: `Ctrl+C` in terminal or kill process
 - **Agent Launcher**: `Ctrl+C` in terminal or kill process
 - **ws-monitor**: `Ctrl+C` in terminal
 
 ## Troubleshooting
 
 ### "Connection refused" errors
-- Ensure Agent Runtime is running on port 8765
+- Ensure Agent Coordinator is running on port 8765
 - Check no other process is using the port: `lsof -i :8765`
 
 ### Jobs not executing
@@ -227,4 +227,4 @@ Removes the SQLite database and test-executor session data:
 
 ### No WebSocket events
 - Verify ws-monitor connected successfully
-- Check Agent Runtime logs for errors
+- Check Agent Coordinator logs for errors

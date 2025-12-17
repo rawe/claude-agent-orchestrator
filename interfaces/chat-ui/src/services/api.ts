@@ -32,7 +32,7 @@ function generateSessionName(): string {
 
 /**
  * Chat API Service
- * See: docs/agent-runtime/API.md
+ * See: docs/agent-coordinator/API.md
  */
 export const chatService = {
   /**

@@ -1,6 +1,6 @@
 # Agent Launcher
 
-The Agent Launcher is a standalone process that polls Agent Runtime for jobs and executes them via a configurable executor. It enables callback-driven orchestration by allowing the framework to resume parent sessions when child agents complete.
+The Agent Launcher is a standalone process that polls Agent Coordinator for jobs and executes them via a configurable executor. It enables callback-driven orchestration by allowing the framework to resume parent sessions when child agents complete.
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ The Agent Launcher is a standalone process that polls Agent Runtime for jobs and
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) installed
-- Agent Runtime running (default: `http://localhost:8765`)
+- Agent Coordinator running (default: `http://localhost:8765`)
 
 ### Start the Launcher
 
@@ -16,18 +16,18 @@ The Agent Launcher is a standalone process that polls Agent Runtime for jobs and
 # From project root
 ./servers/agent-launcher/agent-launcher
 
-# Or with explicit runtime URL
-./servers/agent-launcher/agent-launcher --runtime-url http://localhost:8765
+# Or with explicit coordinator URL
+./servers/agent-launcher/agent-launcher --coordinator-url http://localhost:8765
 
 # Verbose mode for debugging
 ./servers/agent-launcher/agent-launcher -v
 ```
 
 The launcher will:
-1. Register with Agent Runtime
+1. Register with Agent Coordinator
 2. Start polling for jobs
 3. Execute jobs via the configured executor (default: `executors/claude-code/ao-claude-code-exec`)
-4. Report job status back to the runtime
+4. Report job status back to the Agent Coordinator
 
 ### Stop the Launcher
 
@@ -39,7 +39,7 @@ Press `Ctrl+C` for graceful shutdown.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Runtime URL |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Coordinator URL |
 | `AGENT_EXECUTOR_PATH` | `executors/claude-code/ao-claude-code-exec` | Executor script path (relative to agent-launcher dir) |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
@@ -69,7 +69,7 @@ AGENT_EXECUTOR_PATH=executors/test-executor/ao-test-exec ./agent-launcher
 ### CLI Options
 
 ```
---runtime-url, -r     Agent Runtime URL (overrides AGENT_ORCHESTRATOR_API_URL)
+--coordinator-url, -c  Agent Coordinator URL (overrides AGENT_ORCHESTRATOR_API_URL)
 --executor, -x        Executor name (e.g., 'claude-code', 'test-executor')
 --executor-path, -e   Full executor script path (overrides AGENT_EXECUTOR_PATH)
 --executor-list, -l   List available executors and exit
@@ -115,7 +115,7 @@ servers/agent-launcher/
                               │ HTTP
                               ▼
                     ┌─────────────────┐
-                    │  Agent Runtime  │
+                    │  Agent Coordinator  │
                     │    :8765        │
                     └─────────────────┘
 ```
@@ -131,7 +131,7 @@ Jobs are passed to the executor as JSON via stdin:
 
 ## How It Works
 
-1. **Registration**: On startup, launcher registers with Agent Runtime and receives a unique `launcher_id`
+1. **Registration**: On startup, launcher registers with Agent Coordinator and receives a unique `launcher_id`
 2. **Polling**: Poll thread continuously long-polls for pending jobs
 3. **Execution**: When a job arrives, executor spawns appropriate subprocess with environment variables
 4. **Monitoring**: Supervisor thread monitors subprocess completion and reports status
@@ -142,10 +142,10 @@ Jobs are passed to the executor as JSON via stdin:
 The launcher enables callback-driven orchestration:
 
 ```
-1. Dashboard creates job → Agent Runtime queues it
+1. Dashboard creates job → Agent Coordinator queues it
 2. Launcher picks up job → Spawns executor with mode=start (sets AGENT_SESSION_NAME)
 3. Orchestrator runs → Spawns child agents with callback=true
-4. Child completes → Runtime creates resume job
+4. Child completes → Coordinator creates resume job
 5. Launcher picks up resume job → Spawns executor with mode=resume
 6. Orchestrator continues with callback notification
 ```
@@ -155,7 +155,7 @@ The launcher enables callback-driven orchestration:
 The launcher logs to stdout:
 
 ```
-2025-01-15 10:00:00 [INFO] agent-launcher: Connecting to Agent Runtime at http://localhost:8765
+2025-01-15 10:00:00 [INFO] agent-launcher: Connecting to Agent Coordinator at http://localhost:8765
 2025-01-15 10:00:00 [INFO] agent-launcher: Registered as lnch_abc123
 2025-01-15 10:00:00 [INFO] agent-launcher: Launcher started - waiting for jobs
 2025-01-15 10:00:05 [INFO] poller: Received job job_xyz789 (start_session)
@@ -168,13 +168,13 @@ Use `-v` for debug-level logs.
 
 ### Launcher won't connect
 
-- Ensure Agent Runtime is running: `curl http://localhost:8765/health`
-- Check the runtime URL is correct
+- Ensure Agent Coordinator is running: `curl http://localhost:8765/health`
+- Check the Agent Coordinator URL is correct
 
 ### Jobs not being picked up
 
 - Verify launcher is registered (check logs for `Registered as lnch_...`)
-- Check Agent Runtime logs for job queue status
+- Check Agent Coordinator logs for job queue status
 
 ### Subprocess failures
 

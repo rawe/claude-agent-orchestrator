@@ -9,8 +9,8 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 ```
 ├── dashboard/                    # React web UI for monitoring agents
 ├── servers/
-│   ├── agent-runtime/            # FastAPI server - sessions, jobs, launcher registry
-│   ├── agent-launcher/           # Job executor - polls runtime, spawns executors
+│   ├── agent-coordinator/            # FastAPI server - sessions, jobs, launcher registry
+│   ├── agent-launcher/           # Job executor - polls Agent Coordinator, spawns executors
 │   │   ├── lib/                  # Core launcher (framework-agnostic)
 │   │   └── claude-code/          # Claude Code executors (Claude Agent SDK)
 │   └── context-store/            # Document synchronization server
@@ -26,7 +26,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 
 ### Servers
 
-**Agent Runtime** (`servers/agent-runtime/`) - Port 8765
+**Agent Coordinator** (`servers/agent-coordinator/`) - Port 8765
 - FastAPI + WebSocket server
 - Persists sessions and events in SQLite
 - Broadcasts real-time updates to dashboard
@@ -37,7 +37,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 - Stop command queue for immediate session termination
 
 **Agent Launcher** (`servers/agent-launcher/`)
-- Polls Agent Runtime for pending jobs and stop commands
+- Polls Agent Coordinator for pending jobs and stop commands
 - Executes jobs via framework-specific executors
 - Supports concurrent job execution
 - Reports job status (started, completed, failed, stopped)
@@ -58,7 +58,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 ### Plugins (Claude Code Skills)
 
 **Orchestrator Skill** (`plugins/orchestrator/skills/orchestrator/`)
-- ao-* CLI commands that call Agent Runtime APIs
+- ao-* CLI commands that call Agent Coordinator APIs
 - `ao-start`, `ao-resume` - Create jobs via Jobs API
 - `ao-list-sessions`, `ao-status`, `ao-get-result` - Query Sessions API
 - `ao-list-blueprints`, `ao-show-config`, `ao-delete-all` - Utilities
@@ -89,7 +89,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
                   │ HTTP (Jobs API)                   │ HTTP
                   ▼                                   ▼
 ┌─────────────────────────────────────┐   ┌─────────────────────────────────┐
-│         Agent Runtime :8765         │   │       Context Store :8766       │
+│         Agent Coordinator :8765         │   │       Context Store :8766       │
 │  - Sessions API                     │   │   - Document storage            │
 │  - Jobs API                         │   │   - Tag-based queries           │
 │  - Launcher registry                │   │   - Semantic search             │
@@ -130,16 +130,16 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 
 | Source | Target | Protocol | Purpose |
 |--------|--------|----------|---------|
-| ao-* CLI commands | Agent Runtime | HTTP | Create jobs, query sessions |
+| ao-* CLI commands | Agent Coordinator | HTTP | Create jobs, query sessions |
 | doc-* commands | Context Store | HTTP | Document operations |
-| Dashboard | Agent Runtime | HTTP | Jobs API, Sessions API, Blueprints API |
-| Dashboard | Agent Runtime | HTTP | Launcher management |
-| Dashboard | Agent Runtime | WebSocket | Real-time session updates |
+| Dashboard | Agent Coordinator | HTTP | Jobs API, Sessions API, Blueprints API |
+| Dashboard | Agent Coordinator | HTTP | Launcher management |
+| Dashboard | Agent Coordinator | WebSocket | Real-time session updates |
 | Dashboard | Context Store | HTTP | Document listing/viewing |
-| Agent Launcher | Agent Runtime | HTTP | Long-poll for jobs, report status |
-| Agent Launcher | Agent Runtime | HTTP | Registration, heartbeat |
+| Agent Launcher | Agent Coordinator | HTTP | Long-poll for jobs, report status |
+| Agent Launcher | Agent Coordinator | HTTP | Registration, heartbeat |
 | Agent Launcher | Claude Code Executors | Subprocess | Execute ao-start, ao-resume |
-| Agent Orchestrator MCP | Agent Runtime | HTTP | Jobs API (start/resume sessions) |
+| Agent Orchestrator MCP | Agent Coordinator | HTTP | Jobs API (start/resume sessions) |
 | Context Store MCP | doc-* commands | Subprocess | Expose as MCP tools |
 
 ## Key Environment Variables
@@ -149,8 +149,8 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 | `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | ao-* CLI commands, MCP Server, Agent Launcher |
 | `VITE_AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Dashboard |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | cwd | ao-* CLI commands, MCP Server |
-| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Runtime |
-| `DEBUG_LOGGING` | `false` | Agent Runtime |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Coordinator |
+| `DEBUG_LOGGING` | `false` | Agent Coordinator |
 | `POLL_TIMEOUT` | `30` | Agent Launcher |
 | `HEARTBEAT_INTERVAL` | `60` | Agent Launcher |
 | `PROJECT_DIR` | cwd | Agent Launcher |
@@ -158,17 +158,17 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 
 ## Agent Launcher Architecture
 
-The Agent Launcher enables distributed agent execution, separating orchestration (Agent Runtime) from execution (Launcher + Executors).
+The Agent Launcher enables distributed agent execution, separating orchestration (Agent Coordinator) from execution (Launcher + Executors).
 
 ### Why Separate?
 
-Starting agent sessions requires spawning AI framework processes (e.g., Claude Code). These processes must run on the host machine—not inside a Docker container. The Agent Launcher runs on hosts where agent frameworks are installed, while the Agent Runtime can be containerized.
+Starting agent sessions requires spawning AI framework processes (e.g., Claude Code). These processes must run on the host machine—not inside a Docker container. The Agent Launcher runs on hosts where agent frameworks are installed, while the Agent Coordinator can be containerized.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────┐
-│         Agent Runtime               │
+│         Agent Coordinator               │
 │  - Jobs API (queue & dispatch)      │
 │  - Launcher registry                │
 │  - Callback processor               │
@@ -212,7 +212,7 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
 Parent-child session coordination enables orchestration patterns:
 
 1. Parent agent starts child with `callback=true`
-2. Agent Runtime tracks `parent_session_name` on child session
+2. Agent Coordinator tracks `parent_session_name` on child session
 3. When child completes, Callback Processor checks parent status
 4. If parent is idle: creates resume job immediately
 5. If parent is busy: queues notification for later delivery
@@ -241,4 +241,4 @@ The architecture supports multiple agent frameworks:
 - **Claude Code**: Currently implemented (`servers/agent-launcher/claude-code/`)
 - **Future**: LangChain, AutoGen, or other frameworks can add executors
 
-Only the executor directory is framework-specific. The Launcher core, Agent Runtime, Jobs API, and all ao-* CLI commands are framework-agnostic.
+Only the executor directory is framework-specific. The Launcher core, Agent Coordinator, Jobs API, and all ao-* CLI commands are framework-agnostic.

@@ -32,7 +32,7 @@ App
 ```
 User Input → ChatContext.sendMessage() → API (POST /jobs)
                                               ↓
-WebSocket ← Agent Runtime broadcasts events
+WebSocket ← Agent Coordinator broadcasts events
     ↓
 ChatContext handles event → Updates state → UI re-renders
 ```

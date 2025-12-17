@@ -4,7 +4,7 @@ Verify that starting a session with a specific agent blueprint works correctly.
 
 ## Prerequisites
 
-- Agent Runtime running
+- Agent Coordinator running
 - Agent Launcher running
 - ws-monitor running
 - At least one agent blueprint registered (for `claude-code` executor)
@@ -129,7 +129,7 @@ If the agent doesn't exist:
 [ERROR] supervisor: Job job_... failed: Process exited with code 1
 ```
 
-Runtime logs will show:
+Coordinator logs will show:
 ```
 GET /agents/<agent-name> HTTP/1.1" 404 Not Found
 ```

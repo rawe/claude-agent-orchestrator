@@ -1,5 +1,5 @@
 """
-HTTP client for communicating with Agent Runtime.
+HTTP client for communicating with Agent Coordinator.
 
 Wraps the Launcher API endpoints with typed methods.
 """
@@ -44,14 +44,14 @@ class PollResult:
             self.stop_jobs = []
 
 
-class RuntimeAPIClient:
-    """HTTP client for Agent Runtime Launcher API."""
+class CoordinatorAPIClient:
+    """HTTP client for Agent Coordinator Launcher API."""
 
     def __init__(self, base_url: str, timeout: float = 35.0):
         """Initialize client with base URL.
 
         Args:
-            base_url: Agent Runtime URL (e.g., http://localhost:8765)
+            base_url: Agent Coordinator URL (e.g., http://localhost:8765)
             timeout: Request timeout in seconds (slightly longer than poll timeout)
         """
         self.base_url = base_url.rstrip("/")
@@ -68,7 +68,7 @@ class RuntimeAPIClient:
         project_dir: Optional[str] = None,
         executor_type: Optional[str] = None,
     ) -> RegistrationResponse:
-        """Register this launcher with Agent Runtime.
+        """Register this launcher with Agent Coordinator.
 
         Args:
             hostname: The machine hostname where the launcher is running

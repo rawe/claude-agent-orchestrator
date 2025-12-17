@@ -1,6 +1,6 @@
 # Shared Data Models
 
-Common data structures used by the Agent Runtime.
+Common data structures used by the Agent Coordinator.
 
 ## Event
 

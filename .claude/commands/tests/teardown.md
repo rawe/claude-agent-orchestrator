@@ -11,7 +11,7 @@ See `tests/README.md` for full documentation.
 ## Your Task
 
 1. **Stop background processes**:
-   - Stop Agent Runtime (the uv run python -m main process)
+   - Stop Agent Coordinator (the uv run python -m main process)
    - Stop Agent Launcher (the agent-launcher process)
    - Stop WebSocket Monitor (the ws-monitor process)
 

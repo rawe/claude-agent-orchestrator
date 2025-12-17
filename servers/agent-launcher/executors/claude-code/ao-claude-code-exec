@@ -82,7 +82,7 @@ EXIT CODES:
 
 ENVIRONMENT:
     AGENT_SESSION_NAME                  Session name for MCP headers
-    AGENT_ORCHESTRATOR_API_URL          Runtime API (default: http://127.0.0.1:8765)
+    AGENT_ORCHESTRATOR_API_URL          Coordinator API (default: http://127.0.0.1:8765)
     AGENT_ORCHESTRATOR_ENABLE_LOGGING   Enable debug logging
 
 SCHEMA VERSION:

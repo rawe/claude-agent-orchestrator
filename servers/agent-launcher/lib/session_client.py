@@ -60,7 +60,7 @@ class SessionClient:
         """
         Create new session with full metadata.
 
-        NOTE: parent_session_name is now set by Agent Runtime from the Job's
+        NOTE: parent_session_name is now set by Agent Coordinator from the Job's
         parent_session_name field. See mcp-server-api-refactor.md Phase 2.
         """
         data = {

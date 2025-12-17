@@ -6,7 +6,7 @@ Verify that resuming an existing session produces the correct sequence of WebSoc
 
 - Complete test `01-basic-session-start` first (need existing session)
 - OR create a session using Step 0 below
-- Agent Runtime running
+- Agent Coordinator running
 - Agent Launcher running with `-x test-executor`
 - ws-monitor running
 

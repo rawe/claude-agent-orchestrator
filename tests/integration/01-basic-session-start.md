@@ -5,7 +5,7 @@ Verify that starting a new session produces the correct sequence of WebSocket ev
 ## Prerequisites
 
 - Database reset: `./tests/scripts/reset-db`
-- Agent Runtime running
+- Agent Coordinator running
 - Agent Launcher running with `-x test-executor`
 - ws-monitor running
 
@@ -83,7 +83,7 @@ Watch the ws-monitor output.
 ## Cleanup
 
 The session data is stored in:
-- Database: `servers/agent-runtime/.agent-orchestrator/observability.db`
+- Database: `servers/agent-coordinator/.agent-orchestrator/observability.db`
 - Test executor: `servers/agent-launcher/executors/test-executor/.test-executor-data/test-basic-001.json`
 
 Run `./tests/scripts/reset-db` before the next test.

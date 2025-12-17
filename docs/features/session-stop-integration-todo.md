@@ -11,11 +11,11 @@ The backend implementation for stopping sessions is **complete** (see `docs/feat
 In the previous coding session, the following backend components were implemented:
 
 ### New Files Created
-- `servers/agent-runtime/services/stop_command_queue.py` - Thread-safe queue with asyncio Events
+- `servers/agent-coordinator/services/stop_command_queue.py` - Thread-safe queue with asyncio Events
 
 ### Modified Backend Files
-- `servers/agent-runtime/services/job_queue.py` - Added `STOPPING` and `STOPPED` job statuses
-- `servers/agent-runtime/main.py`:
+- `servers/agent-coordinator/services/job_queue.py` - Added `STOPPING` and `STOPPED` job statuses
+- `servers/agent-coordinator/main.py`:
   - `POST /sessions/{session_id}/stop` endpoint
   - Modified `GET /launcher/jobs` to return `stop_jobs` and wake up immediately
   - `POST /launcher/jobs/{job_id}/stopped` endpoint
@@ -26,13 +26,13 @@ In the previous coding session, the following backend components were implemente
 - `servers/agent-launcher/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
 
 ### Updated Documentation
-- `docs/agent-runtime/API.md` - New endpoints documented
-- `docs/agent-runtime/DATA_MODELS.md` - Updated job statuses
+- `docs/agent-coordinator/API.md` - New endpoints documented
+- `docs/agent-coordinator/DATA_MODELS.md` - Updated job statuses
 - `docs/ARCHITECTURE.md` - Updated to reflect stop capability
 
 ### Database Note
 The database schema uses TEXT for session status, so 'stopping' can be added without schema migration.
-See: `servers/agent-runtime/database.py` line 80-89 (`update_session_status` accepts any string).
+See: `servers/agent-coordinator/database.py` line 80-89 (`update_session_status` accepts any string).
 
 ## Current State
 
@@ -187,7 +187,7 @@ Handle `session_updated` WebSocket messages to update status to 'stopping'.
 
 Currently, when `POST /sessions/{session_id}/stop` is called, the session status isn't updated in the database. We need to:
 
-**File:** `servers/agent-runtime/main.py`
+**File:** `servers/agent-coordinator/main.py`
 
 In `stop_session()` endpoint, after queueing the stop command:
 1. Update session status to 'stopping' (new status)
@@ -218,7 +218,7 @@ async def stop_session(session_id: str):
     }
 ```
 
-**File:** `servers/agent-runtime/database.py`
+**File:** `servers/agent-coordinator/database.py`
 
 Ensure `update_session_status()` accepts 'stopping' as valid status.
 
@@ -228,7 +228,7 @@ Ensure `update_session_status()` accepts 'stopping' as valid status.
 
 When the launcher terminates a process and reports `POST /launcher/jobs/{job_id}/stopped`, we need to:
 
-**File:** `servers/agent-runtime/main.py`
+**File:** `servers/agent-coordinator/main.py`
 
 In `report_job_stopped()` endpoint:
 1. Update session status to 'stopped'
@@ -264,10 +264,10 @@ async def report_job_stopped(job_id: str, request: JobStoppedRequest):
 ### Backend Files
 | File | Purpose |
 |------|---------|
-| `servers/agent-runtime/main.py` | Stop endpoint, job stopped reporting |
-| `servers/agent-runtime/database.py` | Session status updates |
-| `servers/agent-runtime/services/job_queue.py` | Job status management |
-| `servers/agent-runtime/services/stop_command_queue.py` | Stop command queue (done) |
+| `servers/agent-coordinator/main.py` | Stop endpoint, job stopped reporting |
+| `servers/agent-coordinator/database.py` | Session status updates |
+| `servers/agent-coordinator/services/job_queue.py` | Job status management |
+| `servers/agent-coordinator/services/stop_command_queue.py` | Stop command queue (done) |
 
 ### Dashboard Files
 | File | Purpose |
@@ -283,8 +283,8 @@ async def report_job_stopped(job_id: str, request: JobStoppedRequest):
 | File | Purpose |
 |------|---------|
 | `docs/features/session-stop-command.md` | Feature specification |
-| `docs/agent-runtime/API.md` | API documentation (updated) |
-| `docs/agent-runtime/DATA_MODELS.md` | Data models (updated) |
+| `docs/agent-coordinator/API.md` | API documentation (updated) |
+| `docs/agent-coordinator/DATA_MODELS.md` | Data models (updated) |
 | `docs/ARCHITECTURE.md` | Architecture overview (updated) |
 
 ---

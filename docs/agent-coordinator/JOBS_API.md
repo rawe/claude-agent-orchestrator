@@ -1,6 +1,6 @@
 # Jobs API
 
-The Jobs API enables distributed agent execution by separating orchestration (Agent Runtime) from execution (Agent Launcher). This allows the Agent Runtime to be containerized while launchers run on host machines where agent frameworks are installed.
+The Jobs API enables distributed agent execution by separating orchestration (Agent Coordinator) from execution (Agent Launcher). This allows the Agent Coordinator to be containerized while launchers run on host machines where agent frameworks are installed.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ ao-* CLI / Dashboard / MCP Server
               │ POST /jobs
               ▼
 ┌─────────────────────────────────┐
-│       Agent Runtime :8765       │
+│       Agent Coordinator :8765       │
 │  ┌───────────────────────────┐  │
 │  │   In-Memory Job Queue     │  │
 │  │  (thread-safe, singleton) │  │
@@ -286,7 +286,7 @@ POST /launcher/jobs/{job_id}/failed
 
 ### Job Queue
 
-**File:** `servers/agent-runtime/services/job_queue.py`
+**File:** `servers/agent-coordinator/services/job_queue.py`
 
 The job queue is an in-memory, thread-safe singleton that stores jobs in a dictionary with locking for atomic operations.
 
@@ -312,7 +312,7 @@ Key characteristics:
 | `JobPoller` | `servers/agent-launcher/lib/poller.py` | Background thread polling for pending jobs |
 | `JobExecutor` | `servers/agent-launcher/lib/executor.py` | Spawns ao-start/ao-resume subprocesses |
 | `JobSupervisor` | `servers/agent-launcher/lib/supervisor.py` | Monitors running jobs, reports completion |
-| `RuntimeAPIClient` | `servers/agent-launcher/lib/api_client.py` | HTTP client for launcher endpoints |
+| `CoordinatorAPIClient` | `servers/agent-launcher/lib/api_client.py` | HTTP client for launcher endpoints |
 
 ### Long-Polling Configuration
 
@@ -358,7 +358,7 @@ result = client.start_session(
 Jobs support hierarchical orchestration through `parent_session_name`:
 
 1. Parent agent starts child with `parent_session_name` set
-2. Agent Runtime tracks the relationship
+2. Agent Coordinator tracks the relationship
 3. When child completes, Callback Processor notifies parent
 4. Parent resumes with child's result
 

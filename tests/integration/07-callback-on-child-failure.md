@@ -4,7 +4,7 @@ Verify that when a child agent fails, the parent receives a failure callback wit
 
 ## Prerequisites
 
-- Agent Runtime running
+- Agent Coordinator running
 - Agent Launcher running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:

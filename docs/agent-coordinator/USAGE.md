@@ -1,13 +1,13 @@
 # Usage Guide
 
-How to use the Agent Runtime with the Agent Orchestrator framework.
+How to use the Agent Coordinator with the Agent Orchestrator framework.
 
 ## Quick Start
 
-**1. Start the Agent Runtime server:**
+**1. Start the Agent Coordinator server:**
 
 ```bash
-cd servers/agent-runtime
+cd servers/agent-coordinator
 uv run main.py
 ```
 
@@ -28,7 +28,7 @@ Dashboard runs on `http://localhost:3000`
 uv run plugins/orchestrator/commands/ao-start my-session -p "Your prompt"
 ```
 
-The commands automatically connect to the Agent Runtime at the default URL.
+The commands automatically connect to the Agent Coordinator at the default URL.
 
 ## What Gets Tracked
 

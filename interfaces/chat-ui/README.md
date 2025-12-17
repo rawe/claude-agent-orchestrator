@@ -1,6 +1,6 @@
 # Chat UI
 
-Customer-facing chat interface for the Agent Runtime.
+Customer-facing chat interface for the Agent Coordinator.
 
 ## Quick Start
 
@@ -15,14 +15,14 @@ Copy `.env.example` to `.env` and configure:
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_API_URL` | Agent Runtime API (default: `http://localhost:8765`) |
+| `VITE_API_URL` | Agent Coordinator API (default: `http://localhost:8765`) |
 | `VITE_WS_URL` | WebSocket endpoint (default: `ws://localhost:8765/ws`) |
 | `VITE_AGENT_BLUEPRINT` | Agent to use for sessions |
 | `VITE_APP_TITLE` | Header title |
 
 ## Requirements
 
-Agent Runtime must be running. See `docs/agent-runtime/API.md` for API details.
+Agent Coordinator must be running. See `docs/agent-coordinator/API.md` for API details.
 
 ## Build
 

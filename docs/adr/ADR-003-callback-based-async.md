@@ -20,7 +20,7 @@ Both have limitations: blocking or constant polling overhead.
 
 1. Orchestrator spawns child with `callback=true`
 2. Child completes, triggers `session_stop` event
-3. Agent Runtime checks parent idle status:
+3. Agent Coordinator checks parent idle status:
    - **If idle**: Resumes immediately with callback
    - **If busy**: Queues notification for later delivery
 

@@ -4,10 +4,10 @@ This document explains the complete lifecycle of a job from creation to completi
 
 ## Overview
 
-When a client (Dashboard, CLI, or MCP Server) wants to start or resume an agent session, it doesn't spawn the process directly. Instead, it creates a **job** in the Agent Runtime's queue. The **Agent Launcher**, running on a host machine, continuously polls for pending jobs, claims them, and executes them.
+When a client (Dashboard, CLI, or MCP Server) wants to start or resume an agent session, it doesn't spawn the process directly. Instead, it creates a **job** in the Agent Coordinator's queue. The **Agent Launcher**, running on a host machine, continuously polls for pending jobs, claims them, and executes them.
 
 This decoupled architecture allows:
-- Agent Runtime to run in containers (no subprocess spawning needed)
+- Agent Coordinator to run in containers (no subprocess spawning needed)
 - Multiple launchers to distribute workload across machines
 - Graceful handling of launcher failures
 
@@ -16,34 +16,34 @@ This decoupled architecture allows:
 ```mermaid
 sequenceDiagram
     participant Client as Client<br/>(Dashboard/CLI/MCP)
-    participant Runtime as Agent Runtime<br/>:8765
+    participant Coordinator as Agent Coordinator<br/>:8765
     participant Queue as JobQueue<br/>(in-memory)
     participant Launcher as Agent Launcher
     participant Executor as Claude Code<br/>Executor
 
     Note over Client,Executor: Phase 1: Job Creation
-    Client->>+Runtime: POST /jobs<br/>{type, session_name, prompt, ...}
-    Runtime->>Queue: add_job(JobCreate)
-    Queue-->>Runtime: Job (status=pending)
-    Runtime-->>-Client: {job_id, status: "pending"}
+    Client->>+Coordinator: POST /jobs<br/>{type, session_name, prompt, ...}
+    Coordinator->>Queue: add_job(JobCreate)
+    Queue-->>Coordinator: Job (status=pending)
+    Coordinator-->>-Client: {job_id, status: "pending"}
 
     Note over Client,Executor: Phase 2: Job Polling (Long-Poll Loop)
     loop Continuous Polling
-        Launcher->>+Runtime: GET /launcher/jobs?launcher_id=lnch_xxx
-        Runtime->>Queue: claim_job(launcher_id)
+        Launcher->>+Coordinator: GET /launcher/jobs?launcher_id=lnch_xxx
+        Coordinator->>Queue: claim_job(launcher_id)
         alt No pending jobs
-            Note over Runtime: Hold connection for<br/>POLL_TIMEOUT (30s)
-            Runtime-->>Launcher: 204 No Content
+            Note over Coordinator: Hold connection for<br/>POLL_TIMEOUT (30s)
+            Coordinator-->>Launcher: 204 No Content
         else Job available
-            Queue-->>Runtime: Job (status=claimed)
-            Runtime-->>-Launcher: {job: {...}}
+            Queue-->>Coordinator: Job (status=claimed)
+            Coordinator-->>-Launcher: {job: {...}}
         end
     end
 
     Note over Client,Executor: Phase 3: Job Execution
-    Launcher->>+Runtime: POST /launcher/jobs/{job_id}/started<br/>{launcher_id}
-    Runtime->>Queue: update_job_status(job_id, RUNNING)
-    Runtime-->>-Launcher: {ok: true}
+    Launcher->>+Coordinator: POST /launcher/jobs/{job_id}/started<br/>{launcher_id}
+    Coordinator->>Queue: update_job_status(job_id, RUNNING)
+    Coordinator-->>-Launcher: {ok: true}
 
     Launcher->>+Executor: spawn subprocess<br/>ao-start or ao-resume
     Note over Executor: Claude Code session<br/>executes task...
@@ -51,21 +51,21 @@ sequenceDiagram
 
     Note over Client,Executor: Phase 4: Job Completion
     alt exit_code == 0
-        Launcher->>+Runtime: POST /launcher/jobs/{job_id}/completed<br/>{launcher_id}
-        Runtime->>Queue: update_job_status(job_id, COMPLETED)
-        Runtime-->>-Launcher: {ok: true}
+        Launcher->>+Coordinator: POST /launcher/jobs/{job_id}/completed<br/>{launcher_id}
+        Coordinator->>Queue: update_job_status(job_id, COMPLETED)
+        Coordinator-->>-Launcher: {ok: true}
     else exit_code != 0
-        Launcher->>+Runtime: POST /launcher/jobs/{job_id}/failed<br/>{launcher_id, error}
-        Runtime->>Queue: update_job_status(job_id, FAILED)
-        Runtime-->>-Launcher: {ok: true}
+        Launcher->>+Coordinator: POST /launcher/jobs/{job_id}/failed<br/>{launcher_id, error}
+        Coordinator->>Queue: update_job_status(job_id, FAILED)
+        Coordinator-->>-Launcher: {ok: true}
     end
 
     Note over Client,Executor: Phase 5: Result Retrieval (Optional)
-    Client->>+Runtime: GET /jobs/{job_id}
-    Runtime->>Queue: get_job(job_id)
-    Runtime-->>-Client: Job (status=completed/failed)
-    Client->>+Runtime: GET /sessions/{session_id}/result
-    Runtime-->>-Client: {result: "..."}
+    Client->>+Coordinator: GET /jobs/{job_id}
+    Coordinator->>Queue: get_job(job_id)
+    Coordinator-->>-Client: Job (status=completed/failed)
+    Client->>+Coordinator: GET /sessions/{session_id}/result
+    Coordinator-->>-Client: {result: "..."}
 ```
 
 ## Phase Details
@@ -85,7 +85,7 @@ sequenceDiagram
 ```
 
 **What happens:**
-1. Agent Runtime receives the request
+1. Agent Coordinator receives the request
 2. `JobQueue.add_job()` creates a new `Job` with:
    - Unique `job_id` (e.g., `job_abc123def456`)
    - Status set to `pending`
@@ -106,7 +106,7 @@ The launcher uses **long-polling** to efficiently wait for jobs without hammerin
 │                     Long-Poll Cycle                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  1. Launcher sends GET /launcher/jobs?launcher_id=lnch_xxx      │
-│  2. Runtime checks for pending jobs                             │
+│  2. Coordinator checks for pending jobs                         │
 │  3. If no jobs: hold connection open for 30 seconds             │
 │  4. If job arrives during wait: return immediately              │
 │  5. After timeout: return 204 No Content                        │
@@ -210,7 +210,7 @@ Clients can:
 │         │ poll_job()        │ execute()         │ check_jobs()  │
 │         ▼                   ▼                   ▼                │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │              RuntimeAPIClient                            │    │
+│  │              CoordinatorAPIClient                            │    │
 │  │  - register(), poll_job(), report_started()             │    │
 │  │  - report_completed(), report_failed(), heartbeat()     │    │
 │  └─────────────────────────────────────────────────────────┘    │
@@ -219,7 +219,7 @@ Clients can:
                                │ HTTP
                                ▼
                     ┌─────────────────────┐
-                    │   Agent Runtime     │
+                    │   Agent Coordinator     │
                     │      :8765          │
                     └─────────────────────┘
 ```
@@ -231,7 +231,7 @@ Clients can:
 | `JobPoller` | Background | Continuously polls for pending jobs, spawns executors |
 | `JobExecutor` | Main | Maps job types to CLI commands, spawns subprocesses |
 | `JobSupervisor` | Background | Monitors running processes, reports completion/failure |
-| `RuntimeAPIClient` | Shared | HTTP client for all Agent Runtime communication |
+| `CoordinatorAPIClient` | Shared | HTTP client for all Agent Coordinator communication |
 | `HeartbeatSender` | Background | Sends periodic heartbeats to maintain registration |
 
 ## Timing Configuration
@@ -271,5 +271,5 @@ Clients can:
 ## Related Documentation
 
 - [JOBS_API.md](./JOBS_API.md) - Complete API reference
-- [API.md](./API.md) - All Agent Runtime endpoints
+- [API.md](./API.md) - All Agent Coordinator endpoints
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview

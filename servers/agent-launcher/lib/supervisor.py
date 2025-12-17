@@ -3,18 +3,18 @@ Supervisor Thread - monitors running subprocesses for completion.
 
 Checks subprocess status periodically and reports completion/failure.
 
-NOTE: Callback processing has been moved to agent-runtime (callback_processor.py).
-The agent-runtime now handles callbacks when it receives session_stop events,
+NOTE: Callback processing has been moved to agent-coordinator (callback_processor.py).
+The agent-coordinator now handles callbacks when it receives session_stop events,
 which allows proper queuing when the parent is busy. See:
 - docs/features/06-callback-queue-busy-parent.md
-- servers/agent-runtime/services/callback_processor.py
+- servers/agent-coordinator/services/callback_processor.py
 """
 
 import threading
 import time
 import logging
 
-from api_client import RuntimeAPIClient
+from api_client import CoordinatorAPIClient
 from registry import RunningJobsRegistry
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class JobSupervisor:
 
     def __init__(
         self,
-        api_client: RuntimeAPIClient,
+        api_client: CoordinatorAPIClient,
         registry: RunningJobsRegistry,
         launcher_id: str,
         check_interval: float = 1.0,
@@ -33,7 +33,7 @@ class JobSupervisor:
         """Initialize the supervisor.
 
         Args:
-            api_client: HTTP client for Agent Runtime
+            api_client: HTTP client for Agent Coordinator
             registry: Registry of running jobs
             launcher_id: This launcher's ID
             check_interval: How often to check subprocess status (seconds)
@@ -90,8 +90,8 @@ class JobSupervisor:
     def _handle_completion(self, job_id: str, running_job, return_code: int) -> None:
         """Handle job completion (success or failure).
 
-        Reports completion status to agent-runtime. Callback processing
-        is handled by agent-runtime when it receives the session_stop event.
+        Reports completion status to agent-coordinator. Callback processing
+        is handled by agent-coordinator when it receives the session_stop event.
         """
         # Remove from registry first
         self.registry.remove_job(job_id)

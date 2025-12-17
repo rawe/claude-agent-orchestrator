@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2025-12-12
 **Decision Makers:** Architecture Review
-**Affected Components:** Agent Runtime, Dashboard, ao-list-blueprints
+**Affected Components:** Agent Coordinator, Dashboard, ao-list-blueprints
 
 ## Context
 

@@ -4,7 +4,7 @@ Executor Configuration Management
 Handles configuration loading for executor scripts with precedence:
 CLI Flags > Environment Variables > Defaults (PWD)
 
-Note: Session and agent management is now API-based via AgentRuntime and AgentRegistry
+Note: Session and agent management is now API-based via AgentCoordinator and AgentRegistry
 services. The only directory configuration needed is project_dir for the working directory.
 """
 

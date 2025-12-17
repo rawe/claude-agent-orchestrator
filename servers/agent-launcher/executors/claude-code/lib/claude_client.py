@@ -131,9 +131,9 @@ async def run_claude_session(
     Run Claude session with API-based session management.
 
     This function uses the Claude Agent SDK to create or resume a session,
-    with session state managed via the AgentRuntime API.
+    with session state managed via the AgentCoordinator API.
 
-    NOTE: parent_session_name is now handled automatically by Agent Runtime
+    NOTE: parent_session_name is now handled automatically by Agent Coordinator
     via the Jobs API. The launcher sets AGENT_SESSION_NAME env var which
     flows through the job to the session. See mcp-server-api-refactor.md.
 
@@ -232,7 +232,7 @@ async def run_claude_session(
                             try:
                                 if not resume_session_id:
                                     # New session: create via API
-                                    # NOTE: parent_session_name is set by Agent Runtime
+                                    # NOTE: parent_session_name is set by Agent Coordinator
                                     # from the Job's parent_session_name field
                                     session_client.create_session(
                                         session_id=session_id,
@@ -347,7 +347,7 @@ def run_session_sync(
     This allows command scripts to remain synchronous while using
     the SDK's async API internally.
 
-    NOTE: parent_session_name is now handled automatically by Agent Runtime
+    NOTE: parent_session_name is now handled automatically by Agent Coordinator
     via the Jobs API. See mcp-server-api-refactor.md.
 
     Args:

@@ -1,10 +1,10 @@
-# Agent Runtime
+# Agent Coordinator
 
 FastAPI service providing session management, real-time observability, and agent blueprint registry.
 
 ## Why?
 
-The Agent Runtime is the unified backend service for the Agent Orchestrator Framework. It handles:
+The Agent Coordinator is the unified backend service for the Agent Orchestrator Framework. It handles:
 - **Session Management**: Track agent session lifecycle, events, and results
 - **Real-time Updates**: WebSocket broadcasting for dashboard live monitoring
 - **Agent Registry**: CRUD API for agent blueprints (system prompts, MCP servers, skills)
@@ -97,7 +97,7 @@ Session and event data is stored in SQLite:
 make start-bg
 
 # Check logs
-make logs-runtime
+make logs-coordinator
 
 # Health check
 curl http://localhost:8765/health

@@ -1,8 +1,8 @@
 """
-HTTP client for Agent Runtime API.
+HTTP client for Agent Coordinator API.
 
 This module provides an async HTTP client using httpx to communicate
-with the Agent Runtime API for job management and session operations.
+with the Agent Coordinator API for job management and session operations.
 """
 
 import asyncio
@@ -22,7 +22,7 @@ class APIError(Exception):
 
 
 class APIClient:
-    """Async HTTP client for Agent Runtime API."""
+    """Async HTTP client for Agent Coordinator API."""
 
     DEFAULT_TIMEOUT = 10.0
     DEFAULT_POLL_INTERVAL = 2.0

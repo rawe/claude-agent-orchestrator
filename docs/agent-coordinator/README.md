@@ -1,4 +1,4 @@
-# Agent Runtime Documentation
+# Agent Coordinator Documentation
 
 Server for tracking agent sessions and events with real-time WebSocket updates.
 

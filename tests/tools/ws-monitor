@@ -6,7 +6,7 @@
 # ]
 # ///
 """
-WebSocket Monitor - Connects to Agent Runtime WebSocket and prints events as JSON lines.
+WebSocket Monitor - Connects to Agent Coordinator WebSocket and prints events as JSON lines.
 
 Usage:
     uv run tests/tools/ws-monitor
@@ -42,7 +42,7 @@ async def monitor():
 
     except ConnectionRefusedError:
         print(f"Error: Could not connect to {WS_URL}", file=sys.stderr)
-        print("Is the Agent Runtime running?", file=sys.stderr)
+        print("Is the Agent Coordinator running?", file=sys.stderr)
         sys.exit(1)
     except websockets.exceptions.ConnectionClosed:
         print("\nConnection closed.", file=sys.stderr)

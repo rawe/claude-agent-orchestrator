@@ -7,17 +7,17 @@
 # ]
 # ///
 """
-Agent Launcher - Connects to Agent Runtime and executes jobs.
+Agent Launcher - Connects to Agent Coordinator and executes jobs.
 
-The launcher polls for jobs from Agent Runtime and spawns executor
+The launcher polls for jobs from Agent Coordinator and spawns executor
 subprocesses to handle them. It supports concurrent job execution
-and reports job status back to the runtime.
+and reports job status back to the coordinator.
 
 Usage:
     ./servers/agent-launcher/agent-launcher
 
 Environment Variables:
-    AGENT_ORCHESTRATOR_API_URL - Agent Runtime URL (default: http://localhost:8765)
+    AGENT_ORCHESTRATOR_API_URL - Agent Coordinator URL (default: http://localhost:8765)
     AGENT_EXECUTOR_PATH  - Executor script path (default: executors/claude-code/ao-claude-code-exec)
     POLL_TIMEOUT         - Long-poll timeout in seconds (default: 30)
     HEARTBEAT_INTERVAL   - Heartbeat interval in seconds (default: 60)
@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from config import LauncherConfig
-from api_client import RuntimeAPIClient
+from api_client import CoordinatorAPIClient
 from registry import RunningJobsRegistry
 from executor import JobExecutor, list_executors, resolve_executor_name, get_executor_type
 from poller import JobPoller
@@ -65,7 +65,7 @@ class HeartbeatThread:
 
     def __init__(
         self,
-        api_client: RuntimeAPIClient,
+        api_client: CoordinatorAPIClient,
         launcher_id: str,
         interval: int,
     ):
@@ -95,9 +95,9 @@ class HeartbeatThread:
         while not self._stop_event.wait(self.interval):
             try:
                 self.api_client.heartbeat(self.launcher_id)
-                logger.info("Heartbeat sent to agent-runtime")
+                logger.info("Heartbeat sent to agent-coordinator")
             except Exception as e:
-                logger.warning(f"Heartbeat to agent-runtime failed: {e}")
+                logger.warning(f"Heartbeat to agent-coordinator failed: {e}")
 
 
 class Launcher:
@@ -105,8 +105,8 @@ class Launcher:
 
     def __init__(self, config: LauncherConfig):
         self.config = config
-        self.api_client = RuntimeAPIClient(
-            config.agent_runtime_url,
+        self.api_client = CoordinatorAPIClient(
+            config.agent_coordinator_url,
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
         self.registry = RunningJobsRegistry()
@@ -121,8 +121,8 @@ class Launcher:
         self._externally_deregistered = False  # True if shutdown was triggered by external deregistration
 
     def register(self) -> None:
-        """Register with Agent Runtime."""
-        logger.info(f"Connecting to Agent Runtime at {self.config.agent_runtime_url}")
+        """Register with Agent Coordinator."""
+        logger.info(f"Connecting to Agent Coordinator at {self.config.agent_coordinator_url}")
 
         # Get machine hostname and executor type for registration metadata
         hostname = socket.gethostname()
@@ -185,7 +185,7 @@ class Launcher:
         self.shutdown()
 
     def stop(self) -> None:
-        """Stop all background threads and deregister from Agent Runtime."""
+        """Stop all background threads and deregister from Agent Coordinator."""
         logger.info("Stopping launcher...")
 
         if self.poller:
@@ -195,7 +195,7 @@ class Launcher:
         if self.heartbeat:
             self.heartbeat.stop()
 
-        # Deregister from Agent Runtime (only if not already deregistered externally)
+        # Deregister from Agent Coordinator (only if not already deregistered externally)
         if self.launcher_id and not self._externally_deregistered:
             self.api_client.deregister(self.launcher_id)
 
@@ -213,11 +213,11 @@ class Launcher:
 
 @app.command()
 def main(
-    runtime_url: str = typer.Option(
+    coordinator_url: str = typer.Option(
         None,
-        "--runtime-url",
-        "-r",
-        help="Agent Runtime URL (env: AGENT_ORCHESTRATOR_API_URL)",
+        "--coordinator-url",
+        "-c",
+        help="Agent Coordinator URL (env: AGENT_ORCHESTRATOR_API_URL)",
     ),
     executor: str = typer.Option(
         None,
@@ -251,9 +251,9 @@ def main(
     ),
 ):
     """
-    Agent Launcher - Execute jobs from Agent Runtime.
+    Agent Launcher - Execute jobs from Agent Coordinator.
 
-    Polls Agent Runtime for jobs and spawns executor subprocesses to handle them.
+    Polls Agent Coordinator for jobs and spawns executor subprocesses to handle them.
     Supports concurrent job execution.
     """
     # Handle --executor-list
@@ -276,8 +276,8 @@ def main(
     config = LauncherConfig.from_env()
 
     # Override with CLI args
-    if runtime_url:
-        config.agent_runtime_url = runtime_url
+    if coordinator_url:
+        config.agent_coordinator_url = coordinator_url
     if project_dir:
         config.project_dir = project_dir
 

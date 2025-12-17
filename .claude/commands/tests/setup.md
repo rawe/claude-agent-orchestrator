@@ -23,9 +23,9 @@ Valid executors:
 
 1. **Reset the database** - Run `./tests/scripts/reset-db`
 
-2. **Start Agent Runtime** in background:
+2. **Start Agent Coordinator** in background:
    ```bash
-   cd servers/agent-runtime && uv run python -m main
+   cd servers/agent-coordinator && uv run python -m main
    ```
 
 3. **Start Agent Launcher** with the specified executor in background:

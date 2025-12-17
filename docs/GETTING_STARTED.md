@@ -12,13 +12,13 @@ Quick setup guide for the Agent Orchestrator Framework.
 
 The framework has three layers:
 
-1. **Backend Services** (Docker) - Agent Runtime, Context Store, Dashboard
+1. **Backend Services** (Docker) - Agent Coordinator, Context Store, Dashboard
 2. **Agent Launcher** - Bridge that executes agent jobs (runs in your project directory)
 3. **Interface** - Plugin (Claude Code) or MCP Server (Claude Desktop)
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Claude Code    │     │  Agent Runtime  │     │ Agent Launcher  │
+│  Claude Code    │     │  Agent Coordinator  │     │ Agent Launcher  │
 │  or Claude      │────▶│    (Docker)     │────▶│ (your project)  │
 │  Desktop        │     │    :8765        │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
@@ -50,7 +50,7 @@ make start-bg
 ```
 
 This starts in the background:
-- Agent Runtime (port 8765) - Session tracking + Agent blueprints
+- Agent Coordinator (port 8765) - Session tracking + Agent blueprints
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
@@ -60,7 +60,7 @@ cd /path/to/your/project
 /path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
 ```
 
-The launcher must run in the directory where you want agents to execute. It polls the Agent Runtime for jobs and spawns Claude Code sessions.
+The launcher must run in the directory where you want agents to execute. It polls the Agent Coordinator for jobs and spawns Claude Code sessions.
 
 **4. Open the dashboard:**
 ```bash
@@ -135,7 +135,7 @@ make start-bg
 ```
 
 This starts in the background:
-- Agent Runtime (port 8765) - Session tracking + Agent blueprints
+- Agent Coordinator (port 8765) - Session tracking + Agent blueprints
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
@@ -232,7 +232,7 @@ See [mcps/agent-orchestrator/README.md](../mcps/agent-orchestrator/README.md) fo
 
 ## Agent Launcher
 
-The Agent Launcher is a critical component that bridges the Agent Runtime with actual agent execution. It must be running for agents to execute.
+The Agent Launcher is a critical component that bridges the Agent Coordinator with actual agent execution. It must be running for agents to execute.
 
 ### Starting the Launcher
 
@@ -244,15 +244,15 @@ cd /path/to/your/project
 /path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
 
 # Or with options
-./servers/agent-launcher/agent-launcher --runtime-url http://localhost:8765 -v
+./servers/agent-launcher/agent-launcher --coordinator-url http://localhost:8765 -v
 ```
 
 ### What It Does
 
-1. Registers with Agent Runtime
+1. Registers with Agent Coordinator
 2. Polls for pending jobs (start/resume sessions)
 3. Executes jobs as Claude Code sessions
-4. Reports job status back to the runtime
+4. Reports job status back to the Agent Coordinator
 
 ### Why Run in Project Directory?
 

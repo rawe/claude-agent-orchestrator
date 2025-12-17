@@ -75,7 +75,7 @@ export function Home() {
             Architecture Overview
           </h2>
           <p className="text-gray-500 text-center mb-8 max-w-2xl mx-auto">
-            The framework consists of a central runtime, distributed launchers, and a context store
+            The framework consists of a central coordinator, distributed launchers, and a context store
             working together to manage agent sessions.
           </p>
 
@@ -101,7 +101,7 @@ export function Home() {
               <div className="w-full max-w-2xl">
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl p-6 text-white">
                   <div className="text-center mb-4">
-                    <h3 className="font-bold text-lg">Agent Runtime</h3>
+                    <h3 className="font-bold text-lg">Agent Coordinator</h3>
                     <p className="text-indigo-100 text-sm">Central orchestration service</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">

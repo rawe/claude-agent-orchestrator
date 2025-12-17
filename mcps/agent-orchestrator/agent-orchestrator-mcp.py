@@ -16,7 +16,7 @@ Agent Orchestrator MCP Server
 Standalone entry point for the Agent Orchestrator MCP server.
 Uses UV for dependency management with inline dependency declarations.
 
-This server communicates with the Agent Runtime API to orchestrate Claude Code agents.
+This server communicates with the Agent Coordinator API to orchestrate Claude Code agents.
 It no longer spawns subprocess commands directly - all operations go through the Jobs API.
 
 Usage:
@@ -29,7 +29,7 @@ Usage:
     uv run agent-orchestrator-mcp.py --http-mode --host 0.0.0.0 --port 8080
 
 Environment Variables:
-    AGENT_ORCHESTRATOR_API_URL  - Optional: Agent Runtime API URL (default: http://127.0.0.1:8765)
+    AGENT_ORCHESTRATOR_API_URL  - Optional: Agent Coordinator API URL (default: http://127.0.0.1:8765)
     AGENT_SESSION_NAME          - Optional: Parent session name for callback support (stdio mode)
     MCP_SERVER_DEBUG            - Optional: Enable debug logging (true/false)
 """
