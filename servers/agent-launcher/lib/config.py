@@ -1,7 +1,7 @@
 """
 Launcher Configuration
 
-Configuration for the Agent Launcher process that polls Agent Coordinator for jobs.
+Configuration for the Agent Launcher process that polls Agent Coordinator for runs.
 """
 
 import os

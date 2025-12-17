@@ -15,7 +15,7 @@ export interface SessionStartRequest {
 }
 
 export interface SessionStartResponse {
-  job_id: string;
+  run_id: string;
   status: string;
 }
 
@@ -24,8 +24,8 @@ export interface SessionResumeRequest {
   async_mode: boolean;
 }
 
-// Job API request types
-interface CreateJobRequest {
+// Run API request types
+interface CreateRunRequest {
   type: 'start_session' | 'resume_session';
   session_name: string;
   agent_name?: string;
@@ -33,8 +33,8 @@ interface CreateJobRequest {
   project_dir?: string;
 }
 
-interface CreateJobResponse {
-  job_id: string;
+interface CreateRunResponse {
+  run_id: string;
   status: string;
 }
 
@@ -53,13 +53,13 @@ export const chatService = {
   },
 
   /**
-   * Start a new agent session via Job API
+   * Start a new agent session via Run API
    *
-   * Creates a job that the Agent Launcher will pick up and execute.
+   * Creates a run that the Agent Launcher will pick up and execute.
    * Session updates come through WebSocket.
    */
   async startSession(request: SessionStartRequest): Promise<SessionStartResponse> {
-    const jobRequest: CreateJobRequest = {
+    const runRequest: CreateRunRequest = {
       type: 'start_session',
       session_name: request.session_name,
       prompt: request.prompt,
@@ -67,29 +67,29 @@ export const chatService = {
       ...(request.project_dir && { project_dir: request.project_dir }),
     };
 
-    const response = await agentOrchestratorApi.post<CreateJobResponse>('/jobs', jobRequest);
+    const response = await agentOrchestratorApi.post<CreateRunResponse>('/runs', runRequest);
     return {
-      job_id: response.data.job_id,
+      run_id: response.data.run_id,
       status: response.data.status,
     };
   },
 
   /**
-   * Resume an existing session with a new prompt via Job API
+   * Resume an existing session with a new prompt via Run API
    *
-   * Creates a resume job that the Agent Launcher will pick up and execute.
+   * Creates a resume run that the Agent Launcher will pick up and execute.
    * Session updates come through WebSocket.
    */
   async resumeSession(sessionName: string, request: SessionResumeRequest): Promise<SessionStartResponse> {
-    const jobRequest: CreateJobRequest = {
+    const runRequest: CreateRunRequest = {
       type: 'resume_session',
       session_name: sessionName,
       prompt: request.prompt,
     };
 
-    const response = await agentOrchestratorApi.post<CreateJobResponse>('/jobs', jobRequest);
+    const response = await agentOrchestratorApi.post<CreateRunResponse>('/runs', runRequest);
     return {
-      job_id: response.data.job_id,
+      run_id: response.data.run_id,
       status: response.data.status,
     };
   },

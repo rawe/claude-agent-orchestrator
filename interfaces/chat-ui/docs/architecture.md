@@ -30,7 +30,7 @@ App
 ## Data Flow
 
 ```
-User Input → ChatContext.sendMessage() → API (POST /jobs)
+User Input → ChatContext.sendMessage() → API (POST /runs)
                                               ↓
 WebSocket ← Agent Coordinator broadcasts events
     ↓

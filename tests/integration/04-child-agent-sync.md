@@ -26,7 +26,7 @@ Should include `agent-orchestrator` in the list.
 ### Step 2: Create orchestrator session
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",

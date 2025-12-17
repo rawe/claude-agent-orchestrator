@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AGENT_ORCHESTRATOR_API_URL, DOCUMENT_SERVER_URL } from '@/utils/constants';
 
-// Axios instance for Agent Orchestrator API (sessions, events, agent blueprints, jobs)
+// Axios instance for Agent Orchestrator API (sessions, events, agent blueprints, runs)
 export const agentOrchestratorApi = axios.create({
   baseURL: AGENT_ORCHESTRATOR_API_URL,
   headers: {

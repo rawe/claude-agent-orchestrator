@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { config } from '../config';
-import type { JobRequest, JobResponse } from '../types';
+import type { RunRequest, RunResponse } from '../types';
 
 // Create axios instance
 const api = axios.create({
@@ -36,12 +36,12 @@ function generateSessionName(): string {
  */
 export const chatService = {
   /**
-   * Start a new chat session (POST /jobs)
+   * Start a new chat session (POST /runs)
    */
-  async startSession(prompt: string): Promise<{ jobId: string; sessionName: string }> {
+  async startSession(prompt: string): Promise<{ runId: string; sessionName: string }> {
     const sessionName = generateSessionName();
 
-    const request: JobRequest = {
+    const request: RunRequest = {
       type: 'start_session',
       session_name: sessionName,
       prompt,
@@ -49,9 +49,9 @@ export const chatService = {
     };
 
     try {
-      const response = await api.post<JobResponse>('/jobs', request);
+      const response = await api.post<RunResponse>('/runs', request);
       return {
-        jobId: response.data.job_id,
+        runId: response.data.run_id,
         sessionName,
       };
     } catch (error) {
@@ -60,19 +60,19 @@ export const chatService = {
   },
 
   /**
-   * Resume an existing session (POST /jobs)
+   * Resume an existing session (POST /runs)
    */
-  async resumeSession(sessionName: string, prompt: string): Promise<{ jobId: string }> {
-    const request: JobRequest = {
+  async resumeSession(sessionName: string, prompt: string): Promise<{ runId: string }> {
+    const request: RunRequest = {
       type: 'resume_session',
       session_name: sessionName,
       prompt,
     };
 
     try {
-      const response = await api.post<JobResponse>('/jobs', request);
+      const response = await api.post<RunResponse>('/runs', request);
       return {
-        jobId: response.data.job_id,
+        runId: response.data.run_id,
       };
     } catch (error) {
       handleError(error);

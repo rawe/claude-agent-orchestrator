@@ -15,21 +15,21 @@ These requirements conflict with containerization goals for the Agent Coordinato
 
 ## Decision
 
-**Separate Agent Coordinator (orchestration) from Agent Launcher (execution)** with asynchronous job distribution.
+**Separate Agent Coordinator (orchestration) from Agent Launcher (execution)** with asynchronous run distribution.
 
 ### Component Responsibilities
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **Agent Coordinator** | Containerizable | Orchestration, job queue, persistence |
-| **Agent Launcher** | Host machine | Job polling, subprocess management |
+| **Agent Coordinator** | Containerizable | Orchestration, run queue, persistence |
+| **Agent Launcher** | Host machine | Run polling, subprocess management |
 | **Executors** | `claude-code/` | Framework-specific execution (ao-start, ao-resume) |
 
 ### Communication Protocol
 
-- **Long-polling HTTP**: Launcher calls `GET /launcher/jobs?launcher_id=xxx`
-- **30s poll timeout**: Connection held until job available or timeout
-- **Status reporting**: `POST /launcher/jobs/{job_id}/{started|completed|failed}`
+- **Long-polling HTTP**: Launcher calls `GET /launcher/runs?launcher_id=xxx`
+- **30s poll timeout**: Connection held until run available or timeout
+- **Status reporting**: `POST /launcher/runs/{run_id}/{started|completed|failed}`
 
 ## Rationale
 
@@ -49,7 +49,7 @@ These requirements conflict with containerization goals for the Agent Coordinato
 
 - Simpler implementation (no WebSocket state management)
 - Works through HTTP proxies/firewalls
-- Atomic job claiming with `threading.Lock`
+- Atomic run claiming with `threading.Lock`
 
 ## Consequences
 
@@ -65,4 +65,4 @@ These requirements conflict with containerization goals for the Agent Coordinato
 ## References
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
-- [JOB_EXECUTION_FLOW.md](../agent-coordinator/JOB_EXECUTION_FLOW.md)
+- [RUN_EXECUTION_FLOW.md](../agent-coordinator/RUN_EXECUTION_FLOW.md)

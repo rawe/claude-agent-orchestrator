@@ -17,7 +17,7 @@ Verify that resuming an existing session produces the correct sequence of WebSoc
 Skip this if you just completed `01-basic-session-start` with session "test-basic-001".
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -27,12 +27,12 @@ curl -X POST http://localhost:8765/jobs \
   }'
 ```
 
-Wait for the job to complete (watch launcher logs).
+Wait for the run to complete (watch launcher logs).
 
-### Step 1: Create a resume_session job
+### Step 1: Create a resume_session run
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
@@ -43,14 +43,14 @@ curl -X POST http://localhost:8765/jobs \
 
 Expected response:
 ```json
-{"job_id":"job_...","status":"pending","message":"Job queued"}
+{"run_id":"run_...","status":"pending","message":"Run queued"}
 ```
 
 ### Step 2: Wait for execution
 
 Watch the launcher terminal for:
 ```
-[INFO] poller: Received job job_... (resume_session)
+[INFO] poller: Received run run_... (resume_session)
 [INFO] executor: Resuming session test-basic-001
 ```
 

@@ -17,7 +17,7 @@ Standalone entry point for the Agent Orchestrator MCP server.
 Uses UV for dependency management with inline dependency declarations.
 
 This server communicates with the Agent Coordinator API to orchestrate Claude Code agents.
-It no longer spawns subprocess commands directly - all operations go through the Jobs API.
+It no longer spawns subprocess commands directly - all operations go through the Runs API.
 
 Usage:
     # stdio mode (default, for Claude Desktop/CLI)

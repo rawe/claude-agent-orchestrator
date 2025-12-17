@@ -1,10 +1,10 @@
-# Job Execution Flow
+# Run Execution Flow
 
-This document explains the complete lifecycle of a job from creation to completion, with a focus on the Agent Launcher's polling mechanism.
+This document explains the complete lifecycle of a run from creation to completion, with a focus on the Agent Launcher's polling mechanism.
 
 ## Overview
 
-When a client (Dashboard, CLI, or MCP Server) wants to start or resume an agent session, it doesn't spawn the process directly. Instead, it creates a **job** in the Agent Coordinator's queue. The **Agent Launcher**, running on a host machine, continuously polls for pending jobs, claims them, and executes them.
+When a client (Dashboard, CLI, or MCP Server) wants to start or resume an agent session, it doesn't spawn the process directly. Instead, it creates a **run** in the Agent Coordinator's queue. The **Agent Launcher**, running on a host machine, continuously polls for pending runs, claims them, and executes them.
 
 This decoupled architecture allows:
 - Agent Coordinator to run in containers (no subprocess spawning needed)
@@ -17,62 +17,62 @@ This decoupled architecture allows:
 sequenceDiagram
     participant Client as Client<br/>(Dashboard/CLI/MCP)
     participant Coordinator as Agent Coordinator<br/>:8765
-    participant Queue as JobQueue<br/>(in-memory)
+    participant Queue as RunQueue<br/>(in-memory)
     participant Launcher as Agent Launcher
     participant Executor as Claude Code<br/>Executor
 
-    Note over Client,Executor: Phase 1: Job Creation
-    Client->>+Coordinator: POST /jobs<br/>{type, session_name, prompt, ...}
-    Coordinator->>Queue: add_job(JobCreate)
-    Queue-->>Coordinator: Job (status=pending)
-    Coordinator-->>-Client: {job_id, status: "pending"}
+    Note over Client,Executor: Phase 1: Run Creation
+    Client->>+Coordinator: POST /runs<br/>{type, session_name, prompt, ...}
+    Coordinator->>Queue: add_run(RunCreate)
+    Queue-->>Coordinator: Run (status=pending)
+    Coordinator-->>-Client: {run_id, status: "pending"}
 
-    Note over Client,Executor: Phase 2: Job Polling (Long-Poll Loop)
+    Note over Client,Executor: Phase 2: Run Polling (Long-Poll Loop)
     loop Continuous Polling
-        Launcher->>+Coordinator: GET /launcher/jobs?launcher_id=lnch_xxx
-        Coordinator->>Queue: claim_job(launcher_id)
-        alt No pending jobs
+        Launcher->>+Coordinator: GET /launcher/runs?launcher_id=lnch_xxx
+        Coordinator->>Queue: claim_run(launcher_id)
+        alt No pending runs
             Note over Coordinator: Hold connection for<br/>POLL_TIMEOUT (30s)
             Coordinator-->>Launcher: 204 No Content
-        else Job available
-            Queue-->>Coordinator: Job (status=claimed)
-            Coordinator-->>-Launcher: {job: {...}}
+        else Run available
+            Queue-->>Coordinator: Run (status=claimed)
+            Coordinator-->>-Launcher: {run: {...}}
         end
     end
 
-    Note over Client,Executor: Phase 3: Job Execution
-    Launcher->>+Coordinator: POST /launcher/jobs/{job_id}/started<br/>{launcher_id}
-    Coordinator->>Queue: update_job_status(job_id, RUNNING)
+    Note over Client,Executor: Phase 3: Run Execution
+    Launcher->>+Coordinator: POST /launcher/runs/{run_id}/started<br/>{launcher_id}
+    Coordinator->>Queue: update_run_status(run_id, RUNNING)
     Coordinator-->>-Launcher: {ok: true}
 
     Launcher->>+Executor: spawn subprocess<br/>ao-start or ao-resume
     Note over Executor: Claude Code session<br/>executes task...
     Executor-->>-Launcher: exit_code
 
-    Note over Client,Executor: Phase 4: Job Completion
+    Note over Client,Executor: Phase 4: Run Completion
     alt exit_code == 0
-        Launcher->>+Coordinator: POST /launcher/jobs/{job_id}/completed<br/>{launcher_id}
-        Coordinator->>Queue: update_job_status(job_id, COMPLETED)
+        Launcher->>+Coordinator: POST /launcher/runs/{run_id}/completed<br/>{launcher_id}
+        Coordinator->>Queue: update_run_status(run_id, COMPLETED)
         Coordinator-->>-Launcher: {ok: true}
     else exit_code != 0
-        Launcher->>+Coordinator: POST /launcher/jobs/{job_id}/failed<br/>{launcher_id, error}
-        Coordinator->>Queue: update_job_status(job_id, FAILED)
+        Launcher->>+Coordinator: POST /launcher/runs/{run_id}/failed<br/>{launcher_id, error}
+        Coordinator->>Queue: update_run_status(run_id, FAILED)
         Coordinator-->>-Launcher: {ok: true}
     end
 
     Note over Client,Executor: Phase 5: Result Retrieval (Optional)
-    Client->>+Coordinator: GET /jobs/{job_id}
-    Coordinator->>Queue: get_job(job_id)
-    Coordinator-->>-Client: Job (status=completed/failed)
+    Client->>+Coordinator: GET /runs/{run_id}
+    Coordinator->>Queue: get_run(run_id)
+    Coordinator-->>-Client: Run (status=completed/failed)
     Client->>+Coordinator: GET /sessions/{session_id}/result
     Coordinator-->>-Client: {result: "..."}
 ```
 
 ## Phase Details
 
-### Phase 1: Job Creation
+### Phase 1: Run Creation
 
-**Trigger:** Client calls `POST /jobs`
+**Trigger:** Client calls `POST /runs`
 
 ```json
 {
@@ -86,85 +86,85 @@ sequenceDiagram
 
 **What happens:**
 1. Agent Coordinator receives the request
-2. `JobQueue.add_job()` creates a new `Job` with:
-   - Unique `job_id` (e.g., `job_abc123def456`)
+2. `RunQueue.add_run()` creates a new `Run` with:
+   - Unique `run_id` (e.g., `run_abc123def456`)
    - Status set to `pending`
    - `created_at` timestamp
-3. Job is stored in the in-memory dictionary
-4. Client receives `{job_id, status: "pending"}` immediately
+3. Run is stored in the in-memory dictionary
+4. Client receives `{run_id, status: "pending"}` immediately
 
-**Key point:** The client does NOT wait for execution - it gets an immediate response with the job ID for tracking.
+**Key point:** The client does NOT wait for execution - it gets an immediate response with the run ID for tracking.
 
-### Phase 2: Job Polling
+### Phase 2: Run Polling
 
-**Trigger:** Agent Launcher's `JobPoller` thread runs continuously
+**Trigger:** Agent Launcher's `RunPoller` thread runs continuously
 
-The launcher uses **long-polling** to efficiently wait for jobs without hammering the server:
+The launcher uses **long-polling** to efficiently wait for runs without hammering the server:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Long-Poll Cycle                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. Launcher sends GET /launcher/jobs?launcher_id=lnch_xxx      │
-│  2. Coordinator checks for pending jobs                         │
-│  3. If no jobs: hold connection open for 30 seconds             │
-│  4. If job arrives during wait: return immediately              │
+│  1. Launcher sends GET /launcher/runs?launcher_id=lnch_xxx      │
+│  2. Coordinator checks for pending runs                         │
+│  3. If no runs: hold connection open for 30 seconds             │
+│  4. If run arrives during wait: return immediately              │
 │  5. After timeout: return 204 No Content                        │
 │  6. Launcher immediately starts new poll cycle                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Job claiming is atomic:**
+**Run claiming is atomic:**
 ```python
-# In job_queue.py
-def claim_job(self, launcher_id: str) -> Optional[Job]:
+# In run_queue.py
+def claim_run(self, launcher_id: str) -> Optional[Run]:
     with self._lock:  # Thread-safe
-        for job in self._jobs.values():
-            if job.status == JobStatus.PENDING:
-                job.status = JobStatus.CLAIMED
-                job.launcher_id = launcher_id
-                job.claimed_at = now
-                return job
+        for run in self._runs.values():
+            if run.status == RunStatus.PENDING:
+                run.status = RunStatus.CLAIMED
+                run.launcher_id = launcher_id
+                run.claimed_at = now
+                return run
     return None
 ```
 
 **Why long-polling?**
 - More efficient than frequent short polls (reduces network overhead)
-- Lower latency than fixed-interval polling (job starts within milliseconds)
+- Lower latency than fixed-interval polling (run starts within milliseconds)
 - Simple to implement (no WebSocket complexity on launcher side)
 
-### Phase 3: Job Execution
+### Phase 3: Run Execution
 
-**Trigger:** Launcher receives a job from polling
+**Trigger:** Launcher receives a run from polling
 
 **Sequence:**
-1. Launcher calls `POST /launcher/jobs/{job_id}/started`
-2. Job status changes: `claimed` → `running`
-3. `JobExecutor` spawns the appropriate subprocess:
+1. Launcher calls `POST /launcher/runs/{run_id}/started`
+2. Run status changes: `claimed` → `running`
+3. `RunExecutor` spawns the appropriate subprocess:
 
 ```python
 # executor.py
-def _execute_start_session(self, job: Job) -> subprocess.Popen:
+def _execute_start_session(self, run: Run) -> subprocess.Popen:
     cmd = [
         self.ao_start_path,
-        "--session-name", job.session_name,
-        "--prompt", job.prompt,
+        "--session-name", run.session_name,
+        "--prompt", run.prompt,
     ]
-    if job.agent_name:
-        cmd.extend(["--agent", job.agent_name])
+    if run.agent_name:
+        cmd.extend(["--agent", run.agent_name])
 
     env = os.environ.copy()
-    env["AGENT_SESSION_NAME"] = job.session_name
+    env["AGENT_SESSION_NAME"] = run.session_name
 
     return subprocess.Popen(cmd, env=env, ...)
 ```
 
 **Process supervision:**
-- `JobSupervisor` thread monitors all running subprocesses
+- `RunSupervisor` thread monitors all running subprocesses
 - Checks process status every second
 - Captures exit codes when processes terminate
 
-### Phase 4: Job Completion
+### Phase 4: Run Completion
 
 **Trigger:** Subprocess exits
 
@@ -172,25 +172,25 @@ def _execute_start_session(self, job: Job) -> subprocess.Popen:
 
 | Exit Code | Status | API Call |
 |-----------|--------|----------|
-| 0 | `completed` | `POST /launcher/jobs/{job_id}/completed` |
-| Non-zero | `failed` | `POST /launcher/jobs/{job_id}/failed` |
+| 0 | `completed` | `POST /launcher/runs/{run_id}/completed` |
+| Non-zero | `failed` | `POST /launcher/runs/{run_id}/failed` |
 
 ```python
 # supervisor.py
-def _handle_completion(self, job_id: str, running_job: RunningJob, return_code: int):
+def _handle_completion(self, run_id: str, running_run: RunningRun, return_code: int):
     if return_code == 0:
-        self.api_client.report_completed(self.launcher_id, job_id)
+        self.api_client.report_completed(self.launcher_id, run_id)
     else:
         error_msg = f"Process exited with code {return_code}"
-        self.api_client.report_failed(self.launcher_id, job_id, error_msg)
+        self.api_client.report_failed(self.launcher_id, run_id, error_msg)
 ```
 
 ### Phase 5: Result Retrieval
 
-**Trigger:** Client wants to check job outcome
+**Trigger:** Client wants to check run outcome
 
 Clients can:
-1. Poll `GET /jobs/{job_id}` to check status
+1. Poll `GET /runs/{run_id}` to check status
 2. Once `completed`, call `GET /sessions/{session_id}/result` to get the final output
 
 **Alternative:** Use WebSocket connection to receive real-time session updates without polling.
@@ -203,15 +203,15 @@ Clients can:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │  JobPoller   │    │ JobExecutor  │    │JobSupervisor │       │
+│  │  RunPoller   │    │ RunExecutor  │    │RunSupervisor │       │
 │  │   (thread)   │    │   (class)    │    │   (thread)   │       │
 │  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
 │         │                   │                   │                │
-│         │ poll_job()        │ execute()         │ check_jobs()  │
+│         │ poll_run()        │ execute()         │ check_runs()  │
 │         ▼                   ▼                   ▼                │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │              CoordinatorAPIClient                            │    │
-│  │  - register(), poll_job(), report_started()             │    │
+│  │  - register(), poll_run(), report_started()             │    │
 │  │  - report_completed(), report_failed(), heartbeat()     │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                              │                                   │
@@ -228,9 +228,9 @@ Clients can:
 
 | Component | Thread | Responsibility |
 |-----------|--------|----------------|
-| `JobPoller` | Background | Continuously polls for pending jobs, spawns executors |
-| `JobExecutor` | Main | Maps job types to CLI commands, spawns subprocesses |
-| `JobSupervisor` | Background | Monitors running processes, reports completion/failure |
+| `RunPoller` | Background | Continuously polls for pending runs, spawns executors |
+| `RunExecutor` | Main | Maps run types to CLI commands, spawns subprocesses |
+| `RunSupervisor` | Background | Monitors running processes, reports completion/failure |
 | `CoordinatorAPIClient` | Shared | HTTP client for all Agent Coordinator communication |
 | `HeartbeatSender` | Background | Sends periodic heartbeats to maintain registration |
 
@@ -238,7 +238,7 @@ Clients can:
 
 | Parameter | Default | Environment Variable | Description |
 |-----------|---------|---------------------|-------------|
-| Poll Timeout | 30s | `LAUNCHER_POLL_TIMEOUT` | How long to hold connection waiting for jobs |
+| Poll Timeout | 30s | `LAUNCHER_POLL_TIMEOUT` | How long to hold connection waiting for runs |
 | Heartbeat Interval | 60s | `LAUNCHER_HEARTBEAT_INTERVAL` | How often launcher sends heartbeat |
 | Heartbeat Timeout | 120s | `LAUNCHER_HEARTBEAT_TIMEOUT` | When launcher is considered stale |
 | Supervisor Check | 1s | (hardcoded) | How often to check subprocess status |
@@ -260,16 +260,16 @@ Clients can:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Job Execution Failures
+### Run Execution Failures
 
 | Failure Type | Handling |
 |--------------|----------|
 | Subprocess crashes | Supervisor detects non-zero exit, reports `failed` |
 | Subprocess hangs | No built-in timeout (relies on Claude Code's own limits) |
-| Launcher dies mid-job | Job stays in `running` state; requires manual cleanup |
+| Launcher dies mid-run | Run stays in `running` state; requires manual cleanup |
 
 ## Related Documentation
 
-- [JOBS_API.md](./JOBS_API.md) - Complete API reference
+- [RUNS_API.md](./RUNS_API.md) - Complete API reference
 - [API.md](./API.md) - All Agent Coordinator endpoints
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview

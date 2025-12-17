@@ -1,28 +1,28 @@
-# Jobs API
+# Runs API
 
-The Jobs API enables distributed agent execution by separating orchestration (Agent Coordinator) from execution (Agent Launcher). This allows the Agent Coordinator to be containerized while launchers run on host machines where agent frameworks are installed.
+The Runs API enables distributed agent execution by separating orchestration (Agent Coordinator) from execution (Agent Launcher). This allows the Agent Coordinator to be containerized while launchers run on host machines where agent frameworks are installed.
 
 ## Architecture
 
 ```
 ao-* CLI / Dashboard / MCP Server
               │
-              │ POST /jobs
+              │ POST /runs
               ▼
 ┌─────────────────────────────────┐
 │       Agent Coordinator :8765       │
 │  ┌───────────────────────────┐  │
-│  │   In-Memory Job Queue     │  │
+│  │   In-Memory Run Queue     │  │
 │  │  (thread-safe, singleton) │  │
 │  └───────────────────────────┘  │
 └──────────────┬──────────────────┘
-               │ Long-poll GET /launcher/jobs
+               │ Long-poll GET /launcher/runs
                ▼
 ┌─────────────────────────────────┐
 │        Agent Launcher           │
-│  - Polls for pending jobs       │
+│  - Polls for pending runs       │
 │  - Concurrent execution         │
-│  - Reports job status           │
+│  - Reports run status           │
 │  - Heartbeat monitoring         │
 └──────────────┬──────────────────┘
                │ Subprocess
@@ -34,9 +34,9 @@ ao-* CLI / Dashboard / MCP Server
 └─────────────────────────────────┘
 ```
 
-## Job Lifecycle
+## Run Lifecycle
 
-Jobs follow a state machine with five statuses:
+Runs follow a state machine with five statuses:
 
 ```
 ┌─────────┐    claim    ┌─────────┐   started   ┌─────────┐
@@ -53,19 +53,19 @@ Jobs follow a state machine with five statuses:
 
 | Status | Description |
 |--------|-------------|
-| `pending` | Job created, waiting for a launcher to claim it |
-| `claimed` | Launcher claimed the job, preparing to execute |
-| `running` | Job execution has started |
-| `completed` | Job completed successfully |
-| `failed` | Job execution failed |
+| `pending` | Run created, waiting for a launcher to claim it |
+| `claimed` | Launcher claimed the run, preparing to execute |
+| `running` | Run execution has started |
+| `completed` | Run completed successfully |
+| `failed` | Run execution failed |
 
 ## Data Model
 
-### Job
+### Run
 
 ```json
 {
-  "job_id": "job_abc123def456",
+  "run_id": "run_abc123def456",
   "type": "start_session",
   "session_name": "my-research-task",
   "agent_name": "researcher",
@@ -84,22 +84,22 @@ Jobs follow a state machine with five statuses:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `job_id` | string | Unique identifier (e.g., `job_abc123def456`) |
+| `run_id` | string | Unique identifier (e.g., `run_abc123def456`) |
 | `type` | enum | `start_session` or `resume_session` |
 | `session_name` | string | Name of the session to start/resume |
 | `agent_name` | string? | Optional agent blueprint to use |
 | `prompt` | string | User prompt/instruction for the agent |
 | `project_dir` | string? | Optional project directory path |
 | `parent_session_name` | string? | Parent session name for callback support |
-| `status` | enum | Current job status |
-| `launcher_id` | string? | ID of the launcher that claimed/executed the job |
-| `error` | string? | Error message if job failed |
-| `created_at` | ISO 8601 | Timestamp when job was created |
-| `claimed_at` | ISO 8601? | Timestamp when launcher claimed the job |
+| `status` | enum | Current run status |
+| `launcher_id` | string? | ID of the launcher that claimed/executed the run |
+| `error` | string? | Error message if run failed |
+| `created_at` | ISO 8601 | Timestamp when run was created |
+| `claimed_at` | ISO 8601? | Timestamp when launcher claimed the run |
 | `started_at` | ISO 8601? | Timestamp when execution started |
-| `completed_at` | ISO 8601? | Timestamp when job completed or failed |
+| `completed_at` | ISO 8601? | Timestamp when run completed or failed |
 
-### Job Types
+### Run Types
 
 | Type | Description |
 |------|-------------|
@@ -108,12 +108,12 @@ Jobs follow a state machine with five statuses:
 
 ## API Endpoints
 
-### Create Job
+### Create Run
 
-Create a new job for a launcher to execute.
+Create a new run for a launcher to execute.
 
 ```
-POST /jobs
+POST /runs
 ```
 
 **Request Body:**
@@ -140,23 +140,23 @@ POST /jobs
 **Response:**
 ```json
 {
-  "job_id": "job_abc123",
+  "run_id": "run_abc123",
   "status": "pending"
 }
 ```
 
-### Get Job
+### Get Run
 
-Get job status and details.
+Get run status and details.
 
 ```
-GET /jobs/{job_id}
+GET /runs/{run_id}
 ```
 
 **Response:**
 ```json
 {
-  "job_id": "job_abc123",
+  "run_id": "run_abc123",
   "type": "start_session",
   "session_name": "my-task",
   "agent_name": "researcher",
@@ -173,18 +173,18 @@ GET /jobs/{job_id}
 }
 ```
 
-**Error:** `404 Not Found` if job doesn't exist.
+**Error:** `404 Not Found` if run doesn't exist.
 
 ## Launcher Endpoints
 
-These endpoints are used by the Agent Launcher to poll for and report on jobs.
+These endpoints are used by the Agent Launcher to poll for and report on runs.
 
-### Poll for Jobs
+### Poll for Runs
 
-Long-poll for available jobs. Returns immediately if a job is available, otherwise holds the connection open.
+Long-poll for available runs. Returns immediately if a run is available, otherwise holds the connection open.
 
 ```
-GET /launcher/jobs?launcher_id={launcher_id}
+GET /launcher/runs?launcher_id={launcher_id}
 ```
 
 **Query Parameters:**
@@ -192,11 +192,11 @@ GET /launcher/jobs?launcher_id={launcher_id}
 |-----------|----------|-------------|
 | `launcher_id` | Yes | The registered launcher ID |
 
-**Response (Job Available):**
+**Response (Run Available):**
 ```json
 {
-  "job": {
-    "job_id": "job_abc123",
+  "run": {
+    "run_id": "run_abc123",
     "type": "start_session",
     "session_name": "my-task",
     "prompt": "Do something",
@@ -205,7 +205,7 @@ GET /launcher/jobs?launcher_id={launcher_id}
 }
 ```
 
-**Response (No Jobs):** `204 No Content`
+**Response (No Runs):** `204 No Content`
 
 **Response (Deregistered):**
 ```json
@@ -214,12 +214,12 @@ GET /launcher/jobs?launcher_id={launcher_id}
 }
 ```
 
-### Report Job Started
+### Report Run Started
 
-Report that job execution has started.
+Report that run execution has started.
 
 ```
-POST /launcher/jobs/{job_id}/started
+POST /launcher/runs/{run_id}/started
 ```
 
 **Request Body:**
@@ -236,12 +236,12 @@ POST /launcher/jobs/{job_id}/started
 }
 ```
 
-### Report Job Completed
+### Report Run Completed
 
-Report that job completed successfully.
+Report that run completed successfully.
 
 ```
-POST /launcher/jobs/{job_id}/completed
+POST /launcher/runs/{run_id}/completed
 ```
 
 **Request Body:**
@@ -259,12 +259,12 @@ POST /launcher/jobs/{job_id}/completed
 }
 ```
 
-### Report Job Failed
+### Report Run Failed
 
-Report that job execution failed.
+Report that run execution failed.
 
 ```
-POST /launcher/jobs/{job_id}/failed
+POST /launcher/runs/{run_id}/failed
 ```
 
 **Request Body:**
@@ -284,34 +284,34 @@ POST /launcher/jobs/{job_id}/failed
 
 ## Implementation Details
 
-### Job Queue
+### Run Queue
 
-**File:** `servers/agent-coordinator/services/job_queue.py`
+**File:** `servers/agent-coordinator/services/run_queue.py`
 
-The job queue is an in-memory, thread-safe singleton that stores jobs in a dictionary with locking for atomic operations.
+The run queue is an in-memory, thread-safe singleton that stores runs in a dictionary with locking for atomic operations.
 
 ```python
-class JobQueue:
-    def add_job(job_create: JobCreate) -> Job
-    def claim_job(launcher_id: str) -> Optional[Job]
-    def get_job(job_id: str) -> Optional[Job]
-    def update_job_status(job_id: str, status: JobStatus, error: str = None) -> Optional[Job]
-    def get_job_by_session_name(session_name: str) -> Optional[Job]
+class RunQueue:
+    def add_run(run_create: RunCreate) -> Run
+    def claim_run(launcher_id: str) -> Optional[Run]
+    def get_run(run_id: str) -> Optional[Run]
+    def update_run_status(run_id: str, status: RunStatus, error: str = None) -> Optional[Run]
+    def get_run_by_session_name(session_name: str) -> Optional[Run]
 ```
 
 Key characteristics:
-- Jobs are **not persisted** to SQLite (in-memory only)
+- Runs are **not persisted** to SQLite (in-memory only)
 - Thread-safe with `threading.Lock` for concurrent access
-- FIFO ordering for job claiming
-- Module-level singleton: `job_queue`
+- FIFO ordering for run claiming
+- Module-level singleton: `run_queue`
 
 ### Agent Launcher Components
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `JobPoller` | `servers/agent-launcher/lib/poller.py` | Background thread polling for pending jobs |
-| `JobExecutor` | `servers/agent-launcher/lib/executor.py` | Spawns ao-start/ao-resume subprocesses |
-| `JobSupervisor` | `servers/agent-launcher/lib/supervisor.py` | Monitors running jobs, reports completion |
+| `RunPoller` | `servers/agent-launcher/lib/poller.py` | Background thread polling for pending runs |
+| `RunExecutor` | `servers/agent-launcher/lib/executor.py` | Spawns ao-start/ao-resume subprocesses |
+| `RunSupervisor` | `servers/agent-launcher/lib/supervisor.py` | Monitors running runs, reports completion |
 | `CoordinatorAPIClient` | `servers/agent-launcher/lib/api_client.py` | HTTP client for launcher endpoints |
 
 ### Long-Polling Configuration
@@ -326,11 +326,11 @@ Key characteristics:
 
 ### Dashboard
 
-The dashboard creates jobs when users start or resume sessions:
+The dashboard creates runs when users start or resume sessions:
 
 ```typescript
 // dashboard/src/services/chatService.ts
-const response = await agentOrchestratorApi.post('/jobs', {
+const response = await agentOrchestratorApi.post('/runs', {
   type: 'start_session',
   session_name: sessionName,
   agent_name: agentName,
@@ -341,11 +341,11 @@ const response = await agentOrchestratorApi.post('/jobs', {
 
 ### CLI Commands
 
-The orchestrator plugin uses `JobClient` to create jobs and wait for completion:
+The orchestrator plugin uses `RunClient` to create runs and wait for completion:
 
 ```python
-# plugins/orchestrator/skills/orchestrator/commands/lib/job_client.py
-client = JobClient(api_url)
+# plugins/orchestrator/skills/orchestrator/commands/lib/run_client.py
+client = RunClient(api_url)
 result = client.start_session(
     session_name="my-task",
     prompt="Do something",
@@ -355,7 +355,7 @@ result = client.start_session(
 
 ### Parent-Child Callbacks
 
-Jobs support hierarchical orchestration through `parent_session_name`:
+Runs support hierarchical orchestration through `parent_session_name`:
 
 1. Parent agent starts child with `parent_session_name` set
 2. Agent Coordinator tracks the relationship
@@ -365,7 +365,7 @@ Jobs support hierarchical orchestration through `parent_session_name`:
 ```
 Parent (orchestrator)          Child (worker)
        │                            │
-       │ POST /jobs                 │
+       │ POST /runs                 │
        │ parent_session_name=self   │
        │───────────────────────────►│
        │                            │
@@ -374,7 +374,7 @@ Parent (orchestrator)          Child (worker)
        │ becomes idle               │ completes
        │                            │
        │◄─── callback notification ─┤
-       │     (via resume job)       │
+       │     (via resume run)       │
        │                            │
        ▼
   resumes with child result

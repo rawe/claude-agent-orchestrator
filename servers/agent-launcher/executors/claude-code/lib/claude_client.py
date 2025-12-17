@@ -134,8 +134,8 @@ async def run_claude_session(
     with session state managed via the AgentCoordinator API.
 
     NOTE: parent_session_name is now handled automatically by Agent Coordinator
-    via the Jobs API. The launcher sets AGENT_SESSION_NAME env var which
-    flows through the job to the session. See mcp-server-api-refactor.md.
+    via the Runs API. The launcher sets AGENT_SESSION_NAME env var which
+    flows through the run to the session. See mcp-server-api-refactor.md.
 
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
@@ -233,7 +233,7 @@ async def run_claude_session(
                                 if not resume_session_id:
                                     # New session: create via API
                                     # NOTE: parent_session_name is set by Agent Coordinator
-                                    # from the Job's parent_session_name field
+                                    # from the Run's parent_session_name field
                                     session_client.create_session(
                                         session_id=session_id,
                                         session_name=session_name or session_id,
@@ -348,7 +348,7 @@ def run_session_sync(
     the SDK's async API internally.
 
     NOTE: parent_session_name is now handled automatically by Agent Coordinator
-    via the Jobs API. See mcp-server-api-refactor.md.
+    via the Runs API. See mcp-server-api-refactor.md.
 
     Args:
         prompt: User prompt (may include prepended system prompt from agent)

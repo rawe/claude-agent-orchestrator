@@ -1,5 +1,5 @@
 // API URLs from environment variables
-// Agent Orchestrator API handles sessions, events, agent blueprints, and jobs (unified service)
+// Agent Orchestrator API handles sessions, events, agent blueprints, and runs (unified service)
 export const AGENT_ORCHESTRATOR_API_URL = import.meta.env.VITE_AGENT_ORCHESTRATOR_API_URL || 'http://localhost:8765';
 export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || 'http://localhost:8766';
 export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8765/ws';

@@ -198,6 +198,31 @@ Renaming `--runtime-url` to `--coordinator-url` requires checking:
 3. Run script → Verify and find remaining
 4. Repeat until clean
 
+### 6. Subagents for Detection Only, Not Modification
+
+Use subagents only for discovery and verification, never for making changes:
+
+| Subagent Should | Subagent Should NOT |
+|-----------------|---------------------|
+| Search for occurrences | Edit files |
+| Classify matches | Create new files |
+| Report findings | Rename files |
+| Verify completion | Run `git mv` |
+
+**Why:** When subagents modify files, the main agent loses awareness of what changed. Mistakes happen silently and are harder to catch. Keeping all modifications in the main agent ensures full control and immediate verification.
+
+### 7. "OK to Keep" Requires Scrutiny in Project Docs
+
+Terms in our own project's documentation/comments often need changing even when they look generic:
+
+| Example | Looks Like | Actually Is |
+|---------|-----------|-------------|
+| "Jobs not executing" (troubleshooting section) | Generic troubleshooting | Our Jobs/Runs terminology |
+| "sessions, events, jobs" (env comment) | Feature list | Our Jobs/Runs terminology |
+| "Jobs API" (code comment) | Generic API mention | Our Jobs/Runs API |
+
+**Lesson:** If it's in our codebase describing our system, it probably needs changing.
+
 ## Template for Future Renames
 
 ```bash

@@ -1,7 +1,7 @@
 """
-Job Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
+Run Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
 
-Maps job types to execution modes and handles subprocess spawning.
+Maps agent run types to execution modes and handles subprocess spawning.
 Uses unified ao-*-exec entrypoint with structured JSON payloads.
 """
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 import logging
 
-from api_client import Job
+from api_client import Run
 from invocation import SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
@@ -124,45 +124,45 @@ def get_executor_type() -> str:
         return "unknown"
 
 
-class JobExecutor:
-    """Executes jobs by spawning executor subprocess with JSON payload."""
+class RunExecutor:
+    """Executes agent runs by spawning executor subprocess with JSON payload."""
 
     def __init__(self, default_project_dir: str):
         """Initialize executor.
 
         Args:
-            default_project_dir: Default project directory if job doesn't specify one
+            default_project_dir: Default project directory if agent run doesn't specify one
         """
         self.default_project_dir = default_project_dir
         self.executor_path = get_executor_path()
 
         logger.debug(f"Executor path: {self.executor_path}")
 
-    def execute(self, job: Job, parent_session_name: Optional[str] = None) -> subprocess.Popen:
-        """Execute a job by spawning ao-*-exec with JSON payload via stdin.
+    def execute_run(self, run: Run, parent_session_name: Optional[str] = None) -> subprocess.Popen:
+        """Execute an agent run by spawning ao-*-exec with JSON payload via stdin.
 
         Args:
-            job: The job to execute
+            run: The agent run to execute
             parent_session_name: Optional parent session name for callback context
 
         Returns:
             The spawned subprocess.Popen object
         """
-        # Map job type to execution mode
-        if job.type == "start_session":
+        # Map run type to execution mode
+        if run.type == "start_session":
             mode = "start"
-        elif job.type == "resume_session":
+        elif run.type == "resume_session":
             mode = "resume"
         else:
-            raise ValueError(f"Unknown job type: {job.type}")
+            raise ValueError(f"Unknown agent run type: {run.type}")
 
-        return self._execute_with_payload(job, mode)
+        return self._execute_with_payload(run, mode)
 
-    def _build_payload(self, job: Job, mode: str) -> dict:
+    def _build_payload(self, run: Run, mode: str) -> dict:
         """Build JSON payload for ao-*-exec.
 
         Args:
-            job: The job to execute
+            run: The agent run to execute
             mode: Execution mode ('start' or 'resume')
 
         Returns:
@@ -171,31 +171,31 @@ class JobExecutor:
         payload = {
             "schema_version": SCHEMA_VERSION,
             "mode": mode,
-            "session_name": job.session_name,
-            "prompt": job.prompt,
+            "session_name": run.session_name,
+            "prompt": run.prompt,
         }
 
         # Add optional fields for start mode
         if mode == "start":
-            if job.agent_name:
-                payload["agent_name"] = job.agent_name
-            project_dir = job.project_dir or self.default_project_dir
+            if run.agent_name:
+                payload["agent_name"] = run.agent_name
+            project_dir = run.project_dir or self.default_project_dir
             payload["project_dir"] = project_dir
 
         return payload
 
-    def _execute_with_payload(self, job: Job, mode: str) -> subprocess.Popen:
+    def _execute_with_payload(self, run: Run, mode: str) -> subprocess.Popen:
         """Execute executor with JSON payload via stdin.
 
         Args:
-            job: The job to execute
+            run: The agent run to execute
             mode: Execution mode ('start' or 'resume')
 
         Returns:
             The spawned subprocess.Popen object
         """
         # Build JSON payload
-        payload = self._build_payload(job, mode)
+        payload = self._build_payload(run, mode)
         payload_json = json.dumps(payload)
 
         # Build command
@@ -209,20 +209,20 @@ class JobExecutor:
         # for callback support (X-Agent-Session-Name header).
         # Flow: Launcher sets env → ao-*-exec replaces ${AGENT_SESSION_NAME} in MCP config
         #       → Claude sends X-Agent-Session-Name header → MCP server reads it
-        env["AGENT_SESSION_NAME"] = job.session_name
+        env["AGENT_SESSION_NAME"] = run.session_name
 
         # Log action (don't log full payload - prompt may be large/sensitive)
         if mode == "start":
             logger.info(
-                f"Starting session: {job.session_name}"
-                + (f" (agent={job.agent_name})" if job.agent_name else "")
+                f"Starting session: {run.session_name}"
+                + (f" (agent={run.agent_name})" if run.agent_name else "")
             )
         else:
-            logger.info(f"Resuming session: {job.session_name}")
+            logger.info(f"Resuming session: {run.session_name}")
 
         logger.debug(
-            f"Executing ao-*-exec: mode={mode} session={job.session_name} "
-            f"prompt_len={len(job.prompt)}"
+            f"Executing ao-*-exec: mode={mode} session={run.session_name} "
+            f"prompt_len={len(run.prompt)}"
         )
 
         # Spawn subprocess with stdin pipe

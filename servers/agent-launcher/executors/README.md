@@ -1,6 +1,6 @@
 # Executors
 
-This directory contains executor implementations that handle job execution for the Agent Launcher.
+This directory contains executor implementations that handle run execution for the Agent Launcher.
 
 ## Directory Structure
 

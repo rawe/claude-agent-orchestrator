@@ -22,9 +22,9 @@ class RegistrationResponse:
 
 
 @dataclass
-class Job:
-    """Job to execute."""
-    job_id: str
+class Run:
+    """Agent run to execute."""
+    run_id: str
     type: str  # "start_session" or "resume_session"
     session_name: str
     agent_name: Optional[str]
@@ -34,14 +34,14 @@ class Job:
 
 @dataclass
 class PollResult:
-    """Result from polling for jobs."""
-    job: Optional[Job] = None
+    """Result from polling for agent runs."""
+    run: Optional[Run] = None
     deregistered: bool = False
-    stop_jobs: list[str] = None  # Job IDs to stop
+    stop_runs: list[str] = None  # Run IDs to stop
 
     def __post_init__(self):
-        if self.stop_jobs is None:
-            self.stop_jobs = []
+        if self.stop_runs is None:
+            self.stop_runs = []
 
 
 class CoordinatorAPIClient:
@@ -100,22 +100,22 @@ class CoordinatorAPIClient:
             heartbeat_interval_seconds=data["heartbeat_interval_seconds"],
         )
 
-    def poll_job(self, launcher_id: str) -> PollResult:
-        """Long-poll for a job to execute or stop commands.
+    def poll_run(self, launcher_id: str) -> PollResult:
+        """Long-poll for an agent run to execute or stop commands.
 
         Returns PollResult with:
-        - job: Job if available
+        - run: Run if available
         - deregistered: True if launcher has been deregistered externally
-        - stop_jobs: List of job IDs to stop
+        - stop_runs: List of run IDs to stop
         """
         try:
             response = self._client.get(
-                f"{self.base_url}/launcher/jobs",
+                f"{self.base_url}/launcher/runs",
                 params={"launcher_id": launcher_id},
             )
 
             if response.status_code == 204:
-                # No jobs available
+                # No runs available
                 return PollResult()
 
             response.raise_for_status()
@@ -126,53 +126,53 @@ class CoordinatorAPIClient:
                 return PollResult(deregistered=True)
 
             # Check for stop commands
-            if "stop_jobs" in data:
-                return PollResult(stop_jobs=data["stop_jobs"])
+            if "stop_runs" in data:
+                return PollResult(stop_runs=data["stop_runs"])
 
-            # Normal job response
-            job_data = data["job"]
-            job = Job(
-                job_id=job_data["job_id"],
-                type=job_data["type"],
-                session_name=job_data["session_name"],
-                agent_name=job_data.get("agent_name"),
-                prompt=job_data["prompt"],
-                project_dir=job_data.get("project_dir"),
+            # Normal run response
+            run_data = data["run"]
+            run = Run(
+                run_id=run_data["run_id"],
+                type=run_data["type"],
+                session_name=run_data["session_name"],
+                agent_name=run_data.get("agent_name"),
+                prompt=run_data["prompt"],
+                project_dir=run_data.get("project_dir"),
             )
-            return PollResult(job=job)
+            return PollResult(run=run)
         except httpx.TimeoutException:
             # Timeout is expected for long-polling
             logger.debug("Poll timeout (expected)")
             return PollResult()
 
-    def report_started(self, launcher_id: str, job_id: str) -> None:
-        """Report that job execution has started."""
+    def report_started(self, launcher_id: str, run_id: str) -> None:
+        """Report that agent run execution has started."""
         response = self._client.post(
-            f"{self.base_url}/launcher/jobs/{job_id}/started",
+            f"{self.base_url}/launcher/runs/{run_id}/started",
             json={"launcher_id": launcher_id},
         )
         response.raise_for_status()
 
-    def report_completed(self, launcher_id: str, job_id: str) -> None:
-        """Report that job completed successfully."""
+    def report_completed(self, launcher_id: str, run_id: str) -> None:
+        """Report that agent run completed successfully."""
         response = self._client.post(
-            f"{self.base_url}/launcher/jobs/{job_id}/completed",
+            f"{self.base_url}/launcher/runs/{run_id}/completed",
             json={"launcher_id": launcher_id, "status": "success"},
         )
         response.raise_for_status()
 
-    def report_failed(self, launcher_id: str, job_id: str, error: str) -> None:
-        """Report that job execution failed."""
+    def report_failed(self, launcher_id: str, run_id: str, error: str) -> None:
+        """Report that agent run execution failed."""
         response = self._client.post(
-            f"{self.base_url}/launcher/jobs/{job_id}/failed",
+            f"{self.base_url}/launcher/runs/{run_id}/failed",
             json={"launcher_id": launcher_id, "error": error},
         )
         response.raise_for_status()
 
-    def report_stopped(self, launcher_id: str, job_id: str, signal: str = "SIGTERM") -> None:
-        """Report that job was stopped (terminated by stop command)."""
+    def report_stopped(self, launcher_id: str, run_id: str, signal: str = "SIGTERM") -> None:
+        """Report that agent run was stopped (terminated by stop command)."""
         response = self._client.post(
-            f"{self.base_url}/launcher/jobs/{job_id}/stopped",
+            f"{self.base_url}/launcher/runs/{run_id}/stopped",
             json={"launcher_id": launcher_id, "signal": signal},
         )
         response.raise_for_status()
@@ -247,32 +247,32 @@ class CoordinatorAPIClient:
             logger.debug(f"Failed to get result for session {session_name}: {e}")
             return None
 
-    def create_resume_job(
+    def create_resume_run(
         self,
         session_name: str,
         prompt: str,
         project_dir: Optional[str] = None,
     ) -> Optional[str]:
-        """Create a resume_session job.
+        """Create a resume_session agent run.
 
-        Returns job_id if successful, None on error.
+        Returns run_id if successful, None on error.
         """
         try:
-            job_request = {
+            run_request = {
                 "type": "resume_session",
                 "session_name": session_name,
                 "prompt": prompt,
             }
             if project_dir:
-                job_request["project_dir"] = project_dir
+                run_request["project_dir"] = project_dir
 
             response = self._client.post(
-                f"{self.base_url}/jobs",
-                json=job_request,
+                f"{self.base_url}/runs",
+                json=run_request,
             )
             response.raise_for_status()
             data = response.json()
-            return data.get("job_id")
+            return data.get("run_id")
         except Exception as e:
-            logger.error(f"Failed to create resume job for {session_name}: {e}")
+            logger.error(f"Failed to create resume run for {session_name}: {e}")
             return None

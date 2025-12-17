@@ -221,7 +221,7 @@ Removes the SQLite database and test-executor session data:
 - Ensure Agent Coordinator is running on port 8765
 - Check no other process is using the port: `lsof -i :8765`
 
-### Jobs not executing
+### Runs not executing
 - Verify Agent Launcher is registered (check launcher logs)
 - Ensure using `-x test-executor` flag
 

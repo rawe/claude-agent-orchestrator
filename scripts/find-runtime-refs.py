@@ -159,7 +159,7 @@ def classify_match(line: str) -> str:
     # Check context for Agent Runtime references
     if "runtime" in line_lower:
         # Look for patterns suggesting it's about the Agent Runtime service
-        if any(word in line_lower for word in ["coordinator", "launcher", "agent", "session", "job", "poll"]):
+        if any(word in line_lower for word in ["coordinator", "launcher", "agent", "session", "run", "poll"]):
             if "at runtime" not in line_lower and "runtime environment" not in line_lower:
                 return "POSSIBLY-AGENT-RUNTIME"
 

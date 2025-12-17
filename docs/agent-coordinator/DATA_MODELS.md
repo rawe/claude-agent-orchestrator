@@ -63,11 +63,11 @@ Common data structures used by the Agent Coordinator.
 - `last_resumed_at` - Optional timestamp when session was last resumed
 - `parent_session_name` - Optional name of the parent session (for callback support)
 
-## Job
+## Run
 
 ```json
 {
-  "job_id": "string",
+  "run_id": "string",
   "type": "start_session | resume_session",
   "session_name": "string",
   "agent_name": "string (optional)",
@@ -85,29 +85,29 @@ Common data structures used by the Agent Coordinator.
 ```
 
 **Fields:**
-- `job_id` - Unique identifier for the job (e.g., `job_abc123`)
-- `type` - Job type: `start_session` or `resume_session`
+- `run_id` - Unique identifier for the run (e.g., `run_abc123`)
+- `type` - Run type: `start_session` or `resume_session`
 - `session_name` - Name of the session to start/resume
 - `agent_name` - Optional name of the agent blueprint to use
 - `prompt` - User prompt/instruction for the agent
 - `project_dir` - Optional project directory path
 - `parent_session_name` - Optional parent session name (for callbacks)
-- `status` - Current job status
-- `launcher_id` - ID of the launcher that claimed/executed the job
-- `error` - Error message if job failed
-- `created_at` - Timestamp when job was created
-- `claimed_at` - Timestamp when launcher claimed the job
-- `started_at` - Timestamp when job execution started
-- `completed_at` - Timestamp when job completed or failed
+- `status` - Current run status
+- `launcher_id` - ID of the launcher that claimed/executed the run
+- `error` - Error message if run failed
+- `created_at` - Timestamp when run was created
+- `claimed_at` - Timestamp when launcher claimed the run
+- `started_at` - Timestamp when run execution started
+- `completed_at` - Timestamp when run completed or failed
 
-**Job Status Values:**
-- `pending` - Job created, waiting for launcher
-- `claimed` - Launcher claimed the job
-- `running` - Job execution started
+**Run Status Values:**
+- `pending` - Run created, waiting for launcher
+- `claimed` - Launcher claimed the run
+- `running` - Run execution started
 - `stopping` - Stop requested, waiting for launcher to terminate process
-- `completed` - Job completed successfully
-- `failed` - Job execution failed
-- `stopped` - Job was stopped (terminated by stop command)
+- `completed` - Run completed successfully
+- `failed` - Run execution failed
+- `stopped` - Run was stopped (terminated by stop command)
 
 ## Launcher
 

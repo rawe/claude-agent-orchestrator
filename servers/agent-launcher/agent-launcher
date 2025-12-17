@@ -7,11 +7,11 @@
 # ]
 # ///
 """
-Agent Launcher - Connects to Agent Coordinator and executes jobs.
+Agent Launcher - Connects to Agent Coordinator and executes agent runs.
 
-The launcher polls for jobs from Agent Coordinator and spawns executor
-subprocesses to handle them. It supports concurrent job execution
-and reports job status back to the coordinator.
+The launcher polls for agent runs from Agent Coordinator and spawns executor
+subprocesses to handle them. It supports concurrent agent run execution
+and reports run status back to the coordinator.
 
 Usage:
     ./servers/agent-launcher/agent-launcher
@@ -39,10 +39,10 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import typer
 from config import LauncherConfig
 from api_client import CoordinatorAPIClient
-from registry import RunningJobsRegistry
-from executor import JobExecutor, list_executors, resolve_executor_name, get_executor_type
-from poller import JobPoller
-from supervisor import JobSupervisor
+from registry import RunningRunsRegistry
+from executor import RunExecutor, list_executors, resolve_executor_name, get_executor_type
+from poller import RunPoller
+from supervisor import RunSupervisor
 
 # Configure logging
 logging.basicConfig(
@@ -109,12 +109,12 @@ class Launcher:
             config.agent_coordinator_url,
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
-        self.registry = RunningJobsRegistry()
-        self.executor = JobExecutor(config.project_dir)
+        self.registry = RunningRunsRegistry()
+        self.executor = RunExecutor(config.project_dir)
         self.launcher_id: str | None = None
 
-        self.poller: JobPoller | None = None
-        self.supervisor: JobSupervisor | None = None
+        self.poller: RunPoller | None = None
+        self.supervisor: RunSupervisor | None = None
         self.heartbeat: HeartbeatThread | None = None
 
         self._shutdown_event = threading.Event()
@@ -151,7 +151,7 @@ class Launcher:
             raise RuntimeError("Must register before starting")
 
         # Create components
-        self.poller = JobPoller(
+        self.poller = RunPoller(
             self.api_client,
             self.executor,
             self.registry,
@@ -159,7 +159,7 @@ class Launcher:
             on_deregistered=self._on_external_deregistration,
         )
 
-        self.supervisor = JobSupervisor(
+        self.supervisor = RunSupervisor(
             self.api_client,
             self.registry,
             self.launcher_id,
@@ -176,7 +176,7 @@ class Launcher:
         self.supervisor.start()
         self.heartbeat.start()
 
-        logger.info("Launcher started - waiting for jobs")
+        logger.info("Launcher started - waiting for agent runs")
 
     def _on_external_deregistration(self) -> None:
         """Called when launcher is deregistered externally (e.g., from dashboard)."""
@@ -251,10 +251,10 @@ def main(
     ),
 ):
     """
-    Agent Launcher - Execute jobs from Agent Coordinator.
+    Agent Launcher - Execute agent runs from Agent Coordinator.
 
-    Polls Agent Coordinator for jobs and spawns executor subprocesses to handle them.
-    Supports concurrent job execution.
+    Polls Agent Coordinator for agent runs and spawns executor subprocesses to handle them.
+    Supports concurrent agent run execution.
     """
     # Handle --executor-list
     if executor_list:

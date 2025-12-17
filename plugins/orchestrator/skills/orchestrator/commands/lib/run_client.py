@@ -1,8 +1,8 @@
 """
-Job Client
+Run Client
 
-HTTP client for Agent Coordinator Jobs API.
-Creates jobs and polls for completion.
+HTTP client for Agent Coordinator Runs API.
+Creates runs and polls for completion.
 """
 
 import httpx
@@ -10,23 +10,23 @@ import time
 from typing import Optional
 
 
-class JobClientError(Exception):
-    """Base exception for job client errors."""
+class RunClientError(Exception):
+    """Base exception for run client errors."""
     pass
 
 
-class JobTimeoutError(JobClientError):
-    """Job did not complete within timeout."""
+class RunTimeoutError(RunClientError):
+    """Run did not complete within timeout."""
     pass
 
 
-class JobFailedError(JobClientError):
-    """Job failed to execute."""
+class RunFailedError(RunClientError):
+    """Run failed to execute."""
     pass
 
 
-class JobClient:
-    """HTTP client for Jobs API with synchronous completion."""
+class RunClient:
+    """HTTP client for Runs API with synchronous completion."""
 
     DEFAULT_POLL_INTERVAL = 2.0  # seconds
     DEFAULT_TIMEOUT = 600.0  # 10 minutes
@@ -43,18 +43,18 @@ class JobClient:
         self.poll_interval = poll_interval
         self.completion_timeout = completion_timeout
 
-    def _create_job(
+    def _create_run(
         self,
-        job_type: str,
+        run_type: str,
         session_name: str,
         prompt: str,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
     ) -> str:
         """
-        Create a job via POST /jobs.
+        Create a run via POST /runs.
 
-        Request body (JobCreate):
+        Request body (RunCreate):
             type: "start_session" | "resume_session"
             session_name: str
             prompt: str
@@ -62,13 +62,13 @@ class JobClient:
             project_dir: Optional[str]
 
         Response:
-            {"job_id": "job_xxx", "status": "pending"}
+            {"run_id": "run_xxx", "status": "pending"}
 
-        Returns the job_id.
+        Returns the run_id.
         """
-        url = f"{self.base_url}/jobs"
+        url = f"{self.base_url}/runs"
         data = {
-            "type": job_type,
+            "type": run_type,
             "session_name": session_name,
             "prompt": prompt,
         }
@@ -81,18 +81,18 @@ class JobClient:
             response = httpx.post(url, json=data, timeout=self.timeout)
             response.raise_for_status()
             result = response.json()
-            return result["job_id"]
+            return result["run_id"]
         except httpx.HTTPStatusError as e:
-            raise JobClientError(f"Failed to create job: {e.response.text}")
+            raise RunClientError(f"Failed to create run: {e.response.text}")
         except httpx.RequestError as e:
-            raise JobClientError(f"Request failed: {e}")
+            raise RunClientError(f"Request failed: {e}")
 
-    def _get_job(self, job_id: str) -> dict:
+    def _get_run(self, run_id: str) -> dict:
         """
-        Get job status via GET /jobs/{job_id}.
+        Get run status via GET /runs/{run_id}.
 
-        Response (Job):
-            job_id: str
+        Response (Run):
+            run_id: str
             type: "start_session" | "resume_session"
             session_name: str
             agent_name: Optional[str]
@@ -106,15 +106,15 @@ class JobClient:
             started_at: Optional[str]
             completed_at: Optional[str]
         """
-        url = f"{self.base_url}/jobs/{job_id}"
+        url = f"{self.base_url}/runs/{run_id}"
         try:
             response = httpx.get(url, timeout=self.timeout)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
-            raise JobClientError(f"Failed to get job status: {e.response.text}")
+            raise RunClientError(f"Failed to get run status: {e.response.text}")
         except httpx.RequestError as e:
-            raise JobClientError(f"Request failed: {e}")
+            raise RunClientError(f"Request failed: {e}")
 
     def _get_session_by_name(self, session_name: str) -> Optional[dict]:
         """
@@ -131,9 +131,9 @@ class JobClient:
             response.raise_for_status()
             return response.json().get("session")
         except httpx.HTTPStatusError as e:
-            raise JobClientError(f"Failed to get session: {e.response.text}")
+            raise RunClientError(f"Failed to get session: {e.response.text}")
         except httpx.RequestError as e:
-            raise JobClientError(f"Request failed: {e}")
+            raise RunClientError(f"Request failed: {e}")
 
     def _get_session_result(self, session_id: str) -> str:
         """
@@ -148,56 +148,56 @@ class JobClient:
             response.raise_for_status()
             return response.json().get("result", "")
         except httpx.HTTPStatusError as e:
-            raise JobClientError(f"Failed to get session result: {e.response.text}")
+            raise RunClientError(f"Failed to get session result: {e.response.text}")
         except httpx.RequestError as e:
-            raise JobClientError(f"Request failed: {e}")
+            raise RunClientError(f"Request failed: {e}")
 
-    def _wait_for_completion(self, job_id: str, session_name: str) -> str:
+    def _wait_for_completion(self, run_id: str, session_name: str) -> str:
         """
-        Wait for job to complete and return the session result.
+        Wait for run to complete and return the session result.
 
         Strategy:
-        1. Poll job status until completed/failed
-        2. Once job is completed, get result from session
+        1. Poll run status until completed/failed
+        2. Once run is completed, get result from session
         """
         start_time = time.time()
 
         while True:
             elapsed = time.time() - start_time
             if elapsed > self.completion_timeout:
-                raise JobTimeoutError(
-                    f"Job {job_id} did not complete within {self.completion_timeout}s"
+                raise RunTimeoutError(
+                    f"Run {run_id} did not complete within {self.completion_timeout}s"
                 )
 
-            job = self._get_job(job_id)
-            status = job.get("status")
+            run = self._get_run(run_id)
+            status = run.get("status")
 
             if status == "completed":
-                # Job completed - get result from session
+                # Run completed - get result from session
                 session = self._get_session_by_name(session_name)
                 if session:
                     session_id = session.get("session_id")
                     if session_id:
                         return self._get_session_result(session_id)
                     else:
-                        raise JobClientError(
+                        raise RunClientError(
                             f"Session '{session_name}' has no session_id"
                         )
                 else:
-                    raise JobClientError(
-                        f"Session '{session_name}' not found after job completed"
+                    raise RunClientError(
+                        f"Session '{session_name}' not found after run completed"
                     )
 
             elif status == "failed":
-                error = job.get("error", "Unknown error")
-                raise JobFailedError(f"Job failed: {error}")
+                error = run.get("error", "Unknown error")
+                raise RunFailedError(f"Run failed: {error}")
 
             elif status in ("pending", "claimed", "running"):
                 # Still in progress - wait and poll again
                 time.sleep(self.poll_interval)
 
             else:
-                raise JobClientError(f"Unknown job status: {status}")
+                raise RunClientError(f"Unknown run status: {status}")
 
     def start_session(
         self,
@@ -207,7 +207,7 @@ class JobClient:
         project_dir: Optional[str] = None,
     ) -> str:
         """
-        Create a start_session job and wait for completion.
+        Create a start_session run and wait for completion.
 
         Args:
             session_name: Name for the new session
@@ -218,14 +218,14 @@ class JobClient:
         Returns:
             The session result text
         """
-        job_id = self._create_job(
-            job_type="start_session",
+        run_id = self._create_run(
+            run_type="start_session",
             session_name=session_name,
             prompt=prompt,
             agent_name=agent_name,
             project_dir=project_dir,
         )
-        return self._wait_for_completion(job_id, session_name)
+        return self._wait_for_completion(run_id, session_name)
 
     def resume_session(
         self,
@@ -233,7 +233,7 @@ class JobClient:
         prompt: str,
     ) -> str:
         """
-        Create a resume_session job and wait for completion.
+        Create a resume_session run and wait for completion.
 
         Args:
             session_name: Name of existing session to resume
@@ -242,9 +242,9 @@ class JobClient:
         Returns:
             The session result text
         """
-        job_id = self._create_job(
-            job_type="resume_session",
+        run_id = self._create_run(
+            run_type="resume_session",
             session_name=session_name,
             prompt=prompt,
         )
-        return self._wait_for_completion(job_id, session_name)
+        return self._wait_for_completion(run_id, session_name)

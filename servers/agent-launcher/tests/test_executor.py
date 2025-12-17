@@ -1,5 +1,5 @@
 """
-Tests for JobExecutor with JSON payload.
+Tests for RunExecutor with JSON payload.
 
 Tests cover:
 - Payload building for start/resume modes
@@ -16,13 +16,13 @@ from unittest.mock import patch, MagicMock
 # Add launcher lib to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 
-from executor import JobExecutor
+from executor import RunExecutor
 from invocation import SCHEMA_VERSION
-from api_client import Job
+from api_client import Run
 
 
 class TestBuildPayload:
-    """Tests for JobExecutor._build_payload()"""
+    """Tests for RunExecutor._build_payload()"""
 
     @pytest.fixture
     def executor(self, tmp_path):
@@ -31,12 +31,12 @@ class TestBuildPayload:
         fake_exec.write_text("#!/bin/bash\necho test")
         fake_exec.chmod(0o755)
         with patch("executor.get_executor_path", return_value=fake_exec):
-            return JobExecutor(default_project_dir="/default/path")
+            return RunExecutor(default_project_dir="/default/path")
 
     def test_start_payload_minimal(self, executor):
         """Start payload includes required fields."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="test-session",
             agent_name=None,
@@ -44,7 +44,7 @@ class TestBuildPayload:
             project_dir=None,
         )
 
-        payload = executor._build_payload(job, "start")
+        payload = executor._build_payload(run, "start")
 
         assert payload["schema_version"] == SCHEMA_VERSION
         assert payload["mode"] == "start"
@@ -57,8 +57,8 @@ class TestBuildPayload:
 
     def test_start_payload_with_agent(self, executor):
         """Start payload includes agent_name when specified."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="test-session",
             agent_name="security-auditor",
@@ -66,15 +66,15 @@ class TestBuildPayload:
             project_dir="/custom/path",
         )
 
-        payload = executor._build_payload(job, "start")
+        payload = executor._build_payload(run, "start")
 
         assert payload["agent_name"] == "security-auditor"
         assert payload["project_dir"] == "/custom/path"
 
     def test_resume_payload_minimal(self, executor):
         """Resume payload includes only required fields."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="resume_session",
             session_name="test-session",
             agent_name="should-be-ignored",
@@ -82,7 +82,7 @@ class TestBuildPayload:
             project_dir="/should/be/ignored",
         )
 
-        payload = executor._build_payload(job, "resume")
+        payload = executor._build_payload(run, "resume")
 
         assert payload["schema_version"] == SCHEMA_VERSION
         assert payload["mode"] == "resume"
@@ -94,8 +94,8 @@ class TestBuildPayload:
 
     def test_payload_is_valid_json(self, executor):
         """Payload can be serialized to valid JSON."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="test-session",
             agent_name="agent",
@@ -103,7 +103,7 @@ class TestBuildPayload:
             project_dir="/path",
         )
 
-        payload = executor._build_payload(job, "start")
+        payload = executor._build_payload(run, "start")
         json_str = json.dumps(payload)
 
         # Should be valid JSON
@@ -112,7 +112,7 @@ class TestBuildPayload:
 
 
 class TestExecuteWithPayload:
-    """Tests for JobExecutor._execute_with_payload()"""
+    """Tests for RunExecutor._execute_with_payload()"""
 
     @pytest.fixture
     def executor(self, tmp_path):
@@ -122,12 +122,12 @@ class TestExecuteWithPayload:
         fake_exec.chmod(0o755)
 
         with patch("executor.get_executor_path", return_value=fake_exec):
-            return JobExecutor(default_project_dir="/default/path")
+            return RunExecutor(default_project_dir="/default/path")
 
     def test_execute_calls_executor(self, executor):
         """Execute calls executor subprocess."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="test-session",
             agent_name=None,
@@ -140,7 +140,7 @@ class TestExecuteWithPayload:
             mock_process.stdin = MagicMock()
             mock_popen.return_value = mock_process
 
-            executor._execute_with_payload(job, "start")
+            executor._execute_with_payload(run, "start")
 
             # Should call Popen with executor
             mock_popen.assert_called_once()
@@ -150,8 +150,8 @@ class TestExecuteWithPayload:
 
     def test_execute_writes_json_to_stdin(self, executor):
         """Execute writes JSON payload to subprocess stdin."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="test-session",
             agent_name=None,
@@ -164,7 +164,7 @@ class TestExecuteWithPayload:
             mock_process.stdin = MagicMock()
             mock_popen.return_value = mock_process
 
-            executor._execute_with_payload(job, "start")
+            executor._execute_with_payload(run, "start")
 
             # Should write to stdin
             mock_process.stdin.write.assert_called_once()
@@ -180,8 +180,8 @@ class TestExecuteWithPayload:
 
     def test_execute_sets_agent_session_name_env(self, executor):
         """Execute sets AGENT_SESSION_NAME environment variable."""
-        job = Job(
-            job_id="job-1",
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="my-session",
             agent_name=None,
@@ -194,7 +194,7 @@ class TestExecuteWithPayload:
             mock_process.stdin = MagicMock()
             mock_popen.return_value = mock_process
 
-            executor._execute_with_payload(job, "start")
+            executor._execute_with_payload(run, "start")
 
             # Check env passed to Popen
             call_kwargs = mock_popen.call_args[1]
@@ -203,7 +203,7 @@ class TestExecuteWithPayload:
 
 
 class TestExecute:
-    """Tests for JobExecutor.execute()"""
+    """Tests for RunExecutor.execute_run()"""
 
     @pytest.fixture
     def executor(self, tmp_path):
@@ -213,12 +213,12 @@ class TestExecute:
         fake_exec.chmod(0o755)
 
         with patch("executor.get_executor_path", return_value=fake_exec):
-            return JobExecutor(default_project_dir="/default/path")
+            return RunExecutor(default_project_dir="/default/path")
 
     def test_execute_start_session(self, executor):
-        """execute routes start_session to mode='start'."""
-        job = Job(
-            job_id="job-1",
+        """execute_run routes start_session to mode='start'."""
+        run = Run(
+            run_id="run-1",
             type="start_session",
             session_name="test",
             agent_name=None,
@@ -228,13 +228,13 @@ class TestExecute:
 
         with patch.object(executor, "_execute_with_payload") as mock_exec:
             mock_exec.return_value = MagicMock()
-            executor.execute(job)
-            mock_exec.assert_called_once_with(job, "start")
+            executor.execute_run(run)
+            mock_exec.assert_called_once_with(run, "start")
 
     def test_execute_resume_session(self, executor):
-        """execute routes resume_session to mode='resume'."""
-        job = Job(
-            job_id="job-1",
+        """execute_run routes resume_session to mode='resume'."""
+        run = Run(
+            run_id="run-1",
             type="resume_session",
             session_name="test",
             agent_name=None,
@@ -244,13 +244,13 @@ class TestExecute:
 
         with patch.object(executor, "_execute_with_payload") as mock_exec:
             mock_exec.return_value = MagicMock()
-            executor.execute(job)
-            mock_exec.assert_called_once_with(job, "resume")
+            executor.execute_run(run)
+            mock_exec.assert_called_once_with(run, "resume")
 
     def test_execute_unknown_type_raises(self, executor):
-        """execute raises ValueError for unknown job type."""
-        job = Job(
-            job_id="job-1",
+        """execute_run raises ValueError for unknown agent run type."""
+        run = Run(
+            run_id="run-1",
             type="unknown_type",
             session_name="test",
             agent_name=None,
@@ -258,5 +258,5 @@ class TestExecute:
             project_dir=None,
         )
 
-        with pytest.raises(ValueError, match="Unknown job type: unknown_type"):
-            executor.execute(job)
+        with pytest.raises(ValueError, match="Unknown agent run type: unknown_type"):
+            executor.execute_run(run)

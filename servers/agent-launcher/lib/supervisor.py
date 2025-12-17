@@ -1,5 +1,5 @@
 """
-Supervisor Thread - monitors running subprocesses for completion.
+Supervisor Thread - monitors running agent run subprocesses for completion.
 
 Checks subprocess status periodically and reports completion/failure.
 
@@ -15,18 +15,18 @@ import time
 import logging
 
 from api_client import CoordinatorAPIClient
-from registry import RunningJobsRegistry
+from registry import RunningRunsRegistry
 
 logger = logging.getLogger(__name__)
 
 
-class JobSupervisor:
-    """Background thread that monitors running jobs for completion."""
+class RunSupervisor:
+    """Background thread that monitors running agent runs for completion."""
 
     def __init__(
         self,
         api_client: CoordinatorAPIClient,
-        registry: RunningJobsRegistry,
+        registry: RunningRunsRegistry,
         launcher_id: str,
         check_interval: float = 1.0,
     ):
@@ -34,7 +34,7 @@ class JobSupervisor:
 
         Args:
             api_client: HTTP client for Agent Coordinator
-            registry: Registry of running jobs
+            registry: Registry of running agent runs
             launcher_id: This launcher's ID
             check_interval: How often to check subprocess status (seconds)
         """
@@ -69,50 +69,50 @@ class JobSupervisor:
         """Main supervision loop."""
         while not self._stop_event.is_set():
             try:
-                self._check_jobs()
+                self._check_runs()
             except Exception as e:
                 logger.error(f"Supervision error: {e}")
 
             time.sleep(self.check_interval)
 
-    def _check_jobs(self) -> None:
-        """Check all running jobs for completion."""
-        jobs = self.registry.get_all_jobs()
+    def _check_runs(self) -> None:
+        """Check all running agent runs for completion."""
+        runs = self.registry.get_all_runs()
 
-        for job_id, running_job in jobs.items():
+        for run_id, running_run in runs.items():
             # Check if process has finished
-            return_code = running_job.process.poll()
+            return_code = running_run.process.poll()
 
             if return_code is not None:
                 # Process has finished
-                self._handle_completion(job_id, running_job, return_code)
+                self._handle_completion(run_id, running_run, return_code)
 
-    def _handle_completion(self, job_id: str, running_job, return_code: int) -> None:
-        """Handle job completion (success or failure).
+    def _handle_completion(self, run_id: str, running_run, return_code: int) -> None:
+        """Handle agent run completion (success or failure).
 
         Reports completion status to agent-coordinator. Callback processing
         is handled by agent-coordinator when it receives the session_stop event.
         """
         # Remove from registry first
-        self.registry.remove_job(job_id)
+        self.registry.remove_run(run_id)
 
         # Get any output
         stdout, stderr = "", ""
         try:
-            stdout, stderr = running_job.process.communicate(timeout=1.0)
+            stdout, stderr = running_run.process.communicate(timeout=1.0)
         except Exception:
             pass
 
         if return_code == 0:
-            logger.info(f"Job {job_id} completed successfully (session={running_job.session_name})")
+            logger.info(f"Agent run {run_id} completed successfully (session={running_run.session_name})")
             try:
-                self.api_client.report_completed(self.launcher_id, job_id)
+                self.api_client.report_completed(self.launcher_id, run_id)
             except Exception as e:
-                logger.error(f"Failed to report completion for {job_id}: {e}")
+                logger.error(f"Failed to report completion for {run_id}: {e}")
         else:
             error_msg = stderr.strip() if stderr else f"Process exited with code {return_code}"
-            logger.error(f"Job {job_id} failed: {error_msg}")
+            logger.error(f"Agent run {run_id} failed: {error_msg}")
             try:
-                self.api_client.report_failed(self.launcher_id, job_id, error_msg)
+                self.api_client.report_failed(self.launcher_id, run_id, error_msg)
             except Exception as e:
-                logger.error(f"Failed to report failure for {job_id}: {e}")
+                logger.error(f"Failed to report failure for {run_id}: {e}")

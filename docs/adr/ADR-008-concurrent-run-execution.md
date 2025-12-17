@@ -1,4 +1,4 @@
-# ADR-008: Concurrent Job Execution in Agent Launcher
+# ADR-008: Concurrent Run Execution in Agent Launcher
 
 **Status:** Accepted
 **Date:** 2025-12-12
@@ -12,7 +12,7 @@ Orchestration scenarios require:
 2. Multiple children completing simultaneously
 3. Parent continuing while children execute
 
-Single-job execution would defeat async patterns.
+Single-run execution would defeat async patterns.
 
 ## Decision
 
@@ -22,15 +22,15 @@ Single-job execution would defeat async patterns.
 
 | Component | Responsibility |
 |-----------|---------------|
-| **Poll Thread** | Long-polls for jobs, spawns subprocesses |
-| **Running Jobs Registry** | Thread-safe tracking of active jobs |
+| **Poll Thread** | Long-polls for runs, spawns subprocesses |
+| **Running Runs Registry** | Thread-safe tracking of active runs |
 | **Supervisor Thread** | Monitors completion, reports status |
 | **Heartbeat Thread** | Maintains launcher registration |
 
 ### Concurrency
 
 **POC**: No hard limit (~10-20 practical based on resources)
-**Future**: Configurable `max_concurrent_jobs`
+**Future**: Configurable `max_concurrent_runs`
 
 ## Rationale
 
@@ -55,9 +55,9 @@ Single-job execution would defeat async patterns.
 
 ### Negative
 - Requires thread-safe code
-- Resource consumption scales with concurrent jobs
+- Resource consumption scales with concurrent runs
 
 ## References
 
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md)
-- [JOB_EXECUTION_FLOW.md](../agent-coordinator/JOB_EXECUTION_FLOW.md)
+- [RUN_EXECUTION_FLOW.md](../agent-coordinator/RUN_EXECUTION_FLOW.md)

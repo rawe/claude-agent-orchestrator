@@ -9,7 +9,7 @@
 """
 Start a new agent orchestrator session.
 
-This command creates a job to start a new Claude AI session via the Agent Coordinator.
+This command creates a run to start a new Claude AI session via the Agent Coordinator.
 
 Configuration:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
@@ -44,7 +44,7 @@ def main(
     """
     from config import load_config
     from agent_api import get_agent_api, AgentAPIError
-    from job_client import JobClient, JobClientError, JobFailedError, JobTimeoutError
+    from run_client import RunClient, RunClientError, RunFailedError, RunTimeoutError
     from utils import (
         get_prompt_from_args_and_stdin,
         error_exit,
@@ -75,9 +75,9 @@ def main(
 
             agent_name = agent_data.get("name")
 
-        # 4. Create job and wait for result
-        job_client = JobClient(config.api_url)
-        result = job_client.start_session(
+        # 4. Create run and wait for result
+        run_client = RunClient(config.api_url)
+        result = run_client.start_session(
             session_name=session_name,
             prompt=user_prompt,
             agent_name=agent_name,
@@ -87,11 +87,11 @@ def main(
         # 5. Print result to stdout
         print(result)
 
-    except JobFailedError as e:
+    except RunFailedError as e:
         error_exit(str(e))
-    except JobTimeoutError as e:
+    except RunTimeoutError as e:
         error_exit(str(e))
-    except JobClientError as e:
+    except RunClientError as e:
         error_exit(str(e))
     except ValueError as e:
         # Prompt errors, etc.

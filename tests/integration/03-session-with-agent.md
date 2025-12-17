@@ -40,12 +40,12 @@ curl -X POST http://localhost:8765/agents \
   }'
 ```
 
-### Step 2: Create a start_session job with agent_name
+### Step 2: Create a start_session run with agent_name
 
 Use an agent name from Step 1:
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -58,7 +58,7 @@ curl -X POST http://localhost:8765/jobs \
 
 Expected response:
 ```json
-{"job_id":"job_...","status":"pending"}
+{"run_id":"run_...","status":"pending"}
 ```
 
 ### Step 3: Wait for execution
@@ -126,7 +126,7 @@ Watch the ws-monitor output.
 
 If the agent doesn't exist:
 ```
-[ERROR] supervisor: Job job_... failed: Process exited with code 1
+[ERROR] supervisor: Run run_... failed: Process exited with code 1
 ```
 
 Coordinator logs will show:

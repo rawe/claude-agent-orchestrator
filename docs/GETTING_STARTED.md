@@ -13,7 +13,7 @@ Quick setup guide for the Agent Orchestrator Framework.
 The framework has three layers:
 
 1. **Backend Services** (Docker) - Agent Coordinator, Context Store, Dashboard
-2. **Agent Launcher** - Bridge that executes agent jobs (runs in your project directory)
+2. **Agent Launcher** - Bridge that executes agent runs (runs in your project directory)
 3. **Interface** - Plugin (Claude Code) or MCP Server (Claude Desktop)
 
 ```
@@ -60,7 +60,7 @@ cd /path/to/your/project
 /path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
 ```
 
-The launcher must run in the directory where you want agents to execute. It polls the Agent Coordinator for jobs and spawns Claude Code sessions.
+The launcher must run in the directory where you want agents to execute. It polls the Agent Coordinator for runs and spawns Claude Code sessions.
 
 **4. Open the dashboard:**
 ```bash
@@ -145,7 +145,7 @@ cd /path/to/your/project
 /path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
 ```
 
-> **Important:** The Agent Launcher must run in the directory where you want agents to execute. Without the launcher, agent sessions will be queued but not executed.
+> **Important:** The Agent Launcher must run in the directory where you want agents to execute. Without the launcher, agent runs will be queued but not executed.
 
 **5. Open the dashboard:**
 ```bash
@@ -250,9 +250,9 @@ cd /path/to/your/project
 ### What It Does
 
 1. Registers with Agent Coordinator
-2. Polls for pending jobs (start/resume sessions)
-3. Executes jobs as Claude Code sessions
-4. Reports job status back to the Agent Coordinator
+2. Polls for pending runs (start/resume sessions)
+3. Executes runs as Claude Code sessions
+4. Reports run status back to the Agent Coordinator
 
 ### Why Run in Project Directory?
 
@@ -262,7 +262,7 @@ The launcher spawns Claude Code sessions in its current working directory. Runni
 
 Once registered, the launcher appears in the Dashboard. You can:
 - See launcher status and metadata
-- View running jobs
+- View running runs
 - Deregister launchers remotely
 
 See [servers/agent-launcher/README.md](../servers/agent-launcher/README.md) for detailed documentation.

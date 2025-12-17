@@ -106,7 +106,7 @@ export function Home() {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="bg-white/20 rounded px-2 py-1.5 text-center">Sessions API</div>
-                    <div className="bg-white/20 rounded px-2 py-1.5 text-center">Jobs Queue</div>
+                    <div className="bg-white/20 rounded px-2 py-1.5 text-center">Runs Queue</div>
                     <div className="bg-white/20 rounded px-2 py-1.5 text-center">Blueprints</div>
                     <div className="bg-white/20 rounded px-2 py-1.5 text-center">Callbacks</div>
                   </div>

@@ -30,8 +30,8 @@ In-memory registry (ephemeral by design).
 
 ### Why Heartbeat vs Alternatives?
 
-**Poll-based detection**: Can't distinguish "no jobs" from "healthy"
-**Job tracking**: Only detects failures during execution
+**Poll-based detection**: Can't distinguish "no runs" from "healthy"
+**Run tracking**: Only detects failures during execution
 **Heartbeat**: Explicit health signal independent of work
 
 ### Why 60s Interval?
@@ -53,4 +53,4 @@ In-memory registry (ephemeral by design).
 ## References
 
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md)
-- [JOBS_API.md](../agent-coordinator/JOBS_API.md)
+- [RUNS_API.md](../agent-coordinator/RUNS_API.md)

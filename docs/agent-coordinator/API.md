@@ -167,14 +167,14 @@ Get the result text from the last assistant message.
 
 Stop a running session by signaling its launcher.
 
-Finds the active job for this session and queues a stop command.
+Finds the active run for this session and queues a stop command.
 
 **Response (Success):**
 ```json
 {
   "ok": true,
   "session_id": "abc-123",
-  "job_id": "job_xyz789",
+  "run_id": "run_xyz789",
   "session_name": "my-task",
   "status": "stopping"
 }
@@ -183,12 +183,12 @@ Finds the active job for this session and queues a stop command.
 **Error Responses:**
 - `404 Not Found` - Session not found
 - `400 Bad Request` - Session is not running
-- `404 Not Found` - No active job found for session
-- `400 Bad Request` - Job not claimed by any launcher / Job cannot be stopped
+- `404 Not Found` - No active run found for session
+- `400 Bad Request` - Run not claimed by any launcher / Run cannot be stopped
 
 **Notes:**
-- Convenience endpoint that looks up the job by session
-- For direct job control, use `POST /jobs/{job_id}/stop` instead
+- Convenience endpoint that looks up the run by session
+- For direct run control, use `POST /runs/{run_id}/stop` instead
 - Queues a stop command for the launcher that will terminate the session's process
 - The launcher receives the stop command immediately (wakes up from long-poll)
 - Launcher sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
@@ -424,13 +424,13 @@ Update agent status (active/inactive).
 
 ---
 
-### Jobs API
+### Runs API
 
-Queue and manage jobs for launchers to execute.
+Queue and manage runs for launchers to execute.
 
-#### POST /jobs
+#### POST /runs
 
-Create a new job for a launcher to execute.
+Create a new run for a launcher to execute.
 
 **Request Body:**
 ```json
@@ -447,19 +447,19 @@ Create a new job for a launcher to execute.
 **Response:**
 ```json
 {
-  "job_id": "job_abc123",
+  "run_id": "run_abc123",
   "status": "pending"
 }
 ```
 
-#### GET /jobs/{job_id}
+#### GET /runs/{run_id}
 
-Get job status and details.
+Get run status and details.
 
 **Response:**
 ```json
 {
-  "job_id": "job_abc123",
+  "run_id": "run_abc123",
   "type": "start_session",
   "session_name": "my-task",
   "agent_name": "researcher",
@@ -476,41 +476,41 @@ Get job status and details.
 }
 ```
 
-**Job Status Values:**
-- `pending` - Job created, waiting for launcher
-- `claimed` - Launcher claimed the job
-- `running` - Job execution started
+**Run Status Values:**
+- `pending` - Run created, waiting for launcher
+- `claimed` - Launcher claimed the run
+- `running` - Run execution started
 - `stopping` - Stop requested, waiting for launcher to terminate process
-- `completed` - Job completed successfully
-- `failed` - Job execution failed
-- `stopped` - Job was stopped (terminated by stop command)
+- `completed` - Run completed successfully
+- `failed` - Run execution failed
+- `stopped` - Run was stopped (terminated by stop command)
 
-**Error:** `404 Not Found` if job doesn't exist.
+**Error:** `404 Not Found` if run doesn't exist.
 
-#### POST /jobs/{job_id}/stop
+#### POST /runs/{run_id}/stop
 
-Stop a running job by signaling its launcher.
+Stop a running run by signaling its launcher.
 
 **Response (Success):**
 ```json
 {
   "ok": true,
-  "job_id": "job_abc123",
+  "run_id": "run_abc123",
   "session_name": "my-task",
   "status": "stopping"
 }
 ```
 
 **Error Responses:**
-- `404 Not Found` - Job not found
-- `400 Bad Request` - Job cannot be stopped (not in `claimed` or `running` status)
-- `400 Bad Request` - Job not claimed by any launcher
+- `404 Not Found` - Run not found
+- `400 Bad Request` - Run cannot be stopped (not in `claimed` or `running` status)
+- `400 Bad Request` - Run not claimed by any launcher
 
 **Notes:**
-- Queues a stop command for the launcher that will terminate the job's process
+- Queues a stop command for the launcher that will terminate the run's process
 - The launcher receives the stop command immediately (wakes up from long-poll)
 - Launcher sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
-- Use `POST /sessions/{session_id}/stop` if you have session_id instead of job_id
+- Use `POST /sessions/{session_id}/stop` if you have session_id instead of run_id
 
 ---
 
@@ -535,24 +535,24 @@ Register a new launcher instance.
 ```json
 {
   "launcher_id": "lnch_abc123",
-  "poll_endpoint": "/launcher/jobs",
+  "poll_endpoint": "/launcher/runs",
   "poll_timeout_seconds": 30,
   "heartbeat_interval_seconds": 60
 }
 ```
 
-#### GET /launcher/jobs
+#### GET /launcher/runs
 
-Long-poll for available jobs or stop commands (used by launcher).
+Long-poll for available runs or stop commands (used by launcher).
 
 **Query Parameters:**
 - `launcher_id` (required) - The registered launcher ID
 
-**Response (Job Available):**
+**Response (Run Available):**
 ```json
 {
-  "job": {
-    "job_id": "job_abc123",
+  "run": {
+    "run_id": "run_abc123",
     "type": "start_session",
     "session_name": "my-task",
     "prompt": "Do something",
@@ -564,11 +564,11 @@ Long-poll for available jobs or stop commands (used by launcher).
 **Response (Stop Commands):**
 ```json
 {
-  "stop_jobs": ["job_abc123", "job_def456"]
+  "stop_runs": ["run_abc123", "run_def456"]
 }
 ```
 
-**Response (No Jobs):** `204 No Content`
+**Response (No Runs):** `204 No Content`
 
 **Response (Deregistered):**
 ```json
@@ -579,13 +579,13 @@ Long-poll for available jobs or stop commands (used by launcher).
 
 **Notes:**
 - Holds connection open for up to `poll_timeout_seconds`
-- Returns immediately if job or stop command available
+- Returns immediately if run or stop command available
 - Stop commands wake up the poll immediately (no waiting)
 - Returns `deregistered: true` if launcher has been deregistered
 
-#### POST /launcher/jobs/{job_id}/started
+#### POST /launcher/runs/{run_id}/started
 
-Report that job execution has started.
+Report that run execution has started.
 
 **Request Body:**
 ```json
@@ -601,9 +601,9 @@ Report that job execution has started.
 }
 ```
 
-#### POST /launcher/jobs/{job_id}/completed
+#### POST /launcher/runs/{run_id}/completed
 
-Report that job completed successfully.
+Report that run completed successfully.
 
 **Request Body:**
 ```json
@@ -620,9 +620,9 @@ Report that job completed successfully.
 }
 ```
 
-#### POST /launcher/jobs/{job_id}/failed
+#### POST /launcher/runs/{run_id}/failed
 
-Report that job execution failed.
+Report that run execution failed.
 
 **Request Body:**
 ```json
@@ -639,9 +639,9 @@ Report that job execution failed.
 }
 ```
 
-#### POST /launcher/jobs/{job_id}/stopped
+#### POST /launcher/runs/{run_id}/stopped
 
-Report that job was stopped (terminated by stop command).
+Report that run was stopped (terminated by stop command).
 
 **Request Body:**
 ```json
@@ -752,7 +752,7 @@ Deregister a launcher.
 | `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | Agent Orchestrator API URL |
 | `DEBUG_LOGGING` | `false` | Enable verbose logging |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
-| `LAUNCHER_POLL_TIMEOUT` | `30` | Launcher job poll timeout in seconds |
+| `LAUNCHER_POLL_TIMEOUT` | `30` | Launcher run poll timeout in seconds |
 | `LAUNCHER_HEARTBEAT_INTERVAL` | `60` | Launcher heartbeat interval in seconds |
 | `LAUNCHER_HEARTBEAT_TIMEOUT` | `120` | Launcher heartbeat timeout in seconds |
 

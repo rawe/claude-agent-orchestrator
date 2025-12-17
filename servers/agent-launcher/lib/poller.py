@@ -1,7 +1,7 @@
 """
-Poll Thread - continuously polls Agent Coordinator for new jobs.
+Poll Thread - continuously polls Agent Coordinator for new agent runs.
 
-Runs in a background thread, spawning subprocesses for each job.
+Runs in a background thread, spawning subprocesses for each agent run.
 """
 
 import threading
@@ -9,9 +9,9 @@ import time
 import logging
 from typing import Callable, Optional
 
-from api_client import CoordinatorAPIClient, Job, PollResult
-from executor import JobExecutor
-from registry import RunningJobsRegistry
+from api_client import CoordinatorAPIClient, Run, PollResult
+from executor import RunExecutor
+from registry import RunningRunsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 MAX_CONNECTION_RETRIES = 3
 
 
-class JobPoller:
-    """Background thread that polls for and executes jobs."""
+class RunPoller:
+    """Background thread that polls for and executes agent runs."""
 
     def __init__(
         self,
         api_client: CoordinatorAPIClient,
-        executor: JobExecutor,
-        registry: RunningJobsRegistry,
+        executor: RunExecutor,
+        registry: RunningRunsRegistry,
         launcher_id: str,
         on_deregistered: Optional[Callable[[], None]] = None,
     ):
@@ -34,8 +34,8 @@ class JobPoller:
 
         Args:
             api_client: HTTP client for Agent Coordinator
-            executor: Job executor for spawning subprocesses
-            registry: Registry for tracking running jobs
+            executor: Run executor for spawning subprocesses
+            registry: Registry for tracking running agent runs
             launcher_id: This launcher's ID
             on_deregistered: Callback when launcher is deregistered externally
         """
@@ -75,7 +75,7 @@ class JobPoller:
 
         while not self._stop_event.is_set():
             try:
-                result = self.api_client.poll_job(self.launcher_id)
+                result = self.api_client.poll_run(self.launcher_id)
 
                 # Successful connection - reset failure counter
                 consecutive_failures = 0
@@ -89,13 +89,13 @@ class JobPoller:
                     return  # Exit poll loop
 
                 # Handle stop commands
-                if result.stop_jobs:
-                    for job_id in result.stop_jobs:
-                        self._handle_stop(job_id)
+                if result.stop_runs:
+                    for run_id in result.stop_runs:
+                        self._handle_stop(run_id)
                     continue  # Check for more commands
 
-                if result.job:
-                    self._handle_job(result.job)
+                if result.run:
+                    self._handle_run(result.run)
 
             except Exception as e:
                 consecutive_failures += 1
@@ -111,63 +111,63 @@ class JobPoller:
                 time.sleep(self._backoff_seconds)
                 self._backoff_seconds = min(self._backoff_seconds * 2, self._max_backoff)
 
-    def _handle_job(self, job: Job) -> None:
-        """Handle a received job by spawning subprocess."""
-        logger.debug(f"Received job {job.job_id}: type={job.type}, session={job.session_name}")
+    def _handle_run(self, run: Run) -> None:
+        """Handle a received agent run by spawning subprocess."""
+        logger.debug(f"Received agent run {run.run_id}: type={run.type}, session={run.session_name}")
 
         try:
             # Spawn subprocess
-            process = self.executor.execute(job)
+            process = self.executor.execute_run(run)
 
             # Add to registry
-            self.registry.add_job(job.job_id, job.session_name, process)
+            self.registry.add_run(run.run_id, run.session_name, process)
 
             # Report started
-            self.api_client.report_started(self.launcher_id, job.job_id)
-            logger.debug(f"Job {job.job_id} started (pid={process.pid})")
+            self.api_client.report_started(self.launcher_id, run.run_id)
+            logger.debug(f"Agent run {run.run_id} started (pid={process.pid})")
 
         except Exception as e:
-            logger.error(f"Failed to start job {job.job_id}: {e}")
+            logger.error(f"Failed to start agent run {run.run_id}: {e}")
             try:
-                self.api_client.report_failed(self.launcher_id, job.job_id, str(e))
+                self.api_client.report_failed(self.launcher_id, run.run_id, str(e))
             except Exception:
-                logger.error(f"Failed to report job failure for {job.job_id}")
+                logger.error(f"Failed to report agent run failure for {run.run_id}")
 
-    def _handle_stop(self, job_id: str) -> None:
-        """Stop a running job by terminating its process."""
-        running_job = self.registry.get_job(job_id)
+    def _handle_stop(self, run_id: str) -> None:
+        """Stop a running agent run by terminating its process."""
+        running_run = self.registry.get_run(run_id)
 
-        if not running_job:
-            # Job not running (already completed or never started)
-            logger.debug(f"Stop command for job {job_id} ignored - job not running")
+        if not running_run:
+            # Agent run not running (already completed or never started)
+            logger.debug(f"Stop command for agent run {run_id} ignored - run not running")
             return
 
-        logger.info(f"Stopping job {job_id} (session={running_job.session_name}, pid={running_job.process.pid})")
+        logger.info(f"Stopping agent run {run_id} (session={running_run.session_name}, pid={running_run.process.pid})")
 
         signal_used = "SIGTERM"
 
         try:
             # Send SIGTERM first (graceful)
-            running_job.process.terminate()
+            running_run.process.terminate()
 
             # Wait briefly for graceful shutdown
             try:
-                running_job.process.wait(timeout=5)
+                running_run.process.wait(timeout=5)
             except Exception:
                 # Force kill if not responding
-                running_job.process.kill()
+                running_run.process.kill()
                 signal_used = "SIGKILL"
-                logger.warning(f"Job {job_id} did not respond to SIGTERM, sent SIGKILL")
+                logger.warning(f"Agent run {run_id} did not respond to SIGTERM, sent SIGKILL")
 
             # Remove from registry
-            self.registry.remove_job(job_id)
+            self.registry.remove_run(run_id)
 
             # Report stopped
             try:
-                self.api_client.report_stopped(self.launcher_id, job_id, signal=signal_used)
-                logger.info(f"Job {job_id} stopped successfully (signal={signal_used})")
+                self.api_client.report_stopped(self.launcher_id, run_id, signal=signal_used)
+                logger.info(f"Agent run {run_id} stopped successfully (signal={signal_used})")
             except Exception as e:
-                logger.error(f"Failed to report stopped for {job_id}: {e}")
+                logger.error(f"Failed to report stopped for {run_id}: {e}")
 
         except Exception as e:
-            logger.error(f"Error stopping job {job_id}: {e}")
+            logger.error(f"Error stopping agent run {run_id}: {e}")

@@ -1,7 +1,7 @@
 """
-Running Jobs Registry - tracks active subprocess executions.
+Running Runs Registry - tracks active agent run subprocess executions.
 
-Thread-safe storage for mapping job_id to subprocess.Popen objects.
+Thread-safe storage for mapping run_id to subprocess.Popen objects.
 """
 
 import subprocess
@@ -12,52 +12,52 @@ from typing import Optional
 
 
 @dataclass
-class RunningJob:
-    """Information about a running job."""
+class RunningRun:
+    """Information about a running agent run."""
     process: subprocess.Popen
     started_at: datetime
-    job_id: str
+    run_id: str
     session_name: str
 
 
-class RunningJobsRegistry:
-    """Thread-safe registry for tracking running job subprocesses."""
+class RunningRunsRegistry:
+    """Thread-safe registry for tracking running agent run subprocesses."""
 
     def __init__(self):
-        self._jobs: dict[str, RunningJob] = {}
+        self._runs: dict[str, RunningRun] = {}
         self._lock = threading.Lock()
 
-    def add_job(self, job_id: str, session_name: str, process: subprocess.Popen) -> None:
-        """Add a running job to the registry."""
-        running_job = RunningJob(
+    def add_run(self, run_id: str, session_name: str, process: subprocess.Popen) -> None:
+        """Add a running agent run to the registry."""
+        running_run = RunningRun(
             process=process,
             started_at=datetime.now(),
-            job_id=job_id,
+            run_id=run_id,
             session_name=session_name,
         )
 
         with self._lock:
-            self._jobs[job_id] = running_job
+            self._runs[run_id] = running_run
 
-    def remove_job(self, job_id: str) -> Optional[RunningJob]:
-        """Remove and return a job from the registry.
+    def remove_run(self, run_id: str) -> Optional[RunningRun]:
+        """Remove and return an agent run from the registry.
 
-        Returns the removed job or None if not found.
+        Returns the removed run or None if not found.
         """
         with self._lock:
-            return self._jobs.pop(job_id, None)
+            return self._runs.pop(run_id, None)
 
-    def get_job(self, job_id: str) -> Optional[RunningJob]:
-        """Get a running job by ID."""
+    def get_run(self, run_id: str) -> Optional[RunningRun]:
+        """Get a running agent run by ID."""
         with self._lock:
-            return self._jobs.get(job_id)
+            return self._runs.get(run_id)
 
-    def get_all_jobs(self) -> dict[str, RunningJob]:
-        """Get a copy of all running jobs."""
+    def get_all_runs(self) -> dict[str, RunningRun]:
+        """Get a copy of all running agent runs."""
         with self._lock:
-            return dict(self._jobs)
+            return dict(self._runs)
 
     def count(self) -> int:
-        """Get number of running jobs."""
+        """Get number of running agent runs."""
         with self._lock:
-            return len(self._jobs)
+            return len(self._runs)

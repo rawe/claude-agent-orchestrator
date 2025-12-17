@@ -4,7 +4,7 @@ Stop running agent sessions from the Agent Coordinator, with immediate propagati
 
 ## Motivation
 
-Currently, once a job is started, there's no way to stop it from the Agent Coordinator. Users may need to:
+Currently, once a run is started, there's no way to stop it from the Agent Coordinator. Users may need to:
 - Cancel long-running tasks that are no longer needed
 - Stop sessions that are stuck or behaving unexpectedly
 - Free up launcher capacity for higher-priority work
@@ -24,12 +24,12 @@ Dashboard/API                Agent Coordinator              Agent Launcher
       │                            │  (poll wakes immediately)│
       │                            │                          │
       │                            │─────────────────────────►│
-      │                            │  {stop_jobs: ["job_123"]}│
+      │                            │  {stop_runs: ["run_123"]}│
       │                            │                          │
       │                            │                     terminate process
       │                            │                          │
       │                            │◄─────────────────────────│
-      │                            │  POST /jobs/{id}/stopped │
+      │                            │  POST /runs/{id}/stopped │
       │                            │                          │
       │◄───────────────────────────│                          │
       │  {ok: true, status: "stopping"}                       │
@@ -54,7 +54,7 @@ from dataclasses import dataclass, field
 @dataclass
 class LauncherStopState:
     """Stop commands and event for a single launcher."""
-    pending_stops: set[str] = field(default_factory=set)  # job_ids
+    pending_stops: set[str] = field(default_factory=set)  # run_ids
     event: asyncio.Event = field(default_factory=asyncio.Event)
 
 class StopCommandQueue:
@@ -78,7 +78,7 @@ class StopCommandQueue:
         with self._lock:
             self._launchers.pop(launcher_id, None)
 
-    def add_stop(self, launcher_id: str, job_id: str) -> bool:
+    def add_stop(self, launcher_id: str, run_id: str) -> bool:
         """Queue a stop command and wake up the launcher's poll.
 
         Returns True if command was queued, False if launcher not found.
@@ -88,14 +88,14 @@ class StopCommandQueue:
             if not state:
                 return False
 
-            state.pending_stops.add(job_id)
+            state.pending_stops.add(run_id)
             state.event.set()  # Wake up the poll!
             return True
 
     def get_and_clear(self, launcher_id: str) -> list[str]:
         """Get pending stop commands and clear them.
 
-        Returns list of job_ids to stop.
+        Returns list of run_ids to stop.
         """
         with self._lock:
             state = self._launchers.get(launcher_id)
@@ -117,12 +117,12 @@ class StopCommandQueue:
 stop_command_queue = StopCommandQueue()
 ```
 
-#### 2. New Job Status: STOPPED
+#### 2. New Run Status: STOPPED
 
-**File:** `servers/agent-coordinator/services/job_queue.py`
+**File:** `servers/agent-coordinator/services/run_queue.py`
 
 ```python
-class JobStatus(str, Enum):
+class RunStatus(str, Enum):
     PENDING = "pending"
     CLAIMED = "claimed"
     RUNNING = "running"
@@ -144,7 +144,7 @@ POST /sessions/{session_id}/stop
 {
   "ok": true,
   "session_id": "abc-123",
-  "job_id": "job_xyz789",
+  "run_id": "run_xyz789",
   "status": "stopping"
 }
 ```
@@ -157,37 +157,37 @@ POST /sessions/{session_id}/stop
 ```
 Status: `400 Bad Request`
 
-**Response (No Job Found):**
+**Response (No Run Found):**
 ```json
 {
-  "detail": "No active job found for session"
+  "detail": "No active run found for session"
 }
 ```
 Status: `404 Not Found`
 
-#### Modified Endpoint: Poll for Jobs
+#### Modified Endpoint: Poll for Runs
 
 ```
-GET /launcher/jobs?launcher_id={id}
+GET /launcher/runs?launcher_id={id}
 ```
 
 **New Response Type (Stop Commands):**
 ```json
 {
-  "stop_jobs": ["job_123", "job_456"]
+  "stop_runs": ["run_123", "run_456"]
 }
 ```
 
 The response can now be one of:
-- `{"job": {...}}` - New job to execute
-- `{"stop_jobs": [...]}` - Jobs to stop
+- `{"run": {...}}` - New run to execute
+- `{"stop_runs": [...]}` - Runs to stop
 - `{"deregistered": true}` - Shutdown signal
 - `204 No Content` - Nothing to do
 
-#### New Endpoint: Report Job Stopped
+#### New Endpoint: Report Run Stopped
 
 ```
-POST /launcher/jobs/{job_id}/stopped
+POST /launcher/runs/{run_id}/stopped
 ```
 
 **Request Body:**
@@ -212,9 +212,9 @@ POST /launcher/jobs/{job_id}/stopped
 **File:** `servers/agent-coordinator/main.py`
 
 ```python
-@app.get("/launcher/jobs")
-async def poll_for_jobs(launcher_id: str = Query(...)):
-    """Long-poll for available jobs or stop commands."""
+@app.get("/launcher/runs")
+async def poll_for_runs(launcher_id: str = Query(...)):
+    """Long-poll for available runs or stop commands."""
 
     # Check deregistration (existing)
     if launcher_registry.is_deregistered(launcher_id):
@@ -232,25 +232,25 @@ async def poll_for_jobs(launcher_id: str = Query(...)):
 
     while elapsed < LAUNCHER_POLL_TIMEOUT:
         # Check for stop commands FIRST (new)
-        stop_jobs = stop_command_queue.get_and_clear(launcher_id)
-        if stop_jobs:
-            return {"stop_jobs": stop_jobs}
+        stop_runs = stop_command_queue.get_and_clear(launcher_id)
+        if stop_runs:
+            return {"stop_runs": stop_runs}
 
         # Check for deregistration (existing)
         if launcher_registry.is_deregistered(launcher_id):
             launcher_registry.confirm_deregistered(launcher_id)
             return {"deregistered": True}
 
-        # Check for new jobs (existing)
-        job = job_queue.claim_job(launcher_id)
-        if job:
-            return {"job": job.model_dump()}
+        # Check for new runs (existing)
+        run = run_queue.claim_run(launcher_id)
+        if run:
+            return {"run": run.model_dump()}
 
         # Wait with event (modified)
         if event:
             try:
                 await asyncio.wait_for(event.wait(), timeout=poll_interval)
-                # Event was set - loop will check stop_jobs
+                # Event was set - loop will check stop_runs
             except asyncio.TimeoutError:
                 pass
         else:
@@ -278,25 +278,25 @@ async def stop_session(session_id: str):
     if session.status != "running":
         raise HTTPException(status_code=400, detail="Session is not running")
 
-    # Find the job for this session
-    job = job_queue.get_job_by_session_name(session.session_name)
-    if not job:
-        raise HTTPException(status_code=404, detail="No active job found for session")
+    # Find the run for this session
+    run = run_queue.get_run_by_session_name(session.session_name)
+    if not run:
+        raise HTTPException(status_code=404, detail="No active run found for session")
 
-    if not job.launcher_id:
-        raise HTTPException(status_code=400, detail="Job not claimed by any launcher")
+    if not run.launcher_id:
+        raise HTTPException(status_code=400, detail="Run not claimed by any launcher")
 
     # Queue the stop command
-    if not stop_command_queue.add_stop(job.launcher_id, job.job_id):
+    if not stop_command_queue.add_stop(run.launcher_id, run.run_id):
         raise HTTPException(status_code=500, detail="Failed to queue stop command")
 
-    # Update job status
-    job_queue.update_job_status(job.job_id, JobStatus.STOPPING)
+    # Update run status
+    run_queue.update_run_status(run.run_id, RunStatus.STOPPING)
 
     return {
         "ok": True,
         "session_id": session_id,
-        "job_id": job.job_id,
+        "run_id": run.run_id,
         "status": "stopping"
     }
 ```
@@ -307,37 +307,37 @@ async def stop_session(session_id: str):
 
 ```python
 def _poll_cycle(self):
-    result = self.api_client.poll_job(self.launcher_id)
+    result = self.api_client.poll_run(self.launcher_id)
 
     if result.deregistered:
         self._running = False
         return
 
     # Handle stop commands (new)
-    if result.stop_jobs:
-        for job_id in result.stop_jobs:
-            self._handle_stop(job_id)
+    if result.stop_runs:
+        for run_id in result.stop_runs:
+            self._handle_stop(run_id)
         return
 
-    if result.job:
-        self._handle_job(result.job)
+    if result.run:
+        self._handle_run(result.run)
 
-def _handle_stop(self, job_id: str):
-    """Stop a running job by terminating its process."""
-    running_job = self.supervisor.get_running_job(job_id)
-    if running_job:
+def _handle_stop(self, run_id: str):
+    """Stop a running run by terminating its process."""
+    running_run = self.supervisor.get_running_run(run_id)
+    if running_run:
         # Send SIGTERM first (graceful)
-        running_job.process.terminate()
+        running_run.process.terminate()
 
         # Wait briefly for graceful shutdown
         try:
-            running_job.process.wait(timeout=5)
+            running_run.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             # Force kill if not responding
-            running_job.process.kill()
+            running_run.process.kill()
 
         # Report stopped
-        self.api_client.report_stopped(self.launcher_id, job_id, signal="SIGTERM")
+        self.api_client.report_stopped(self.launcher_id, run_id, signal="SIGTERM")
 ```
 
 #### Agent Launcher: API Client Extension
@@ -347,13 +347,13 @@ def _handle_stop(self, job_id: str):
 ```python
 @dataclass
 class PollResult:
-    job: Optional[Job] = None
+    run: Optional[Run] = None
     deregistered: bool = False
-    stop_jobs: list[str] = field(default_factory=list)  # NEW
+    stop_runs: list[str] = field(default_factory=list)  # NEW
 
-def poll_job(self, launcher_id: str) -> PollResult:
+def poll_run(self, launcher_id: str) -> PollResult:
     response = self.session.get(
-        f"{self.base_url}/launcher/jobs",
+        f"{self.base_url}/launcher/runs",
         params={"launcher_id": launcher_id},
         timeout=self.poll_timeout + 5
     )
@@ -367,18 +367,18 @@ def poll_job(self, launcher_id: str) -> PollResult:
         return PollResult(deregistered=True)
 
     # NEW: Handle stop commands
-    if "stop_jobs" in data:
-        return PollResult(stop_jobs=data["stop_jobs"])
+    if "stop_runs" in data:
+        return PollResult(stop_runs=data["stop_runs"])
 
-    if "job" in data:
-        return PollResult(job=Job(**data["job"]))
+    if "run" in data:
+        return PollResult(run=Run(**data["run"]))
 
     return PollResult()
 
-def report_stopped(self, launcher_id: str, job_id: str, signal: str = "SIGTERM"):
-    """Report that a job was stopped."""
+def report_stopped(self, launcher_id: str, run_id: str, signal: str = "SIGTERM"):
+    """Report that a run was stopped."""
     response = self.session.post(
-        f"{self.base_url}/launcher/jobs/{job_id}/stopped",
+        f"{self.base_url}/launcher/runs/{run_id}/stopped",
         json={"launcher_id": launcher_id, "signal": signal}
     )
     response.raise_for_status()
@@ -399,9 +399,9 @@ sequenceDiagram
 
     Client->>+Coordinator: POST /sessions/{id}/stop
     Coordinator->>Coordinator: get_session(session_id)
-    Coordinator->>Coordinator: job_queue.get_job_by_session_name()
-    Coordinator->>Queue: add_stop(launcher_id, job_id)
-    Queue->>Queue: pending_stops.add(job_id)
+    Coordinator->>Coordinator: run_queue.get_run_by_session_name()
+    Coordinator->>Queue: add_stop(launcher_id, run_id)
+    Queue->>Queue: pending_stops.add(run_id)
     Queue->>Poll: event.set()
 
     Note over Poll: Wait interrupted!
@@ -409,14 +409,14 @@ sequenceDiagram
     Coordinator-->>-Client: {ok: true, status: "stopping"}
 
     Poll->>Queue: get_and_clear(launcher_id)
-    Queue-->>Poll: ["job_123"]
-    Poll-->>Launcher: {stop_jobs: ["job_123"]}
+    Queue-->>Poll: ["run_123"]
+    Poll-->>Launcher: {stop_runs: ["run_123"]}
 
     Launcher->>Process: SIGTERM
     Process-->>Launcher: (exits)
 
-    Launcher->>+Coordinator: POST /jobs/{id}/stopped
-    Coordinator->>Coordinator: job_queue.update_status(STOPPED)
+    Launcher->>+Coordinator: POST /runs/{id}/stopped
+    Coordinator->>Coordinator: run_queue.update_status(STOPPED)
     Coordinator-->>-Launcher: {ok: true}
 ```
 
@@ -426,8 +426,8 @@ sequenceDiagram
 |----------|----------|--------|
 | Session not found | `{"detail": "Session not found"}` | 404 |
 | Session not running | `{"detail": "Session is not running"}` | 400 |
-| No job for session | `{"detail": "No active job found for session"}` | 404 |
-| Job not claimed | `{"detail": "Job not claimed by any launcher"}` | 400 |
+| No run for session | `{"detail": "No active run found for session"}` | 404 |
+| Run not claimed | `{"detail": "Run not claimed by any launcher"}` | 400 |
 | Launcher offline | Stop command queued, delivered when launcher reconnects | 200 |
 
 ## Edge Cases
@@ -435,7 +435,7 @@ sequenceDiagram
 ### 1. Launcher Disconnected
 - Stop command is queued in `StopCommandQueue`
 - When launcher reconnects and polls, it receives the stop command
-- If job already completed, launcher ignores the stop (job not in running_jobs)
+- If run already completed, launcher ignores the stop (run not in running_runs)
 
 ### 2. Process Ignores SIGTERM
 - Launcher waits 5 seconds after SIGTERM
@@ -443,21 +443,21 @@ sequenceDiagram
 - Reports stopped with `signal: "SIGKILL"`
 
 ### 3. Multiple Stop Requests
-- Additional stops for same job_id are deduplicated (using set)
+- Additional stops for same run_id are deduplicated (using set)
 - Only one stop command sent to launcher
 
-### 4. Race: Job Completes While Stop In-Flight
+### 4. Race: Run Completes While Stop In-Flight
 - Launcher receives stop command
-- Looks up job in `running_jobs` - not found (already completed)
+- Looks up run in `running_runs` - not found (already completed)
 - Ignores stop command silently
-- Job status remains COMPLETED (not overwritten)
+- Run status remains COMPLETED (not overwritten)
 
 ## Data Model Changes
 
-### Job Status Enum
+### Run Status Enum
 
 ```python
-class JobStatus(str, Enum):
+class RunStatus(str, Enum):
     PENDING = "pending"
     CLAIMED = "claimed"
     RUNNING = "running"
@@ -467,7 +467,7 @@ class JobStatus(str, Enum):
     STOPPED = "stopped"    # NEW: Successfully stopped
 ```
 
-### Job Status Transitions
+### Run Status Transitions
 
 ```
                               ┌──────────┐
@@ -483,7 +483,7 @@ class JobStatus(str, Enum):
                                            └─────────┘
                                  │
                                  │         ┌─────────┐
-                                 └────────►│ STOPPED │◄─── POST /jobs/{id}/stopped
+                                 └────────►│ STOPPED │◄─── POST /runs/{id}/stopped
                                            └─────────┘
 ```
 
@@ -492,13 +492,13 @@ class JobStatus(str, Enum):
 | File | Changes |
 |------|---------|
 | `servers/agent-coordinator/services/stop_command_queue.py` | NEW: StopCommandQueue service |
-| `servers/agent-coordinator/services/job_queue.py` | Add STOPPING, STOPPED status |
+| `servers/agent-coordinator/services/run_queue.py` | Add STOPPING, STOPPED status |
 | `servers/agent-coordinator/main.py` | Add stop endpoint, modify poll endpoint |
-| `servers/agent-launcher/lib/api_client.py` | Add stop_jobs to PollResult, report_stopped() |
+| `servers/agent-launcher/lib/api_client.py` | Add stop_runs to PollResult, report_stopped() |
 | `servers/agent-launcher/lib/poller.py` | Handle stop commands |
-| `servers/agent-launcher/lib/supervisor.py` | Add get_running_job() method |
+| `servers/agent-launcher/lib/supervisor.py` | Add get_running_run() method |
 | `docs/agent-coordinator/API.md` | Document new endpoints |
-| `docs/agent-coordinator/DATA_MODELS.md` | Document new job statuses |
+| `docs/agent-coordinator/DATA_MODELS.md` | Document new run statuses |
 
 ## Future Enhancements
 

@@ -28,9 +28,9 @@ The challenge: launchers use long-polling (30s timeout), creating latency for st
 ```
 POST /sessions/{id}/stop → StopCommandQueue.add_stop()
                          → event.set() (wake poll)
-                         → Launcher receives stop_jobs
+                         → Launcher receives stop_runs
                          → SIGTERM → SIGKILL
-                         → POST /jobs/{id}/stopped
+                         → POST /runs/{id}/stopped
 ```
 
 ## Rationale

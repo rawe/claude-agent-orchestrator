@@ -11,10 +11,10 @@ Verify that starting a new session produces the correct sequence of WebSocket ev
 
 ## Test Steps
 
-### Step 1: Create a start_session job
+### Step 1: Create a start_session run
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -26,14 +26,14 @@ curl -X POST http://localhost:8765/jobs \
 
 Expected response:
 ```json
-{"job_id":"job_...","status":"pending","message":"Job queued"}
+{"run_id":"run_...","status":"pending","message":"Run queued"}
 ```
 
 ### Step 2: Wait for execution
 
-The launcher should pick up the job within a few seconds. Watch the launcher terminal for:
+The launcher should pick up the run within a few seconds. Watch the launcher terminal for:
 ```
-[INFO] poller: Received job job_... (start_session)
+[INFO] poller: Received run run_... (start_session)
 [INFO] executor: Starting session test-basic-001 with agent test-agent
 ```
 

@@ -32,7 +32,7 @@ curl -s http://localhost:8765/agents | grep agent-orchestrator
 ### Step 2: Start parent orchestrator session
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
@@ -64,7 +64,7 @@ All 5 sleeper-agent sessions should show as completed.
 This is the critical verification step. Resume the parent session and ask it to check its own conversation history:
 
 ```bash
-curl -X POST http://localhost:8765/jobs \
+curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
