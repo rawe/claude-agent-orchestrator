@@ -5,6 +5,22 @@ services:
     ports:
       - "127.0.0.1:9003:9003"
     env_file:
-      - .env
+      # Optional: override defaults with .env file if present
+      - path: .env
+        required: false
     environment:
+      # MCP Server Settings
       - NEO4J_MCP_SERVER_PORT=9003
+      - NEO4J_MCP_SERVER_HOST=0.0.0.0
+      - NEO4J_MCP_SERVER_PATH=/mcp/
+      - NEO4J_TRANSPORT=http
+      # Neo4j Connection - defaults to local container from main docker-compose.yml
+      # (host.docker.internal allows container-to-container communication)
+      - NEO4J_URL=${NEO4J_URL:-bolt://host.docker.internal:7688}
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-agent-orchestrator}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+      # Query Settings
+      - NEO4J_READ_TIMEOUT=${NEO4J_READ_TIMEOUT:-30}
+      - NEO4J_RESPONSE_TOKEN_LIMIT=${NEO4J_RESPONSE_TOKEN_LIMIT:-10000}
+      - NEO4J_READ_ONLY=${NEO4J_READ_ONLY:-false}

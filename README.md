@@ -1,6 +1,6 @@
 # Agent Orchestrator Framework (AOF)
 
-A comprehensive framework for orchestrating specialized Claude Code agent sessions with multiple usage levels and integration approaches.
+A comprehensive framework for orchestrating specialized Claude Code agent sessions.
 
 ## What is the Agent Orchestrator Framework?
 
@@ -15,94 +15,61 @@ The Agent Orchestrator Framework (AOF) enables you to create, manage, and orches
 - Create reusable agent blueprints for common tasks
 - Support for long-running and background tasks
 
-## Prerequisites
+## Quick Start
 
-Both integration options require the backend services running. The plugins and MCP server are thin HTTP clients.
+### Requirements
+
+- **Claude Code CLI** - installed and authenticated
+- **Docker** - Desktop or Engine + Compose V2
+- **Python ≥3.11** + **[uv](https://docs.astral.sh/uv/)**
+
+### 1. Clone and Start Services
 
 ```bash
-git clone <your-repo-url>
+git clone <repo-url>
 cd claude-agent-orchestrator
-make start-bg    # Starts Dashboard (:3000), Agent Runtime (:8765), Context Store (:8766)
+make start-all
 ```
 
-**Requirements:** 
+This starts:
+- **Dashboard** at http://localhost:3000
+- **Agent Runtime** at http://localhost:8765
+- **Context Store** at http://localhost:8766
+- **Neo4j** at http://localhost:7475
+- **MCP Servers** (Agent Orchestrator, Context Store, Neo4j)
 
-* Claude Code CLI
-* Docker (Desktop or Engine + Compose V2)
-* Python ≥3.10, [uv](https://docs.astral.sh/uv/)
+> **Note:** Atlassian and Azure DevOps MCPs require credentials in `.env` files and will be skipped if not configured. See [mcps/README.md](./mcps/README.md) for setup.
 
-## Two Integration Options
+### 2. Start the Agent Launcher
 
-### Option 1: Claude Code Plugin
+The Agent Launcher executes agent jobs. Run it in your **project directory** (where agents should work):
 
-**Best for:** Direct integration within Claude Code with full control
-
-- Python-based `ao-*` commands for agent orchestration
-- Slash commands for agent management
-- Skills for creating and managing agents
-
-**Setup:** Add this repository as a marketplace in Claude Code `/plugin` settings (use the path to the checked out repo), activate `orchestrator` plugin, restart.
-
-**Usage:**
-```
-/agent-orchestrator-init
-Use the orchestrator skill to create a new session called "code-review"
+```bash
+cd /path/to/your/project
+/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
 ```
 
-**Documentation:** [plugins/orchestrator/README.md](./plugins/orchestrator/README.md)
+The launcher connects to Agent Runtime and waits for jobs. Keep it running while using the framework.
 
----
+### 3. Open the Dashboard
 
-### Option 2: MCP Server
-
-**Best for:** Claude Desktop or other MCP-compatible clients
-
-- 7 MCP tools for agent orchestration + 7 MCP tools for document management
-- Works with Claude Desktop, Claude Code, or any MCP system
-
-**Setup:** Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "agent-orchestrator": {
-      "command": "uv",
-      "args": ["run", "/path/to/mcps/agent-orchestrator/agent-orchestrator-mcp.py"],
-      "env": {
-        "AGENT_ORCHESTRATOR_PROJECT_DIR": "/path/to/project",
-        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-      }
-    },
-    "context-store": {
-      "command": "uv",
-      "args": ["run", "/path/to/mcps/context-store/context-store-mcp.py"],
-      "env": {
-        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-      }
-    }
-  }
-}
+```bash
+make open
+# Or manually: open http://localhost:3000
 ```
 
-**Usage Example (from Claude Desktop):**
+From the Dashboard you can:
+- Create and manage agent sessions
+- Monitor agent execution in real-time
+- Browse and edit agent blueprints
+- Manage documents in the Context Store
+
+### Stopping Everything
+
+```bash
+make stop-all    # Stop all services
+# Ctrl+C         # Stop the agent launcher
 ```
-List available agents
-Create a new agent session called "code-review" using the code-reviewer agent
-```
-
-**Documentation:** [mcps/agent-orchestrator/README.md](./mcps/agent-orchestrator/README.md)
-
-**Limitation:** Due to a [known Claude Code bug](https://github.com/anthropics/claude-code/issues/3426), stdio MCP servers don't work in headless mode (`-p`). Orchestrated agents won't have access to stdio-based MCP servers. Use SSE transport or Option 1 as workaround.
-
----
-
-## Which Option Should You Use?
-
-| Option | Use When... | Integration |
-|--------|-------------|-------------|
-| **Option 1: Plugin** | You work within Claude Code | Claude Code only |
-| **Option 2: MCP** | You use Claude Desktop or other MCP clients | Any MCP system |
-
-Both options can be used together.
 
 ## Repository Structure
 
@@ -119,13 +86,15 @@ agent-orchestrator-framework/
 │
 ├── servers/                           # Backend servers
 │   ├── agent-runtime/                 # Session management + event capture + agent registry
+│   ├── agent-launcher/                # Job executor (polls runtime, runs Claude Code)
 │   └── context-store/                 # Document storage
 │
 ├── mcps/                              # MCP servers (agent capabilities)
 │   ├── agent-orchestrator/            # Agent orchestration MCP (dual-purpose: capabilities + framework access)
 │   ├── context-store/                 # Document management MCP
-│   ├── atlassian/                     # Jira + Confluence MCP (Docker)
-│   └── ado/                           # Azure DevOps MCP (Docker)
+│   ├── neo4j/                         # Neo4j graph database MCP (Docker)
+│   ├── atlassian/                     # Jira + Confluence MCP (Docker, requires credentials)
+│   └── ado/                           # Azure DevOps MCP (Docker, requires credentials)
 │
 ├── dashboard/                         # Web UI (React + Vite)
 │
@@ -141,12 +110,13 @@ agent-orchestrator-framework/
 
 The `mcps/` directory contains MCP servers that provide capabilities to agents. These are the tools agents can use to interact with external services and the framework itself.
 
-| MCP Server | Port | Purpose | Type |
-|------------|------|---------|------|
-| `agent-orchestrator` | 9500 | Agent orchestration tools + framework access for any MCP-capable AI | Internal |
-| `context-store` | 9501 | Document storage and retrieval | Internal |
-| `atlassian` | 9000 | Jira + Confluence integration | External (Docker) |
-| `ado` | 9001 | Azure DevOps work items | External (Docker) |
+| MCP Server | Port | Purpose | Requires .env |
+|------------|------|---------|---------------|
+| `agent-orchestrator` | 9500 | Agent orchestration tools + framework access | No |
+| `context-store` | 9501 | Document storage and retrieval | No |
+| `neo4j` | 9003 | Neo4j graph database queries | No (has defaults) |
+| `atlassian` | 9000 | Jira + Confluence integration | Yes |
+| `ado` | 9001 | Azure DevOps work items | Yes |
 
 **Start all MCP servers:**
 ```bash
@@ -155,8 +125,9 @@ make start-mcps
 
 **Start individually:**
 ```bash
-make start-mcp-agent-orchestrator  # Our orchestration framework
+make start-mcp-agent-orchestrator  # Agent orchestration
 make start-mcp-context-store       # Document management
+make start-mcp-neo4j               # Neo4j queries (uses defaults)
 make start-mcp-atlassian           # Requires mcps/atlassian/.env
 make start-mcp-ado                 # Requires mcps/ado/.env
 ```
@@ -180,32 +151,6 @@ The `config/agents/` folder contains example agent blueprints.
 | `web-researcher` | Web research | None (built-in) |
 | `browser-tester` | Playwright automation | Playwright (npx) |
 
-## Quick Start
-
-See **[Getting Started](./docs/GETTING_STARTED.md)** for setup instructions.
-
-## Agent Launcher
-
-The Agent Launcher is a critical component that bridges the Agent Runtime with actual agent execution. It polls for jobs and spawns Claude Code sessions.
-
-**Start the launcher in your project directory:**
-```bash
-cd /path/to/your/project
-/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
-```
-
-> **Important:** The launcher must run in the directory where you want agents to execute. Without a running launcher, agent sessions will be queued but not executed.
-
-The launcher:
-- Registers with Agent Runtime and appears in the Dashboard
-- Polls for pending jobs (start/resume sessions)
-- Executes jobs as Claude Code sessions
-- Reports job status back to the runtime
-
-Currently implements **Claude Code** as the agent backend. The architecture supports adding other backends in the future.
-
-See [servers/agent-launcher/README.md](./servers/agent-launcher/README.md) for detailed documentation.
-
 ## Core Concepts
 
 ### Agent Blueprints
@@ -221,31 +166,14 @@ Different agents can have different MCP server configurations, enabling speciali
 The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
 
 
-## Dashboard & Observability
+## Service URLs
 
-Monitor your agent orchestration in real-time with the unified Dashboard:
-
-- **Real-time monitoring** of agent sessions and tool calls
-- **WebSocket-based** live updates
-- **Docker support** for one-command deployment
-- **Agent blueprint management** via web UI
-- **Document management** for context sharing
-
-**Quick Start:**
-```bash
-# Start all services (Dashboard + all backend servers)
-make start-bg
-
-# Open http://localhost:3000
-make open
-```
-
-**Service URLs:**
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
 | Agent Runtime | http://localhost:8765 | Session management, WebSocket events, Blueprint API |
 | Context Store | http://localhost:8766 | Document storage API |
+| Neo4j Browser | http://localhost:7475 | Graph database UI (neo4j/agent-orchestrator) |
 
 See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for full architecture.
 
@@ -268,12 +196,10 @@ See **[tests/README.md](./tests/README.md)** for setup and test case documentati
 
 ## Documentation
 
-- **[Getting Started](./docs/GETTING_STARTED.md)** - Quick setup guide
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
+- **[Getting Started Guide](./docs/GETTING_STARTED.md)** - Detailed setup and configuration
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
-- **[Agent Launcher](./servers/agent-launcher/README.md)** - Job execution bridge
-- **[Orchestrator Plugin](./plugins/orchestrator/README.md)** - Option 1: Claude Code plugin
-- **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - Option 2: MCP server for agent orchestration
-- **[Context Store MCP](./mcps/context-store/README.md)** - MCP server for document management
+- **[Agent Launcher](./servers/agent-launcher/README.md)** - Job execution bridge details
 - **[MCP Servers Overview](./mcps/README.md)** - All available MCP servers
-- **[Context Store Plugin](./plugins/context-store/README.md)** - Document management plugin
+- **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - MCP server for agent orchestration
+- **[Context Store MCP](./mcps/context-store/README.md)** - MCP server for document management

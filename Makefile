@@ -245,9 +245,8 @@ stop-mcp-ado:
 start-mcp-neo4j:
 	@echo "Starting Neo4j MCP server..."
 	@if [ ! -f mcps/neo4j/.env ]; then \
-		echo "⚠️  No .env file found. Copy the example and configure credentials:"; \
-		echo "   cp mcps/neo4j/.env.example mcps/neo4j/.env"; \
-		exit 1; \
+		echo "ℹ️  No .env file found. Using defaults (connecting to local Neo4j container)."; \
+		echo "   To customize, copy: cp mcps/neo4j/.env.example mcps/neo4j/.env"; \
 	fi
 	@cd mcps/neo4j && docker compose up -d
 	@echo "Neo4j MCP started: http://localhost:9003"
