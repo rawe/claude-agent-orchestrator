@@ -5,7 +5,7 @@ Verify that an orchestrator agent can spawn a child agent in synchronous mode.
 ## Prerequisites
 
 - Agent Coordinator running
-- Agent Launcher running with `claude-code` executor
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash

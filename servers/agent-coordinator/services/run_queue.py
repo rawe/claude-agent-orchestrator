@@ -1,7 +1,7 @@
 """
-Thread-safe in-memory run queue for Agent Launcher.
+Thread-safe in-memory run queue for Agent Runner.
 
-Runs are created via POST /runs and claimed by the Launcher via GET /launcher/runs.
+Runs are created via POST /runs and claimed by the Runner via GET /runner/runs.
 """
 
 import threading
@@ -21,7 +21,7 @@ class RunStatus(str, Enum):
     PENDING = "pending"
     CLAIMED = "claimed"
     RUNNING = "running"
-    STOPPING = "stopping"  # Stop requested, waiting for launcher
+    STOPPING = "stopping"  # Stop requested, waiting for runner
     COMPLETED = "completed"
     FAILED = "failed"
     STOPPED = "stopped"    # Successfully stopped
@@ -47,7 +47,7 @@ class Run(BaseModel):
     project_dir: Optional[str] = None
     parent_session_name: Optional[str] = None
     status: RunStatus = RunStatus.PENDING
-    launcher_id: Optional[str] = None
+    runner_id: Optional[str] = None
     error: Optional[str] = None
     created_at: str
     claimed_at: Optional[str] = None
@@ -84,8 +84,8 @@ class RunQueue:
 
         return run
 
-    def claim_run(self, launcher_id: str) -> Optional[Run]:
-        """Atomically claim a pending run for a launcher.
+    def claim_run(self, runner_id: str) -> Optional[Run]:
+        """Atomically claim a pending run for a runner.
 
         Returns the claimed run or None if no pending runs.
         """
@@ -97,7 +97,7 @@ class RunQueue:
                 if run.status == RunStatus.PENDING:
                     # Claim it
                     run.status = RunStatus.CLAIMED
-                    run.launcher_id = launcher_id
+                    run.runner_id = runner_id
                     run.claimed_at = now
                     return run
 

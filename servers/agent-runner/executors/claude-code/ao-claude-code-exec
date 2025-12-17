@@ -30,10 +30,10 @@ import json
 import sys
 from pathlib import Path
 
-# Add launcher lib to path for shared invocation module
+# Add runner lib to path for shared invocation module
 # This allows all executor types (claude-code, openai, etc.) to share the schema
-launcher_lib = Path(__file__).parent.parent.parent / "lib"
-sys.path.insert(0, str(launcher_lib))
+runner_lib = Path(__file__).parent.parent.parent / "lib"
+sys.path.insert(0, str(runner_lib))
 
 # Add local lib to path for executor-specific modules
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
@@ -55,7 +55,7 @@ USAGE:
 
 DESCRIPTION:
     Executes a Claude agent session (start or resume) based on a JSON
-    payload received via stdin. This script is invoked by agent-launcher,
+    payload received via stdin. This script is invoked by agent-runner,
     not directly by users.
 
 JSON PAYLOAD FORMAT:

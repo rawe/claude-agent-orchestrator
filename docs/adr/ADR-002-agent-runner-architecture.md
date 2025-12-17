@@ -1,4 +1,4 @@
-# ADR-002: Agent Launcher Architecture
+# ADR-002: Agent Runner Architecture
 
 **Status:** Accepted
 **Date:** 2025-12-12
@@ -15,25 +15,25 @@ These requirements conflict with containerization goals for the Agent Coordinato
 
 ## Decision
 
-**Separate Agent Coordinator (orchestration) from Agent Launcher (execution)** with asynchronous run distribution.
+**Separate Agent Coordinator (orchestration) from Agent Runner (execution)** with asynchronous run distribution.
 
 ### Component Responsibilities
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **Agent Coordinator** | Containerizable | Orchestration, run queue, persistence |
-| **Agent Launcher** | Host machine | Run polling, subprocess management |
+| **Agent Runner** | Host machine | Run polling, subprocess management |
 | **Executors** | `claude-code/` | Framework-specific execution (ao-start, ao-resume) |
 
 ### Communication Protocol
 
-- **Long-polling HTTP**: Launcher calls `GET /launcher/runs?launcher_id=xxx`
+- **Long-polling HTTP**: Runner calls `GET /runner/runs?runner_id=xxx`
 - **30s poll timeout**: Connection held until run available or timeout
-- **Status reporting**: `POST /launcher/runs/{run_id}/{started|completed|failed}`
+- **Status reporting**: `POST /runner/runs/{run_id}/{started|completed|failed}`
 
 ## Rationale
 
-### Why Separate Coordinator and Launcher?
+### Why Separate Coordinator and Runner?
 
 **Agent processes cannot run in containers** because they need:
 - Host filesystem access (read/write project files)
@@ -42,7 +42,7 @@ These requirements conflict with containerization goals for the Agent Coordinato
 
 **Separating allows:**
 - Agent Coordinator to be containerized (Docker, Kubernetes)
-- Launchers to run on any host with frameworks installed
+- Runners to run on any host with frameworks installed
 - Distributed execution across multiple machines
 
 ### Why Long-Polling Over WebSocket?
@@ -59,8 +59,8 @@ These requirements conflict with containerization goals for the Agent Coordinato
 - Framework-agnostic core (future LangChain, AutoGen support)
 
 ### Negative
-- Network dependency between Agent Coordinator and launcher
-- Two processes to run (Agent Coordinator + launcher)
+- Network dependency between Agent Coordinator and runner
+- Two processes to run (Agent Coordinator + runner)
 
 ## References
 

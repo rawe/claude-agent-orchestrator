@@ -27,7 +27,7 @@ class RunPoller:
         api_client: CoordinatorAPIClient,
         executor: RunExecutor,
         registry: RunningRunsRegistry,
-        launcher_id: str,
+        runner_id: str,
         on_deregistered: Optional[Callable[[], None]] = None,
     ):
         """Initialize the poller.
@@ -36,13 +36,13 @@ class RunPoller:
             api_client: HTTP client for Agent Coordinator
             executor: Run executor for spawning subprocesses
             registry: Registry for tracking running agent runs
-            launcher_id: This launcher's ID
-            on_deregistered: Callback when launcher is deregistered externally
+            runner_id: This runner's ID
+            on_deregistered: Callback when runner is deregistered externally
         """
         self.api_client = api_client
         self.executor = executor
         self.registry = registry
-        self.launcher_id = launcher_id
+        self.runner_id = runner_id
         self.on_deregistered = on_deregistered
 
         self._thread: threading.Thread | None = None
@@ -75,7 +75,7 @@ class RunPoller:
 
         while not self._stop_event.is_set():
             try:
-                result = self.api_client.poll_run(self.launcher_id)
+                result = self.api_client.poll_run(self.runner_id)
 
                 # Successful connection - reset failure counter
                 consecutive_failures = 0
@@ -123,13 +123,13 @@ class RunPoller:
             self.registry.add_run(run.run_id, run.session_name, process)
 
             # Report started
-            self.api_client.report_started(self.launcher_id, run.run_id)
+            self.api_client.report_started(self.runner_id, run.run_id)
             logger.debug(f"Agent run {run.run_id} started (pid={process.pid})")
 
         except Exception as e:
             logger.error(f"Failed to start agent run {run.run_id}: {e}")
             try:
-                self.api_client.report_failed(self.launcher_id, run.run_id, str(e))
+                self.api_client.report_failed(self.runner_id, run.run_id, str(e))
             except Exception:
                 logger.error(f"Failed to report agent run failure for {run.run_id}")
 
@@ -164,7 +164,7 @@ class RunPoller:
 
             # Report stopped
             try:
-                self.api_client.report_stopped(self.launcher_id, run_id, signal=signal_used)
+                self.api_client.report_stopped(self.runner_id, run_id, signal=signal_used)
                 logger.info(f"Agent run {run_id} stopped successfully (signal={signal_used})")
             except Exception as e:
                 logger.error(f"Failed to report stopped for {run_id}: {e}")

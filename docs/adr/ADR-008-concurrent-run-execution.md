@@ -1,9 +1,9 @@
-# ADR-008: Concurrent Run Execution in Agent Launcher
+# ADR-008: Concurrent Run Execution in Agent Runner
 
 **Status:** Accepted
 **Date:** 2025-12-12
 **Decision Makers:** Architecture Review
-**Affected Components:** Agent Launcher
+**Affected Components:** Agent Runner
 
 ## Context
 
@@ -25,7 +25,7 @@ Single-run execution would defeat async patterns.
 | **Poll Thread** | Long-polls for runs, spawns subprocesses |
 | **Running Runs Registry** | Thread-safe tracking of active runs |
 | **Supervisor Thread** | Monitors completion, reports status |
-| **Heartbeat Thread** | Maintains launcher registration |
+| **Heartbeat Thread** | Maintains runner registration |
 
 ### Concurrency
 

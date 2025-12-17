@@ -75,7 +75,7 @@ Common data structures used by the Agent Coordinator.
   "project_dir": "string (optional)",
   "parent_session_name": "string (optional)",
   "status": "pending | claimed | running | stopping | completed | failed | stopped",
-  "launcher_id": "string (optional)",
+  "runner_id": "string (optional)",
   "error": "string (optional)",
   "created_at": "ISO 8601 string",
   "claimed_at": "ISO 8601 string (optional)",
@@ -93,27 +93,27 @@ Common data structures used by the Agent Coordinator.
 - `project_dir` - Optional project directory path
 - `parent_session_name` - Optional parent session name (for callbacks)
 - `status` - Current run status
-- `launcher_id` - ID of the launcher that claimed/executed the run
+- `runner_id` - ID of the runner that claimed/executed the run
 - `error` - Error message if run failed
 - `created_at` - Timestamp when run was created
-- `claimed_at` - Timestamp when launcher claimed the run
+- `claimed_at` - Timestamp when runner claimed the run
 - `started_at` - Timestamp when run execution started
 - `completed_at` - Timestamp when run completed or failed
 
 **Run Status Values:**
-- `pending` - Run created, waiting for launcher
-- `claimed` - Launcher claimed the run
+- `pending` - Run created, waiting for runner
+- `claimed` - Runner claimed the run
 - `running` - Run execution started
-- `stopping` - Stop requested, waiting for launcher to terminate process
+- `stopping` - Stop requested, waiting for runner to terminate process
 - `completed` - Run completed successfully
 - `failed` - Run execution failed
 - `stopped` - Run was stopped (terminated by stop command)
 
-## Launcher
+## Runner
 
 ```json
 {
-  "launcher_id": "string",
+  "runner_id": "string",
   "registered_at": "ISO 8601 string",
   "last_heartbeat": "ISO 8601 string",
   "hostname": "string (optional)",
@@ -123,14 +123,14 @@ Common data structures used by the Agent Coordinator.
 ```
 
 **Fields:**
-- `launcher_id` - Unique identifier for the launcher (e.g., `lnch_abc123`)
-- `registered_at` - Timestamp when launcher registered
+- `runner_id` - Unique identifier for the runner (e.g., `lnch_abc123`)
+- `registered_at` - Timestamp when runner registered
 - `last_heartbeat` - Timestamp of the most recent heartbeat
-- `hostname` - Optional machine hostname where launcher is running
-- `project_dir` - Optional default project directory for this launcher
+- `hostname` - Optional machine hostname where runner is running
+- `project_dir` - Optional default project directory for this runner
 - `executor_type` - Optional executor type (folder name, e.g., `claude-code`, `test-executor`)
 
-**Note:** When fetching launchers via GET /launchers, additional computed fields are included:
+**Note:** When fetching runners via GET /runners, additional computed fields are included:
 - `status` - Computed status: `online`, `stale`, or `offline`
 - `seconds_since_heartbeat` - Seconds since last heartbeat
 

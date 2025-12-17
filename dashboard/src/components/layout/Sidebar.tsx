@@ -14,7 +14,7 @@ const navItems: NavItem[] = [
   { to: '/sessions', icon: <Activity className="w-5 h-5" />, label: 'Agent Sessions' },
   { to: '/context-store', icon: <Database className="w-5 h-5" />, label: 'Context Store' },
   { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Blueprints' },
-  { to: '/launchers', icon: <Server className="w-5 h-5" />, label: 'Agent Launchers' },
+  { to: '/runners', icon: <Server className="w-5 h-5" />, label: 'Agent Runners' },
 ];
 
 export function Sidebar() {

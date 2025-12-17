@@ -8,7 +8,7 @@
 
 The Agent Orchestrator system needs to:
 1. Accept requests to start/resume agent sessions via an API
-2. Distribute work to Agent Launchers running on host machines
+2. Distribute work to Agent Runners running on host machines
 3. Track execution state and store results persistently
 4. Support long-polling communication for efficient run distribution
 
@@ -64,7 +64,7 @@ Keep run concept but persist to database.
 - SQLite is not designed as a work queue
 - Atomic "claim" operation needs `threading.Lock` semantics
 - Race conditions between SELECT and UPDATE without read locks
-- Performance degradation for launcher polling
+- Performance degradation for runner polling
 
 #### Option D: Current Design (Accepted)
 Keep in-memory runs + SQLite sessions.
@@ -73,7 +73,7 @@ Keep in-memory runs + SQLite sessions.
 - In-memory run queue with `threading.Lock` enables fast atomic claims
 - SQLite sessions provide reliable persistence for results/events
 - Clean separation: runs = work items, sessions = execution records
-- Supports distributed launchers with efficient long-polling
+- Supports distributed runners with efficient long-polling
 
 ### Data Field Analysis
 
@@ -84,7 +84,7 @@ Keep in-memory runs + SQLite sessions.
 | `project_dir` | Yes | Yes | Copied for persistence |
 | `parent_session_name` | Yes | Yes | Callback support |
 | `prompt` | Yes | No | Run-only (execution input) |
-| `launcher_id` | Yes | No | Run-only (distribution tracking) |
+| `runner_id` | Yes | No | Run-only (distribution tracking) |
 | `status` | Yes | Yes | Different values/meanings |
 | `error` | Yes | No | Run-only (failure tracking) |
 
@@ -122,7 +122,7 @@ Long-polling with 500ms check intervals requires sub-millisecond claim operation
 ### Positive
 - Fast run distribution via long-polling
 - Clean separation of concerns
-- Distributed launcher support
+- Distributed runner support
 - Sessions remain clean execution records
 - Runs can be lost on restart without data loss (sessions persist)
 

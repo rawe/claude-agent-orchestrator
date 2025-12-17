@@ -75,7 +75,7 @@ export function Home() {
             Architecture Overview
           </h2>
           <p className="text-gray-500 text-center mb-8 max-w-2xl mx-auto">
-            The framework consists of a central coordinator, distributed launchers, and a context store
+            The framework consists of a central coordinator, distributed runners, and a context store
             working together to manage agent sessions.
           </p>
 
@@ -121,13 +121,13 @@ export function Home() {
 
               {/* Execution Layer */}
               <div className="flex flex-wrap justify-center gap-6 w-full">
-                {/* Launcher */}
+                {/* Runner */}
                 <div className="bg-teal-50 border-2 border-teal-200 rounded-xl p-5 min-w-[200px]">
                   <div className="text-center">
                     <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center mx-auto mb-2">
                       <Server className="w-5 h-5 text-teal-600" />
                     </div>
-                    <h4 className="font-semibold text-teal-800 text-sm">Agent Launcher</h4>
+                    <h4 className="font-semibold text-teal-800 text-sm">Agent Runner</h4>
                     <p className="text-teal-600 text-xs mt-1">Executes Claude Code sessions</p>
                   </div>
                 </div>
@@ -270,19 +270,19 @@ export function Home() {
               </p>
             </Link>
 
-            {/* Agent Launchers */}
+            {/* Agent Runners */}
             <Link
-              to="/launchers"
+              to="/runners"
               className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-teal-300 hover:-translate-y-1 transition-all"
             >
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2.5 bg-teal-100 rounded-xl group-hover:bg-teal-200 transition-colors">
                   <Server className="w-5 h-5 text-teal-600" />
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">Agent Launchers</h3>
+                <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">Agent Runners</h3>
               </div>
               <p className="text-sm text-gray-600 leading-relaxed">
-                View registered launchers and their health status. Launchers
+                View registered runners and their health status. Runners
                 execute agent sessions as Claude Code subprocesses.
               </p>
             </Link>

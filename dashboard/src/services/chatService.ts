@@ -55,7 +55,7 @@ export const chatService = {
   /**
    * Start a new agent session via Run API
    *
-   * Creates a run that the Agent Launcher will pick up and execute.
+   * Creates a run that the Agent Runner will pick up and execute.
    * Session updates come through WebSocket.
    */
   async startSession(request: SessionStartRequest): Promise<SessionStartResponse> {
@@ -77,7 +77,7 @@ export const chatService = {
   /**
    * Resume an existing session with a new prompt via Run API
    *
-   * Creates a resume run that the Agent Launcher will pick up and execute.
+   * Creates a resume run that the Agent Runner will pick up and execute.
    * Session updates come through WebSocket.
    */
   async resumeSession(sessionName: string, request: SessionResumeRequest): Promise<SessionStartResponse> {

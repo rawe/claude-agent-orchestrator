@@ -11,7 +11,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Database paths
 COORDINATOR_DB="$PROJECT_ROOT/servers/agent-coordinator/.agent-orchestrator/observability.db"
-TEST_EXECUTOR_DATA="$PROJECT_ROOT/servers/agent-launcher/executors/test-executor/.test-executor-data"
+TEST_EXECUTOR_DATA="$PROJECT_ROOT/servers/agent-runner/executors/test-executor/.test-executor-data"
 
 echo "Resetting test environment..."
 

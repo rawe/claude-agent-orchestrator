@@ -16,7 +16,7 @@ See `tests/README.md` for full documentation.
 
 2. **Start services** in background:
    - Agent Coordinator: `cd servers/agent-coordinator && uv run python -m main`
-   - Agent Launcher: `./servers/agent-launcher/agent-launcher -x test-executor`
+   - Agent Runner: `./servers/agent-runner/agent-runner -x test-executor`
    - WebSocket Monitor: `./tests/tools/ws-monitor`
 
 3. **Verify** all services are running and healthy
@@ -35,7 +35,7 @@ For each test case in `tests/integration/` (in alphabetical order):
 
 ### Phase 3: Teardown
 
-1. Stop all background processes (coordinator, launcher, ws-monitor)
+1. Stop all background processes (coordinator, runner, ws-monitor)
 2. Final database cleanup: `./tests/scripts/reset-db`
 
 ### Phase 4: Report

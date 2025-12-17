@@ -1,4 +1,4 @@
-# ADR-006: Launcher Registration with Health Monitoring
+# ADR-006: Runner Registration with Health Monitoring
 
 **Status:** Accepted
 **Date:** 2025-12-12
@@ -7,8 +7,8 @@
 ## Context
 
 The system needs to:
-1. Track which launchers are available
-2. Detect launcher failures
+1. Track which runners are available
+2. Detect runner failures
 3. Coordinate graceful shutdown
 
 ## Decision
@@ -17,10 +17,10 @@ The system needs to:
 
 ### Protocol
 
-1. **Registration**: `POST /launcher/register` → `launcher_id`
-2. **Heartbeat**: `POST /launcher/heartbeat` every 60s
-3. **Timeout**: 120s before marking launcher stale
-4. **Deregistration**: Launcher receives `{ "deregistered": true }` on next poll
+1. **Registration**: `POST /runner/register` → `runner_id`
+2. **Heartbeat**: `POST /runner/heartbeat` every 60s
+3. **Timeout**: 120s before marking runner stale
+4. **Deregistration**: Runner receives `{ "deregistered": true }` on next poll
 
 ### Storage
 
@@ -42,8 +42,8 @@ In-memory registry (ephemeral by design).
 ## Consequences
 
 ### Positive
-- Coordinator knows which launchers are active
-- Crashed launchers detected within 120s
+- Coordinator knows which runners are active
+- Crashed runners detected within 120s
 - Graceful shutdown support
 
 ### Negative

@@ -186,7 +186,7 @@ async def start_agent_session_impl(
                 logger.warn("callback=true but no parent session name available")
 
         # Create agent run
-        # Note: If project_dir is None, the Agent Coordinator/Launcher decides the default
+        # Note: If project_dir is None, the Agent Coordinator/Runner decides the default
         run_id = await client.create_run(
             run_type="start_session",
             session_name=session_name,

@@ -1,15 +1,15 @@
 # Run Execution Flow
 
-This document explains the complete lifecycle of a run from creation to completion, with a focus on the Agent Launcher's polling mechanism.
+This document explains the complete lifecycle of a run from creation to completion, with a focus on the Agent Runner's polling mechanism.
 
 ## Overview
 
-When a client (Dashboard, CLI, or MCP Server) wants to start or resume an agent session, it doesn't spawn the process directly. Instead, it creates a **run** in the Agent Coordinator's queue. The **Agent Launcher**, running on a host machine, continuously polls for pending runs, claims them, and executes them.
+When a client (Dashboard, CLI, or MCP Server) wants to start or resume an agent session, it doesn't spawn the process directly. Instead, it creates a **run** in the Agent Coordinator's queue. The **Agent Runner**, running on a host machine, continuously polls for pending runs, claims them, and executes them.
 
 This decoupled architecture allows:
 - Agent Coordinator to run in containers (no subprocess spawning needed)
-- Multiple launchers to distribute workload across machines
-- Graceful handling of launcher failures
+- Multiple runners to distribute workload across machines
+- Graceful handling of runner failures
 
 ## Sequence Diagram
 
@@ -18,7 +18,7 @@ sequenceDiagram
     participant Client as Client<br/>(Dashboard/CLI/MCP)
     participant Coordinator as Agent Coordinator<br/>:8765
     participant Queue as RunQueue<br/>(in-memory)
-    participant Launcher as Agent Launcher
+    participant Runner as Agent Runner
     participant Executor as Claude Code<br/>Executor
 
     Note over Client,Executor: Phase 1: Run Creation
@@ -29,35 +29,35 @@ sequenceDiagram
 
     Note over Client,Executor: Phase 2: Run Polling (Long-Poll Loop)
     loop Continuous Polling
-        Launcher->>+Coordinator: GET /launcher/runs?launcher_id=lnch_xxx
-        Coordinator->>Queue: claim_run(launcher_id)
+        Runner->>+Coordinator: GET /runner/runs?runner_id=lnch_xxx
+        Coordinator->>Queue: claim_run(runner_id)
         alt No pending runs
             Note over Coordinator: Hold connection for<br/>POLL_TIMEOUT (30s)
-            Coordinator-->>Launcher: 204 No Content
+            Coordinator-->>Runner: 204 No Content
         else Run available
             Queue-->>Coordinator: Run (status=claimed)
-            Coordinator-->>-Launcher: {run: {...}}
+            Coordinator-->>-Runner: {run: {...}}
         end
     end
 
     Note over Client,Executor: Phase 3: Run Execution
-    Launcher->>+Coordinator: POST /launcher/runs/{run_id}/started<br/>{launcher_id}
+    Runner->>+Coordinator: POST /runner/runs/{run_id}/started<br/>{runner_id}
     Coordinator->>Queue: update_run_status(run_id, RUNNING)
-    Coordinator-->>-Launcher: {ok: true}
+    Coordinator-->>-Runner: {ok: true}
 
-    Launcher->>+Executor: spawn subprocess<br/>ao-start or ao-resume
+    Runner->>+Executor: spawn subprocess<br/>ao-start or ao-resume
     Note over Executor: Claude Code session<br/>executes task...
-    Executor-->>-Launcher: exit_code
+    Executor-->>-Runner: exit_code
 
     Note over Client,Executor: Phase 4: Run Completion
     alt exit_code == 0
-        Launcher->>+Coordinator: POST /launcher/runs/{run_id}/completed<br/>{launcher_id}
+        Runner->>+Coordinator: POST /runner/runs/{run_id}/completed<br/>{runner_id}
         Coordinator->>Queue: update_run_status(run_id, COMPLETED)
-        Coordinator-->>-Launcher: {ok: true}
+        Coordinator-->>-Runner: {ok: true}
     else exit_code != 0
-        Launcher->>+Coordinator: POST /launcher/runs/{run_id}/failed<br/>{launcher_id, error}
+        Runner->>+Coordinator: POST /runner/runs/{run_id}/failed<br/>{runner_id, error}
         Coordinator->>Queue: update_run_status(run_id, FAILED)
-        Coordinator-->>-Launcher: {ok: true}
+        Coordinator-->>-Runner: {ok: true}
     end
 
     Note over Client,Executor: Phase 5: Result Retrieval (Optional)
@@ -97,32 +97,32 @@ sequenceDiagram
 
 ### Phase 2: Run Polling
 
-**Trigger:** Agent Launcher's `RunPoller` thread runs continuously
+**Trigger:** Agent Runner's `RunPoller` thread runs continuously
 
-The launcher uses **long-polling** to efficiently wait for runs without hammering the server:
+The runner uses **long-polling** to efficiently wait for runs without hammering the server:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Long-Poll Cycle                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. Launcher sends GET /launcher/runs?launcher_id=lnch_xxx      │
+│  1. Runner sends GET /runner/runs?runner_id=lnch_xxx            │
 │  2. Coordinator checks for pending runs                         │
 │  3. If no runs: hold connection open for 30 seconds             │
 │  4. If run arrives during wait: return immediately              │
 │  5. After timeout: return 204 No Content                        │
-│  6. Launcher immediately starts new poll cycle                  │
+│  6. Runner immediately starts new poll cycle                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Run claiming is atomic:**
 ```python
 # In run_queue.py
-def claim_run(self, launcher_id: str) -> Optional[Run]:
+def claim_run(self, runner_id: str) -> Optional[Run]:
     with self._lock:  # Thread-safe
         for run in self._runs.values():
             if run.status == RunStatus.PENDING:
                 run.status = RunStatus.CLAIMED
-                run.launcher_id = launcher_id
+                run.runner_id = runner_id
                 run.claimed_at = now
                 return run
     return None
@@ -131,14 +131,14 @@ def claim_run(self, launcher_id: str) -> Optional[Run]:
 **Why long-polling?**
 - More efficient than frequent short polls (reduces network overhead)
 - Lower latency than fixed-interval polling (run starts within milliseconds)
-- Simple to implement (no WebSocket complexity on launcher side)
+- Simple to implement (no WebSocket complexity on runner side)
 
 ### Phase 3: Run Execution
 
-**Trigger:** Launcher receives a run from polling
+**Trigger:** Runner receives a run from polling
 
 **Sequence:**
-1. Launcher calls `POST /launcher/runs/{run_id}/started`
+1. Runner calls `POST /runner/runs/{run_id}/started`
 2. Run status changes: `claimed` → `running`
 3. `RunExecutor` spawns the appropriate subprocess:
 
@@ -172,17 +172,17 @@ def _execute_start_session(self, run: Run) -> subprocess.Popen:
 
 | Exit Code | Status | API Call |
 |-----------|--------|----------|
-| 0 | `completed` | `POST /launcher/runs/{run_id}/completed` |
-| Non-zero | `failed` | `POST /launcher/runs/{run_id}/failed` |
+| 0 | `completed` | `POST /runner/runs/{run_id}/completed` |
+| Non-zero | `failed` | `POST /runner/runs/{run_id}/failed` |
 
 ```python
 # supervisor.py
 def _handle_completion(self, run_id: str, running_run: RunningRun, return_code: int):
     if return_code == 0:
-        self.api_client.report_completed(self.launcher_id, run_id)
+        self.api_client.report_completed(self.runner_id, run_id)
     else:
         error_msg = f"Process exited with code {return_code}"
-        self.api_client.report_failed(self.launcher_id, run_id, error_msg)
+        self.api_client.report_failed(self.runner_id, run_id, error_msg)
 ```
 
 ### Phase 5: Result Retrieval
@@ -195,11 +195,11 @@ Clients can:
 
 **Alternative:** Use WebSocket connection to receive real-time session updates without polling.
 
-## Launcher Internal Architecture
+## Runner Internal Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Agent Launcher                              │
+│                      Agent Runner                                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
@@ -238,14 +238,14 @@ Clients can:
 
 | Parameter | Default | Environment Variable | Description |
 |-----------|---------|---------------------|-------------|
-| Poll Timeout | 30s | `LAUNCHER_POLL_TIMEOUT` | How long to hold connection waiting for runs |
-| Heartbeat Interval | 60s | `LAUNCHER_HEARTBEAT_INTERVAL` | How often launcher sends heartbeat |
-| Heartbeat Timeout | 120s | `LAUNCHER_HEARTBEAT_TIMEOUT` | When launcher is considered stale |
+| Poll Timeout | 30s | `RUNNER_POLL_TIMEOUT` | How long to hold connection waiting for runs |
+| Heartbeat Interval | 60s | `RUNNER_HEARTBEAT_INTERVAL` | How often runner sends heartbeat |
+| Heartbeat Timeout | 120s | `RUNNER_HEARTBEAT_TIMEOUT` | When runner is considered stale |
 | Supervisor Check | 1s | (hardcoded) | How often to check subprocess status |
 
 ## Error Handling
 
-### Launcher Connection Failures
+### Runner Connection Failures
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -256,7 +256,7 @@ Clients can:
 │  Attempt 2: Connection refused                               │
 │      → Wait 5 seconds, retry                                │
 │  Attempt 3: Connection refused                               │
-│      → MAX_RETRIES exceeded, launcher exits                 │
+│      → MAX_RETRIES exceeded, runner exits                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -266,7 +266,7 @@ Clients can:
 |--------------|----------|
 | Subprocess crashes | Supervisor detects non-zero exit, reports `failed` |
 | Subprocess hangs | No built-in timeout (relies on Claude Code's own limits) |
-| Launcher dies mid-run | Run stays in `running` state; requires manual cleanup |
+| Runner dies mid-run | Run stays in `running` state; requires manual cleanup |
 
 ## Related Documentation
 

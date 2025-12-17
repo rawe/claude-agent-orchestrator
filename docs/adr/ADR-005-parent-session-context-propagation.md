@@ -20,7 +20,7 @@ Callback mechanism requires child agents to know their parent's identity. Two ex
 
 ### Flow
 
-**stdio**: Launcher sets env var → subprocess inherits → ao-start reads it
+**stdio**: Runner sets env var → subprocess inherits → ao-start reads it
 
 **HTTP**: Config has placeholder → ao-start replaces → Claude sends header → MCP extracts
 
@@ -36,7 +36,7 @@ Callback mechanism requires child agents to know their parent's identity. Two ex
 
 | Component | Responsibility |
 |-----------|---------------|
-| **Agent Launcher** | Sets `AGENT_SESSION_NAME` env var |
+| **Agent Runner** | Sets `AGENT_SESSION_NAME` env var |
 | **ao-start/ao-resume** | Reads env, passes to Sessions API, replaces placeholders |
 | **MCP Servers (stdio)** | Propagates env to child subprocess |
 | **MCP Servers (HTTP)** | Extracts header, sets env for subprocess |

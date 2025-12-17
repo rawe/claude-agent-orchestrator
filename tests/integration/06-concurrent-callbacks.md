@@ -5,7 +5,7 @@ Verify that multiple child agents completing in rapid succession all have their 
 ## Prerequisites
 
 - Agent Coordinator running
-- Agent Launcher running with `claude-code` executor
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
@@ -139,4 +139,4 @@ Note which callbacks are missing. If Wave 1 agents (001-003) are affected more t
 
 ### Cannot determine callback status
 - Check parent session's full conversation via logs
-- Look at Agent Launcher logs for callback delivery attempts
+- Look at Agent Runner logs for callback delivery attempts

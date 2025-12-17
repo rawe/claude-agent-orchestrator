@@ -18,19 +18,19 @@ from invocation import SCHEMA_VERSION
 logger = logging.getLogger(__name__)
 
 
-# Environment variable for executor path (relative to agent-launcher dir)
+# Environment variable for executor path (relative to agent-runner dir)
 ENV_EXECUTOR_PATH = "AGENT_EXECUTOR_PATH"
 DEFAULT_EXECUTOR_PATH = "executors/claude-code/ao-claude-code-exec"
 
 
-def get_launcher_dir() -> Path:
-    """Get the agent-launcher directory."""
+def get_runner_dir() -> Path:
+    """Get the agent-runner directory."""
     return Path(__file__).parent.parent.resolve()
 
 
 def get_executors_dir() -> Path:
     """Get the executors directory."""
-    return get_launcher_dir() / "executors"
+    return get_runner_dir() / "executors"
 
 
 def list_executors() -> list[str]:
@@ -90,14 +90,14 @@ def resolve_executor_name(name: str) -> str:
 def get_executor_path() -> Path:
     """Get path to executor script.
 
-    Uses AGENT_EXECUTOR_PATH env var (relative to agent-launcher dir).
+    Uses AGENT_EXECUTOR_PATH env var (relative to agent-runner dir).
     Default: executors/claude-code/ao-claude-code-exec
     """
     executor_rel_path = os.environ.get(ENV_EXECUTOR_PATH, DEFAULT_EXECUTOR_PATH)
 
-    # Resolve relative to agent-launcher dir
-    launcher_dir = get_launcher_dir()
-    executor_path = launcher_dir / executor_rel_path
+    # Resolve relative to agent-runner dir
+    runner_dir = get_runner_dir()
+    executor_path = runner_dir / executor_rel_path
 
     if not executor_path.exists():
         raise RuntimeError(f"Executor not found: {executor_path}")
@@ -207,8 +207,8 @@ class RunExecutor:
         # Set AGENT_SESSION_NAME so the session knows its own identity.
         # This allows MCP servers to include the session name in HTTP headers
         # for callback support (X-Agent-Session-Name header).
-        # Flow: Launcher sets env → ao-*-exec replaces ${AGENT_SESSION_NAME} in MCP config
-        #       → Claude sends X-Agent-Session-Name header → MCP server reads it
+        # Flow: Runner sets env -> ao-*-exec replaces ${AGENT_SESSION_NAME} in MCP config
+        #       -> Claude sends X-Agent-Session-Name header -> MCP server reads it
         env["AGENT_SESSION_NAME"] = run.session_name
 
         # Log action (don't log full payload - prompt may be large/sensitive)

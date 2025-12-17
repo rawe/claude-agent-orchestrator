@@ -13,12 +13,12 @@ Quick setup guide for the Agent Orchestrator Framework.
 The framework has three layers:
 
 1. **Backend Services** (Docker) - Agent Coordinator, Context Store, Dashboard
-2. **Agent Launcher** - Bridge that executes agent runs (runs in your project directory)
+2. **Agent Runner** - Bridge that executes agent runs (runs in your project directory)
 3. **Interface** - Plugin (Claude Code) or MCP Server (Claude Desktop)
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Claude Code    │     │  Agent Coordinator  │     │ Agent Launcher  │
+│  Claude Code    │     │  Agent Coordinator  │     │ Agent Runner    │
 │  or Claude      │────▶│    (Docker)     │────▶│ (your project)  │
 │  Desktop        │     │    :8765        │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
@@ -54,20 +54,20 @@ This starts in the background:
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
-**3. Start the Agent Launcher in your project directory:**
+**3. Start the Agent Runner in your project directory:**
 ```bash
 cd /path/to/your/project
-/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+/path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner
 ```
 
-The launcher must run in the directory where you want agents to execute. It polls the Agent Coordinator for runs and spawns Claude Code sessions.
+The runner must run in the directory where you want agents to execute. It polls the Agent Coordinator for runs and spawns Claude Code sessions.
 
 **4. Open the dashboard:**
 ```bash
 make open
 ```
 
-Verify the dashboard is running at http://localhost:3000. You should see the launcher registered.
+Verify the dashboard is running at http://localhost:3000. You should see the runner registered.
 
 **5. Add plugins to Claude Code:**
 - Start Claude Code in your project directory
@@ -139,20 +139,20 @@ This starts in the background:
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
-**4. Start the Agent Launcher in your project directory:**
+**4. Start the Agent Runner in your project directory:**
 ```bash
 cd /path/to/your/project
-/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+/path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner
 ```
 
-> **Important:** The Agent Launcher must run in the directory where you want agents to execute. Without the launcher, agent runs will be queued but not executed.
+> **Important:** The Agent Runner must run in the directory where you want agents to execute. Without the runner, agent runs will be queued but not executed.
 
 **5. Open the dashboard:**
 ```bash
 make open
 ```
 
-Verify the dashboard is running at http://localhost:3000. You should see the launcher registered.
+Verify the dashboard is running at http://localhost:3000. You should see the runner registered.
 
 **6. Start the MCP server (HTTP mode):**
 ```bash
@@ -223,28 +223,28 @@ make stop-mcp-agent-orchestrator
 
 ### Verify
 
-- Dashboard at http://localhost:3000 shows active sessions and registered launcher
+- Dashboard at http://localhost:3000 shows active sessions and registered runner
 - MCP server endpoint: http://localhost:9500/mcp
 
 See [mcps/agent-orchestrator/README.md](../mcps/agent-orchestrator/README.md) for detailed MCP server documentation.
 
 ---
 
-## Agent Launcher
+## Agent Runner
 
-The Agent Launcher is a critical component that bridges the Agent Coordinator with actual agent execution. It must be running for agents to execute.
+The Agent Runner is a critical component that bridges the Agent Coordinator with actual agent execution. It must be running for agents to execute.
 
-### Starting the Launcher
+### Starting the Runner
 
 ```bash
 # Navigate to your project directory
 cd /path/to/your/project
 
-# Start the launcher
-/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+# Start the runner
+/path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner
 
 # Or with options
-./servers/agent-launcher/agent-launcher --coordinator-url http://localhost:8765 -v
+./servers/agent-runner/agent-runner --coordinator-url http://localhost:8765 -v
 ```
 
 ### What It Does
@@ -256,16 +256,16 @@ cd /path/to/your/project
 
 ### Why Run in Project Directory?
 
-The launcher spawns Claude Code sessions in its current working directory. Running it in your project ensures agents have access to your codebase.
+The runner spawns Claude Code sessions in its current working directory. Running it in your project ensures agents have access to your codebase.
 
 ### Dashboard Integration
 
-Once registered, the launcher appears in the Dashboard. You can:
-- See launcher status and metadata
+Once registered, the runner appears in the Dashboard. You can:
+- See runner status and metadata
 - View running runs
-- Deregister launchers remotely
+- Deregister runners remotely
 
-See [servers/agent-launcher/README.md](../servers/agent-launcher/README.md) for detailed documentation.
+See [servers/agent-runner/README.md](../servers/agent-runner/README.md) for detailed documentation.
 
 ---
 
@@ -280,4 +280,4 @@ See [servers/agent-launcher/README.md](../servers/agent-launcher/README.md) for 
 | `make start-all` | Start everything |
 | `make stop-all` | Stop everything |
 | `make open` | Open Dashboard in browser |
-| `./servers/agent-launcher/agent-launcher` | Start Agent Launcher |
+| `./servers/agent-runner/agent-runner` | Start Agent Runner |

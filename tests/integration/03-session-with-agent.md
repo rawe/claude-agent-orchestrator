@@ -5,7 +5,7 @@ Verify that starting a session with a specific agent blueprint works correctly.
 ## Prerequisites
 
 - Agent Coordinator running
-- Agent Launcher running
+- Agent Runner running
 - ws-monitor running
 - At least one agent blueprint registered (for `claude-code` executor)
 
@@ -63,7 +63,7 @@ Expected response:
 
 ### Step 3: Wait for execution
 
-Watch the launcher terminal for:
+Watch the runner terminal for:
 ```
 [INFO] executor: Starting session: test-agent-001 (agent=<agent-name>)
 ```

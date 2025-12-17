@@ -31,7 +31,7 @@ Both have limitations: blocking or constant polling overhead.
 | **MCP Server** | Propagates `AGENT_SESSION_NAME` when `callback=true` |
 | **Sessions API** | Tracks `parent_session_name` for parent-child relationships |
 | **Callback Processor** | Monitors completion, creates resume runs |
-| **Agent Launcher** | Executes resume runs |
+| **Agent Runner** | Executes resume runs |
 
 ## Rationale
 
@@ -43,7 +43,7 @@ Both have limitations: blocking or constant polling overhead.
 
 ### Constraints
 
-Callbacks only work when parent is started by the framework (Dashboard → Run API → Launcher).
+Callbacks only work when parent is started by the framework (Dashboard → Run API → Runner).
 
 ## Consequences
 

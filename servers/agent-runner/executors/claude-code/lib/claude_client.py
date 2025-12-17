@@ -4,7 +4,7 @@ Claude SDK Integration
 Wrapper around Claude Agent SDK for session creation and resumption.
 Uses SessionClient for API-based session management.
 
-NOTE: This module expects the launcher lib to already be in sys.path.
+NOTE: This module expects the runner lib to already be in sys.path.
       The parent executor (ao-claude-code-exec) is responsible for
       setting up the path before importing this module.
 """
@@ -134,7 +134,7 @@ async def run_claude_session(
     with session state managed via the AgentCoordinator API.
 
     NOTE: parent_session_name is now handled automatically by Agent Coordinator
-    via the Runs API. The launcher sets AGENT_SESSION_NAME env var which
+    via the Runs API. The runner sets AGENT_SESSION_NAME env var which
     flows through the run to the session. See mcp-server-api-refactor.md.
 
     Args:

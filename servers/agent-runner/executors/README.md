@@ -1,6 +1,6 @@
 # Executors
 
-This directory contains executor implementations that handle run execution for the Agent Launcher.
+This directory contains executor implementations that handle run execution for the Agent Runner.
 
 ## Directory Structure
 
@@ -25,7 +25,7 @@ mkdir executors/my-executor
 ### 2. Create the executable
 
 The executable must:
-- Be named `ao-*-exec` (the launcher scans for this pattern)
+- Be named `ao-*-exec` (the runner scans for this pattern)
 - Be executable (`chmod +x`)
 - Read JSON payload from stdin
 - Follow the invocation schema (see below)
@@ -53,15 +53,15 @@ The executor receives a JSON payload via stdin:
 
 ### 4. Use shared libraries
 
-Executors can import shared libraries from `agent-launcher/lib/`:
+Executors can import shared libraries from `agent-runner/lib/`:
 
 ```python
 import sys
 from pathlib import Path
 
-# Add launcher lib to path
-launcher_lib = Path(__file__).parent.parent.parent / "lib"
-sys.path.insert(0, str(launcher_lib))
+# Add runner lib to path
+runner_lib = Path(__file__).parent.parent.parent / "lib"
+sys.path.insert(0, str(runner_lib))
 
 # Now import shared modules
 from invocation import ExecutorInvocation
@@ -69,16 +69,16 @@ from session_client import SessionClient
 from executor_config import get_api_url
 ```
 
-### 5. Register with launcher
+### 5. Register with runner
 
-No registration needed. The launcher auto-discovers executors by scanning this directory.
+No registration needed. The runner auto-discovers executors by scanning this directory.
 
 ```bash
 # List available executors
-./agent-launcher --executor-list
+./agent-runner --executor-list
 
 # Use your executor
-./agent-launcher --executor my-executor
+./agent-runner --executor my-executor
 ```
 
 ## Example: Minimal Executor
@@ -93,9 +93,9 @@ No registration needed. The launcher auto-discovers executors by scanning this d
 import sys
 from pathlib import Path
 
-# Add launcher lib
-launcher_lib = Path(__file__).parent.parent.parent / "lib"
-sys.path.insert(0, str(launcher_lib))
+# Add runner lib
+runner_lib = Path(__file__).parent.parent.parent / "lib"
+sys.path.insert(0, str(runner_lib))
 
 from invocation import ExecutorInvocation
 

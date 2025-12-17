@@ -1,7 +1,7 @@
 """
-Launcher Configuration
+Runner Configuration
 
-Configuration for the Agent Launcher process that polls Agent Coordinator for runs.
+Configuration for the Agent Runner process that polls Agent Coordinator for runs.
 """
 
 import os
@@ -21,8 +21,8 @@ DEFAULT_HEARTBEAT_INTERVAL = 60
 
 
 @dataclass
-class LauncherConfig:
-    """Configuration for the Agent Launcher."""
+class RunnerConfig:
+    """Configuration for the Agent Runner."""
 
     agent_coordinator_url: str
     poll_timeout: int
@@ -30,7 +30,7 @@ class LauncherConfig:
     project_dir: str
 
     @classmethod
-    def from_env(cls) -> "LauncherConfig":
+    def from_env(cls) -> "RunnerConfig":
         """Load configuration from environment variables."""
         return cls(
             agent_coordinator_url=os.environ.get(ENV_COORDINATOR_URL, DEFAULT_COORDINATOR_URL),

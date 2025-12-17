@@ -15,7 +15,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Current schema version - used by both launcher (to build) and executor (to validate)
+# Current schema version - used by both runner (to build) and executor (to validate)
 SCHEMA_VERSION = "1.0"
 
 # Supported schema versions for backward compatibility

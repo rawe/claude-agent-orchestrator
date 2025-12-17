@@ -17,13 +17,13 @@ In the previous coding session, the following backend components were implemente
 - `servers/agent-coordinator/services/run_queue.py` - Added `STOPPING` and `STOPPED` run statuses
 - `servers/agent-coordinator/main.py`:
   - `POST /sessions/{session_id}/stop` endpoint
-  - Modified `GET /launcher/runs` to return `stop_runs` and wake up immediately
-  - `POST /launcher/runs/{run_id}/stopped` endpoint
-  - Integrated stop command queue with launcher registration
+  - Modified `GET /runner/runs` to return `stop_runs` and wake up immediately
+  - `POST /runner/runs/{run_id}/stopped` endpoint
+  - Integrated stop command queue with runner registration
 
-### Modified Launcher Files
-- `servers/agent-launcher/lib/api_client.py` - Added `stop_runs` to `PollResult`, `report_stopped()` method
-- `servers/agent-launcher/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
+### Modified Runner Files
+- `servers/agent-runner/lib/api_client.py` - Added `stop_runs` to `PollResult`, `report_stopped()` method
+- `servers/agent-runner/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
 
 ### Updated Documentation
 - `docs/agent-coordinator/API.md` - New endpoints documented
@@ -43,7 +43,7 @@ See: `servers/agent-coordinator/database.py` line 80-89 (`update_session_status`
   - Returns: `{ ok, run_id, session_name, status: "stopping" }`
 - Both endpoints share `_stop_run()` helper function
 - Runs transition: `RUNNING` → `STOPPING` → `STOPPED`
-- Stop commands wake up launcher immediately via asyncio Events
+- Stop commands wake up runner immediately via asyncio Events
 
 ### Dashboard (Needs Updates)
 - Has UI for stop button (works, shows on running sessions)
@@ -224,9 +224,9 @@ Ensure `update_session_status()` accepts 'stopping' as valid status.
 
 ---
 
-### Task 5: Handle Session Stop Event from Launcher
+### Task 5: Handle Session Stop Event from Runner
 
-When the launcher terminates a process and reports `POST /launcher/runs/{run_id}/stopped`, we need to:
+When the runner terminates a process and reports `POST /runner/runs/{run_id}/stopped`, we need to:
 
 **File:** `servers/agent-coordinator/main.py`
 
@@ -236,7 +236,7 @@ In `report_run_stopped()` endpoint:
 3. Consider creating a `session_stop` event
 
 ```python
-@app.post("/launcher/runs/{run_id}/stopped")
+@app.post("/runner/runs/{run_id}/stopped")
 async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     # ... existing code ...
 

@@ -165,7 +165,7 @@ Get the result text from the last assistant message.
 
 #### POST /sessions/{session_id}/stop
 
-Stop a running session by signaling its launcher.
+Stop a running session by signaling its runner.
 
 Finds the active run for this session and queues a stop command.
 
@@ -184,14 +184,14 @@ Finds the active run for this session and queues a stop command.
 - `404 Not Found` - Session not found
 - `400 Bad Request` - Session is not running
 - `404 Not Found` - No active run found for session
-- `400 Bad Request` - Run not claimed by any launcher / Run cannot be stopped
+- `400 Bad Request` - Run not claimed by any runner / Run cannot be stopped
 
 **Notes:**
 - Convenience endpoint that looks up the run by session
 - For direct run control, use `POST /runs/{run_id}/stop` instead
-- Queues a stop command for the launcher that will terminate the session's process
-- The launcher receives the stop command immediately (wakes up from long-poll)
-- Launcher sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
+- Queues a stop command for the runner that will terminate the session's process
+- The runner receives the stop command immediately (wakes up from long-poll)
+- Runner sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
 
 #### PATCH /sessions/{session_id}/metadata
 
@@ -426,11 +426,11 @@ Update agent status (active/inactive).
 
 ### Runs API
 
-Queue and manage runs for launchers to execute.
+Queue and manage runs for runners to execute.
 
 #### POST /runs
 
-Create a new run for a launcher to execute.
+Create a new run for a runner to execute.
 
 **Request Body:**
 ```json
@@ -467,7 +467,7 @@ Get run status and details.
   "project_dir": "/path/to/project",
   "parent_session_name": "parent-task",
   "status": "completed",
-  "launcher_id": "lnch_xyz789",
+  "runner_id": "lnch_xyz789",
   "error": null,
   "created_at": "2025-12-10T10:00:00Z",
   "claimed_at": "2025-12-10T10:00:01Z",
@@ -477,10 +477,10 @@ Get run status and details.
 ```
 
 **Run Status Values:**
-- `pending` - Run created, waiting for launcher
-- `claimed` - Launcher claimed the run
+- `pending` - Run created, waiting for runner
+- `claimed` - Runner claimed the run
 - `running` - Run execution started
-- `stopping` - Stop requested, waiting for launcher to terminate process
+- `stopping` - Stop requested, waiting for runner to terminate process
 - `completed` - Run completed successfully
 - `failed` - Run execution failed
 - `stopped` - Run was stopped (terminated by stop command)
@@ -489,7 +489,7 @@ Get run status and details.
 
 #### POST /runs/{run_id}/stop
 
-Stop a running run by signaling its launcher.
+Stop a running run by signaling its runner.
 
 **Response (Success):**
 ```json
@@ -504,23 +504,23 @@ Stop a running run by signaling its launcher.
 **Error Responses:**
 - `404 Not Found` - Run not found
 - `400 Bad Request` - Run cannot be stopped (not in `claimed` or `running` status)
-- `400 Bad Request` - Run not claimed by any launcher
+- `400 Bad Request` - Run not claimed by any runner
 
 **Notes:**
-- Queues a stop command for the launcher that will terminate the run's process
-- The launcher receives the stop command immediately (wakes up from long-poll)
-- Launcher sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
+- Queues a stop command for the runner that will terminate the run's process
+- The runner receives the stop command immediately (wakes up from long-poll)
+- Runner sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
 - Use `POST /sessions/{session_id}/stop` if you have session_id instead of run_id
 
 ---
 
-### Launcher API
+### Runner API
 
-Endpoints for launcher instances to communicate with the Agent Coordinator.
+Endpoints for runner instances to communicate with the Agent Coordinator.
 
-#### POST /launcher/register
+#### POST /runner/register
 
-Register a new launcher instance.
+Register a new runner instance.
 
 **Request Body:**
 ```json
@@ -534,19 +534,19 @@ Register a new launcher instance.
 **Response:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
-  "poll_endpoint": "/launcher/runs",
+  "runner_id": "lnch_abc123",
+  "poll_endpoint": "/runner/runs",
   "poll_timeout_seconds": 30,
   "heartbeat_interval_seconds": 60
 }
 ```
 
-#### GET /launcher/runs
+#### GET /runner/runs
 
-Long-poll for available runs or stop commands (used by launcher).
+Long-poll for available runs or stop commands (used by runner).
 
 **Query Parameters:**
-- `launcher_id` (required) - The registered launcher ID
+- `runner_id` (required) - The registered runner ID
 
 **Response (Run Available):**
 ```json
@@ -581,16 +581,16 @@ Long-poll for available runs or stop commands (used by launcher).
 - Holds connection open for up to `poll_timeout_seconds`
 - Returns immediately if run or stop command available
 - Stop commands wake up the poll immediately (no waiting)
-- Returns `deregistered: true` if launcher has been deregistered
+- Returns `deregistered: true` if runner has been deregistered
 
-#### POST /launcher/runs/{run_id}/started
+#### POST /runner/runs/{run_id}/started
 
 Report that run execution has started.
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123"
+  "runner_id": "lnch_abc123"
 }
 ```
 
@@ -601,14 +601,14 @@ Report that run execution has started.
 }
 ```
 
-#### POST /launcher/runs/{run_id}/completed
+#### POST /runner/runs/{run_id}/completed
 
 Report that run completed successfully.
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "status": "success"  // optional
 }
 ```
@@ -620,14 +620,14 @@ Report that run completed successfully.
 }
 ```
 
-#### POST /launcher/runs/{run_id}/failed
+#### POST /runner/runs/{run_id}/failed
 
 Report that run execution failed.
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "error": "Error message"
 }
 ```
@@ -639,14 +639,14 @@ Report that run execution failed.
 }
 ```
 
-#### POST /launcher/runs/{run_id}/stopped
+#### POST /runner/runs/{run_id}/stopped
 
 Report that run was stopped (terminated by stop command).
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "signal": "SIGTERM"  // or "SIGKILL" if force killed
 }
 ```
@@ -659,17 +659,17 @@ Report that run was stopped (terminated by stop command).
 ```
 
 **Notes:**
-- Called by launcher after terminating a process in response to a stop command
+- Called by runner after terminating a process in response to a stop command
 - Signal indicates which signal was used to terminate the process
 
-#### POST /launcher/heartbeat
+#### POST /runner/heartbeat
 
-Keep launcher registration alive.
+Keep runner registration alive.
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123"
+  "runner_id": "lnch_abc123"
 }
 ```
 
@@ -681,19 +681,19 @@ Keep launcher registration alive.
 ```
 
 **Notes:**
-- Launchers should send heartbeat every `heartbeat_interval_seconds`
-- Launcher is considered stale after `heartbeat_timeout_seconds` without heartbeat
+- Runners should send heartbeat every `heartbeat_interval_seconds`
+- Runner is considered stale after `heartbeat_timeout_seconds` without heartbeat
 
-#### GET /launchers
+#### GET /runners
 
-List all registered launchers with their status.
+List all registered runners with their status.
 
 **Response:**
 ```json
 {
-  "launchers": [
+  "runners": [
     {
-      "launcher_id": "lnch_abc123",
+      "runner_id": "lnch_abc123",
       "registered_at": "2025-12-10T10:00:00Z",
       "last_heartbeat": "2025-12-10T10:05:00Z",
       "hostname": "macbook-pro",
@@ -706,22 +706,22 @@ List all registered launchers with their status.
 }
 ```
 
-**Launcher Status Values:**
+**Runner Status Values:**
 - `online` - Heartbeat within last 2 minutes
 - `stale` - No heartbeat for 2+ minutes (connection may be lost)
 
-#### DELETE /launchers/{launcher_id}
+#### DELETE /runners/{runner_id}
 
-Deregister a launcher.
+Deregister a runner.
 
 **Query Parameters:**
-- `self` (optional, default: false) - If true, launcher is deregistering itself
+- `self` (optional, default: false) - If true, runner is deregistering itself
 
 **Response (External Deregistration):**
 ```json
 {
   "ok": true,
-  "message": "Launcher marked for deregistration",
+  "message": "Runner marked for deregistration",
   "initiated_by": "external"
 }
 ```
@@ -730,16 +730,16 @@ Deregister a launcher.
 ```json
 {
   "ok": true,
-  "message": "Launcher deregistered",
+  "message": "Runner deregistered",
   "initiated_by": "self"
 }
 ```
 
 **Notes:**
-- External deregistration (dashboard): Marks launcher for deregistration, signals on next poll
-- Self-deregistration (launcher shutdown): Immediately removes from registry
+- External deregistration (dashboard): Marks runner for deregistration, signals on next poll
+- Self-deregistration (runner shutdown): Immediately removes from registry
 
-**Error:** `404 Not Found` if launcher doesn't exist.
+**Error:** `404 Not Found` if runner doesn't exist.
 
 ---
 
@@ -752,9 +752,9 @@ Deregister a launcher.
 | `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | Agent Orchestrator API URL |
 | `DEBUG_LOGGING` | `false` | Enable verbose logging |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
-| `LAUNCHER_POLL_TIMEOUT` | `30` | Launcher run poll timeout in seconds |
-| `LAUNCHER_HEARTBEAT_INTERVAL` | `60` | Launcher heartbeat interval in seconds |
-| `LAUNCHER_HEARTBEAT_TIMEOUT` | `120` | Launcher heartbeat timeout in seconds |
+| `RUNNER_POLL_TIMEOUT` | `30` | Runner run poll timeout in seconds |
+| `RUNNER_HEARTBEAT_INTERVAL` | `60` | Runner heartbeat interval in seconds |
+| `RUNNER_HEARTBEAT_TIMEOUT` | `120` | Runner heartbeat timeout in seconds |
 
 ---
 

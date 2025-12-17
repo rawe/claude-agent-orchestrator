@@ -1,6 +1,6 @@
 # Runs API
 
-The Runs API enables distributed agent execution by separating orchestration (Agent Coordinator) from execution (Agent Launcher). This allows the Agent Coordinator to be containerized while launchers run on host machines where agent frameworks are installed.
+The Runs API enables distributed agent execution by separating orchestration (Agent Coordinator) from execution (Agent Runner). This allows the Agent Coordinator to be containerized while runners run on host machines where agent frameworks are installed.
 
 ## Architecture
 
@@ -16,10 +16,10 @@ ao-* CLI / Dashboard / MCP Server
 │  │  (thread-safe, singleton) │  │
 │  └───────────────────────────┘  │
 └──────────────┬──────────────────┘
-               │ Long-poll GET /launcher/runs
+               │ Long-poll GET /runner/runs
                ▼
 ┌─────────────────────────────────┐
-│        Agent Launcher           │
+│        Agent Runner             │
 │  - Polls for pending runs       │
 │  - Concurrent execution         │
 │  - Reports run status           │
@@ -53,8 +53,8 @@ Runs follow a state machine with five statuses:
 
 | Status | Description |
 |--------|-------------|
-| `pending` | Run created, waiting for a launcher to claim it |
-| `claimed` | Launcher claimed the run, preparing to execute |
+| `pending` | Run created, waiting for a runner to claim it |
+| `claimed` | Runner claimed the run, preparing to execute |
 | `running` | Run execution has started |
 | `completed` | Run completed successfully |
 | `failed` | Run execution failed |
@@ -73,7 +73,7 @@ Runs follow a state machine with five statuses:
   "project_dir": "/path/to/project",
   "parent_session_name": "orchestrator-main",
   "status": "running",
-  "launcher_id": "lnch_xyz789",
+  "runner_id": "lnch_xyz789",
   "error": null,
   "created_at": "2025-12-10T10:00:00Z",
   "claimed_at": "2025-12-10T10:00:01Z",
@@ -92,10 +92,10 @@ Runs follow a state machine with five statuses:
 | `project_dir` | string? | Optional project directory path |
 | `parent_session_name` | string? | Parent session name for callback support |
 | `status` | enum | Current run status |
-| `launcher_id` | string? | ID of the launcher that claimed/executed the run |
+| `runner_id` | string? | ID of the runner that claimed/executed the run |
 | `error` | string? | Error message if run failed |
 | `created_at` | ISO 8601 | Timestamp when run was created |
-| `claimed_at` | ISO 8601? | Timestamp when launcher claimed the run |
+| `claimed_at` | ISO 8601? | Timestamp when runner claimed the run |
 | `started_at` | ISO 8601? | Timestamp when execution started |
 | `completed_at` | ISO 8601? | Timestamp when run completed or failed |
 
@@ -110,7 +110,7 @@ Runs follow a state machine with five statuses:
 
 ### Create Run
 
-Create a new run for a launcher to execute.
+Create a new run for a runner to execute.
 
 ```
 POST /runs
@@ -164,7 +164,7 @@ GET /runs/{run_id}
   "project_dir": "/path/to/project",
   "parent_session_name": "parent-task",
   "status": "completed",
-  "launcher_id": "lnch_xyz789",
+  "runner_id": "lnch_xyz789",
   "error": null,
   "created_at": "2025-12-10T10:00:00Z",
   "claimed_at": "2025-12-10T10:00:01Z",
@@ -175,22 +175,22 @@ GET /runs/{run_id}
 
 **Error:** `404 Not Found` if run doesn't exist.
 
-## Launcher Endpoints
+## Runner Endpoints
 
-These endpoints are used by the Agent Launcher to poll for and report on runs.
+These endpoints are used by the Agent Runner to poll for and report on runs.
 
 ### Poll for Runs
 
 Long-poll for available runs. Returns immediately if a run is available, otherwise holds the connection open.
 
 ```
-GET /launcher/runs?launcher_id={launcher_id}
+GET /runner/runs?runner_id={runner_id}
 ```
 
 **Query Parameters:**
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `launcher_id` | Yes | The registered launcher ID |
+| `runner_id` | Yes | The registered runner ID |
 
 **Response (Run Available):**
 ```json
@@ -219,13 +219,13 @@ GET /launcher/runs?launcher_id={launcher_id}
 Report that run execution has started.
 
 ```
-POST /launcher/runs/{run_id}/started
+POST /runner/runs/{run_id}/started
 ```
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123"
+  "runner_id": "lnch_abc123"
 }
 ```
 
@@ -241,13 +241,13 @@ POST /launcher/runs/{run_id}/started
 Report that run completed successfully.
 
 ```
-POST /launcher/runs/{run_id}/completed
+POST /runner/runs/{run_id}/completed
 ```
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "status": "success"
 }
 ```
@@ -264,13 +264,13 @@ POST /launcher/runs/{run_id}/completed
 Report that run execution failed.
 
 ```
-POST /launcher/runs/{run_id}/failed
+POST /runner/runs/{run_id}/failed
 ```
 
 **Request Body:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "error": "Error message describing what went wrong"
 }
 ```
@@ -293,7 +293,7 @@ The run queue is an in-memory, thread-safe singleton that stores runs in a dicti
 ```python
 class RunQueue:
     def add_run(run_create: RunCreate) -> Run
-    def claim_run(launcher_id: str) -> Optional[Run]
+    def claim_run(runner_id: str) -> Optional[Run]
     def get_run(run_id: str) -> Optional[Run]
     def update_run_status(run_id: str, status: RunStatus, error: str = None) -> Optional[Run]
     def get_run_by_session_name(session_name: str) -> Optional[Run]
@@ -305,22 +305,22 @@ Key characteristics:
 - FIFO ordering for run claiming
 - Module-level singleton: `run_queue`
 
-### Agent Launcher Components
+### Agent Runner Components
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `RunPoller` | `servers/agent-launcher/lib/poller.py` | Background thread polling for pending runs |
-| `RunExecutor` | `servers/agent-launcher/lib/executor.py` | Spawns ao-start/ao-resume subprocesses |
-| `RunSupervisor` | `servers/agent-launcher/lib/supervisor.py` | Monitors running runs, reports completion |
-| `CoordinatorAPIClient` | `servers/agent-launcher/lib/api_client.py` | HTTP client for launcher endpoints |
+| `RunPoller` | `servers/agent-runner/lib/poller.py` | Background thread polling for pending runs |
+| `RunExecutor` | `servers/agent-runner/lib/executor.py` | Spawns ao-start/ao-resume subprocesses |
+| `RunSupervisor` | `servers/agent-runner/lib/supervisor.py` | Monitors running runs, reports completion |
+| `CoordinatorAPIClient` | `servers/agent-runner/lib/api_client.py` | HTTP client for runner endpoints |
 
 ### Long-Polling Configuration
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `LAUNCHER_POLL_TIMEOUT` | `30` | Seconds to hold connection open |
-| `LAUNCHER_HEARTBEAT_INTERVAL` | `60` | Seconds between heartbeats |
-| `LAUNCHER_HEARTBEAT_TIMEOUT` | `120` | Seconds before launcher marked stale |
+| `RUNNER_POLL_TIMEOUT` | `30` | Seconds to hold connection open |
+| `RUNNER_HEARTBEAT_INTERVAL` | `60` | Seconds between heartbeats |
+| `RUNNER_HEARTBEAT_TIMEOUT` | `120` | Seconds before runner marked stale |
 
 ## Usage Examples
 

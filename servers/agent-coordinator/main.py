@@ -23,19 +23,19 @@ import agent_storage
 from validation import validate_agent_name
 from datetime import datetime, timezone
 
-# Import run queue and launcher registry services
+# Import run queue and runner registry services
 from services.run_queue import run_queue, RunCreate, Run, RunStatus, RunType
-from services.launcher_registry import launcher_registry, LauncherInfo
+from services.runner_registry import runner_registry, RunnerInfo
 from services.stop_command_queue import stop_command_queue
 from services import callback_processor
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
 
-# Launcher configuration
-LAUNCHER_POLL_TIMEOUT = int(os.getenv("LAUNCHER_POLL_TIMEOUT", "30"))
-LAUNCHER_HEARTBEAT_INTERVAL = int(os.getenv("LAUNCHER_HEARTBEAT_INTERVAL", "60"))
-LAUNCHER_HEARTBEAT_TIMEOUT = int(os.getenv("LAUNCHER_HEARTBEAT_TIMEOUT", "120"))
+# Runner configuration
+RUNNER_POLL_TIMEOUT = int(os.getenv("RUNNER_POLL_TIMEOUT", "30"))
+RUNNER_HEARTBEAT_INTERVAL = int(os.getenv("RUNNER_HEARTBEAT_INTERVAL", "60"))
+RUNNER_HEARTBEAT_TIMEOUT = int(os.getenv("RUNNER_HEARTBEAT_TIMEOUT", "120"))
 
 # WebSocket connections (in-memory set)
 connections: set[WebSocket] = set()
@@ -257,9 +257,9 @@ async def _stop_run(run: Run) -> dict:
         "session_name": run.session_name,
     }
 
-    # Handle PENDING runs - not yet claimed by any launcher
+    # Handle PENDING runs - not yet claimed by any runner
     if run.status == RunStatus.PENDING:
-        # Just mark as stopped directly - no launcher to signal
+        # Just mark as stopped directly - no runner to signal
         run_queue.update_run_status(run.run_id, RunStatus.STOPPED)
         result["status"] = "stopped"
         result["message"] = "Run cancelled before execution"
@@ -275,18 +275,18 @@ async def _stop_run(run: Run) -> dict:
 
         return result
 
-    # Handle CLAIMED or RUNNING runs - need to signal the launcher
+    # Handle CLAIMED or RUNNING runs - need to signal the runner
     if run.status not in (RunStatus.CLAIMED, RunStatus.RUNNING):
         raise HTTPException(
             status_code=400,
             detail=f"Run cannot be stopped (status: {run.status})"
         )
 
-    if not run.launcher_id:
-        raise HTTPException(status_code=400, detail="Run not claimed by any launcher")
+    if not run.runner_id:
+        raise HTTPException(status_code=400, detail="Run not claimed by any runner")
 
-    # Queue the stop command (wakes up the launcher's poll immediately)
-    if not stop_command_queue.add_stop(run.launcher_id, run.run_id):
+    # Queue the stop command (wakes up the runner's poll immediately)
+    if not stop_command_queue.add_stop(run.runner_id, run.run_id):
         raise HTTPException(status_code=500, detail="Failed to queue stop command")
 
     # Update run status to STOPPING
@@ -294,7 +294,7 @@ async def _stop_run(run: Run) -> dict:
     result["status"] = "stopping"
 
     if DEBUG:
-        print(f"[DEBUG] Stop requested for run {run.run_id} (session={run.session_name}, launcher={run.launcher_id})", flush=True)
+        print(f"[DEBUG] Stop requested for run {run.run_id} (session={run.session_name}, runner={run.runner_id})", flush=True)
 
     # Update session status to 'stopping' and broadcast to WebSocket clients
     session = get_session_by_name(run.session_name)
@@ -307,10 +307,10 @@ async def _stop_run(run: Run) -> dict:
 
 @app.post("/sessions/{session_id}/stop")
 async def stop_session(session_id: str):
-    """Stop a running session by signaling its launcher.
+    """Stop a running session by signaling its runner.
 
     Finds the active run for this session and queues a stop command.
-    The launcher will receive the stop command on its next poll and terminate the process.
+    The runner will receive the stop command on its next poll and terminate the process.
 
     This endpoint is robust and handles various states:
     - If session is 'stopping', returns success (already stopping)
@@ -416,8 +416,8 @@ async def add_session_event(session_id: str, event: Event):
                 connections.discard(ws)
 
         # Callback processing: handle child completion and pending notifications
-        # TODO: REMOVE - Move success callback to POST /launcher/runs/{run_id}/completed
-        # This callback logic should be unified with failure/stopped callbacks in the Launcher API.
+        # TODO: REMOVE - Move success callback to POST /runner/runs/{run_id}/completed
+        # This callback logic should be unified with failure/stopped callbacks in the Runner API.
         # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
         session_name = updated_session.get("session_name")
         parent_session_name = updated_session.get("parent_session_name")
@@ -634,70 +634,70 @@ def update_agent_status(name: str, data: AgentStatusUpdate):
 
 
 # ==============================================================================
-# Launcher API Routes (for Agent Launcher communication)
+# Runner API Routes (for Agent Runner communication)
 # ==============================================================================
 
-class LauncherRegisterRequest(BaseModel):
-    """Request body for launcher registration with metadata."""
+class RunnerRegisterRequest(BaseModel):
+    """Request body for runner registration with metadata."""
     hostname: str | None = None
     project_dir: str | None = None
     executor_type: str | None = None
 
 
-class LauncherRegisterResponse(BaseModel):
-    """Response from launcher registration."""
-    launcher_id: str
+class RunnerRegisterResponse(BaseModel):
+    """Response from runner registration."""
+    runner_id: str
     poll_endpoint: str
     poll_timeout_seconds: int
     heartbeat_interval_seconds: int
 
 
-class LauncherIdRequest(BaseModel):
-    """Request body containing launcher_id."""
-    launcher_id: str
+class RunnerIdRequest(BaseModel):
+    """Request body containing runner_id."""
+    runner_id: str
 
 
 class RunCompletedRequest(BaseModel):
     """Request body for run completion."""
-    launcher_id: str
+    runner_id: str
     status: str = "success"
 
 
 class RunFailedRequest(BaseModel):
     """Request body for run failure."""
-    launcher_id: str
+    runner_id: str
     error: str
 
 
 class RunStoppedRequest(BaseModel):
     """Request body for run stopped report."""
-    launcher_id: str
+    runner_id: str
     signal: str = "SIGTERM"
 
 
-@app.post("/launcher/register")
-async def register_launcher(request: LauncherRegisterRequest | None = None):
-    """Register a new launcher instance.
+@app.post("/runner/register")
+async def register_runner(request: RunnerRegisterRequest | None = None):
+    """Register a new runner instance.
 
-    Accepts optional metadata about the launcher (hostname, project_dir).
-    Returns launcher_id and configuration for polling.
+    Accepts optional metadata about the runner (hostname, project_dir).
+    Returns runner_id and configuration for polling.
     """
     # Handle both empty body and JSON body
     hostname = request.hostname if request else None
     project_dir = request.project_dir if request else None
     executor_type = request.executor_type if request else None
 
-    launcher = launcher_registry.register_launcher(
+    runner = runner_registry.register_runner(
         hostname=hostname,
         project_dir=project_dir,
         executor_type=executor_type,
     )
 
     # Register with stop command queue for immediate wake-up on stop requests
-    stop_command_queue.register_launcher(launcher.launcher_id)
+    stop_command_queue.register_runner(runner.runner_id)
 
     if DEBUG:
-        print(f"[DEBUG] Registered new launcher: {launcher.launcher_id}", flush=True)
+        print(f"[DEBUG] Registered new runner: {runner.runner_id}", flush=True)
         if hostname:
             print(f"[DEBUG]   hostname: {hostname}", flush=True)
         if project_dir:
@@ -705,65 +705,65 @@ async def register_launcher(request: LauncherRegisterRequest | None = None):
         if executor_type:
             print(f"[DEBUG]   executor_type: {executor_type}", flush=True)
 
-    return LauncherRegisterResponse(
-        launcher_id=launcher.launcher_id,
-        poll_endpoint="/launcher/runs",
-        poll_timeout_seconds=LAUNCHER_POLL_TIMEOUT,
-        heartbeat_interval_seconds=LAUNCHER_HEARTBEAT_INTERVAL,
+    return RunnerRegisterResponse(
+        runner_id=runner.runner_id,
+        poll_endpoint="/runner/runs",
+        poll_timeout_seconds=RUNNER_POLL_TIMEOUT,
+        heartbeat_interval_seconds=RUNNER_HEARTBEAT_INTERVAL,
     )
 
 
-@app.get("/launcher/runs")
-async def poll_for_runs(launcher_id: str = Query(..., description="The registered launcher ID")):
+@app.get("/runner/runs")
+async def poll_for_runs(runner_id: str = Query(..., description="The registered runner ID")):
     """Long-poll for available runs or stop commands.
 
-    Holds the connection open for up to LAUNCHER_POLL_TIMEOUT seconds,
+    Holds the connection open for up to RUNNER_POLL_TIMEOUT seconds,
     returning immediately if a run or stop command is available.
     Returns 204 No Content if nothing available after timeout.
-    Returns {"deregistered": true} if launcher has been deregistered.
+    Returns {"deregistered": true} if runner has been deregistered.
     Returns {"stop_runs": [...]} if there are runs to stop.
     """
-    # Check if launcher has been deregistered
-    if launcher_registry.is_deregistered(launcher_id):
+    # Check if runner has been deregistered
+    if runner_registry.is_deregistered(runner_id):
         # Confirm deregistration and remove from registry
-        launcher_registry.confirm_deregistered(launcher_id)
-        stop_command_queue.unregister_launcher(launcher_id)
+        runner_registry.confirm_deregistered(runner_id)
+        stop_command_queue.unregister_runner(runner_id)
         if DEBUG:
-            print(f"[DEBUG] Launcher {launcher_id} deregistered, signaling shutdown", flush=True)
+            print(f"[DEBUG] Runner {runner_id} deregistered, signaling shutdown", flush=True)
         return {"deregistered": True}
 
-    # Verify launcher is registered
-    if not launcher_registry.get_launcher(launcher_id):
-        raise HTTPException(status_code=401, detail="Launcher not registered")
+    # Verify runner is registered
+    if not runner_registry.get_runner(runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
 
-    # Get the event for this launcher (for immediate wake-up on stop commands)
-    event = stop_command_queue.get_event(launcher_id)
+    # Get the event for this runner (for immediate wake-up on stop commands)
+    event = stop_command_queue.get_event(runner_id)
 
     # Poll for runs with timeout
     poll_interval = 0.5  # Check every 500ms
     elapsed = 0.0
 
-    while elapsed < LAUNCHER_POLL_TIMEOUT:
+    while elapsed < RUNNER_POLL_TIMEOUT:
         # Check for stop commands FIRST (highest priority)
-        stop_runs = stop_command_queue.get_and_clear(launcher_id)
+        stop_runs = stop_command_queue.get_and_clear(runner_id)
         if stop_runs:
             if DEBUG:
-                print(f"[DEBUG] Launcher {launcher_id} received stop commands for runs: {stop_runs}", flush=True)
+                print(f"[DEBUG] Runner {runner_id} received stop commands for runs: {stop_runs}", flush=True)
             return {"stop_runs": stop_runs}
 
         # Check for deregistration during polling
-        if launcher_registry.is_deregistered(launcher_id):
-            launcher_registry.confirm_deregistered(launcher_id)
-            stop_command_queue.unregister_launcher(launcher_id)
+        if runner_registry.is_deregistered(runner_id):
+            runner_registry.confirm_deregistered(runner_id)
+            stop_command_queue.unregister_runner(runner_id)
             if DEBUG:
-                print(f"[DEBUG] Launcher {launcher_id} deregistered during poll, signaling shutdown", flush=True)
+                print(f"[DEBUG] Runner {runner_id} deregistered during poll, signaling shutdown", flush=True)
             return {"deregistered": True}
 
         # Check for new runs
-        run = run_queue.claim_run(launcher_id)
+        run = run_queue.claim_run(runner_id)
         if run:
             if DEBUG:
-                print(f"[DEBUG] Launcher {launcher_id} claimed run {run.run_id}", flush=True)
+                print(f"[DEBUG] Runner {runner_id} claimed run {run.run_id}", flush=True)
             return {"run": run.model_dump()}
 
         # Wait with event for immediate wake-up on stop commands
@@ -782,12 +782,12 @@ async def poll_for_runs(launcher_id: str = Query(..., description="The registere
     return Response(status_code=204)
 
 
-@app.post("/launcher/runs/{run_id}/started")
-async def report_run_started(run_id: str, request: LauncherIdRequest):
+@app.post("/runner/runs/{run_id}/started")
+async def report_run_started(run_id: str, request: RunnerIdRequest):
     """Report that run execution has started."""
-    # Verify launcher
-    if not launcher_registry.get_launcher(request.launcher_id):
-        raise HTTPException(status_code=401, detail="Launcher not registered")
+    # Verify runner
+    if not runner_registry.get_runner(request.runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
 
     # Get run first to access parent_session_name
     run = run_queue.get_run(run_id)
@@ -808,24 +808,24 @@ async def report_run_started(run_id: str, request: LauncherIdRequest):
         # If session doesn't exist yet (start case), POST /sessions will pick up parent from run
 
     if DEBUG:
-        print(f"[DEBUG] Run {run_id} started by launcher {request.launcher_id}", flush=True)
+        print(f"[DEBUG] Run {run_id} started by runner {request.runner_id}", flush=True)
 
     return {"ok": True}
 
 
-@app.post("/launcher/runs/{run_id}/completed")
+@app.post("/runner/runs/{run_id}/completed")
 async def report_run_completed(run_id: str, request: RunCompletedRequest):
     """Report that run completed successfully."""
-    # Verify launcher
-    if not launcher_registry.get_launcher(request.launcher_id):
-        raise HTTPException(status_code=401, detail="Launcher not registered")
+    # Verify runner
+    if not runner_registry.get_runner(request.runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
 
     run = run_queue.update_run_status(run_id, RunStatus.COMPLETED)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
     if DEBUG:
-        print(f"[DEBUG] Run {run_id} completed by launcher {request.launcher_id}", flush=True)
+        print(f"[DEBUG] Run {run_id} completed by runner {request.runner_id}", flush=True)
 
     # TODO: ADD - Move success callback here from POST /sessions/{session_id}/events
     # This will unify callback triggers with failure/stopped callbacks.
@@ -853,12 +853,12 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
     return {"ok": True}
 
 
-@app.post("/launcher/runs/{run_id}/failed")
+@app.post("/runner/runs/{run_id}/failed")
 async def report_run_failed(run_id: str, request: RunFailedRequest):
     """Report that run execution failed."""
-    # Verify launcher
-    if not launcher_registry.get_launcher(request.launcher_id):
-        raise HTTPException(status_code=401, detail="Launcher not registered")
+    # Verify runner
+    if not runner_registry.get_runner(request.runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
 
     run = run_queue.update_run_status(run_id, RunStatus.FAILED, error=request.error)
     if not run:
@@ -887,23 +887,23 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
     return {"ok": True}
 
 
-@app.post("/launcher/runs/{run_id}/stopped")
+@app.post("/runner/runs/{run_id}/stopped")
 async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     """Report that run was stopped (terminated by stop command).
 
-    Called by launcher after terminating a process in response to a stop command.
+    Called by runner after terminating a process in response to a stop command.
     Updates session status to 'stopped' and broadcasts to WebSocket clients.
     """
-    # Verify launcher
-    if not launcher_registry.get_launcher(request.launcher_id):
-        raise HTTPException(status_code=401, detail="Launcher not registered")
+    # Verify runner
+    if not runner_registry.get_runner(request.runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
 
     run = run_queue.update_run_status(run_id, RunStatus.STOPPED)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
     if DEBUG:
-        print(f"[DEBUG] Run {run_id} stopped by launcher {request.launcher_id} (signal={request.signal})", flush=True)
+        print(f"[DEBUG] Run {run_id} stopped by runner {request.runner_id} (signal={request.signal})", flush=True)
 
     # Notify parent if this was a callback run (treat as failure)
     if run.parent_session_name:
@@ -930,18 +930,18 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     return {"ok": True}
 
 
-@app.post("/launcher/heartbeat")
-async def launcher_heartbeat(request: LauncherIdRequest):
-    """Keep launcher registration alive."""
-    if not launcher_registry.heartbeat(request.launcher_id):
-        raise HTTPException(status_code=401, detail="Launcher not registered")
+@app.post("/runner/heartbeat")
+async def runner_heartbeat(request: RunnerIdRequest):
+    """Keep runner registration alive."""
+    if not runner_registry.heartbeat(request.runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
 
     return {"ok": True}
 
 
-class LauncherWithStatus(BaseModel):
-    """Launcher info with computed status fields."""
-    launcher_id: str
+class RunnerWithStatus(BaseModel):
+    """Runner info with computed status fields."""
+    runner_id: str
     registered_at: str
     last_heartbeat: str
     hostname: str | None = None
@@ -951,75 +951,75 @@ class LauncherWithStatus(BaseModel):
     seconds_since_heartbeat: float
 
 
-@app.get("/launchers")
-async def list_launchers():
-    """List all registered launchers with their status.
+@app.get("/runners")
+async def list_runners():
+    """List all registered runners with their status.
 
-    Returns all launchers with status:
+    Returns all runners with status:
     - "online": heartbeat within last 2 minutes
     - "stale": no heartbeat for 2+ minutes (connection may be lost)
-    - "offline": launcher has deregistered or been removed
+    - "offline": runner has deregistered or been removed
     """
-    launchers = launcher_registry.get_all_launchers()
+    runners = runner_registry.get_all_runners()
     result = []
 
-    for launcher in launchers:
-        seconds = launcher_registry.get_seconds_since_heartbeat(launcher.launcher_id)
+    for runner in runners:
+        seconds = runner_registry.get_seconds_since_heartbeat(runner.runner_id)
         if seconds is None:
             continue  # Shouldn't happen, but skip if it does
 
         # Determine status based on heartbeat age
-        if seconds < LAUNCHER_HEARTBEAT_TIMEOUT:
+        if seconds < RUNNER_HEARTBEAT_TIMEOUT:
             status = "online"
         else:
             status = "stale"
 
-        result.append(LauncherWithStatus(
-            launcher_id=launcher.launcher_id,
-            registered_at=launcher.registered_at,
-            last_heartbeat=launcher.last_heartbeat,
-            hostname=launcher.hostname,
-            project_dir=launcher.project_dir,
-            executor_type=launcher.executor_type,
+        result.append(RunnerWithStatus(
+            runner_id=runner.runner_id,
+            registered_at=runner.registered_at,
+            last_heartbeat=runner.last_heartbeat,
+            hostname=runner.hostname,
+            project_dir=runner.project_dir,
+            executor_type=runner.executor_type,
             status=status,
             seconds_since_heartbeat=seconds,
         ))
 
-    return {"launchers": result}
+    return {"runners": result}
 
 
-@app.delete("/launchers/{launcher_id}")
-async def deregister_launcher(
-    launcher_id: str,
-    self_initiated: bool = Query(False, alias="self", description="True if launcher is deregistering itself"),
+@app.delete("/runners/{runner_id}")
+async def deregister_runner(
+    runner_id: str,
+    self_initiated: bool = Query(False, alias="self", description="True if runner is deregistering itself"),
 ):
-    """Deregister a launcher.
+    """Deregister a runner.
 
     Two modes:
-    - External (dashboard): Marks launcher for deregistration, signals on next poll
-    - Self-initiated (launcher shutdown): Immediately removes from registry
+    - External (dashboard): Marks runner for deregistration, signals on next poll
+    - Self-initiated (runner shutdown): Immediately removes from registry
 
     Args:
-        launcher_id: The launcher to deregister
-        self_initiated: If true, launcher is deregistering itself (immediate removal)
+        runner_id: The runner to deregister
+        self_initiated: If true, runner is deregistering itself (immediate removal)
     """
-    # Check if launcher exists
-    if not launcher_registry.get_launcher(launcher_id):
-        raise HTTPException(status_code=404, detail="Launcher not found")
+    # Check if runner exists
+    if not runner_registry.get_runner(runner_id):
+        raise HTTPException(status_code=404, detail="Runner not found")
 
     if self_initiated:
-        # Launcher is shutting down gracefully - remove immediately
-        launcher_registry.remove_launcher(launcher_id)
-        stop_command_queue.unregister_launcher(launcher_id)
+        # Runner is shutting down gracefully - remove immediately
+        runner_registry.remove_runner(runner_id)
+        stop_command_queue.unregister_runner(runner_id)
         if DEBUG:
-            print(f"[DEBUG] Launcher {launcher_id} self-deregistered (graceful shutdown)", flush=True)
-        return {"ok": True, "message": "Launcher deregistered", "initiated_by": "self"}
+            print(f"[DEBUG] Runner {runner_id} self-deregistered (graceful shutdown)", flush=True)
+        return {"ok": True, "message": "Runner deregistered", "initiated_by": "self"}
     else:
         # External request (dashboard) - mark for deregistration, signal on next poll
-        launcher_registry.mark_deregistered(launcher_id)
+        runner_registry.mark_deregistered(runner_id)
         if DEBUG:
-            print(f"[DEBUG] Launcher {launcher_id} marked for deregistration (external request)", flush=True)
-        return {"ok": True, "message": "Launcher marked for deregistration", "initiated_by": "external"}
+            print(f"[DEBUG] Runner {runner_id} marked for deregistration (external request)", flush=True)
+        return {"ok": True, "message": "Runner marked for deregistration", "initiated_by": "external"}
 
 
 # ==============================================================================
@@ -1028,7 +1028,7 @@ async def deregister_launcher(
 
 @app.post("/runs")
 async def create_run(run_create: RunCreate):
-    """Create a new run for the launcher to execute.
+    """Create a new run for the runner to execute.
 
     Used by Dashboard and future ao-start to queue work.
     """
@@ -1061,10 +1061,10 @@ async def get_run(run_id: str):
 
 @app.post("/runs/{run_id}/stop")
 async def stop_run(run_id: str):
-    """Stop a running run by signaling its launcher.
+    """Stop a running run by signaling its runner.
 
-    Queues a stop command for the launcher that will terminate the run's process.
-    The launcher will receive the stop command on its next poll and terminate the process.
+    Queues a stop command for the runner that will terminate the run's process.
+    The runner will receive the stop command on its next poll and terminate the process.
     """
     run = run_queue.get_run(run_id)
     if not run:

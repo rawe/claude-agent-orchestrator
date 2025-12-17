@@ -5,7 +5,7 @@ Verify that when a child agent fails, the parent receives a failure callback wit
 ## Prerequisites
 
 - Agent Coordinator running
-- Agent Launcher running with `claude-code` executor
+- Agent Runner running with `claude-code` executor
 - ws-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
@@ -58,7 +58,7 @@ curl -X POST http://localhost:8765/runs \
 
 1. Child run created successfully (run creation passes)
 2. Executor fails (blueprint not found → exit code 1)
-3. `report_run_failed` called by launcher
+3. `report_run_failed` called by runner
 4. Callback triggered to parent with failure message
 5. Parent receives resume with prompt containing:
    - `"test-child-fail" has failed`

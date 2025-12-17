@@ -24,7 +24,7 @@
 
 ## Testing
 
-Integration tests for Agent Coordinator and Agent Launcher without UI. 
+Integration tests for Agent Coordinator and Agent Runner without UI. 
 
 Use SlashCommands `/tests/setup`, `/tests/case`, `/tests/run`, `/tests/teardown`. 
 

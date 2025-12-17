@@ -9,9 +9,9 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 ```
 ├── dashboard/                    # React web UI for monitoring agents
 ├── servers/
-│   ├── agent-coordinator/            # FastAPI server - sessions, runs, launcher registry
-│   ├── agent-launcher/           # Run executor - polls Agent Coordinator, spawns executors
-│   │   ├── lib/                  # Core launcher (framework-agnostic)
+│   ├── agent-coordinator/            # FastAPI server - sessions, runs, runner registry
+│   ├── agent-runner/           # Run executor - polls Agent Coordinator, spawns executors
+│   │   ├── lib/                  # Core runner (framework-agnostic)
 │   │   └── claude-code/          # Claude Code executors (Claude Agent SDK)
 │   └── context-store/            # Document synchronization server
 ├── plugins/
@@ -32,11 +32,11 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 - Broadcasts real-time updates to dashboard
 - Agent blueprint registry (CRUD API for agent definitions)
 - Runs API for asynchronous session start/resume/stop
-- Launcher registry with health monitoring
+- Runner registry with health monitoring
 - Callback processor for parent-child session coordination
 - Stop command queue for immediate session termination
 
-**Agent Launcher** (`servers/agent-launcher/`)
+**Agent Runner** (`servers/agent-runner/`)
 - Polls Agent Coordinator for pending runs and stop commands
 - Executes runs via framework-specific executors
 - Supports concurrent run execution
@@ -45,7 +45,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 - Maintains heartbeat for health monitoring
 - Auto-exits after repeated connection failures
 
-**Claude Code Executors** (`servers/agent-launcher/claude-code/`)
+**Claude Code Executors** (`servers/agent-runner/claude-code/`)
 - `ao-start` - Start new Claude Code sessions
 - `ao-resume` - Resume existing sessions
 - Uses Claude Agent SDK for execution
@@ -92,7 +92,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 │         Agent Coordinator :8765         │   │       Context Store :8766       │
 │  - Sessions API                     │   │   - Document storage            │
 │  - Runs API                         │   │   - Tag-based queries           │
-│  - Launcher registry                │   │   - Semantic search             │
+│  - Runner registry                  │   │   - Semantic search             │
 │  - Callback processor               │   └─────────────────┬───────────────┘
 │  - SQLite persistence               │                     │
 │  - WebSocket broadcast              │◄──────────────┐     │ HTTP
@@ -102,7 +102,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
            │ Long-poll (Runs)                   ┌─────┴─────┴─────┐
            ▼                                    │    Dashboard    │
 ┌─────────────────────────────────────┐         │ - Session view  │
-│        Agent Launcher               │         │ - Launcher mgmt │
+│        Agent Runner                 │         │ - Runner mgmt   │
 │  - Polls for pending runs           │         │ - Blueprint mgmt│
 │  - Concurrent run execution         │         │ - Chat tab      │
 │  - Reports run status               │         │ - Document view │
@@ -113,7 +113,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
            ▼
 ┌─────────────────────────────────────┐
 │  Claude Code Executors              │
-│  (servers/agent-launcher/claude-code)│
+│  (servers/agent-runner/claude-code) │
 │  - ao-start: Start new sessions     │
 │  - ao-resume: Resume sessions       │
 │  - Uses Claude Agent SDK            │
@@ -133,12 +133,12 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 | ao-* CLI commands | Agent Coordinator | HTTP | Create runs, query sessions |
 | doc-* commands | Context Store | HTTP | Document operations |
 | Dashboard | Agent Coordinator | HTTP | Runs API, Sessions API, Blueprints API |
-| Dashboard | Agent Coordinator | HTTP | Launcher management |
+| Dashboard | Agent Coordinator | HTTP | Runner management |
 | Dashboard | Agent Coordinator | WebSocket | Real-time session updates |
 | Dashboard | Context Store | HTTP | Document listing/viewing |
-| Agent Launcher | Agent Coordinator | HTTP | Long-poll for runs, report status |
-| Agent Launcher | Agent Coordinator | HTTP | Registration, heartbeat |
-| Agent Launcher | Claude Code Executors | Subprocess | Execute ao-start, ao-resume |
+| Agent Runner | Agent Coordinator | HTTP | Long-poll for runs, report status |
+| Agent Runner | Agent Coordinator | HTTP | Registration, heartbeat |
+| Agent Runner | Claude Code Executors | Subprocess | Execute ao-start, ao-resume |
 | Agent Orchestrator MCP | Agent Coordinator | HTTP | Runs API (start/resume sessions) |
 | Context Store MCP | doc-* commands | Subprocess | Expose as MCP tools |
 
@@ -146,23 +146,23 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 
 | Variable | Default | Used By |
 |----------|---------|---------|
-| `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | ao-* CLI commands, MCP Server, Agent Launcher |
+| `AGENT_ORCHESTRATOR_API_URL` | `http://127.0.0.1:8765` | ao-* CLI commands, MCP Server, Agent Runner |
 | `VITE_AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Dashboard |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | cwd | ao-* CLI commands, MCP Server |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Coordinator |
 | `DEBUG_LOGGING` | `false` | Agent Coordinator |
-| `POLL_TIMEOUT` | `30` | Agent Launcher |
-| `HEARTBEAT_INTERVAL` | `60` | Agent Launcher |
-| `PROJECT_DIR` | cwd | Agent Launcher |
-| `AGENT_SESSION_NAME` | (none) | Claude Code Executors (set by Launcher) |
+| `POLL_TIMEOUT` | `30` | Agent Runner |
+| `HEARTBEAT_INTERVAL` | `60` | Agent Runner |
+| `PROJECT_DIR` | cwd | Agent Runner |
+| `AGENT_SESSION_NAME` | (none) | Claude Code Executors (set by Runner) |
 
-## Agent Launcher Architecture
+## Agent Runner Architecture
 
-The Agent Launcher enables distributed agent execution, separating orchestration (Agent Coordinator) from execution (Launcher + Executors).
+The Agent Runner enables distributed agent execution, separating orchestration (Agent Coordinator) from execution (Runner + Executors).
 
 ### Why Separate?
 
-Starting agent sessions requires spawning AI framework processes (e.g., Claude Code). These processes must run on the host machine—not inside a Docker container. The Agent Launcher runs on hosts where agent frameworks are installed, while the Agent Coordinator can be containerized.
+Starting agent sessions requires spawning AI framework processes (e.g., Claude Code). These processes must run on the host machine—not inside a Docker container. The Agent Runner runs on hosts where agent frameworks are installed, while the Agent Coordinator can be containerized.
 
 ### Architecture
 
@@ -170,13 +170,13 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
 ┌─────────────────────────────────────┐
 │         Agent Coordinator               │
 │  - Runs API (queue & dispatch)      │
-│  - Launcher registry                │
+│  - Runner registry                  │
 │  - Callback processor               │
 └──────────────┬──────────────────────┘
                │ Long-poll for runs
                ▼
 ┌─────────────────────────────────────┐
-│         Agent Launcher              │
+│         Agent Runner                │
 │  - Polls for pending runs           │
 │  - Concurrent execution             │
 │  - Status reporting                 │
@@ -197,10 +197,10 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
 └─────────────────────────────────────┘
 ```
 
-### Launcher Lifecycle
+### Runner Lifecycle
 
-1. **Registration**: Launcher calls `POST /launcher/register` on startup
-2. **Polling**: Long-polls `GET /launcher/runs` for pending runs or stop commands
+1. **Registration**: Runner calls `POST /runner/register` on startup
+2. **Polling**: Long-polls `GET /runner/runs` for pending runs or stop commands
 3. **Execution**: Spawns executor subprocess (e.g., `claude-code/ao-start`)
 4. **Reporting**: Reports run status (started, completed, failed, stopped)
 5. **Stop Handling**: Receives stop commands and terminates running processes
@@ -238,7 +238,7 @@ Parent (orchestrator)          Child (worker)
 ### Extensibility
 
 The architecture supports multiple agent frameworks:
-- **Claude Code**: Currently implemented (`servers/agent-launcher/claude-code/`)
+- **Claude Code**: Currently implemented (`servers/agent-runner/claude-code/`)
 - **Future**: LangChain, AutoGen, or other frameworks can add executors
 
-Only the executor directory is framework-specific. The Launcher core, Agent Coordinator, Runs API, and all ao-* CLI commands are framework-agnostic.
+Only the executor directory is framework-specific. The Runner core, Agent Coordinator, Runs API, and all ao-* CLI commands are framework-agnostic.

@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document describes the Agent Callback Architecture and its implementation via the **Agent Launcher** component. The launcher replaces the temporary Agent Control API and provides the foundation for callback-driven orchestration.
+This document describes the Agent Callback Architecture and its implementation via the **Agent Runner** component. The runner replaces the temporary Agent Control API and provides the foundation for callback-driven orchestration.
 
 ## Motivation
 
@@ -49,7 +49,7 @@ Orchestrator ──start──► Child Agent ──runs──► completes
                       │ Checks: is orchestrator idle?
                       ▼
            ┌─────────────────────┐
-           │   Agent Launcher    │
+           │   Agent Runner      │
            │  (resumes session)  │
            └──────────┬──────────┘
                       │
@@ -94,7 +94,7 @@ This naturally handles parallel spawns - if an orchestrator spawns 5 agents and 
 1. **Replace Agent Control API** - Eliminate the current MCP-server-based control API
 2. **Enable Callbacks** - Provide the infrastructure for Agent Coordinator to resume orchestrator sessions
 3. **Minimal Implementation** - Simplest path to a working POC
-4. **Foundation for Future** - Design that can evolve (multiple launchers, direct SDK integration)
+4. **Foundation for Future** - Design that can evolve (multiple runners, direct SDK integration)
 
 ## Callback Feature Constraints
 
@@ -103,13 +103,13 @@ This naturally handles parallel spawns - if an orchestrator spawns 5 agents and 
 **Callbacks only work when the parent agent is started and controlled by the Agent Orchestrator framework.**
 
 The callback mechanism requires the ability to resume the parent session. This is only possible if:
-- The parent was started via the Run API → Launcher
+- The parent was started via the Run API → Runner
 - The framework has control over the parent's lifecycle
-- The launcher can execute `ao-resume` on the parent
+- The runner can execute `ao-resume` on the parent
 
 | Parent Started By | Framework Controls? | Can Resume? | Callbacks Work? |
 |-------------------|---------------------|-------------|-----------------|
-| Dashboard → Run API → Launcher | ✅ Yes | ✅ Yes | ✅ Yes |
+| Dashboard → Run API → Runner | ✅ Yes | ✅ Yes | ✅ Yes |
 | User runs `claude` CLI directly | ❌ No | ❌ No | ❌ No |
 | Claude Desktop | ❌ No | ❌ No | ❌ No |
 | External MCP client | ❌ No | ❌ No | ❌ No |
@@ -144,7 +144,7 @@ The MCP server `start_agent_session` and `resume_agent_session` tools gain a new
 #### MCP Server Implementation
 
 When `callback=true`:
-1. MCP server reads `AGENT_SESSION_NAME` from environment (set by Launcher for parent)
+1. MCP server reads `AGENT_SESSION_NAME` from environment (set by Runner for parent)
 2. Sets `AGENT_SESSION_NAME={parent_session_name}` in subprocess environment when spawning `ao-start`
 3. `ao-start` reads env var and passes `parent_session_name` to Sessions API
 
@@ -167,7 +167,7 @@ async def execute_script_async(config, args, callback: bool = False):
 
 For callbacks to work, child agents must know their parent's identity. This requires:
 
-1. **Launcher sets environment variable** when starting a session:
+1. **Runner sets environment variable** when starting a session:
    ```bash
    AGENT_SESSION_NAME=orchestrator ao-start orchestrator -p "..."
    ```
@@ -217,7 +217,7 @@ For callbacks to work, child agents must know their parent's identity. This requ
 ### Callback Flow with Parent Context
 
 ```
-1. Launcher starts orchestrator:
+1. Runner starts orchestrator:
    AGENT_SESSION_NAME=orchestrator ao-start orchestrator -p "..."
 
 2. Orchestrator calls MCP tool with callback=true:
@@ -233,7 +233,7 @@ For callbacks to work, child agents must know their parent's identity. This requ
    → Yes: parent_session_name=orchestrator
    → Create resume run for "orchestrator"
 
-5. Launcher resumes orchestrator:
+5. Runner resumes orchestrator:
    ao-resume orchestrator -p "Child task completed..."
 ```
 
@@ -255,7 +255,7 @@ The parent session name is passed via a custom HTTP header when Claude Code conn
 #### Flow Diagram
 
 ```
-1. Launcher starts Claude Code via SDK:
+1. Runner starts Claude Code via SDK:
    - Sets AGENT_SESSION_NAME=orchestrator in environment
    - Provides optional agent name to the ao-start/ao-resume command
 
@@ -293,7 +293,7 @@ MCP Config (retrieved from agent-coordinator endpoints):
 
 #### How Placeholder Replacement Works
 
-The Launcher sets the `AGENT_SESSION_NAME` environment variable before spawning `ao-start`/`ao-resume`. The **ao-* commands** then:
+The Runner sets the `AGENT_SESSION_NAME` environment variable before spawning `ao-start`/`ao-resume`. The **ao-* commands** then:
 
 1. Read the environment variable
 2. Fetch the agent blueprint from Agent Coordinator (which contains MCP config with `${AGENT_SESSION_NAME}` placeholder)
@@ -304,7 +304,7 @@ This approach:
 - Keeps the pattern consistent with Claude Code's config syntax
 - Is transparent to the agent (no explicit parameter passing)
 - Works identically whether using Skill or MCP server
-- Keeps the Launcher simple (just sets env var and spawns subprocess)
+- Keeps the Runner simple (just sets env var and spawns subprocess)
 
 #### Required Changes
 
@@ -333,7 +333,7 @@ export interface MCPServerHttp {
 - Pass as `AGENT_SESSION_NAME` environment variable to `ao-start`/`ao-resume` subprocesses
 - Uses FastMCP's `get_http_headers()` helper to access headers
 
-**4. Launcher SDK Integration**:
+**4. Runner SDK Integration**:
 - When building MCP config for SDK, replace `${AGENT_SESSION_NAME}` placeholder
 - Use the session_name of the agent being started
 
@@ -344,13 +344,13 @@ export interface MCPServerHttp {
 | Term | Definition | Lifecycle | Persistence |
 |------|------------|-----------|-------------|
 | **Session** | A Claude Code agent conversation with its own ID, state, events, and result. Represents the agent's ongoing work and context. | Long-lived: `started` → `running` → `finished`/`error` | Persisted in Agent Coordinator database |
-| **Run** | A discrete command for the launcher to execute. Represents a single operation request. | Short-lived: `pending` → `running` → `completed`/`failed` | Transient (in-memory queue) |
+| **Run** | A discrete command for the runner to execute. Represents a single operation request. | Short-lived: `pending` → `running` → `completed`/`failed` | Transient (in-memory queue) |
 
 **Relationship:**
 - A Run triggers Session operations
 - Run types: `start_session`, `resume_session`
 - One Session may be acted upon by multiple Runs over time (start once, resume many times)
-- Runs are consumed by the Launcher; Sessions are tracked by the Coordinator
+- Runs are consumed by the Runner; Sessions are tracked by the Coordinator
 
 ```
 Run: "start_session"     →  Creates Session "task-1"
@@ -366,22 +366,22 @@ Run: "resume_session"    →  Resumes Session "task-1" (another callback)
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    Agent Coordinator (Docker) :8765                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
-│  │  Sessions API   │  │  Callbacks API  │  │     Launcher API        │  │
+│  │  Sessions API   │  │  Callbacks API  │  │     Runner API          │  │
 │  │  (existing)     │  │  (NEW)          │  │     (NEW)               │  │
 │  └─────────────────┘  └─────────────────┘  └───────────┬─────────────┘  │
 │                                                        │                 │
 │  ┌─────────────────────────────────────────────────────┴───────────────┐│
 │  │                        Run Queue                                     ││
-│  │  - Pending runs waiting for launcher                                 ││
+│  │  - Pending runs waiting for runner                                   ││
 │  │  - In-memory for POC (future: persistent)                           ││
 │  └─────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     │ HTTP Long-polling
-                                    │ (Launcher polls for runs)
+                                    │ (Runner polls for runs)
                                     │
 ┌───────────────────────────────────┴─────────────────────────────────────┐
-│                    Agent Launcher (Host Machine)                         │
+│                    Agent Runner (Host Machine)                           │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
 │  │  Registration   │  │   Run Poller    │  │    Run Executor         │  │
 │  │  (on startup)   │  │  (long-poll)    │  │  (subprocess ao-*)      │  │
@@ -397,7 +397,7 @@ Run: "resume_session"    →  Resumes Session "task-1" (another callback)
                             └───────────────┘
 ```
 
-### Launcher Lifecycle
+### Runner Lifecycle
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
@@ -422,9 +422,9 @@ Run: "resume_session"    →  Resumes Session "task-1" (another callback)
 
 ### Concurrent Execution Model
 
-The launcher **must** support concurrent run execution. This is required because:
+The runner **must** support concurrent run execution. This is required because:
 
-1. **Orchestrator scenario**: Dashboard starts an orchestrator (Run 1), which then starts child agents (Run 2, 3, ...). If the launcher could only run one run, the orchestrator would be blocked.
+1. **Orchestrator scenario**: Dashboard starts an orchestrator (Run 1), which then starts child agents (Run 2, 3, ...). If the runner could only run one run, the orchestrator would be blocked.
 
 2. **Callback scenario**: Multiple child agents may complete while the orchestrator is waiting, triggering multiple resume runs.
 
@@ -466,19 +466,19 @@ For POC, we can allow unlimited concurrent runs (practical limit ~10-20 based on
 
 ### Registration Flow
 
-On startup, the launcher registers with the Agent Coordinator to receive a unique identifier.
+On startup, the runner registers with the Agent Coordinator to receive a unique identifier.
 
 ```
-Launcher                              Agent Coordinator
+Runner                                Agent Coordinator
    │                                       │
-   │  POST /launcher/register              │
+   │  POST /runner/register                │
    │  { }                                  │
    │──────────────────────────────────────►│
    │                                       │
    │  200 OK                               │
    │  {                                    │
-   │    "launcher_id": "lnch_abc123",      │
-   │    "poll_endpoint": "/launcher/runs", │
+   │    "runner_id": "lnch_abc123",        │
+   │    "poll_endpoint": "/runner/runs",   │
    │    "poll_timeout_seconds": 30         │
    │  }                                    │
    │◄──────────────────────────────────────│
@@ -487,12 +487,12 @@ Launcher                              Agent Coordinator
 
 ### Run Polling Flow (Long-polling)
 
-The launcher continuously polls for runs. The server holds the connection open until a run is available or timeout occurs.
+The runner continuously polls for runs. The server holds the connection open until a run is available or timeout occurs.
 
 ```
-Launcher                              Agent Coordinator
+Runner                                Agent Coordinator
    │                                       │
-   │  GET /launcher/runs?launcher_id=X     │
+   │  GET /runner/runs?runner_id=X         │
    │  (blocks up to 30 seconds)            │
    │──────────────────────────────────────►│
    │                                       │
@@ -521,29 +521,29 @@ Launcher                              Agent Coordinator
 ### Run Execution Flow
 
 ```
-Launcher                              Agent Coordinator
+Runner                                Agent Coordinator
    │                                       │
    │  (receives run from poll)             │
    │                                       │
-   │  POST /launcher/runs/{run_id}/started │
-   │  { "launcher_id": "lnch_abc123" }     │
+   │  POST /runner/runs/{run_id}/started   │
+   │  { "runner_id": "lnch_abc123" }       │
    │──────────────────────────────────────►│
    │                                       │
    │  (executes ao-start/ao-resume)        │
    │  (subprocess runs...)                 │
    │                                       │
-   │  POST /launcher/runs/{run_id}/completed│
+   │  POST /runner/runs/{run_id}/completed │
    │  {                                    │
-   │    "launcher_id": "lnch_abc123",      │
+   │    "runner_id": "lnch_abc123",        │
    │    "status": "success"                │
    │  }                                    │
    │──────────────────────────────────────►│
    │                                       │
    │  OR (on failure)                      │
    │                                       │
-   │  POST /launcher/runs/{run_id}/failed  │
+   │  POST /runner/runs/{run_id}/failed    │
    │  {                                    │
-   │    "launcher_id": "lnch_abc123",      │
+   │    "runner_id": "lnch_abc123",        │
    │    "error": "ao-start failed: ..."    │
    │  }                                    │
    │──────────────────────────────────────►│
@@ -563,37 +563,37 @@ When a child agent completes and triggers a callback, the Callback Processor cre
 }
 ```
 
-The launcher executes:
+The runner executes:
 ```bash
 ao-resume orchestrator-main -p "Child session completed..."
 ```
 
 ## API Specification
 
-### Launcher API Endpoints (New in Agent Coordinator)
+### Runner API Endpoints (New in Agent Coordinator)
 
-#### POST /launcher/register
+#### POST /runner/register
 
-Register a new launcher instance.
+Register a new runner instance.
 
 **Request:** `{}` (empty body for anonymous registration)
 
 **Response:**
 ```json
 {
-  "launcher_id": "lnch_abc123def",
-  "poll_endpoint": "/launcher/runs",
+  "runner_id": "lnch_abc123def",
+  "poll_endpoint": "/runner/runs",
   "poll_timeout_seconds": 30,
   "heartbeat_interval_seconds": 60
 }
 ```
 
-#### GET /launcher/runs
+#### GET /runner/runs
 
 Long-poll for available runs.
 
 **Query Parameters:**
-- `launcher_id` (required): The registered launcher ID
+- `runner_id` (required): The registered runner ID
 
 **Response (run available):** `200 OK`
 ```json
@@ -611,55 +611,55 @@ Long-poll for available runs.
 
 **Response (no runs):** `204 No Content`
 
-#### POST /launcher/runs/{run_id}/started
+#### POST /runner/runs/{run_id}/started
 
 Report run execution has started.
 
 **Request:**
 ```json
 {
-  "launcher_id": "lnch_abc123"
+  "runner_id": "lnch_abc123"
 }
 ```
 
 **Response:** `200 OK`
 
-#### POST /launcher/runs/{run_id}/completed
+#### POST /runner/runs/{run_id}/completed
 
 Report run completed successfully.
 
 **Request:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "status": "success"
 }
 ```
 
 **Response:** `200 OK`
 
-#### POST /launcher/runs/{run_id}/failed
+#### POST /runner/runs/{run_id}/failed
 
 Report run execution failed.
 
 **Request:**
 ```json
 {
-  "launcher_id": "lnch_abc123",
+  "runner_id": "lnch_abc123",
   "error": "Error message from subprocess"
 }
 ```
 
 **Response:** `200 OK`
 
-#### POST /launcher/heartbeat
+#### POST /runner/heartbeat
 
-Keep launcher registration alive.
+Keep runner registration alive.
 
 **Request:**
 ```json
 {
-  "launcher_id": "lnch_abc123"
+  "runner_id": "lnch_abc123"
 }
 ```
 
@@ -717,10 +717,10 @@ Get run status.
 
 ## Callback Flow
 
-The Agent Launcher enables the following callback flow:
+The Agent Runner enables the following callback flow:
 
 ```
-1. Launcher starts orchestrator with env var:
+1. Runner starts orchestrator with env var:
    AGENT_SESSION_NAME=orchestrator ao-start orchestrator -p "..."
 
 2. Orchestrator starts child via ao-start:
@@ -737,7 +737,7 @@ The Agent Launcher enables the following callback flow:
 5. Callback Processor creates resume run
    └─► Run queued: type=resume_session, session_name=orchestrator
 
-6. Launcher polls and receives resume run
+6. Runner polls and receives resume run
    └─► Executes: ao-resume orchestrator -p "Child session completed..."
 
 7. Orchestrator resumes with callback notification
@@ -753,8 +753,8 @@ This section documents where callback notifications to parent agents are trigger
 | Event | Trigger Location | Endpoint/Handler | Notes |
 |-------|------------------|------------------|-------|
 | **Success** | `main.py:406-438` | `POST /sessions/{session_id}/events` | Triggered when `session_stop` event is received |
-| **Failure** | `main.py:843-858` | `POST /launcher/runs/{run_id}/failed` | Triggered when launcher reports run failure |
-| **Stopped** | `main.py:881-896` | `POST /launcher/runs/{run_id}/stopped` | Triggered when launcher reports run was stopped |
+| **Failure** | `main.py:843-858` | `POST /runner/runs/{run_id}/failed` | Triggered when runner reports run failure |
+| **Stopped** | `main.py:881-896` | `POST /runner/runs/{run_id}/stopped` | Triggered when runner reports run was stopped |
 
 ### Implementation Details
 
@@ -763,13 +763,13 @@ This section documents where callback notifications to parent agents are trigger
 - Flow: Event received → session status updated to `finished` → checks for `parent_session_name` → calls `callback_processor.on_child_completed()`
 - Result passed: Yes (retrieves child result via `get_session_result()`)
 
-**Failure Callback** (`POST /launcher/runs/{run_id}/failed`):
-- Triggered by: Agent Launcher calling `report_failed()` when subprocess exits with error
+**Failure Callback** (`POST /runner/runs/{run_id}/failed`):
+- Triggered by: Agent Runner calling `report_failed()` when subprocess exits with error
 - Flow: Run marked as `FAILED` → checks `run.parent_session_name` → calls `callback_processor.on_child_completed(child_failed=True)`
-- Error passed: Yes (error from launcher's `request.error`)
+- Error passed: Yes (error from runner's `request.error`)
 
-**Stopped Callback** (`POST /launcher/runs/{run_id}/stopped`):
-- Triggered by: Agent Launcher calling `report_stopped()` after terminating a process
+**Stopped Callback** (`POST /runner/runs/{run_id}/stopped`):
+- Triggered by: Agent Runner calling `report_stopped()` after terminating a process
 - Flow: Run marked as `STOPPED` → checks `run.parent_session_name` → calls `callback_processor.on_child_completed(child_failed=True)`
 - Error passed: Yes (hardcoded message: "Session was manually stopped")
 
@@ -779,18 +779,18 @@ This section documents where callback notifications to parent agents are trigger
 >
 > Currently, success callbacks use a different pattern than failure/stopped callbacks:
 > - **Success**: Triggered via Sessions API (`POST /sessions/{id}/events`) when `session_stop` event arrives
-> - **Failure/Stopped**: Triggered via Launcher API (`POST /launcher/runs/{id}/failed|stopped`)
+> - **Failure/Stopped**: Triggered via Runner API (`POST /runner/runs/{id}/failed|stopped`)
 >
-> For architectural consistency, consider moving the success callback trigger to `POST /launcher/runs/{run_id}/completed`. This would:
-> 1. Unify all callback triggers in the Launcher API endpoints
+> For architectural consistency, consider moving the success callback trigger to `POST /runner/runs/{run_id}/completed`. This would:
+> 1. Unify all callback triggers in the Runner API endpoints
 > 2. Make the callback flow consistent across all completion types
 > 3. Simplify understanding of the callback architecture
 >
-> The current approach works because the executor posts `session_stop` events before exiting, but the Launcher also reports `completed` after the process exits. Moving the success callback to the `/completed` endpoint would create a uniform pattern.
+> The current approach works because the executor posts `session_stop` events before exiting, but the Runner also reports `completed` after the process exits. Moving the success callback to the `/completed` endpoint would create a uniform pattern.
 
 ## Implementation Plan
 
-### Phase 1: Launcher API in Agent Coordinator
+### Phase 1: Runner API in Agent Coordinator
 
 **Files to modify:** `servers/agent-coordinator/`
 
@@ -800,31 +800,31 @@ This section documents where callback notifications to parent agents are trigger
    - Atomic `claim_run()` operation marks run as `claimed` before returning
    - Multiple accessors: Poll endpoint, Dashboard POST, Callback Processor
 
-2. **Add Launcher registry (in-memory)**
-   - Track registered launchers by ID
+2. **Add Runner registry (in-memory)**
+   - Track registered runners by ID
    - Track last heartbeat time
 
 3. **Implement endpoints:**
-   - `POST /launcher/register`
-   - `GET /launcher/runs` (with long-polling)
-   - `POST /launcher/runs/{id}/started`
-   - `POST /launcher/runs/{id}/completed`
-   - `POST /launcher/runs/{id}/failed`
-   - `POST /launcher/heartbeat`
+   - `POST /runner/register`
+   - `GET /runner/runs` (with long-polling)
+   - `POST /runner/runs/{id}/started`
+   - `POST /runner/runs/{id}/completed`
+   - `POST /runner/runs/{id}/failed`
+   - `POST /runner/heartbeat`
    - `POST /runs`
    - `GET /runs/{id}`
 
-### Phase 2: Agent Launcher Process
+### Phase 2: Agent Runner Process
 
-**New directory:** `servers/agent-launcher/`
+**New directory:** `servers/agent-runner/`
 
-1. **Create launcher CLI**
+1. **Create runner CLI**
    - Python script that runs as a standalone process
    - Configuration via environment variables or CLI args
 
 2. **Implement registration**
-   - On startup, POST to /launcher/register
-   - Store launcher_id for subsequent requests
+   - On startup, POST to /runner/register
+   - Store runner_id for subsequent requests
 
 3. **Implement Running Runs Registry**
    - Thread-safe dict: `run_id → { process: Popen, started_at: datetime }`
@@ -832,7 +832,7 @@ This section documents where callback notifications to parent agents are trigger
 
 4. **Implement Poll Thread**
    - Runs in background thread
-   - Long-poll GET /launcher/runs
+   - Long-poll GET /runner/runs
    - Handle timeout (204) → retry immediately
    - Handle run → spawn subprocess, add to registry, report started
 
@@ -888,7 +888,7 @@ This section documents where callback notifications to parent agents are trigger
    - Read `AGENT_SESSION_NAME` environment variable
    - Include in session metadata updates
 
-4. **Update Launcher executor**
+4. **Update Runner executor**
    - Set `AGENT_SESSION_NAME={session_name}` when spawning subprocess
    - This propagates parent context to child agents
 
@@ -915,19 +915,19 @@ This section documents where callback notifications to parent agents are trigger
 ├── servers/
 │   ├── agent-coordinator/
 │   │   ├── routers/
-│   │   │   ├── launcher.py          # NEW: Launcher API endpoints
+│   │   │   ├── runner.py            # NEW: Runner API endpoints
 │   │   │   ├── runs.py              # NEW: Run management endpoints
 │   │   │   └── ...
 │   │   ├── services/
 │   │   │   ├── run_queue.py         # NEW: In-memory run queue
-│   │   │   ├── launcher_registry.py # NEW: Launcher tracking
+│   │   │   ├── runner_registry.py   # NEW: Runner tracking
 │   │   │   ├── callback_processor.py # NEW: Callback logic
 │   │   │   └── ...
 │   │   └── models/
 │   │       ├── run.py               # NEW: Run model
 │   │       └── ...
-│   └── agent-launcher/
-│       ├── agent-launcher           # Main script (uv run --script)
+│   └── agent-runner/
+│       ├── agent-runner             # Main script (uv run --script)
 │       └── lib/                     # Service modules
 │           ├── __init__.py
 │           ├── config.py            # Configuration
@@ -938,11 +938,11 @@ This section documents where callback notifications to parent agents are trigger
 │           └── api_client.py        # HTTP client for Agent Coordinator API
 ```
 
-### Agent Launcher Script Pattern
+### Agent Runner Script Pattern
 
 Following the same pattern as `ao-start` and `ao-resume`:
 
-**Main script** (`agent-launcher`):
+**Main script** (`agent-runner`):
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
@@ -952,7 +952,7 @@ Following the same pattern as `ao-start` and `ao-resume`:
 #     "typer",
 # ]
 # ///
-"""Agent Launcher - Connects to Agent Coordinator and executes runs."""
+"""Agent Runner - Connects to Agent Coordinator and executes runs."""
 
 import sys
 from pathlib import Path
@@ -960,7 +960,7 @@ from pathlib import Path
 # Add lib to path for service modules
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
-from config import LauncherConfig
+from config import RunnerConfig
 from registry import RunningRunsRegistry
 from poller import RunPoller
 from supervisor import RunSupervisor
@@ -973,13 +973,13 @@ from api_client import CoordinatorAPIClient
 
 **Benefits:**
 - No installation required - `uv` handles dependencies automatically
-- Run from any directory: `./servers/agent-launcher/agent-launcher`
+- Run from any directory: `./servers/agent-runner/agent-runner`
 - Modular code with clean separation of concerns
 - Same pattern as existing ao-* commands
 
 ## Configuration
 
-### Agent Launcher
+### Agent Runner
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -992,40 +992,40 @@ from api_client import CoordinatorAPIClient
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LAUNCHER_POLL_TIMEOUT` | `30` | How long to hold poll requests |
-| `LAUNCHER_HEARTBEAT_TIMEOUT` | `120` | Mark launcher as dead after this |
+| `RUNNER_POLL_TIMEOUT` | `30` | How long to hold poll requests |
+| `RUNNER_HEARTBEAT_TIMEOUT` | `120` | Mark runner as dead after this |
 
 ## Migration Path
 
-1. **Implement Launcher API** in Agent Coordinator (no breaking changes)
-2. **Create Agent Launcher** process
+1. **Implement Runner API** in Agent Coordinator (no breaking changes)
+2. **Create Agent Runner** process
 3. **Update Dashboard** to use `/runs` endpoint
 4. **Deprecate Agent Control API** - stop using/documenting
 5. **Remove Agent Control API** - delete code from MCP server
 
 ## Success Criteria (POC)
 
-- [ ] Launcher registers with Agent Coordinator
+- [ ] Runner registers with Agent Coordinator
 - [ ] Dashboard can start sessions via `/runs` endpoint
-- [ ] Launcher executes `ao-start` and reports completion
-- [ ] Launcher executes `ao-resume` and reports completion
+- [ ] Runner executes `ao-start` and reports completion
+- [ ] Runner executes `ao-resume` and reports completion
 - [ ] Callback flow works: child completes → orchestrator resumes
 - [ ] Agent Control API can be disabled
 
 ## Future Enhancements (Post-POC)
 
-1. **Multiple launchers** - Launcher selection, load balancing
+1. **Multiple runners** - Runner selection, load balancing
 2. **Persistent run queue** - SQLite storage for runs
-3. **Direct SDK integration** - Launcher uses Claude SDK directly
+3. **Direct SDK integration** - Runner uses Claude SDK directly
 4. **ao-start via API** - Commands create runs instead of running directly
-5. **Launcher capabilities** - Different launchers for different agent types
-6. **Authentication** - Secure launcher registration
+5. **Runner capabilities** - Different runners for different agent types
+6. **Authentication** - Secure runner registration
 
 ## Known Limitations (POC)
 
 The following are explicitly **out of scope** for the POC:
 
-1. **Error handling** - No retry logic for failed callbacks, no handling of deleted parent sessions, no recovery from Launcher crashes mid-run
+1. **Error handling** - No retry logic for failed callbacks, no handling of deleted parent sessions, no recovery from Runner crashes mid-run
 
 2. **Run failure notification to Dashboard** - If a run fails (e.g., `ao-start` errors), the Dashboard has no way to know. It creates a run and relies on WebSocket for session updates; if the session never starts, the Dashboard sees nothing. Future: broadcast run failures via WebSocket or have Dashboard poll run status briefly after creation.
 
@@ -1033,7 +1033,7 @@ The following are explicitly **out of scope** for the POC:
 
 4. **Parent session cleanup** - When a parent session is deleted while children are running or callbacks are pending, the callbacks will fail gracefully (Callback Processor logs an error). No automatic cleanup of pending notifications.
 
-5. **Heartbeat timeout handling** - When a Launcher's heartbeat times out, it is marked as dead but orphaned runs remain in their current state. No automatic run recovery or reassignment.
+5. **Heartbeat timeout handling** - When a Runner's heartbeat times out, it is marked as dead but orphaned runs remain in their current state. No automatic run recovery or reassignment.
 
 ## Testing the Callback Mechanism
 

@@ -99,7 +99,7 @@ class RunClient:
             prompt: str
             project_dir: Optional[str]
             status: "pending" | "claimed" | "running" | "completed" | "failed"
-            launcher_id: Optional[str]
+            runner_id: Optional[str]
             error: Optional[str]
             created_at: str
             claimed_at: Optional[str]

@@ -40,16 +40,16 @@ This starts:
 
 > **Note:** Atlassian and Azure DevOps MCPs require credentials in `.env` files and will be skipped if not configured. See [mcps/README.md](./mcps/README.md) for setup.
 
-### 2. Start the Agent Launcher
+### 2. Start the Agent Runner
 
-The Agent Launcher executes agent runs. Run it in your **project directory** (where agents should work):
+The Agent Runner executes agent runs. Run it in your **project directory** (where agents should work):
 
 ```bash
 cd /path/to/your/project
-/path/to/claude-agent-orchestrator/servers/agent-launcher/agent-launcher
+/path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner
 ```
 
-The launcher connects to Agent Coordinator and waits for runs. Keep it running while using the framework.
+The runner connects to Agent Coordinator and waits for runs. Keep it running while using the framework.
 
 ### 3. Open the Dashboard
 
@@ -68,7 +68,7 @@ From the Dashboard you can:
 
 ```bash
 make stop-all    # Stop all services
-# Ctrl+C         # Stop the agent launcher
+# Ctrl+C         # Stop the agent runner
 ```
 
 ## Repository Structure
@@ -86,7 +86,7 @@ agent-orchestrator-framework/
 │
 ├── servers/                           # Backend servers
 │   ├── agent-coordinator/             # Session management + event capture + agent registry
-│   ├── agent-launcher/                # Run executor (polls coordinator, runs Claude Code)
+│   ├── agent-runner/                  # Run executor (polls coordinator, runs Claude Code)
 │   └── context-store/                 # Document storage
 │
 ├── mcps/                              # MCP servers (agent capabilities)
@@ -190,13 +190,13 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 | **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Coordinator. |
 | **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
 | **Agent Coordinator** | Backend server (port 8765) that manages session lifecycle, queues runs, captures events, and stores agent blueprints. |
-| **Agent Launcher** | Standalone process that polls Agent Coordinator for runs and executes them as Claude Code sessions. Must run in your project directory. |
+| **Agent Runner** | Standalone process that polls Agent Coordinator for runs and executes them as Claude Code sessions. Must run in your project directory. |
 | **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
 | **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
 
 ## Testing
 
-The framework includes an integration test suite for verifying Agent Coordinator and Agent Launcher functionality. Tests can be run with either a deterministic test executor or the real Claude Code executor.
+The framework includes an integration test suite for verifying Agent Coordinator and Agent Runner functionality. Tests can be run with either a deterministic test executor or the real Claude Code executor.
 
 See **[tests/README.md](./tests/README.md)** for setup and test case documentation.
 
@@ -205,7 +205,7 @@ See **[tests/README.md](./tests/README.md)** for setup and test case documentati
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Getting Started Guide](./docs/GETTING_STARTED.md)** - Detailed setup and configuration
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
-- **[Agent Launcher](./servers/agent-launcher/README.md)** - Run execution bridge details
+- **[Agent Runner](./servers/agent-runner/README.md)** - Run execution bridge details
 - **[Context Store](./servers/context-store/README.md)** - Document storage server with semantic search
 - **[MCP Servers Overview](./mcps/README.md)** - All available MCP servers
 - **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - MCP server for agent orchestration

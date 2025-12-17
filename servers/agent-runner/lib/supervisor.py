@@ -27,7 +27,7 @@ class RunSupervisor:
         self,
         api_client: CoordinatorAPIClient,
         registry: RunningRunsRegistry,
-        launcher_id: str,
+        runner_id: str,
         check_interval: float = 1.0,
     ):
         """Initialize the supervisor.
@@ -35,12 +35,12 @@ class RunSupervisor:
         Args:
             api_client: HTTP client for Agent Coordinator
             registry: Registry of running agent runs
-            launcher_id: This launcher's ID
+            runner_id: This runner's ID
             check_interval: How often to check subprocess status (seconds)
         """
         self.api_client = api_client
         self.registry = registry
-        self.launcher_id = launcher_id
+        self.runner_id = runner_id
         self.check_interval = check_interval
 
         self._thread: threading.Thread | None = None
@@ -106,13 +106,13 @@ class RunSupervisor:
         if return_code == 0:
             logger.info(f"Agent run {run_id} completed successfully (session={running_run.session_name})")
             try:
-                self.api_client.report_completed(self.launcher_id, run_id)
+                self.api_client.report_completed(self.runner_id, run_id)
             except Exception as e:
                 logger.error(f"Failed to report completion for {run_id}: {e}")
         else:
             error_msg = stderr.strip() if stderr else f"Process exited with code {return_code}"
             logger.error(f"Agent run {run_id} failed: {error_msg}")
             try:
-                self.api_client.report_failed(self.launcher_id, run_id, error_msg)
+                self.api_client.report_failed(self.runner_id, run_id, error_msg)
             except Exception as e:
                 logger.error(f"Failed to report failure for {run_id}: {e}")

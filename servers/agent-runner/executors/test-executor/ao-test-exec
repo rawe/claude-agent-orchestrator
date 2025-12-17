@@ -21,9 +21,9 @@ import uuid
 from pathlib import Path
 from datetime import datetime, UTC
 
-# Add launcher lib to path for shared modules
-launcher_lib = Path(__file__).parent.parent.parent / "lib"
-sys.path.insert(0, str(launcher_lib))
+# Add runner lib to path for shared modules
+runner_lib = Path(__file__).parent.parent.parent / "lib"
+sys.path.insert(0, str(runner_lib))
 
 from invocation import ExecutorInvocation
 from session_client import SessionClient, SessionClientError

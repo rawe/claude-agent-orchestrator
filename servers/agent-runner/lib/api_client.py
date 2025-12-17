@@ -1,7 +1,7 @@
 """
 HTTP client for communicating with Agent Coordinator.
 
-Wraps the Launcher API endpoints with typed methods.
+Wraps the Runner API endpoints with typed methods.
 """
 
 import httpx
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RegistrationResponse:
-    """Response from launcher registration."""
-    launcher_id: str
+    """Response from runner registration."""
+    runner_id: str
     poll_endpoint: str
     poll_timeout_seconds: int
     heartbeat_interval_seconds: int
@@ -45,7 +45,7 @@ class PollResult:
 
 
 class CoordinatorAPIClient:
-    """HTTP client for Agent Coordinator Launcher API."""
+    """HTTP client for Agent Coordinator Runner API."""
 
     def __init__(self, base_url: str, timeout: float = 35.0):
         """Initialize client with base URL.
@@ -68,14 +68,14 @@ class CoordinatorAPIClient:
         project_dir: Optional[str] = None,
         executor_type: Optional[str] = None,
     ) -> RegistrationResponse:
-        """Register this launcher with Agent Coordinator.
+        """Register this runner with Agent Coordinator.
 
         Args:
-            hostname: The machine hostname where the launcher is running
-            project_dir: The default project directory for this launcher
+            hostname: The machine hostname where the runner is running
+            project_dir: The default project directory for this runner
             executor_type: The type of executor (folder name, e.g., 'claude-code')
 
-        Returns registration info including launcher_id.
+        Returns registration info including runner_id.
         """
         # Build metadata payload
         metadata = {}
@@ -87,31 +87,31 @@ class CoordinatorAPIClient:
             metadata["executor_type"] = executor_type
 
         response = self._client.post(
-            f"{self.base_url}/launcher/register",
+            f"{self.base_url}/runner/register",
             json=metadata if metadata else None,
         )
         response.raise_for_status()
         data = response.json()
 
         return RegistrationResponse(
-            launcher_id=data["launcher_id"],
+            runner_id=data["runner_id"],
             poll_endpoint=data["poll_endpoint"],
             poll_timeout_seconds=data["poll_timeout_seconds"],
             heartbeat_interval_seconds=data["heartbeat_interval_seconds"],
         )
 
-    def poll_run(self, launcher_id: str) -> PollResult:
+    def poll_run(self, runner_id: str) -> PollResult:
         """Long-poll for an agent run to execute or stop commands.
 
         Returns PollResult with:
         - run: Run if available
-        - deregistered: True if launcher has been deregistered externally
+        - deregistered: True if runner has been deregistered externally
         - stop_runs: List of run IDs to stop
         """
         try:
             response = self._client.get(
-                f"{self.base_url}/launcher/runs",
-                params={"launcher_id": launcher_id},
+                f"{self.base_url}/runner/runs",
+                params={"runner_id": runner_id},
             )
 
             if response.status_code == 204:
@@ -145,59 +145,59 @@ class CoordinatorAPIClient:
             logger.debug("Poll timeout (expected)")
             return PollResult()
 
-    def report_started(self, launcher_id: str, run_id: str) -> None:
+    def report_started(self, runner_id: str, run_id: str) -> None:
         """Report that agent run execution has started."""
         response = self._client.post(
-            f"{self.base_url}/launcher/runs/{run_id}/started",
-            json={"launcher_id": launcher_id},
+            f"{self.base_url}/runner/runs/{run_id}/started",
+            json={"runner_id": runner_id},
         )
         response.raise_for_status()
 
-    def report_completed(self, launcher_id: str, run_id: str) -> None:
+    def report_completed(self, runner_id: str, run_id: str) -> None:
         """Report that agent run completed successfully."""
         response = self._client.post(
-            f"{self.base_url}/launcher/runs/{run_id}/completed",
-            json={"launcher_id": launcher_id, "status": "success"},
+            f"{self.base_url}/runner/runs/{run_id}/completed",
+            json={"runner_id": runner_id, "status": "success"},
         )
         response.raise_for_status()
 
-    def report_failed(self, launcher_id: str, run_id: str, error: str) -> None:
+    def report_failed(self, runner_id: str, run_id: str, error: str) -> None:
         """Report that agent run execution failed."""
         response = self._client.post(
-            f"{self.base_url}/launcher/runs/{run_id}/failed",
-            json={"launcher_id": launcher_id, "error": error},
+            f"{self.base_url}/runner/runs/{run_id}/failed",
+            json={"runner_id": runner_id, "error": error},
         )
         response.raise_for_status()
 
-    def report_stopped(self, launcher_id: str, run_id: str, signal: str = "SIGTERM") -> None:
+    def report_stopped(self, runner_id: str, run_id: str, signal: str = "SIGTERM") -> None:
         """Report that agent run was stopped (terminated by stop command)."""
         response = self._client.post(
-            f"{self.base_url}/launcher/runs/{run_id}/stopped",
-            json={"launcher_id": launcher_id, "signal": signal},
+            f"{self.base_url}/runner/runs/{run_id}/stopped",
+            json={"runner_id": runner_id, "signal": signal},
         )
         response.raise_for_status()
 
-    def heartbeat(self, launcher_id: str) -> None:
+    def heartbeat(self, runner_id: str) -> None:
         """Send heartbeat to keep registration alive."""
         response = self._client.post(
-            f"{self.base_url}/launcher/heartbeat",
-            json={"launcher_id": launcher_id},
+            f"{self.base_url}/runner/heartbeat",
+            json={"runner_id": runner_id},
         )
         response.raise_for_status()
 
-    def deregister(self, launcher_id: str) -> None:
-        """Deregister this launcher (graceful shutdown).
+    def deregister(self, runner_id: str) -> None:
+        """Deregister this runner (graceful shutdown).
 
-        Called when launcher is shutting down to immediately remove
+        Called when runner is shutting down to immediately remove
         itself from the registry.
         """
         try:
             response = self._client.delete(
-                f"{self.base_url}/launchers/{launcher_id}",
+                f"{self.base_url}/runners/{runner_id}",
                 params={"self": "true"},
             )
             response.raise_for_status()
-            logger.info(f"Deregistered launcher {launcher_id}")
+            logger.info(f"Deregistered runner {runner_id}")
         except Exception as e:
             # Don't fail shutdown if deregistration fails
             logger.warning(f"Failed to deregister: {e}")

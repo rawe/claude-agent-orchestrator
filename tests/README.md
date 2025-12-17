@@ -4,7 +4,7 @@ Manual integration tests for the Agent Orchestrator framework.
 
 ## Overview
 
-Tests verify the Agent Coordinator and Agent Launcher work correctly together. Two executor options:
+Tests verify the Agent Coordinator and Agent Runner work correctly together. Two executor options:
 - `test-executor` - Simple echo executor for fast, deterministic tests
 - `claude-code` - Real Claude AI executor for end-to-end validation
 
@@ -60,16 +60,16 @@ The server runs on `http://localhost:8765`. Verify with:
 curl http://localhost:8765/health
 ```
 
-### 4. Start Agent Launcher
+### 4. Start Agent Runner
 
 In another terminal (or background process):
 
 ```bash
 # With test-executor (fast, deterministic)
-./servers/agent-launcher/agent-launcher -x test-executor
+./servers/agent-runner/agent-runner -x test-executor
 
 # Or with claude-code (real AI)
-./servers/agent-launcher/agent-launcher -x claude-code
+./servers/agent-runner/agent-runner -x claude-code
 ```
 
 ### 5. Start WebSocket Monitor
@@ -92,7 +92,7 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 
 | Command | Description |
 |---------|-------------|
-| `/tests:setup [executor]` | Start core services (Coordinator, Launcher, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
+| `/tests:setup [executor]` | Start core services (Coordinator, Runner, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
 | `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct executor, handles test-specific setup |
 | `/tests:run` | Run all tests sequentially with automatic setup and teardown |
 | `/tests:teardown` | Stop all services and cleanup |
@@ -212,7 +212,7 @@ Removes the SQLite database and test-executor session data:
 ## Stopping Services
 
 - **Agent Coordinator**: `Ctrl+C` in terminal or kill process
-- **Agent Launcher**: `Ctrl+C` in terminal or kill process
+- **Agent Runner**: `Ctrl+C` in terminal or kill process
 - **ws-monitor**: `Ctrl+C` in terminal
 
 ## Troubleshooting
@@ -222,7 +222,7 @@ Removes the SQLite database and test-executor session data:
 - Check no other process is using the port: `lsof -i :8765`
 
 ### Runs not executing
-- Verify Agent Launcher is registered (check launcher logs)
+- Verify Agent Runner is registered (check runner logs)
 - Ensure using `-x test-executor` flag
 
 ### No WebSocket events
