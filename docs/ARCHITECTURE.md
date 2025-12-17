@@ -4,6 +4,34 @@
 
 Framework for managing multiple concurrent Claude Code agent sessions with real-time observability.
 
+## Core Terminology
+
+| Term | Definition |
+|------|------------|
+| **Agent Blueprint** | Reusable agent configuration (system prompt, MCP config, metadata). Templates that get instantiated into sessions. |
+| **Session** | Named, persistent agent conversation with state and history. Can have multiple runs over its lifetime. |
+| **Agent Run** | Single execution of a session (start, resume, or stop). Transient work unit queued in the Runs API. |
+| **Agent Coordinator** | Backend server (port 8765) managing sessions, runs, runners, blueprints, and callbacks. |
+| **Agent Runner** | Standalone process that polls for runs, executes them via executors, and reports status. |
+| **Executor** | Framework-specific code that spawns the actual agent process (e.g., Claude Code via Agent SDK). |
+| **Context Store** | Backend server (port 8766) for document storage and sharing context between agents. |
+
+### Conceptual Hierarchy
+
+```
+Agent Blueprint (template)
+    ↓ instantiate
+Session (persistent instance)
+    ↓ execute
+Agent Run (transient execution)
+    ↓ claimed by
+Agent Runner (execution manager)
+    ↓ delegates to
+Executor (framework-specific)
+    ↓ spawns
+Claude Code / AI Framework
+```
+
 ## Project Structure
 
 ```

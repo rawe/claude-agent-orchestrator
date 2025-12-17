@@ -187,12 +187,15 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 
 | Term | Definition |
 |------|------------|
-| **Agent Blueprint** | A reusable configuration that defines specialized agent behavior, including system prompts, MCP server configs, and capability descriptions. Managed by the Agent Coordinator. |
-| **Session** | A named, persistent Claude Code conversation. Sessions can be created, resumed, and monitored via the `ao-*` commands. |
-| **Agent Coordinator** | Backend server (port 8765) that manages session lifecycle, queues runs, captures events, and stores agent blueprints. |
-| **Agent Runner** | Standalone process that polls Agent Coordinator for runs and executes them as Claude Code sessions. Must run in your project directory. |
-| **Context Store** | Backend server (port 8766) for document storage and retrieval with tag-based querying. |
-| **Dashboard** | React web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
+| **Agent Blueprint** | Reusable agent configuration (system prompt, MCP config, metadata) that gets instantiated into sessions. |
+| **Session** | Named, persistent Claude Code conversation with state and history. Can have multiple runs. |
+| **Agent Run** | Single execution of a session (start, resume, or stop). Transient work unit queued for a runner. |
+| **Agent Coordinator** | Backend server (port 8765) managing sessions, runs, runners, blueprints, and callbacks. |
+| **Agent Runner** | Standalone process that polls for runs and executes them. Must run in your project directory. |
+| **Context Store** | Backend server (port 8766) for document storage and sharing context between agents. |
+| **Dashboard** | Web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
+
+See **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md#core-terminology)** for the complete terminology and conceptual hierarchy.
 
 ## Testing
 
