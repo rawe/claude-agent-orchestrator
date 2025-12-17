@@ -8,15 +8,16 @@ MCP (Model Context Protocol) servers that provide capabilities to agents. These 
 
 ## Available Servers
 
-| Server | Port | Description | Type |
-|--------|------|-------------|------|
-| [Agent Orchestrator](./agent-orchestrator/) | 9500 | Agent orchestration + framework access | Internal (Python) |
-| [Context Store](./context-store/) | 9501 | Document storage and retrieval | Internal (Python) |
-| [Atlassian](./atlassian/) | 9000 | Confluence and Jira integration | External (Docker) |
-| [Azure DevOps](./ado/) | 9001 | Work Items access | External (Docker) |
+| Server | Port | Description | Type | Requires .env |
+|--------|------|-------------|------|---------------|
+| [Agent Orchestrator](./agent-orchestrator/) | 9500 | Agent orchestration + framework access | Internal (Python) | No |
+| [Context Store](./context-store/) | 9501 | Document storage and retrieval | Internal (Python) | No |
+| [Neo4j](./neo4j/) | 9003 | Graph database queries (Cypher) | External (Docker) | No (has defaults) |
+| [Atlassian](./atlassian/) | 9000 | Confluence and Jira integration | External (Docker) | Yes |
+| [Azure DevOps](./ado/) | 9001 | Work Items access | External (Docker) | Yes |
 
 **Internal servers** are Python-based and run via `uv run`.
-**External servers** are Docker-based and require credentials in `.env` files.
+**External servers** are Docker-based. Neo4j works out-of-the-box with the local Neo4j container; Atlassian and ADO require credentials.
 
 ---
 
@@ -31,6 +32,7 @@ make start-mcps
 # Start individually
 make start-mcp-agent-orchestrator
 make start-mcp-context-store
+make start-mcp-neo4j        # Works with defaults (local Neo4j container)
 make start-mcp-atlassian    # Requires atlassian/.env
 make start-mcp-ado          # Requires ado/.env
 
@@ -63,6 +65,24 @@ Provides document management capabilities:
 
 ---
 
+## Neo4j MCP
+
+Provides graph database capabilities via Cypher queries:
+- Execute read/write Cypher queries against Neo4j
+- Inspect database schema (requires APOC plugin)
+- Query knowledge graphs and relationships
+
+**Default Configuration:** Connects to the local Neo4j container started by `docker-compose.yml` (port 7688, credentials: `neo4j/agent-orchestrator`). No `.env` file required for local use.
+
+**Custom Configuration:** To connect to an external Neo4j instance:
+```bash
+cd neo4j
+cp .env.example .env
+# Edit .env with your Neo4j credentials
+```
+
+---
+
 ## External Servers Setup
 
 ### Atlassian MCP Server
@@ -91,6 +111,7 @@ docker compose up -d
 |---------|----------|
 | Agent Orchestrator MCP | `http://127.0.0.1:9500/mcp` |
 | Context Store MCP | `http://127.0.0.1:9501/mcp` |
+| Neo4j MCP | `http://127.0.0.1:9003/mcp/` |
 | Atlassian MCP | `http://127.0.0.1:9000` |
 | Azure DevOps MCP | `http://127.0.0.1:9001/mcp` |
 
@@ -100,6 +121,7 @@ docker compose up -d
 
 - **Agent Orchestrator:** `agent-orchestrator/README.md`
 - **Context Store:** `context-store/README.md`
+- **Neo4j:** `neo4j/README.md`
 - **Atlassian:** `atlassian/README.md`
 - **Azure DevOps:** `ado/README.md` and `ado/docs/`
 

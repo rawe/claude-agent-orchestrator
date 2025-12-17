@@ -6,21 +6,30 @@ Docker-based MCP server for Neo4j graph database integration via HTTP transport.
 
 ## Quick Start
 
-1. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Neo4j credentials
-   ```
+**Works out-of-the-box with the local Neo4j container** from the main `docker-compose.yml`. No configuration required.
 
-2. **Start server:**
-   ```bash
-   docker compose up -d
-   ```
+```bash
+# From project root
+make start-mcp-neo4j
 
-3. **Verify:**
-   ```bash
-   curl http://127.0.0.1:9003/mcp/
-   ```
+# Or directly
+cd mcps/neo4j && docker compose up -d
+```
+
+**Verify:**
+```bash
+curl http://127.0.0.1:9003/mcp/
+```
+
+### Custom Configuration (Optional)
+
+To connect to an external Neo4j instance instead of the local container:
+
+```bash
+cp .env.example .env
+# Edit .env with your Neo4j credentials
+docker compose up -d
+```
 
 ---
 
@@ -28,10 +37,10 @@ Docker-based MCP server for Neo4j graph database integration via HTTP transport.
 
 ### Environment Variables
 
-**Neo4j Connection:**
-- `NEO4J_URL` - Bolt URL to Neo4j (e.g., `bolt://host.docker.internal:7687`)
-- `NEO4J_USERNAME` - Neo4j username
-- `NEO4J_PASSWORD` - Neo4j password
+**Neo4j Connection:** (defaults connect to local Neo4j container)
+- `NEO4J_URL` - Bolt URL (default: `bolt://host.docker.internal:7688`)
+- `NEO4J_USERNAME` - Username (default: `neo4j`)
+- `NEO4J_PASSWORD` - Password (default: `agent-orchestrator`)
 - `NEO4J_DATABASE` - Database name (default: `neo4j`)
 - `NEO4J_NAMESPACE` - Optional namespace for queries
 
