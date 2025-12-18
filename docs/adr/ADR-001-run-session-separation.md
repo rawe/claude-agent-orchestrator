@@ -1,8 +1,18 @@
 # ADR-001: Run and Session Separation
 
-**Status:** Accepted
+**Status:** Accepted (Partially Superseded)
 **Date:** 2025-12-12
 **Decision Makers:** Architecture Review
+
+> **Supersession Notice (2025-12-18):**
+> The core decision (separate runs and sessions) remains valid.
+> However, the **Linking** section and **session identity model** are superseded by
+> [ADR-010: Session Identity and Executor Abstraction](./ADR-010-session-identity-and-executor-abstraction.md).
+>
+> **What changed:**
+> - `session_name` removed as linking key → replaced by `session_id` (coordinator-generated)
+> - `session_id` no longer from Claude SDK → now generated at run creation
+> - Added executor abstraction (`executor_session_id`) and session affinity tracking
 
 ## Context
 
@@ -31,9 +41,14 @@ An initial analysis questioned whether the introduction of "runs" as a separate 
 - **Identity:** `session_id` (UUID)
 
 ### Linking
-- Runs and sessions are linked via `session_name` (not by ID)
-- 1:1 mapping: each run creates exactly one session
-- `run_queue.get_run_by_session_name()` resolves the link
+
+> **⚠️ SUPERSEDED by [ADR-010](./ADR-010-session-identity-and-executor-abstraction.md)**
+> The linking mechanism below has been replaced. Sessions are now linked via
+> coordinator-generated `session_id`, not `session_name`.
+
+~~- Runs and sessions are linked via `session_name` (not by ID)~~
+~~- 1:1 mapping: each run creates exactly one session~~
+~~- `run_queue.get_run_by_session_name()` resolves the link~~
 
 ## Rationale
 

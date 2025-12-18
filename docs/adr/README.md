@@ -21,15 +21,18 @@ Each ADR follows this structure:
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [ADR-001](./ADR-001-run-session-separation.md) | Run and Session Separation | Accepted | 2025-12-12 |
+| [ADR-001](./ADR-001-run-session-separation.md) | Run and Session Separation | Accepted (Partially Superseded) | 2025-12-12 |
 | [ADR-002](./ADR-002-agent-runner-architecture.md) | Agent Runner Architecture | Accepted | 2025-12-12 |
 | [ADR-003](./ADR-003-callback-based-async.md) | Callback-Based Async for Agent Orchestration | Accepted | 2025-12-12 |
 | [ADR-004](./ADR-004-session-stop-command.md) | Session Stop Command with Event Signaling | Accepted | 2025-12-12 |
 | [ADR-005](./ADR-005-parent-session-context-propagation.md) | Parent Session Context Propagation | Accepted | 2025-12-12 |
-| [ADR-006](./ADR-006-runner-registration-health-monitoring.md) | Runner Registration with Health Monitoring | Accepted | 2025-12-12 |
+| [ADR-006](./ADR-006-runner-registration-health-monitoring.md) | Runner Registration with Health Monitoring | Superseded by ADR-012 | 2025-12-12 |
 | [ADR-007](./ADR-007-hybrid-hook-configuration.md) | Hybrid Hook Configuration | Accepted | 2025-12-12 |
 | [ADR-008](./ADR-008-concurrent-run-execution.md) | Concurrent Run Execution in Agent Runner | Accepted | 2025-12-12 |
 | [ADR-009](./ADR-009-agent-filtering-at-discovery.md) | Agent Filtering at Discovery Time | Accepted | 2025-12-12 |
+| [ADR-010](./ADR-010-session-identity-and-executor-abstraction.md) | Session Identity and Executor Abstraction | Proposed | 2025-12-18 |
+| [ADR-011](./ADR-011-runner-capabilities-and-run-demands.md) | Runner Capabilities and Run Demands | Proposed | 2025-12-18 |
+| [ADR-012](./ADR-012-runner-identity-and-registration.md) | Runner Identity and Registration | Proposed | 2025-12-18 |
 
 ## Creating a New ADR
 

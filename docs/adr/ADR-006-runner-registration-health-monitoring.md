@@ -1,8 +1,17 @@
 # ADR-006: Runner Registration with Health Monitoring
 
-**Status:** Accepted
+**Status:** Superseded
 **Date:** 2025-12-12
 **Decision Makers:** Architecture Review
+**Superseded By:** [ADR-012: Runner Identity and Registration](./ADR-012-runner-identity-and-registration.md)
+
+> **Supersession Notice (2025-12-18):**
+> This ADR has been superseded by ADR-012, which introduces:
+> - Deterministic runner ID derivation from (hostname, project_dir, executor_type)
+> - Automatic reconnection recognition
+> - Simplified lifecycle (online → stale → removed)
+>
+> The heartbeat-based health monitoring concept is retained in ADR-012.
 
 ## Context
 
