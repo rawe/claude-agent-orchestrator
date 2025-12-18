@@ -14,7 +14,7 @@ MCP server for interacting with the Context Store document management system.
 For use with Claude Code or Claude Desktop spawning the process:
 
 ```bash
-uv run context-store-mcp.py
+uv run --script context-store-mcp.py
 ```
 
 ### HTTP Mode
@@ -23,13 +23,13 @@ For network-accessible server (recommended for shared/remote access):
 
 ```bash
 # Default port 9501
-uv run context-store-mcp.py --http-mode
+uv run --script context-store-mcp.py --http-mode
 
 # Custom port
-uv run context-store-mcp.py --http-mode --port 9502
+uv run --script context-store-mcp.py --http-mode --port 9502
 
 # Accessible from network
-uv run context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
+uv run --script context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 ```
 
 ### Using Makefile (from project root)
@@ -99,7 +99,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "context-store": {
       "command": "uv",
-      "args": ["run", "/path/to/context-store-mcp.py"]
+      "args": ["run", "--script", "/path/to/context-store-mcp.py"]
     }
   }
 }
@@ -111,7 +111,7 @@ First, start the HTTP server:
 ```bash
 make start-cs-mcp
 # or
-uv run context-store-mcp.py --http-mode --port 9501
+uv run --script context-store-mcp.py --http-mode --port 9501
 ```
 
 Then configure Claude Desktop:

@@ -95,7 +95,7 @@ export AGENT_ORCHESTRATOR_COMMAND_PATH="/absolute/path/to/commands"
 export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/your/project"
 
 # Run MCP Inspector
-npx @modelcontextprotocol/inspector uv run /path/to/agent-orchestrator-mcp.py
+npx @modelcontextprotocol/inspector uv run --script /path/to/agent-orchestrator-mcp.py
 ```
 
 This opens a web interface where you can:
@@ -153,7 +153,7 @@ This opens a web interface where you can:
 - Verify `uv` is in PATH: `which uv`
 - Verify Python >= 3.10 is available: `python3 --version`
 - Check that dependencies can be resolved (first run may take longer)
-- Try running the server directly to see UV output: `uv run agent-orchestrator-mcp.py`
+- Try running the server directly to see UV output: `uv run --script agent-orchestrator-mcp.py`
 
 ### 5. Session naming errors
 

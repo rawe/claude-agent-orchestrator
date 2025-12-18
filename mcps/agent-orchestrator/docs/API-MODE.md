@@ -47,13 +47,13 @@ Endpoints:
 
 ```bash
 # Start the server in API mode (default port 8080)
-uv run agent-orchestrator-mcp.py --api-mode
+uv run --script agent-orchestrator-mcp.py --api-mode
 
 # Start on a custom port
-uv run agent-orchestrator-mcp.py --api-mode --port 9000
+uv run --script agent-orchestrator-mcp.py --api-mode --port 9000
 
 # Start accessible from network
-uv run agent-orchestrator-mcp.py --api-mode --host 0.0.0.0 --port 8080
+uv run --script agent-orchestrator-mcp.py --api-mode --host 0.0.0.0 --port 8080
 ```
 
 ## Available Endpoints
@@ -405,7 +405,7 @@ When exposing the API:
 
 | Mode | Command | Use Case |
 |------|---------|----------|
-| stdio | `uv run agent-orchestrator-mcp.py` | Claude Desktop/CLI integration |
+| stdio | `uv run --script agent-orchestrator-mcp.py` | Claude Desktop/CLI integration |
 | HTTP | `--http-mode` | MCP-only network access |
 | SSE | `--sse-mode` | Legacy MCP clients |
 | **API** | `--api-mode` | REST API + MCP combined |
@@ -418,7 +418,7 @@ When exposing the API:
 lsof -i :8080
 
 # Use a different port
-uv run agent-orchestrator-mcp.py --api-mode --port 9000
+uv run --script agent-orchestrator-mcp.py --api-mode --port 9000
 ```
 
 ### Session Stuck in "running"

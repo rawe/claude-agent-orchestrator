@@ -297,7 +297,7 @@ start-mcp-agent-orchestrator:
 	echo "  Project Dir: $${AGENT_ORCHESTRATOR_PROJECT_DIR:-<not set, uses tool parameter>}"; \
 	echo ""; \
 	AGENT_ORCHESTRATOR_PROJECT_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR}" \
-	uv run $(AO_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
+	uv run --script $(AO_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
 	echo $$! > $(AO_MCP_SERVER_PID_FILE); \
 	sleep 2; \
 	echo ""; \
@@ -340,7 +340,7 @@ start-mcp-context-store:
 	echo "  Host: $$HOST"; \
 	echo "  Port: $$PORT"; \
 	echo ""; \
-	uv run $(CS_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
+	uv run --script $(CS_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
 	echo $$! > $(CS_MCP_SERVER_PID_FILE); \
 	sleep 2; \
 	echo ""; \

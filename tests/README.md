@@ -165,7 +165,7 @@ Test cases 04-07 require the Agent Orchestrator MCP server for spawning child ag
 **Starting the MCP server:**
 
 ```bash
-uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
+uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
 ```
 
 **Verify it's running:**

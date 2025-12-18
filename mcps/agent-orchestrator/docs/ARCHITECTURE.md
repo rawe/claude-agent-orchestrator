@@ -78,7 +78,7 @@ The standalone approach eliminates the need for:
 
 ```bash
 # Direct execution (UV manages everything)
-uv run /path/to/agent-orchestrator-mcp.py
+uv run --script /path/to/agent-orchestrator-mcp.py
 ```
 
 For concrete configuration see: [INTEGRATION_SCENARIOS.md](./INTEGRATION_SCENARIOS.md)
@@ -142,7 +142,7 @@ This design keeps the architecture clear while maintaining modularity.
 
 ```bash
 # Test server starts
-AGENT_ORCHESTRATOR_COMMAND_PATH=/path/to/commands uv run agent-orchestrator-mcp.py
+AGENT_ORCHESTRATOR_COMMAND_PATH=/path/to/commands uv run --script agent-orchestrator-mcp.py
 
 # Server should output:
 # Agent Orchestrator MCP Server

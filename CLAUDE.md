@@ -15,12 +15,12 @@
 **CRITICAL: Always use `uv run` to execute Python scripts and commands.**
 
 * Use `uv run python` instead of `python` or `python3` directly
-* Use `uv run <script.py>` to run Python scripts - this ensures dependencies are available
+* Use `uv run --script <script.py>` to run Python scripts (--script is required for Windows compatibility)
 * NEVER use `pip`, `pip3`, or `uv sync` - the `uv run` command handles everything automatically
 * Examples:
   - `uv run python -m main` (run a module)
-  - `uv run script.py --arg value` (run a script with arguments)
-  - `uv run mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode` (run MCP server)
+  - `uv run --script script.py --arg value` (run a script with arguments)
+  - `uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode` (run MCP server)
 
 ## Testing
 

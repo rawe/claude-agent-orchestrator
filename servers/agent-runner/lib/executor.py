@@ -198,8 +198,9 @@ class RunExecutor:
         payload = self._build_payload(run, mode)
         payload_json = json.dumps(payload)
 
-        # Build command
-        cmd = [str(self.executor_path)]
+        # Build command - use 'uv run --script' for cross-platform compatibility
+        # (Windows doesn't support shebangs, so we need explicit uv invocation)
+        cmd = ["uv", "run", "--script", str(self.executor_path)]
 
         # Build environment
         env = os.environ.copy()

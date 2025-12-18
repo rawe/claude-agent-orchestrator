@@ -4,6 +4,7 @@
       "command": "uv",
       "args": [
         "run",
+        "--script",
         "${PROJECT_ROOT}/interfaces/context-store-mcp-server/context-store-mcp.py"
       ]
     }

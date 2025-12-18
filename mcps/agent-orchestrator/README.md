@@ -8,7 +8,7 @@ Model Context Protocol (MCP) server for orchestrating specialized Claude Code ag
 
 **Run:**
 ```bash
-uv run /path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py
+uv run --script /path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py
 ```
 
 Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inline script metadata.
@@ -32,6 +32,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
+        "--script",
         "/absolute/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"
       ]
     }
@@ -47,6 +48,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
+        "--script",
         "/absolute/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {
@@ -74,6 +76,7 @@ Dependencies (mcp≥1.7.0, pydantic≥2.0.0) are automatically managed via inlin
       "command": "uv",
       "args": [
         "run",
+        "--script",
         "/absolute/path/to/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {
@@ -130,7 +133,7 @@ The server supports multiple transport modes beyond the default stdio:
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| stdio | `uv run agent-orchestrator-mcp.py` | Default, for Claude Desktop/CLI |
+| stdio | `uv run --script agent-orchestrator-mcp.py` | Default, for Claude Desktop/CLI |
 | HTTP | `--http-mode` | MCP protocol over HTTP |
 | SSE | `--sse-mode` | Legacy SSE transport |
 | **API** | `--api-mode` | REST API + MCP combined with OpenAPI docs |
@@ -142,7 +145,7 @@ The server supports multiple transport modes beyond the default stdio:
 make start-ao-api
 
 # Direct command
-uv run agent-orchestrator-mcp.py --api-mode --port 9500
+uv run --script agent-orchestrator-mcp.py --api-mode --port 9500
 ```
 
 When running in API mode:
@@ -200,13 +203,13 @@ Enable debug logging by setting `MCP_SERVER_DEBUG="true"`. Logs are written to `
 
 ```bash
 # No environment variables needed! Commands are auto-discovered
-uv run agent-orchestrator-mcp.py
+uv run --script agent-orchestrator-mcp.py
 ```
 
 With custom project directory:
 ```bash
 export AGENT_ORCHESTRATOR_PROJECT_DIR="/path/to/project"
-uv run agent-orchestrator-mcp.py
+uv run --script agent-orchestrator-mcp.py
 ```
 
 With MCP Inspector:

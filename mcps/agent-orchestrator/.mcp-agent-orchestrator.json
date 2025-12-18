@@ -4,6 +4,7 @@
       "command": "uv",
       "args": [
         "run",
+        "--script",
         "${PROJECT_ROOT}/interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py"
       ],
       "env": {

@@ -198,7 +198,7 @@ Logs are written to: `interfaces/agent-orchestrator-mcp-server/logs/mcp-server.l
 
 ### Command execution errors
 
-1. Test server directly: `uv run /path/to/agent-orchestrator-mcp.py`
+1. Test server directly: `uv run --script /path/to/agent-orchestrator-mcp.py`
 2. Verify Python ≥3.10: `python --version`
 3. Check UV is installed: `uv --version`
 

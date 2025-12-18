@@ -52,7 +52,7 @@ COMMAND_PATH = Path(os.environ["CONTEXT_STORE_COMMAND_PATH"])
 async def run_command(command: str, args: list[str]) -> tuple[str, str, int]:
     """Execute a doc-* command and return stdout, stderr, exit_code."""
     cmd_path = COMMAND_PATH / command
-    full_args = ["uv", "run", str(cmd_path)] + args
+    full_args = ["uv", "run", "--script", str(cmd_path)] + args
 
     process = await asyncio.create_subprocess_exec(
         *full_args,
@@ -70,7 +70,7 @@ async def run_command_with_stdin(
 ) -> tuple[str, str, int]:
     """Execute a doc-* command with optional stdin input."""
     cmd_path = COMMAND_PATH / command
-    full_args = ["uv", "run", str(cmd_path)] + args
+    full_args = ["uv", "run", "--script", str(cmd_path)] + args
 
     process = await asyncio.create_subprocess_exec(
         *full_args,
