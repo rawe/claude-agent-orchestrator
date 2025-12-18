@@ -17,6 +17,8 @@ from constants import (
     HEADER_AGENT_SESSION_NAME,
     ENV_AGENT_TAGS,
     HEADER_AGENT_TAGS,
+    ENV_ADDITIONAL_DEMANDS,
+    HEADER_ADDITIONAL_DEMANDS,
 )
 from logger import logger
 from types_models import ServerConfig
@@ -64,6 +66,43 @@ def get_filter_tags(http_headers: Optional[dict] = None) -> Optional[str]:
 
     # Fall back to environment variable
     return os.environ.get(ENV_AGENT_TAGS)
+
+
+def get_additional_demands(http_headers: Optional[dict] = None) -> Optional[dict]:
+    """
+    Get additional demands from environment or HTTP headers.
+
+    - stdio mode: reads from ADDITIONAL_DEMANDS env var
+    - HTTP mode: reads from X-Additional-Demands header
+
+    Value should be JSON: {"hostname": "...", "project_dir": "...", "executor_type": "...", "tags": [...]}
+
+    Returns: Parsed demands dict or None if not set/invalid.
+    """
+    demands_str = None
+
+    # Try HTTP header first (if provided)
+    if http_headers:
+        header_key_lower = HEADER_ADDITIONAL_DEMANDS.lower()
+        demands_str = http_headers.get(header_key_lower)
+
+    # Fall back to environment variable
+    if not demands_str:
+        demands_str = os.environ.get(ENV_ADDITIONAL_DEMANDS)
+
+    if not demands_str:
+        return None
+
+    # Parse JSON
+    try:
+        demands = json.loads(demands_str)
+        if isinstance(demands, dict):
+            return demands
+        logger.warning(f"Additional demands must be a JSON object, got: {type(demands)}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.warning(f"Failed to parse additional demands JSON: {e}")
+        return None
 
 
 def truncate_response(text: str) -> tuple[str, bool]:
@@ -185,6 +224,11 @@ async def start_agent_session_impl(
             if not parent_session_name:
                 logger.warn("callback=true but no parent session name available")
 
+        # Get additional demands from headers/env (ADR-011)
+        additional_demands = get_additional_demands(http_headers)
+        if additional_demands:
+            logger.info(f"Additional demands: {additional_demands}")
+
         # Create agent run
         # Note: If project_dir is None, the Agent Coordinator/Runner decides the default
         run_id = await client.create_run(
@@ -194,6 +238,7 @@ async def start_agent_session_impl(
             agent_name=agent_blueprint_name,
             project_dir=project_dir,
             parent_session_name=parent_session_name,
+            additional_demands=additional_demands,
         )
 
         logger.info(f"Created run {run_id} for session {session_name}")
@@ -258,12 +303,18 @@ async def resume_agent_session_impl(
             if not parent_session_name:
                 logger.warn("callback=true but no parent session name available")
 
+        # Get additional demands from headers/env (ADR-011)
+        additional_demands = get_additional_demands(http_headers)
+        if additional_demands:
+            logger.info(f"Additional demands for resume: {additional_demands}")
+
         # Create resume run
         run_id = await client.create_run(
             run_type="resume_session",
             session_name=session_name,
             prompt=prompt,
             parent_session_name=parent_session_name,
+            additional_demands=additional_demands,
         )
 
         logger.info(f"Created resume run {run_id} for session {session_name}")

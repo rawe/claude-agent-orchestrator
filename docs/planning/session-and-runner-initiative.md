@@ -62,7 +62,7 @@ Resume must go to runner matching affinity
 
 ## Implementation Order
 
-### Phase 1: Runner Identity (ADR-012)
+### Phase 1: Runner Identity (ADR-012) ✅ COMPLETE
 
 **Why first:** Foundation for everything else. Runner properties must exist before we can match demands.
 
@@ -73,7 +73,9 @@ Resume must go to runner matching affinity
 - Lifecycle: online → stale (2 min) → removed (10 min)
 - Background task for stale detection and cleanup
 
-### Phase 2: Runner Capabilities and Demands (ADR-011)
+**Details:** See [phase-1-runner-identity.md](./phase-1-runner-identity.md)
+
+### Phase 2: Runner Capabilities and Demands (ADR-011) ✅ COMPLETE
 
 **Why second:** Builds on runner properties from Phase 1.
 
@@ -83,6 +85,8 @@ Resume must go to runner matching affinity
 - Run creation: add `additional_demands` (additive merge with blueprint)
 - Claim logic: only matching runners can claim runs
 - Timeout: runs fail after configurable timeout if no matching runner
+
+**Details:** See [phase-2-demands.md](./phase-2-demands.md)
 
 ### Phase 3: Session Identity (ADR-010)
 
@@ -130,7 +134,7 @@ Complete system
 ## Success Criteria
 
 - [x] Runner restarts get same runner_id
-- [ ] Runs with demands only go to matching runners
+- [x] Runs with demands only go to matching runners
 - [ ] session_id available immediately after run creation
 - [ ] Resume works using session_id
 - [ ] session_name completely removed

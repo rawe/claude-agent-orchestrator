@@ -53,6 +53,8 @@ class RunnerInfo(BaseModel):
     hostname: str
     project_dir: str
     executor_type: str
+    # Capabilities (features the runner offers)
+    tags: list[str] = []
     # Status managed by coordinator
     status: Literal["online", "stale"] = RunnerStatus.ONLINE
 
@@ -71,6 +73,7 @@ class RunnerRegistry:
         hostname: str,
         project_dir: str,
         executor_type: str,
+        tags: Optional[list[str]] = None,
     ) -> RunnerInfo:
         """Register a runner and return its info.
 
@@ -82,6 +85,7 @@ class RunnerRegistry:
             hostname: The machine hostname where the runner is running
             project_dir: The default project directory for this runner
             executor_type: The type of executor (folder name, e.g., 'claude-code')
+            tags: Optional list of capability tags this runner offers
 
         Returns:
             RunnerInfo with the runner_id derived from the properties
@@ -96,6 +100,9 @@ class RunnerRegistry:
                 # Reconnection: update existing runner
                 existing.last_heartbeat = now
                 existing.status = RunnerStatus.ONLINE
+                # Update tags on reconnection (runner may have new capabilities)
+                if tags is not None:
+                    existing.tags = tags
                 # Remove from deregistered set if it was marked
                 self._deregistered.discard(runner_id)
                 return existing
@@ -108,6 +115,7 @@ class RunnerRegistry:
                 hostname=hostname,
                 project_dir=project_dir,
                 executor_type=executor_type,
+                tags=tags or [],
                 status=RunnerStatus.ONLINE,
             )
             self._runners[runner_id] = runner

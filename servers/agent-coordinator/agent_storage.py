@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp
+from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, RunnerDemands
 
 
 def get_agents_dir() -> Path:
@@ -86,6 +86,12 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         # Read tags from agent.json (default: empty list)
         tags = data.get("tags", [])
 
+        # Read demands from agent.json (ADR-011)
+        demands = None
+        demands_data = data.get("demands")
+        if demands_data:
+            demands = RunnerDemands(**demands_data)
+
         # Check status via .disabled file
         status = "inactive" if (agent_dir / ".disabled").exists() else "active"
 
@@ -99,6 +105,7 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
             mcp_servers=mcp_servers,
             skills=skills,
             tags=tags,
+            demands=demands,
             status=status,
             created_at=created_at,
             modified_at=modified_at,
@@ -156,6 +163,8 @@ def create_agent(data: AgentCreate) -> Agent:
         agent_data["skills"] = data.skills
     if data.tags:
         agent_data["tags"] = data.tags
+    if data.demands:
+        agent_data["demands"] = data.demands.model_dump(exclude_none=True)
 
     with open(agent_dir / "agent.json", "w", encoding="utf-8") as f:
         json.dump(agent_data, f, indent=2)
@@ -209,6 +218,12 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
             agent_data["tags"] = updates.tags
         else:
             agent_data.pop("tags", None)
+
+    if updates.demands is not None:
+        if not updates.demands.is_empty():
+            agent_data["demands"] = updates.demands.model_dump(exclude_none=True)
+        else:
+            agent_data.pop("demands", None)
 
     # Write updated agent.json
     with open(agent_json_path, "w", encoding="utf-8") as f:

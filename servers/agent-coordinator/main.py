@@ -17,7 +17,7 @@ from database import (
 )
 from models import (
     Event, SessionMetadataUpdate, SessionCreate,
-    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate
+    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands
 )
 import agent_storage
 from validation import validate_agent_name
@@ -39,6 +39,8 @@ RUNNER_HEARTBEAT_INTERVAL = int(os.getenv("RUNNER_HEARTBEAT_INTERVAL", "60"))
 RUNNER_STALE_THRESHOLD = int(os.getenv("RUNNER_STALE_THRESHOLD", "120"))  # 2 minutes
 RUNNER_REMOVE_THRESHOLD = int(os.getenv("RUNNER_REMOVE_THRESHOLD", "600"))  # 10 minutes
 RUNNER_LIFECYCLE_INTERVAL = int(os.getenv("RUNNER_LIFECYCLE_INTERVAL", "30"))  # Check every 30s
+# Run demand timeout (ADR-011)
+RUN_NO_MATCH_TIMEOUT = int(os.getenv("RUN_NO_MATCH_TIMEOUT", "300"))  # 5 minutes
 
 # WebSocket connections (in-memory set)
 connections: set[WebSocket] = set()
@@ -96,6 +98,35 @@ async def runner_lifecycle_task():
             print(f"[ERROR] Runner lifecycle task error: {e}", flush=True)
 
 
+async def run_timeout_task():
+    """Background task to fail runs that have timed out waiting for a matching runner.
+
+    Runs periodically to check for pending runs that have exceeded their timeout.
+    See ADR-011 for demand matching and timeout behavior.
+    """
+    while True:
+        await asyncio.sleep(RUNNER_LIFECYCLE_INTERVAL)  # Check at same interval as lifecycle
+        try:
+            failed_runs = run_queue.fail_timed_out_runs()
+            for run in failed_runs:
+                if DEBUG:
+                    print(f"[DEBUG] Run {run.run_id} timed out waiting for matching runner", flush=True)
+                # Broadcast run failure to WebSocket clients
+                message = json.dumps({
+                    "type": "run_failed",
+                    "run_id": run.run_id,
+                    "error": run.error,
+                    "session_name": run.session_name,
+                })
+                for ws in connections.copy():
+                    try:
+                        await ws.send_text(message)
+                    except:
+                        connections.discard(ws)
+        except Exception as e:
+            print(f"[ERROR] Run timeout task error: {e}", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager"""
@@ -103,13 +134,20 @@ async def lifespan(app: FastAPI):
 
     # Start runner lifecycle background task
     lifecycle_task = asyncio.create_task(runner_lifecycle_task())
+    # Start run timeout background task (ADR-011)
+    timeout_task = asyncio.create_task(run_timeout_task())
 
     yield
 
-    # Cancel lifecycle task
+    # Cancel background tasks
     lifecycle_task.cancel()
+    timeout_task.cancel()
     try:
         await lifecycle_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await timeout_task
     except asyncio.CancelledError:
         pass
 
@@ -681,10 +719,13 @@ class RunnerRegisterRequest(BaseModel):
 
     All properties are required for deterministic runner_id derivation.
     See ADR-012 for runner identity design.
+    Tags are optional capabilities (ADR-011).
     """
     hostname: str
     project_dir: str
     executor_type: str
+    # Optional capability tags (ADR-011)
+    tags: Optional[list[str]] = None
 
 
 class RunnerRegisterResponse(BaseModel):
@@ -726,12 +767,15 @@ async def register_runner(request: RunnerRegisterRequest):
     derive a deterministic runner_id. If a runner with the same properties
     already exists, this is treated as a reconnection.
 
+    Optional tags are capabilities the runner offers (ADR-011).
+
     Returns runner_id and configuration for polling.
     """
     runner = runner_registry.register_runner(
         hostname=request.hostname,
         project_dir=request.project_dir,
         executor_type=request.executor_type,
+        tags=request.tags,
     )
 
     # Register with stop command queue for immediate wake-up on stop requests
@@ -742,6 +786,8 @@ async def register_runner(request: RunnerRegisterRequest):
         print(f"[DEBUG]   hostname: {request.hostname}", flush=True)
         print(f"[DEBUG]   project_dir: {request.project_dir}", flush=True)
         print(f"[DEBUG]   executor_type: {request.executor_type}", flush=True)
+        if request.tags:
+            print(f"[DEBUG]   tags: {request.tags}", flush=True)
 
     return RunnerRegisterResponse(
         runner_id=runner.runner_id,
@@ -760,6 +806,9 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
     Returns 204 No Content if nothing available after timeout.
     Returns {"deregistered": true} if runner has been deregistered.
     Returns {"stop_runs": [...]} if there are runs to stop.
+
+    Only runs whose demands match the runner's capabilities will be claimed.
+    See ADR-011 for demand matching logic.
     """
     # Check if runner has been deregistered
     if runner_registry.is_deregistered(runner_id):
@@ -770,8 +819,9 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
             print(f"[DEBUG] Runner {runner_id} deregistered, signaling shutdown", flush=True)
         return {"deregistered": True}
 
-    # Verify runner is registered
-    if not runner_registry.get_runner(runner_id):
+    # Get runner info (needed for demand matching)
+    runner = runner_registry.get_runner(runner_id)
+    if not runner:
         raise HTTPException(status_code=401, detail="Runner not registered")
 
     # Get the event for this runner (for immediate wake-up on stop commands)
@@ -797,8 +847,8 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
                 print(f"[DEBUG] Runner {runner_id} deregistered during poll, signaling shutdown", flush=True)
             return {"deregistered": True}
 
-        # Check for new runs
-        run = run_queue.claim_run(runner_id)
+        # Check for new runs (demand matching applied via runner info)
+        run = run_queue.claim_run(runner)
         if run:
             if DEBUG:
                 print(f"[DEBUG] Runner {runner_id} claimed run {run.run_id}", flush=True)
@@ -1062,6 +1112,9 @@ async def create_run(run_create: RunCreate):
     """Create a new run for the runner to execute.
 
     Used by Dashboard and future ao-start to queue work.
+
+    Demands are merged from blueprint (if agent_name provided) and additional_demands.
+    See ADR-011 for demand matching logic.
     """
     # For start runs, reject if session name already exists
     if run_create.type == RunType.START_SESSION:
@@ -1073,6 +1126,34 @@ async def create_run(run_create: RunCreate):
             )
 
     run = run_queue.add_run(run_create)
+
+    # Merge demands from blueprint and additional_demands (ADR-011)
+    merged_demands = None
+    blueprint_demands = RunnerDemands()  # Empty defaults
+    additional_demands = RunnerDemands()  # Empty defaults
+
+    # Load blueprint demands if agent_name provided
+    if run_create.agent_name:
+        agent = agent_storage.get_agent(run_create.agent_name)
+        if agent and agent.demands:
+            blueprint_demands = agent.demands
+
+    # Parse additional_demands from request
+    if run_create.additional_demands:
+        additional_demands = RunnerDemands(**run_create.additional_demands)
+
+    # Merge demands (blueprint takes precedence, additional is additive)
+    merged_demands = RunnerDemands.merge(blueprint_demands, additional_demands)
+
+    # Only store and set timeout if there are actual demands
+    if not merged_demands.is_empty():
+        run_queue.set_run_demands(
+            run.run_id,
+            merged_demands.model_dump(exclude_none=True),
+            timeout_seconds=RUN_NO_MATCH_TIMEOUT,
+        )
+        if DEBUG:
+            print(f"[DEBUG] Run {run.run_id} has demands: {merged_demands.model_dump(exclude_none=True)}", flush=True)
 
     if DEBUG:
         print(f"[DEBUG] Created run {run.run_id}: type={run.type}, session={run.session_name}", flush=True)

@@ -27,6 +27,7 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
     headers: {
       'X-Agent-Session-Name': '${AGENT_SESSION_NAME}',
       'X-Agent-Tags': '<your-tags>',
+      'X-Additional-Demands': '{"hostname": null, "project_dir": null, "executor_type": null, "tags": []}',
     },
   },
   'context-store-http': {

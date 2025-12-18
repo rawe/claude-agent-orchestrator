@@ -192,6 +192,10 @@ The MCP server must be started **before** running test cases that use the `agent
 ### Category 3: Runner Management
 - `08-runner-identity.md` - Deterministic runner ID and reconnection recognition (ADR-012)
 
+### Category 4: Demand Matching (ADR-011)
+- `09-demand-matching-success.md` - Runner with matching tags claims run with demands
+- `10-demand-matching-timeout.md` - Run times out when no matching runner available
+
 ## Tools Reference
 
 ### ws-monitor

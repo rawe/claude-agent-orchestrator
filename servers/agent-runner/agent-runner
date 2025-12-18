@@ -139,6 +139,7 @@ class Runner:
                 hostname=hostname,
                 project_dir=self.config.project_dir,
                 executor_type=executor_type,
+                tags=self.config.tags if self.config.tags else None,
             )
             self.runner_id = response.runner_id
             logger.info(f"Registered as {self.runner_id}")
@@ -147,6 +148,8 @@ class Runner:
             logger.info(f"  Poll timeout: {response.poll_timeout_seconds}s")
             logger.info(f"  Heartbeat interval: {response.heartbeat_interval_seconds}s")
             logger.info(f"  Project directory: {self.config.project_dir}")
+            if self.config.tags:
+                logger.info(f"  Tags: {self.config.tags}")
         except Exception as e:
             logger.error(f"Failed to register: {e}")
             raise

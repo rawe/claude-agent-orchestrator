@@ -80,6 +80,7 @@ class AgentCreate(AgentBase):
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
     tags: Optional[list[str]] = None
+    demands: Optional["RunnerDemands"] = None
 
 
 class AgentUpdate(BaseModel):
@@ -90,6 +91,7 @@ class AgentUpdate(BaseModel):
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
     tags: Optional[list[str]] = None
+    demands: Optional["RunnerDemands"] = None
 
 
 class Agent(AgentBase):
@@ -99,6 +101,7 @@ class Agent(AgentBase):
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
     tags: list[str] = []
+    demands: Optional["RunnerDemands"] = None
     status: Literal["active", "inactive"] = "active"
     created_at: str
     modified_at: str
@@ -108,6 +111,57 @@ class AgentStatusUpdate(BaseModel):
     """Request body for status update."""
 
     status: Literal["active", "inactive"]
+
+
+# ==============================================================================
+# Runner Demands Models (ADR-011)
+# ==============================================================================
+
+class RunnerDemands(BaseModel):
+    """
+    Demands that a run requires from a runner.
+
+    Property demands require exact match if specified.
+    Tag demands require runner to have ALL specified tags.
+
+    See ADR-011 for details.
+    """
+    # Property demands (exact match required if specified)
+    hostname: Optional[str] = None
+    project_dir: Optional[str] = None
+    executor_type: Optional[str] = None
+    # Capability demands (must have ALL)
+    tags: List[str] = []
+
+    def is_empty(self) -> bool:
+        """Check if no demands are specified."""
+        return (
+            self.hostname is None
+            and self.project_dir is None
+            and self.executor_type is None
+            and len(self.tags) == 0
+        )
+
+    @staticmethod
+    def merge(
+        blueprint: "RunnerDemands",
+        additional: "RunnerDemands"
+    ) -> "RunnerDemands":
+        """
+        Merge demands additively.
+
+        Blueprint demands take precedence (cannot be overridden).
+        Additional demands can only ADD constraints, never relax or override.
+        Tags are always merged (union).
+        """
+        return RunnerDemands(
+            # Blueprint wins if set, otherwise use additional
+            hostname=blueprint.hostname or additional.hostname,
+            project_dir=blueprint.project_dir or additional.project_dir,
+            executor_type=blueprint.executor_type or additional.executor_type,
+            # Tags are always additive (union)
+            tags=list(set(blueprint.tags) | set(additional.tags)),
+        )
 
 
 # ==============================================================================

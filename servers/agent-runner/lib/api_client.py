@@ -67,6 +67,7 @@ class CoordinatorAPIClient:
         hostname: str,
         project_dir: str,
         executor_type: str,
+        tags: Optional[list[str]] = None,
     ) -> RegistrationResponse:
         """Register this runner with Agent Coordinator.
 
@@ -77,17 +78,22 @@ class CoordinatorAPIClient:
             hostname: The machine hostname where the runner is running
             project_dir: The default project directory for this runner
             executor_type: The type of executor (folder name, e.g., 'claude-code')
+            tags: Optional list of capability tags this runner offers (ADR-011)
 
         Returns:
             Registration info including runner_id derived from properties
         """
+        payload = {
+            "hostname": hostname,
+            "project_dir": project_dir,
+            "executor_type": executor_type,
+        }
+        if tags:
+            payload["tags"] = tags
+
         response = self._client.post(
             f"{self.base_url}/runner/register",
-            json={
-                "hostname": hostname,
-                "project_dir": project_dir,
-                "executor_type": executor_type,
-            },
+            json=payload,
         )
         response.raise_for_status()
         data = response.json()

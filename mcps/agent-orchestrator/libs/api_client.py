@@ -84,8 +84,22 @@ class APIClient:
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
         parent_session_name: Optional[str] = None,
+        additional_demands: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Create an agent run. Returns run_id."""
+        """Create an agent run. Returns run_id.
+
+        Args:
+            run_type: "start_session" or "resume_session"
+            session_name: Name for the session
+            prompt: The prompt to send
+            agent_name: Blueprint name (for start_session)
+            project_dir: Project directory
+            parent_session_name: Parent session for orchestration
+            additional_demands: Additional demands to merge with blueprint (ADR-011)
+
+        Returns:
+            run_id
+        """
         data: Dict[str, Any] = {
             "type": run_type,
             "session_name": session_name,
@@ -97,6 +111,8 @@ class APIClient:
             data["project_dir"] = project_dir
         if parent_session_name:
             data["parent_session_name"] = parent_session_name
+        if additional_demands:
+            data["additional_demands"] = additional_demands
 
         result = await self._request("POST", "/runs", data)
         return result["run_id"]

@@ -2,14 +2,19 @@
 Thread-safe in-memory run queue for Agent Runner.
 
 Runs are created via POST /runs and claimed by the Runner via GET /runner/runs.
+Supports demand-based matching per ADR-011.
 """
 
 import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timezone, timedelta
+from typing import Optional, TYPE_CHECKING
 from enum import Enum
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from models import RunnerDemands
+    from services.runner_registry import RunnerInfo
 
 
 class RunType(str, Enum):
@@ -35,6 +40,8 @@ class RunCreate(BaseModel):
     prompt: str
     project_dir: Optional[str] = None
     parent_session_name: Optional[str] = None
+    # Additional demands to merge with blueprint demands (additive only)
+    additional_demands: Optional[dict] = None
 
 
 class Run(BaseModel):
@@ -46,6 +53,8 @@ class Run(BaseModel):
     prompt: str
     project_dir: Optional[str] = None
     parent_session_name: Optional[str] = None
+    # Merged demands (blueprint + additional) - stored as dict for serialization
+    demands: Optional[dict] = None
     status: RunStatus = RunStatus.PENDING
     runner_id: Optional[str] = None
     error: Optional[str] = None
@@ -53,6 +62,65 @@ class Run(BaseModel):
     claimed_at: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+    # Timeout for no-match scenarios (ISO timestamp)
+    timeout_at: Optional[str] = None
+
+
+# Default timeout for runs waiting for a matching runner (5 minutes)
+DEFAULT_NO_MATCH_TIMEOUT_SECONDS = 300
+
+
+# Demand field names (matching RunnerDemands model in models.py)
+class DemandFields:
+    """Field names for demands matching."""
+    HOSTNAME = "hostname"
+    PROJECT_DIR = "project_dir"
+    EXECUTOR_TYPE = "executor_type"
+    TAGS = "tags"
+
+
+def capabilities_satisfy_demands(
+    runner: "RunnerInfo",
+    demands: Optional[dict],
+) -> bool:
+    """
+    Check if runner capabilities satisfy run demands.
+
+    All specified demands must be met (hard requirements).
+    See ADR-011 for details.
+
+    Args:
+        runner: Runner info with properties and tags
+        demands: Demands dict with hostname, project_dir, executor_type, tags
+
+    Returns:
+        True if runner satisfies all demands, False otherwise
+    """
+    if demands is None:
+        # No demands = any runner can claim
+        return True
+
+    # Property demands (exact match required)
+    demanded_hostname = demands.get(DemandFields.HOSTNAME)
+    if demanded_hostname and runner.hostname != demanded_hostname:
+        return False
+
+    demanded_project_dir = demands.get(DemandFields.PROJECT_DIR)
+    if demanded_project_dir and runner.project_dir != demanded_project_dir:
+        return False
+
+    demanded_executor_type = demands.get(DemandFields.EXECUTOR_TYPE)
+    if demanded_executor_type and runner.executor_type != demanded_executor_type:
+        return False
+
+    # Tag demands - runner must have ALL demanded tags
+    demanded_tags = demands.get(DemandFields.TAGS, [])
+    if demanded_tags:
+        runner_tags = set(runner.tags or [])
+        if not set(demanded_tags).issubset(runner_tags):
+            return False
+
+    return True
 
 
 class RunQueue:
@@ -84,22 +152,31 @@ class RunQueue:
 
         return run
 
-    def claim_run(self, runner_id: str) -> Optional[Run]:
+    def claim_run(self, runner: "RunnerInfo") -> Optional[Run]:
         """Atomically claim a pending run for a runner.
 
-        Returns the claimed run or None if no pending runs.
+        Only runs whose demands are satisfied by the runner's capabilities
+        can be claimed. See ADR-011 for matching logic.
+
+        Args:
+            runner: The runner attempting to claim a run
+
+        Returns:
+            The claimed run or None if no matching pending runs.
         """
         now = datetime.now(timezone.utc).isoformat()
 
         with self._lock:
-            # Find first pending run
+            # Find first pending run that matches runner capabilities
             for run in self._runs.values():
                 if run.status == RunStatus.PENDING:
-                    # Claim it
-                    run.status = RunStatus.CLAIMED
-                    run.runner_id = runner_id
-                    run.claimed_at = now
-                    return run
+                    # Check if runner satisfies run demands
+                    if capabilities_satisfy_demands(runner, run.demands):
+                        # Claim it
+                        run.status = RunStatus.CLAIMED
+                        run.runner_id = runner.runner_id
+                        run.claimed_at = now
+                        return run
 
         return None
 
@@ -159,6 +236,59 @@ class RunQueue:
                 ):
                     return run
         return None
+
+    def fail_timed_out_runs(self) -> list[Run]:
+        """Fail pending runs that have exceeded their timeout.
+
+        Returns list of runs that were failed due to timeout.
+        """
+        now = datetime.now(timezone.utc)
+        failed_runs: list[Run] = []
+
+        with self._lock:
+            for run in self._runs.values():
+                if run.status == RunStatus.PENDING and run.timeout_at:
+                    timeout_time = datetime.fromisoformat(
+                        run.timeout_at.replace('Z', '+00:00')
+                    )
+                    if now >= timeout_time:
+                        run.status = RunStatus.FAILED
+                        run.completed_at = now.isoformat()
+                        run.error = "No matching runner available within timeout"
+                        failed_runs.append(run)
+
+        return failed_runs
+
+    def set_run_demands(
+        self,
+        run_id: str,
+        demands: Optional[dict],
+        timeout_seconds: int = DEFAULT_NO_MATCH_TIMEOUT_SECONDS,
+    ) -> Optional[Run]:
+        """Set demands and timeout on a run after creation.
+
+        This is called by main.py after merging blueprint and additional demands.
+
+        Args:
+            run_id: The run to update
+            demands: Merged demands dict
+            timeout_seconds: Seconds until run fails if not claimed
+
+        Returns:
+            Updated run or None if not found
+        """
+        with self._lock:
+            run = self._runs.get(run_id)
+            if not run:
+                return None
+
+            run.demands = demands
+            # Only set timeout if there are demands (otherwise any runner can claim)
+            if demands and not all(v is None or v == [] for v in demands.values()):
+                timeout_at = datetime.now(timezone.utc) + timedelta(seconds=timeout_seconds)
+                run.timeout_at = timeout_at.isoformat()
+
+            return run
 
 
 # Module-level singleton

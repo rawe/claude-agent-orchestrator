@@ -32,3 +32,11 @@ HEADER_AGENT_TAGS = "X-Agent-Tags"
 
 # Environment variable for tag filtering (in stdio mode)
 ENV_AGENT_TAGS = "AGENT_TAGS"
+
+# HTTP Header for additional demands (in HTTP mode) - ADR-011
+# Value should be JSON: {"hostname": "...", "project_dir": "...", "executor_type": "...", "tags": [...]}
+HEADER_ADDITIONAL_DEMANDS = "X-Additional-Demands"
+
+# Environment variable for additional demands (in stdio mode) - ADR-011
+# Value should be JSON: {"hostname": "...", "project_dir": "...", "executor_type": "...", "tags": [...]}
+ENV_ADDITIONAL_DEMANDS = "ADDITIONAL_DEMANDS"

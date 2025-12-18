@@ -13,11 +13,19 @@ ENV_COORDINATOR_URL = "AGENT_ORCHESTRATOR_API_URL"
 ENV_POLL_TIMEOUT = "POLL_TIMEOUT"
 ENV_HEARTBEAT_INTERVAL = "HEARTBEAT_INTERVAL"
 ENV_PROJECT_DIR = "PROJECT_DIR"
+ENV_RUNNER_TAGS = "RUNNER_TAGS"  # Comma-separated capability tags (ADR-011)
 
 # Defaults
 DEFAULT_COORDINATOR_URL = "http://localhost:8765"
 DEFAULT_POLL_TIMEOUT = 30
 DEFAULT_HEARTBEAT_INTERVAL = 60
+
+
+def _parse_tags(tags_str: str) -> list[str]:
+    """Parse comma-separated tags string into a list."""
+    if not tags_str:
+        return []
+    return [tag.strip() for tag in tags_str.split(",") if tag.strip()]
 
 
 @dataclass
@@ -28,6 +36,7 @@ class RunnerConfig:
     poll_timeout: int
     heartbeat_interval: int
     project_dir: str
+    tags: list[str]  # Capability tags (ADR-011)
 
     @classmethod
     def from_env(cls) -> "RunnerConfig":
@@ -39,4 +48,5 @@ class RunnerConfig:
                 os.environ.get(ENV_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL)
             ),
             project_dir=os.environ.get(ENV_PROJECT_DIR, os.getcwd()),
+            tags=_parse_tags(os.environ.get(ENV_RUNNER_TAGS, "")),
         )
