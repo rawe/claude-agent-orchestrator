@@ -1,3 +1,28 @@
+# ==============================================================================
+# Cross-Platform Compatibility (Mac & Windows)
+# ==============================================================================
+# This Makefile uses bash syntax (conditionals, process management, etc.) and
+# must work on both macOS and Windows (via Git Bash).
+#
+# Key compatibility requirements:
+#
+# 1. SHELL := bash
+#    - Uses PATH lookup instead of hardcoded /bin/bash
+#    - Mac: finds /bin/bash via PATH
+#    - Windows: finds Git Bash's bash.exe via PATH
+#    - Required because Windows PowerShell cannot execute bash syntax
+#
+# 2. Quoted "$(MAKE)" calls
+#    - $(MAKE) expands to the full path of the make binary
+#    - Windows paths often contain spaces/parentheses: C:\Program Files (x86)\...
+#    - Without quotes, these paths break shell command parsing
+#    - All recursive $(MAKE) calls must be quoted: @"$(MAKE)" target
+#
+# Windows users: Run this Makefile from Git Bash, not PowerShell/CMD
+# ==============================================================================
+
+SHELL := bash
+
 .PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-chat-ui-docker stop-chat-ui-docker
 
 # Default target
@@ -64,7 +89,7 @@ start-bg:
 	@echo "Starting all services in background..."
 	docker-compose up --build -d
 	@echo ""
-	@$(MAKE) --no-print-directory info
+	@"$(MAKE)" --no-print-directory info
 	@echo ""
 	@echo "💡 Quick commands:"
 	@echo "   make status    - Check status"
@@ -261,19 +286,19 @@ stop-mcp-neo4j:
 #   The "-" prefix tells Make to continue even if the command fails, showing warnings but not stopping
 start-mcps:
 	@echo "Starting all MCP servers..."
-	@$(MAKE) --no-print-directory start-mcp-agent-orchestrator
-	@$(MAKE) --no-print-directory start-mcp-context-store
-	-@$(MAKE) --no-print-directory start-mcp-atlassian
-	-@$(MAKE) --no-print-directory start-mcp-ado
-	-@$(MAKE) --no-print-directory start-mcp-neo4j
+	@"$(MAKE)" --no-print-directory start-mcp-agent-orchestrator
+	@"$(MAKE)" --no-print-directory start-mcp-context-store
+	-@"$(MAKE)" --no-print-directory start-mcp-atlassian
+	-@"$(MAKE)" --no-print-directory start-mcp-ado
+	-@"$(MAKE)" --no-print-directory start-mcp-neo4j
 
 stop-mcps:
 	@echo "Stopping all MCP servers..."
-	@$(MAKE) --no-print-directory stop-mcp-agent-orchestrator
-	@$(MAKE) --no-print-directory stop-mcp-context-store
-	@$(MAKE) --no-print-directory stop-mcp-atlassian
-	@$(MAKE) --no-print-directory stop-mcp-ado
-	@$(MAKE) --no-print-directory stop-mcp-neo4j
+	@"$(MAKE)" --no-print-directory stop-mcp-agent-orchestrator
+	@"$(MAKE)" --no-print-directory stop-mcp-context-store
+	@"$(MAKE)" --no-print-directory stop-mcp-atlassian
+	@"$(MAKE)" --no-print-directory stop-mcp-ado
+	@"$(MAKE)" --no-print-directory stop-mcp-neo4j
 
 # Agent Orchestrator MCP server (HTTP mode)
 # Loads configuration from .env file
@@ -367,9 +392,9 @@ stop-mcp-context-store:
 start-all:
 	@echo "Starting all services..."
 	@echo ""
-	@$(MAKE) --no-print-directory start-bg
+	@"$(MAKE)" --no-print-directory start-bg
 	@echo ""
-	@$(MAKE) --no-print-directory start-mcps
+	@"$(MAKE)" --no-print-directory start-mcps
 	@echo ""
 	@echo "============================================"
 	@echo "All services started!"
@@ -378,9 +403,9 @@ start-all:
 stop-all:
 	@echo "Stopping all services..."
 	@echo ""
-	@$(MAKE) --no-print-directory stop
+	@"$(MAKE)" --no-print-directory stop
 	@echo ""
-	@$(MAKE) --no-print-directory stop-mcps
+	@"$(MAKE)" --no-print-directory stop-mcps
 	@echo ""
 	@echo "============================================"
 	@echo "All services stopped!"
