@@ -227,6 +227,7 @@ class RunExecutor:
         )
 
         # Spawn subprocess with stdin pipe
+        # encoding='utf-8' required for Windows (defaults to CP1252 which can't handle emojis)
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -234,6 +235,8 @@ class RunExecutor:
             stderr=subprocess.PIPE,
             env=env,
             text=True,
+            encoding='utf-8',
+            errors='replace',
         )
 
         # Write payload to stdin and close

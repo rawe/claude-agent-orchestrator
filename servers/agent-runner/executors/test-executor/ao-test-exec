@@ -21,6 +21,11 @@ import uuid
 from pathlib import Path
 from datetime import datetime, UTC
 
+# Configure UTF-8 encoding for Windows (CP1252 default can't handle emojis)
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # Add runner lib to path for shared modules
 runner_lib = Path(__file__).parent.parent.parent / "lib"
 sys.path.insert(0, str(runner_lib))
