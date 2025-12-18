@@ -28,25 +28,25 @@ description: Context Store - Document management system for storing, querying, a
 
 ### `doc-push` - Upload Documents
 ```bash
-uv run <skill-root>/commands/doc-push <file> [--tags TEXT] [--description TEXT]
-# Example: uv run <skill-root>/commands/doc-push specs.md --tags "api,v2"
+uv run --script <skill-root>/commands/doc-push <file> [--tags TEXT] [--description TEXT]
+# Example: uv run --script <skill-root>/commands/doc-push specs.md --tags "api,v2"
 ```
 **Use when**: Store a document for future reference.
 
 ### `doc-query` - Search by Tags/Name
 ```bash
-uv run <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT] [--include-relations]
-# Example: uv run <skill-root>/commands/doc-query --tags "api,v2"
-# With relations: uv run <skill-root>/commands/doc-query --tags "api" --include-relations
+uv run --script <skill-root>/commands/doc-query [--tags TEXT] [--name TEXT] [--include-relations]
+# Example: uv run --script <skill-root>/commands/doc-query --tags "api,v2"
+# With relations: uv run --script <skill-root>/commands/doc-query --tags "api" --include-relations
 ```
 **Use when**: Find documents by tags (AND logic) or name patterns.
 **Option**: `--include-relations` adds relations to each document in response.
 
 ### `doc-search` - Semantic Search
 ```bash
-uv run <skill-root>/commands/doc-search "<query>" [--limit INT] [--include-relations]
-# Example: uv run <skill-root>/commands/doc-search "how to configure authentication"
-# With relations: uv run <skill-root>/commands/doc-search "auth" --include-relations
+uv run --script <skill-root>/commands/doc-search "<query>" [--limit INT] [--include-relations]
+# Example: uv run --script <skill-root>/commands/doc-search "how to configure authentication"
+# With relations: uv run --script <skill-root>/commands/doc-search "auth" --include-relations
 ```
 **Use when**: Find documents by meaning using natural language queries.
 **Note**: Requires semantic search enabled on server. Returns section offsets for partial reads.
@@ -54,41 +54,41 @@ uv run <skill-root>/commands/doc-search "<query>" [--limit INT] [--include-relat
 
 ### `doc-info` - Get Document Metadata & Relations
 ```bash
-uv run <skill-root>/commands/doc-info <document-id>
-# Example: uv run <skill-root>/commands/doc-info doc_abc123
+uv run --script <skill-root>/commands/doc-info <document-id>
+# Example: uv run --script <skill-root>/commands/doc-info doc_abc123
 ```
 **Use when**: View metadata and relations for a specific document without downloading it.
 **Output**: Includes `relations` field with parent/child/related document links.
 
 ### `doc-read` - Read Text Documents
 ```bash
-uv run <skill-root>/commands/doc-read <document-id> [--offset INT] [--limit INT]
-# Example: uv run <skill-root>/commands/doc-read doc_abc123
-# Partial: uv run <skill-root>/commands/doc-read doc_abc123 --offset 2000 --limit 1000
+uv run --script <skill-root>/commands/doc-read <document-id> [--offset INT] [--limit INT]
+# Example: uv run --script <skill-root>/commands/doc-read doc_abc123
+# Partial: uv run --script <skill-root>/commands/doc-read doc_abc123 --offset 2000 --limit 1000
 ```
 **Use when**: Output text document content directly to stdout (text files only).
 **Partial reads**: Use `--offset` and `--limit` to retrieve specific sections (useful with semantic search results).
 
 ### `doc-pull` - Download Documents
 ```bash
-uv run <skill-root>/commands/doc-pull <document-id> [-o PATH]
-# Example: uv run <skill-root>/commands/doc-pull doc_abc123 -o specs.md
+uv run --script <skill-root>/commands/doc-pull <document-id> [-o PATH]
+# Example: uv run --script <skill-root>/commands/doc-pull doc_abc123 -o specs.md
 ```
 **Use when**: Retrieve a document by its ID.
 
 ### `doc-delete` - Remove Documents
 ```bash
-uv run <skill-root>/commands/doc-delete <document-id>
-# Example: uv run <skill-root>/commands/doc-delete doc_abc123
+uv run --script <skill-root>/commands/doc-delete <document-id>
+# Example: uv run --script <skill-root>/commands/doc-delete doc_abc123
 ```
 **Use when**: Permanently remove a document.
 
 ### `doc-link` - Manage Document Relations
 ```bash
-uv run <skill-root>/commands/doc-link --types                     # List relation types
-uv run <skill-root>/commands/doc-link --create <from> <to> [opts] # Create relation
-uv run <skill-root>/commands/doc-link --update <id> --note "..."  # Update note
-uv run <skill-root>/commands/doc-link --remove <id>               # Remove relation
+uv run --script <skill-root>/commands/doc-link --types                     # List relation types
+uv run --script <skill-root>/commands/doc-link --create <from> <to> [opts] # Create relation
+uv run --script <skill-root>/commands/doc-link --update <id> --note "..."  # Update note
+uv run --script <skill-root>/commands/doc-link --remove <id>               # Remove relation
 ```
 **Use when**: Link documents together in parent-child or peer relationships.
 **Options for --create**:
@@ -103,51 +103,51 @@ uv run <skill-root>/commands/doc-link --remove <id>               # Remove relat
 ### Store and Retrieve
 ```bash
 # Upload with tags
-uv run <skill-root>/commands/doc-push specs.md --tags "api,v2"
+uv run --script <skill-root>/commands/doc-push specs.md --tags "api,v2"
 
 # Find it later
-uv run <skill-root>/commands/doc-query --tags "api,v2"
+uv run --script <skill-root>/commands/doc-query --tags "api,v2"
 
 # Download it
-uv run <skill-root>/commands/doc-pull doc_abc123
+uv run --script <skill-root>/commands/doc-pull doc_abc123
 ```
 
 ### Build Knowledge Base
 ```bash
 # Upload multiple documents with consistent tags
-uv run <skill-root>/commands/doc-push architecture.md --tags "design,mvp"
-uv run <skill-root>/commands/doc-push api-spec.md --tags "api,mvp"
+uv run --script <skill-root>/commands/doc-push architecture.md --tags "design,mvp"
+uv run --script <skill-root>/commands/doc-push api-spec.md --tags "api,mvp"
 
 # Query by project phase
-uv run <skill-root>/commands/doc-query --tags "mvp"
+uv run --script <skill-root>/commands/doc-query --tags "mvp"
 ```
 
 ### Semantic Search + Partial Read
 ```bash
 # Search by meaning
-uv run <skill-root>/commands/doc-search "how to authenticate users"
+uv run --script <skill-root>/commands/doc-search "how to authenticate users"
 # Returns: {"results": [{"document_id": "doc_abc", "sections": [{"offset": 2000, "limit": 1000}]}]}
 
 # Read only the relevant section
-uv run <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
+uv run --script <skill-root>/commands/doc-read doc_abc --offset 2000 --limit 1000
 ```
 
 ### Link Related Documents
 ```bash
 # Get relation types
-uv run <skill-root>/commands/doc-link --types
+uv run --script <skill-root>/commands/doc-link --types
 
 # Create a sequential relationship
-uv run <skill-root>/commands/doc-link --create doc_design doc_implementation --type predecessor-successor --from-to-note "Design doc" --to-from-note "Implementation plan"
+uv run --script <skill-root>/commands/doc-link --create doc_design doc_implementation --type predecessor-successor --from-to-note "Design doc" --to-from-note "Implementation plan"
 
 # Create hierarchical relationship (parent owns children)
-uv run <skill-root>/commands/doc-link --create doc_architecture doc_api --type parent-child --from-to-note "API spec"
+uv run --script <skill-root>/commands/doc-link --create doc_architecture doc_api --type parent-child --from-to-note "API spec"
 
 # Create peer relationship
-uv run <skill-root>/commands/doc-link --create doc_api doc_models --type related --from-to-note "Data models"
+uv run --script <skill-root>/commands/doc-link --create doc_api doc_models --type related --from-to-note "Data models"
 
 # View document with its relations
-uv run <skill-root>/commands/doc-info doc_architecture
+uv run --script <skill-root>/commands/doc-info doc_architecture
 ```
 
 ---

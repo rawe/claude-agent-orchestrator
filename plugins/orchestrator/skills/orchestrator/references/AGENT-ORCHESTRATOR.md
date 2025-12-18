@@ -80,16 +80,16 @@ All commands are thin HTTP clients that call the backend APIs.
 Coordinate multiple specialized sessions:
 ```bash
 # List available blueprints
-uv run commands/ao-list-blueprints
+uv run --script commands/ao-list-blueprints
 
 # Architecture session
-uv run commands/ao-start architect --agent system-architect -p "Design microservices for e-commerce"
+uv run --script commands/ao-start architect --agent system-architect -p "Design microservices for e-commerce"
 
 # Development session
-uv run commands/ao-start developer --agent senior-developer -p "Implement the user service"
+uv run --script commands/ao-start developer --agent senior-developer -p "Implement the user service"
 
 # Review session
-uv run commands/ao-start reviewer --agent security-reviewer -p "Review the implementation"
+uv run --script commands/ao-start reviewer --agent security-reviewer -p "Review the implementation"
 ```
 
 ### Long-Running Background Tasks
@@ -105,13 +105,13 @@ Delegate time-consuming tasks:
 Resume sessions to continue previous work:
 ```bash
 # Initial work
-uv run commands/ao-start docs --agent documentation-expert -p "Create API documentation"
+uv run --script commands/ao-start docs --agent documentation-expert -p "Create API documentation"
 
 # Refinement
-uv run commands/ao-resume docs -p "Add authentication examples"
+uv run --script commands/ao-resume docs -p "Add authentication examples"
 
 # Enhancement
-uv run commands/ao-resume docs -p "Include error handling section"
+uv run --script commands/ao-resume docs -p "Include error handling section"
 ```
 
 ## Features

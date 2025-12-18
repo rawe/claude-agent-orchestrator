@@ -172,16 +172,16 @@ While Claude can handle document operations through natural language, you can al
 
 ```bash
 # Upload
-uv run skills/context-store/commands/doc-push file.txt --tags "tag1,tag2"
+uv run --script skills/context-store/commands/doc-push file.txt --tags "tag1,tag2"
 
 # Query
-uv run skills/context-store/commands/doc-query --tags "tag1"
+uv run --script skills/context-store/commands/doc-query --tags "tag1"
 
 # Download
-uv run skills/context-store/commands/doc-pull doc_abc123...
+uv run --script skills/context-store/commands/doc-pull doc_abc123...
 
 # Delete
-uv run skills/context-store/commands/doc-delete doc_abc123...
+uv run --script skills/context-store/commands/doc-delete doc_abc123...
 ```
 
 See `skills/context-store/README.md` for detailed command documentation.

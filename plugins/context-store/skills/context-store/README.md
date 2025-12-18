@@ -17,7 +17,7 @@ All commands output JSON for easy parsing and integration with Claude Code (exce
 Upload a document to the server with optional tags and description.
 
 ```bash
-uv run /path/to/doc-push <file> [OPTIONS]
+uv run --script /path/to/doc-push <file> [OPTIONS]
 ```
 
 **Arguments:**
@@ -30,7 +30,7 @@ uv run /path/to/doc-push <file> [OPTIONS]
 
 **Example:**
 ```bash
-uv run doc-push architecture.md --tags "design,architecture" --description "System architecture document"
+uv run --script doc-push architecture.md --tags "design,architecture" --description "System architecture document"
 ```
 
 **Output:**
@@ -53,7 +53,7 @@ uv run doc-push architecture.md --tags "design,architecture" --description "Syst
 Query documents by name pattern and/or tags.
 
 ```bash
-uv run /path/to/doc-query [OPTIONS]
+uv run --script /path/to/doc-query [OPTIONS]
 ```
 
 **Options:**
@@ -64,16 +64,16 @@ uv run /path/to/doc-query [OPTIONS]
 **Examples:**
 ```bash
 # List all documents
-uv run doc-query
+uv run --script doc-query
 
 # Find documents with specific tags (AND logic)
-uv run doc-query --tags "python,tutorial"
+uv run --script doc-query --tags "python,tutorial"
 
 # Filter by name pattern
-uv run doc-query --name "architecture"
+uv run --script doc-query --name "architecture"
 
 # Combine filters
-uv run doc-query --name "guide" --tags "python" --limit 5
+uv run --script doc-query --name "guide" --tags "python" --limit 5
 ```
 
 **Tag AND Logic:** When querying with multiple tags (e.g., `--tags "python,api"`), only documents that have **both** tags will be returned.
@@ -100,7 +100,7 @@ uv run doc-query --name "guide" --tags "python" --limit 5
 Retrieve metadata for a specific document without downloading the file.
 
 ```bash
-uv run /path/to/doc-info <document_id>
+uv run --script /path/to/doc-info <document_id>
 ```
 
 **Arguments:**
@@ -108,7 +108,7 @@ uv run /path/to/doc-info <document_id>
 
 **Example:**
 ```bash
-uv run doc-info doc_abc123...
+uv run --script doc-info doc_abc123...
 ```
 
 **Output:**
@@ -133,7 +133,7 @@ uv run doc-info doc_abc123...
 Read text document content directly to stdout without downloading to file.
 
 ```bash
-uv run /path/to/doc-read <document_id>
+uv run --script /path/to/doc-read <document_id>
 ```
 
 **Arguments:**
@@ -147,16 +147,16 @@ uv run /path/to/doc-read <document_id>
 **Examples:**
 ```bash
 # Output content to terminal
-uv run doc-read doc_abc123...
+uv run --script doc-read doc_abc123...
 
 # Pipe to grep
-uv run doc-read doc_abc123... | grep "search term"
+uv run --script doc-read doc_abc123... | grep "search term"
 
 # Pipe to jq (for JSON documents)
-uv run doc-read doc_abc123... | jq '.field'
+uv run --script doc-read doc_abc123... | jq '.field'
 
 # Save to file
-uv run doc-read doc_abc123... > output.txt
+uv run --script doc-read doc_abc123... > output.txt
 ```
 
 **Output:** Raw text content (no JSON wrapper)
@@ -173,7 +173,7 @@ uv run doc-read doc_abc123... > output.txt
 Download a document by its ID.
 
 ```bash
-uv run /path/to/doc-pull <document_id> [OPTIONS]
+uv run --script /path/to/doc-pull <document_id> [OPTIONS]
 ```
 
 **Arguments:**
@@ -185,10 +185,10 @@ uv run /path/to/doc-pull <document_id> [OPTIONS]
 **Examples:**
 ```bash
 # Download with original filename
-uv run doc-pull doc_abc123...
+uv run --script doc-pull doc_abc123...
 
 # Download to specific path
-uv run doc-pull doc_abc123... --output ~/downloads/my-document.md
+uv run --script doc-pull doc_abc123... --output ~/downloads/my-document.md
 ```
 
 **Output:**
@@ -206,7 +206,7 @@ uv run doc-pull doc_abc123... --output ~/downloads/my-document.md
 Delete a document from the server.
 
 ```bash
-uv run /path/to/doc-delete <document_id>
+uv run --script /path/to/doc-delete <document_id>
 ```
 
 **Arguments:**
@@ -214,7 +214,7 @@ uv run /path/to/doc-delete <document_id>
 
 **Example:**
 ```bash
-uv run doc-delete doc_abc123...
+uv run --script doc-delete doc_abc123...
 ```
 
 **Output:**
@@ -235,7 +235,7 @@ Commands connect to the context store server using environment variables:
 - **Default:** `localhost`
 - **Example:**
   ```bash
-  DOC_SYNC_HOST=192.168.1.100 uv run doc-push file.txt
+  DOC_SYNC_HOST=192.168.1.100 uv run --script doc-push file.txt
   ```
 
 ### DOC_SYNC_PORT
@@ -243,7 +243,7 @@ Commands connect to the context store server using environment variables:
 - **Default:** `8766`
 - **Example:**
   ```bash
-  DOC_SYNC_PORT=9000 uv run doc-query
+  DOC_SYNC_PORT=9000 uv run --script doc-query
   ```
 
 ### DOC_SYNC_SCHEME
@@ -251,13 +251,13 @@ Commands connect to the context store server using environment variables:
 - **Default:** `http`
 - **Example:**
   ```bash
-  DOC_SYNC_SCHEME=https uv run doc-pull doc_abc123...
+  DOC_SYNC_SCHEME=https uv run --script doc-pull doc_abc123...
   ```
 
 **Combined Example:**
 ```bash
 DOC_SYNC_HOST=example.com DOC_SYNC_PORT=443 DOC_SYNC_SCHEME=https \
-  uv run doc-push document.pdf --tags "report"
+  uv run --script doc-push document.pdf --tags "report"
 ```
 
 ## Common Workflows
@@ -265,46 +265,46 @@ DOC_SYNC_HOST=example.com DOC_SYNC_PORT=443 DOC_SYNC_SCHEME=https \
 ### Store and Retrieve a Document
 ```bash
 # 1. Upload a document
-uv run doc-push specs.md --tags "api,specification"
+uv run --script doc-push specs.md --tags "api,specification"
 
 # Output includes the document ID: "doc_abc123..."
 
 # 2. Later, query for it
-uv run doc-query --tags "api,specification"
+uv run --script doc-query --tags "api,specification"
 
 # 3. Check metadata before downloading
-uv run doc-info doc_abc123...
+uv run --script doc-info doc_abc123...
 
 # 4. Read content (for text files)
-uv run doc-read doc_abc123... | less
+uv run --script doc-read doc_abc123... | less
 
 # 5. Download it
-uv run doc-pull doc_abc123... --output specs-copy.md
+uv run --script doc-pull doc_abc123... --output specs-copy.md
 ```
 
 ### Share Documents Across Sessions
 ```bash
 # Session 1: Store architecture document
-uv run doc-push architecture.md --tags "design,mvp" \
+uv run --script doc-push architecture.md --tags "design,mvp" \
   --description "MVP architecture decisions"
 
 # Session 2: Query and retrieve
-uv run doc-query --tags "design,mvp"
-uv run doc-info doc_abc123...  # Check metadata
-uv run doc-read doc_abc123... | head -20  # Preview first 20 lines
-uv run doc-pull doc_abc123... --output architecture.md
+uv run --script doc-query --tags "design,mvp"
+uv run --script doc-info doc_abc123...  # Check metadata
+uv run --script doc-read doc_abc123... | head -20  # Preview first 20 lines
+uv run --script doc-pull doc_abc123... --output architecture.md
 ```
 
 ### Manage Document Repository
 ```bash
 # List all documents
-uv run doc-query
+uv run --script doc-query
 
 # Find specific category
-uv run doc-query --tags "deprecated"
+uv run --script doc-query --tags "deprecated"
 
 # Remove old documents
-uv run doc-delete doc_old123...
+uv run --script doc-delete doc_old123...
 ```
 
 ## Error Handling
@@ -365,11 +365,11 @@ uv run python -m src.main
 Use full paths or navigate to the commands directory:
 ```bash
 # Use full path
-uv run /full/path/to/doc-push file.txt
+uv run --script /full/path/to/doc-push file.txt
 
 # Or navigate to commands directory
 cd /path/to/commands
-uv run doc-push file.txt
+uv run --script doc-push file.txt
 ```
 
 ### Commands run slowly the first time

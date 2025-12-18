@@ -3,7 +3,7 @@
 ## doc-push
 
 ```bash
-uv run commands/doc-push <file> [--name TEXT] [--tags TEXT] [--description TEXT]
+uv run --script commands/doc-push <file> [--name TEXT] [--tags TEXT] [--description TEXT]
 ```
 
 **Arguments**: `<file>` - File path to upload
@@ -15,8 +15,8 @@ uv run commands/doc-push <file> [--name TEXT] [--tags TEXT] [--description TEXT]
 
 **Examples**:
 ```bash
-uv run commands/doc-push specs.md --tags "api,v2"
-uv run commands/doc-push arch.md --tags "design,mvp" --description "MVP architecture"
+uv run --script commands/doc-push specs.md --tags "api,v2"
+uv run --script commands/doc-push arch.md --tags "design,mvp" --description "MVP architecture"
 ```
 
 **Output**:
@@ -41,7 +41,7 @@ uv run commands/doc-push arch.md --tags "design,mvp" --description "MVP architec
 ## doc-query
 
 ```bash
-uv run commands/doc-query [--name TEXT] [--tags TEXT] [--limit INTEGER]
+uv run --script commands/doc-query [--name TEXT] [--tags TEXT] [--limit INTEGER]
 ```
 
 **Options**:
@@ -51,9 +51,9 @@ uv run commands/doc-query [--name TEXT] [--tags TEXT] [--limit INTEGER]
 
 **Examples**:
 ```bash
-uv run commands/doc-query                    # List all
-uv run commands/doc-query --tags "api,v2"    # Both tags required (AND)
-uv run commands/doc-query --name "spec"      # Name contains "spec"
+uv run --script commands/doc-query                    # List all
+uv run --script commands/doc-query --tags "api,v2"    # Both tags required (AND)
+uv run --script commands/doc-query --name "spec"      # Name contains "spec"
 ```
 
 **Output**:
@@ -80,14 +80,14 @@ uv run commands/doc-query --name "spec"      # Name contains "spec"
 ## doc-info
 
 ```bash
-uv run commands/doc-info <document-id>
+uv run --script commands/doc-info <document-id>
 ```
 
 **Arguments**: `<document-id>` - Document ID to retrieve metadata for
 
 **Examples**:
 ```bash
-uv run commands/doc-info doc_abc123...
+uv run --script commands/doc-info doc_abc123...
 ```
 
 **Output**:
@@ -131,7 +131,7 @@ uv run commands/doc-info doc_abc123...
 ## doc-read
 
 ```bash
-uv run commands/doc-read <document-id>
+uv run --script commands/doc-read <document-id>
 ```
 
 **Arguments**: `<document-id>` - Document ID to read content from
@@ -139,16 +139,16 @@ uv run commands/doc-read <document-id>
 **Examples**:
 ```bash
 # Direct output
-uv run commands/doc-read doc_abc123...
+uv run --script commands/doc-read doc_abc123...
 
 # Pipe to grep
-uv run commands/doc-read doc_abc123... | grep "pattern"
+uv run --script commands/doc-read doc_abc123... | grep "pattern"
 
 # Pipe to wc
-uv run commands/doc-read doc_abc123... | wc -l
+uv run --script commands/doc-read doc_abc123... | wc -l
 
 # Save to file
-uv run commands/doc-read doc_abc123... > output.txt
+uv run --script commands/doc-read doc_abc123... > output.txt
 ```
 
 **Output**: Raw text content to stdout (no JSON wrapper)
@@ -180,7 +180,7 @@ uv run commands/doc-read doc_abc123... > output.txt
 ## doc-pull
 
 ```bash
-uv run commands/doc-pull <document-id> [--output PATH | -o PATH]
+uv run --script commands/doc-pull <document-id> [--output PATH | -o PATH]
 ```
 
 **Arguments**: `<document-id>` - Document ID from query results
@@ -189,8 +189,8 @@ uv run commands/doc-pull <document-id> [--output PATH | -o PATH]
 
 **Examples**:
 ```bash
-uv run commands/doc-pull doc_abc123...
-uv run commands/doc-pull doc_abc123... -o custom-name.md
+uv run --script commands/doc-pull doc_abc123...
+uv run --script commands/doc-pull doc_abc123... -o custom-name.md
 ```
 
 **Output**:
@@ -208,14 +208,14 @@ uv run commands/doc-pull doc_abc123... -o custom-name.md
 ## doc-delete
 
 ```bash
-uv run commands/doc-delete <document-id>
+uv run --script commands/doc-delete <document-id>
 ```
 
 **Arguments**: `<document-id>` - Document ID from query results
 
 **Example**:
 ```bash
-uv run commands/doc-delete doc_abc123...
+uv run --script commands/doc-delete doc_abc123...
 ```
 
 **Output**:
@@ -234,7 +234,7 @@ uv run commands/doc-delete doc_abc123...
 ## doc-link
 
 ```bash
-uv run commands/doc-link <action-flag> [arguments] [options]
+uv run --script commands/doc-link <action-flag> [arguments] [options]
 ```
 
 **Actions** (mutually exclusive):
@@ -246,7 +246,7 @@ uv run commands/doc-link <action-flag> [arguments] [options]
 ### List Relation Types
 
 ```bash
-uv run commands/doc-link --types
+uv run --script commands/doc-link --types
 ```
 
 **Output**:
@@ -270,7 +270,7 @@ uv run commands/doc-link --types
 ### Create Relation
 
 ```bash
-uv run commands/doc-link --create <from-doc-id> <to-doc-id> [options]
+uv run --script commands/doc-link --create <from-doc-id> <to-doc-id> [options]
 ```
 
 **Options**:
@@ -281,10 +281,10 @@ uv run commands/doc-link --create <from-doc-id> <to-doc-id> [options]
 **Examples**:
 ```bash
 # Create parent-child relation
-uv run commands/doc-link --create doc_parent doc_child --type parent-child --from-to-note "Child module"
+uv run --script commands/doc-link --create doc_parent doc_child --type parent-child --from-to-note "Child module"
 
 # Create peer relation
-uv run commands/doc-link --create doc_a doc_b --type related --from-to-note "See also" --to-from-note "Related doc"
+uv run --script commands/doc-link --create doc_a doc_b --type related --from-to-note "See also" --to-from-note "Related doc"
 ```
 
 **Output**:
@@ -312,14 +312,14 @@ uv run commands/doc-link --create doc_a doc_b --type related --from-to-note "See
 ### Update Relation Note
 
 ```bash
-uv run commands/doc-link --update <relation-id> --note "New note text"
+uv run --script commands/doc-link --update <relation-id> --note "New note text"
 ```
 
 **Options**: `--note TEXT` or `-n TEXT` - New note text (required)
 
 **Example**:
 ```bash
-uv run commands/doc-link --update rel_abc123 --note "Updated: Core database module"
+uv run --script commands/doc-link --update rel_abc123 --note "Updated: Core database module"
 ```
 
 **Output**:
@@ -337,12 +337,12 @@ uv run commands/doc-link --update rel_abc123 --note "Updated: Core database modu
 ### Remove Relation
 
 ```bash
-uv run commands/doc-link --remove <relation-id>
+uv run --script commands/doc-link --remove <relation-id>
 ```
 
 **Example**:
 ```bash
-uv run commands/doc-link --remove rel_abc123
+uv run --script commands/doc-link --remove rel_abc123
 ```
 
 **Output**:

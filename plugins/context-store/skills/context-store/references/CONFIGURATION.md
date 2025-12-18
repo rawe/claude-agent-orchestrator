@@ -10,5 +10,5 @@
 
 ```bash
 DOC_SYNC_HOST=example.com DOC_SYNC_PORT=443 DOC_SYNC_SCHEME=https \
-  uv run commands/doc-push file.txt
+  uv run --script commands/doc-push file.txt
 ```

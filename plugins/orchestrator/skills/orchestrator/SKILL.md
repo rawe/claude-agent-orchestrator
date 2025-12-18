@@ -32,49 +32,49 @@ description: Use this skill when you need to orchestrate specialized Claude agen
 
 ### `ao-start` - Start new session
 ```bash
-uv run commands/ao-start <session-name>
+uv run --script commands/ao-start <session-name>
 ```
 **Use when**: Starting a new Claude agent session. Reads prompt from stdin or `-p` flag.
 
 ### `ao-resume` - Continue existing session
 ```bash
-uv run commands/ao-resume <session-name>
+uv run --script commands/ao-resume <session-name>
 ```
 **Use when**: Adding messages to an existing session. Reads prompt from stdin or `-p` flag.
 
 ### `ao-status` - Check session state
 ```bash
-uv run commands/ao-status <session-name>
+uv run --script commands/ao-status <session-name>
 ```
 **Use when**: Need to know if session is `running`, `finished`, or `not_existent`.
 
 ### `ao-get-result` - Extract result from finished session
 ```bash
-uv run commands/ao-get-result <session-name>
+uv run --script commands/ao-get-result <session-name>
 ```
 **Use when**: Session is finished and you need the final result text.
 
 ### `ao-list-sessions` - List all sessions
 ```bash
-uv run commands/ao-list-sessions
+uv run --script commands/ao-list-sessions
 ```
 **Use when**: Need to see available sessions with their IDs and project directories.
 
 ### `ao-list-blueprints` - List available agent blueprints
 ```bash
-uv run commands/ao-list-blueprints
+uv run --script commands/ao-list-blueprints
 ```
 **Use when**: Need to see what specialized agent blueprints are available.
 
 ### `ao-show-config` - Display session configuration
 ```bash
-uv run commands/ao-show-config <session-name>
+uv run --script commands/ao-show-config <session-name>
 ```
 **Use when**: Need to see session metadata (project dir, agent used, timestamps, etc.).
 
 ### `ao-delete-all` - Delete all sessions
 ```bash
-uv run commands/ao-delete-all
+uv run --script commands/ao-delete-all
 ```
 **Use when**: Need to delete all session data. **Use with caution.**
 
@@ -87,12 +87,12 @@ uv run commands/ao-delete-all
 Before using commands for the first time:
 1. Locate this skill's root folder (same directory as this SKILL.md)
 2. Commands are in: `<skill-root>/commands/ao-*`
-3. Execute using: `uv run <skill-root>/commands/ao-<command> <args>`
+3. Execute using: `uv run --script <skill-root>/commands/ao-<command> <args>`
 
 **Example**:
 ```bash
 # If skill is at /path/to/skills/orchestrator
-uv run /path/to/skills/orchestrator/commands/ao-start my-session -p "Research topic X"
+uv run --script /path/to/skills/orchestrator/commands/ao-start my-session -p "Research topic X"
 ```
 
 ---
@@ -114,40 +114,40 @@ uv run /path/to/skills/orchestrator/commands/ao-start my-session -p "Research to
 ### Basic Session Workflow
 ```bash
 # Start new session
-echo "Analyze this codebase structure" | uv run commands/ao-start analysis
+echo "Analyze this codebase structure" | uv run --script commands/ao-start analysis
 
 # Check status
-uv run commands/ao-status analysis  # Output: finished
+uv run --script commands/ao-status analysis  # Output: finished
 
 # Get result
-uv run commands/ao-get-result analysis
+uv run --script commands/ao-get-result analysis
 
 # Resume with follow-up
-echo "Now focus on security patterns" | uv run commands/ao-resume analysis
+echo "Now focus on security patterns" | uv run --script commands/ao-resume analysis
 ```
 
 ### Using Specialized Agents
 ```bash
 # List available blueprints
-uv run commands/ao-list-blueprints
+uv run --script commands/ao-list-blueprints
 
 # Start session with specific agent blueprint
-uv run commands/ao-start research-task --agent web-researcher -p "Research Claude AI capabilities"
+uv run --script commands/ao-start research-task --agent web-researcher -p "Research Claude AI capabilities"
 
 # View agent configuration
-uv run commands/ao-show-config research-task
+uv run --script commands/ao-show-config research-task
 ```
 
 ### Managing Sessions
 ```bash
 # List all active sessions
-uv run commands/ao-list-sessions
+uv run --script commands/ao-list-sessions
 
 # Check specific session
-uv run commands/ao-status my-session
+uv run --script commands/ao-status my-session
 
 # Delete all sessions
-uv run commands/ao-delete-all
+uv run --script commands/ao-delete-all
 ```
 
 ---

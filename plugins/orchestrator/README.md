@@ -91,7 +91,7 @@ Use the orchestrator skill to create a new session called "code-review" and revi
 ### 3. Check Available Blueprints
 
 ```bash
-uv run skills/orchestrator/commands/ao-list-blueprints
+uv run --script skills/orchestrator/commands/ao-list-blueprints
 ```
 
 ## Key Concepts

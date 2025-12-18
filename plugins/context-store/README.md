@@ -80,22 +80,22 @@ You can also run commands directly:
 
 ```bash
 # Upload a document
-uv run skills/context-store/commands/doc-push file.txt --tags "tag1,tag2"
+uv run --script skills/context-store/commands/doc-push file.txt --tags "tag1,tag2"
 
 # Query documents
-uv run skills/context-store/commands/doc-query --tags "tag1"
+uv run --script skills/context-store/commands/doc-query --tags "tag1"
 
 # Get document metadata
-uv run skills/context-store/commands/doc-info doc_abc123...
+uv run --script skills/context-store/commands/doc-info doc_abc123...
 
 # Read text document content
-uv run skills/context-store/commands/doc-read doc_abc123...
+uv run --script skills/context-store/commands/doc-read doc_abc123...
 
 # Download a document
-uv run skills/context-store/commands/doc-pull doc_abc123...
+uv run --script skills/context-store/commands/doc-pull doc_abc123...
 
 # Delete a document
-uv run skills/context-store/commands/doc-delete doc_abc123...
+uv run --script skills/context-store/commands/doc-delete doc_abc123...
 ```
 
 ## Documentation
