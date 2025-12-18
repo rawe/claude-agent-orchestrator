@@ -2,13 +2,46 @@
 Runner registry for tracking registered runner instances.
 
 Runners register on startup and send periodic heartbeats to stay alive.
+Runner identity is deterministically derived from (hostname, project_dir, executor_type)
+to enable automatic reconnection recognition. See ADR-012.
 """
 
+import hashlib
 import threading
-import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
+
+
+def derive_runner_id(hostname: str, project_dir: str, executor_type: str) -> str:
+    """
+    Deterministically derive runner_id from identifying properties.
+
+    Same properties always produce same ID (enables reconnection recognition).
+    This is an internal implementation detail, not exposed to runners.
+
+    Args:
+        hostname: The machine hostname where the runner is running
+        project_dir: The default project directory for this runner
+        executor_type: The type of executor (folder name, e.g., 'claude-code')
+
+    Returns:
+        Runner ID in format: lnch_{sha256_hash[:12]}
+    """
+    # Normalize inputs
+    key = f"{hostname}:{project_dir}:{executor_type}"
+
+    # Generate deterministic hash
+    hash_hex = hashlib.sha256(key.encode()).hexdigest()
+
+    # Format with prefix
+    return f"lnch_{hash_hex[:12]}"
+
+
+class RunnerStatus:
+    """Runner status constants."""
+    ONLINE = "online"
+    STALE = "stale"
 
 
 class RunnerInfo(BaseModel):
@@ -16,10 +49,12 @@ class RunnerInfo(BaseModel):
     runner_id: str
     registered_at: str
     last_heartbeat: str
-    # Metadata provided by the runner
-    hostname: Optional[str] = None
-    project_dir: Optional[str] = None
-    executor_type: Optional[str] = None
+    # Identifying properties (required for ID derivation)
+    hostname: str
+    project_dir: str
+    executor_type: str
+    # Status managed by coordinator
+    status: Literal["online", "stale"] = RunnerStatus.ONLINE
 
 
 class RunnerRegistry:
@@ -33,33 +68,50 @@ class RunnerRegistry:
 
     def register_runner(
         self,
-        hostname: Optional[str] = None,
-        project_dir: Optional[str] = None,
-        executor_type: Optional[str] = None,
+        hostname: str,
+        project_dir: str,
+        executor_type: str,
     ) -> RunnerInfo:
-        """Register a new runner and return its info.
+        """Register a runner and return its info.
+
+        If a runner with the same (hostname, project_dir, executor_type) already exists,
+        this is treated as a reconnection: the existing record is updated and returned.
+        Otherwise, a new runner record is created.
 
         Args:
             hostname: The machine hostname where the runner is running
             project_dir: The default project directory for this runner
             executor_type: The type of executor (folder name, e.g., 'claude-code')
+
+        Returns:
+            RunnerInfo with the runner_id derived from the properties
         """
-        runner_id = f"rnr_{uuid.uuid4().hex[:12]}"
+        # Derive deterministic runner_id from properties
+        runner_id = derive_runner_id(hostname, project_dir, executor_type)
         now = datetime.now(timezone.utc).isoformat()
 
-        runner = RunnerInfo(
-            runner_id=runner_id,
-            registered_at=now,
-            last_heartbeat=now,
-            hostname=hostname,
-            project_dir=project_dir,
-            executor_type=executor_type,
-        )
-
         with self._lock:
-            self._runners[runner_id] = runner
+            existing = self._runners.get(runner_id)
+            if existing:
+                # Reconnection: update existing runner
+                existing.last_heartbeat = now
+                existing.status = RunnerStatus.ONLINE
+                # Remove from deregistered set if it was marked
+                self._deregistered.discard(runner_id)
+                return existing
 
-        return runner
+            # New registration
+            runner = RunnerInfo(
+                runner_id=runner_id,
+                registered_at=now,
+                last_heartbeat=now,
+                hostname=hostname,
+                project_dir=project_dir,
+                executor_type=executor_type,
+                status=RunnerStatus.ONLINE,
+            )
+            self._runners[runner_id] = runner
+            return runner
 
     def heartbeat(self, runner_id: str) -> bool:
         """Update last heartbeat timestamp.
@@ -147,6 +199,49 @@ class RunnerRegistry:
                 del self._runners[runner_id]
                 return True
             return False
+
+    def update_lifecycle(
+        self,
+        stale_threshold_seconds: float = 120.0,
+        remove_threshold_seconds: float = 600.0,
+    ) -> tuple[list[str], list[str]]:
+        """Update runner lifecycle states based on heartbeat age.
+
+        Runners that haven't sent a heartbeat:
+        - For stale_threshold+ seconds: marked as stale
+        - For remove_threshold+ seconds: removed from registry
+
+        Args:
+            stale_threshold_seconds: Seconds without heartbeat before marking stale
+            remove_threshold_seconds: Seconds without heartbeat before removal
+
+        Returns:
+            Tuple of (stale_runner_ids, removed_runner_ids)
+        """
+        now = datetime.now(timezone.utc)
+        stale_ids: list[str] = []
+        remove_ids: list[str] = []
+
+        with self._lock:
+            for runner_id, runner in list(self._runners.items()):
+                last_hb = datetime.fromisoformat(
+                    runner.last_heartbeat.replace('Z', '+00:00')
+                )
+                age_seconds = (now - last_hb).total_seconds()
+
+                if age_seconds >= remove_threshold_seconds:
+                    remove_ids.append(runner_id)
+                elif age_seconds >= stale_threshold_seconds:
+                    if runner.status != RunnerStatus.STALE:
+                        runner.status = RunnerStatus.STALE
+                        stale_ids.append(runner_id)
+
+            # Remove old runners
+            for runner_id in remove_ids:
+                del self._runners[runner_id]
+                self._deregistered.discard(runner_id)
+
+        return stale_ids, remove_ids
 
 
 # Module-level singleton

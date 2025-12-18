@@ -129,7 +129,7 @@ Complete system
 
 ## Success Criteria
 
-- [ ] Runner restarts get same runner_id
+- [x] Runner restarts get same runner_id
 - [ ] Runs with demands only go to matching runners
 - [ ] session_id available immediately after run creation
 - [ ] Resume works using session_id

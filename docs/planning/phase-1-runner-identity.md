@@ -1,5 +1,7 @@
 # Phase 1: Runner Identity (ADR-012)
 
+**Status: COMPLETED**
+
 ## Overview
 
 Implement deterministic runner ID derivation from runner properties (hostname, project_dir, executor_type) to enable automatic reconnection recognition, with lifecycle management (online/stale/removed states).
@@ -61,7 +63,9 @@ None (Phase 1 is the foundation)
 
 ## Verification
 
-1. Start runner, stop, restart → same runner_id returned
-2. Stop runner process, wait 2+ min → status becomes "stale"
-3. Stale for 10+ min → runner removed from GET /runners
-4. Register without required properties → 422 error
+1. [x] Start runner, stop, restart → same runner_id returned
+2. [ ] Stop runner process, wait 2+ min → status becomes "stale" (not manually tested)
+3. [ ] Stale for 10+ min → runner removed from GET /runners (not manually tested)
+4. [x] Register without required properties → 422 error
+
+Integration test: `tests/integration/08-runner-identity.md`

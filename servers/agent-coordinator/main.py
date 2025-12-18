@@ -35,7 +35,10 @@ DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
 # Runner configuration
 RUNNER_POLL_TIMEOUT = int(os.getenv("RUNNER_POLL_TIMEOUT", "30"))
 RUNNER_HEARTBEAT_INTERVAL = int(os.getenv("RUNNER_HEARTBEAT_INTERVAL", "60"))
-RUNNER_HEARTBEAT_TIMEOUT = int(os.getenv("RUNNER_HEARTBEAT_TIMEOUT", "120"))
+# Lifecycle thresholds (ADR-012)
+RUNNER_STALE_THRESHOLD = int(os.getenv("RUNNER_STALE_THRESHOLD", "120"))  # 2 minutes
+RUNNER_REMOVE_THRESHOLD = int(os.getenv("RUNNER_REMOVE_THRESHOLD", "600"))  # 10 minutes
+RUNNER_LIFECYCLE_INTERVAL = int(os.getenv("RUNNER_LIFECYCLE_INTERVAL", "30"))  # Check every 30s
 
 # WebSocket connections (in-memory set)
 connections: set[WebSocket] = set()
@@ -69,12 +72,48 @@ async def update_session_status_and_broadcast(session_id: str, status: str) -> d
     return updated_session
 
 
+async def runner_lifecycle_task():
+    """Background task to update runner lifecycle states.
+
+    Runs periodically to mark stale runners and remove old ones.
+    """
+    while True:
+        await asyncio.sleep(RUNNER_LIFECYCLE_INTERVAL)
+        try:
+            stale_ids, removed_ids = runner_registry.update_lifecycle(
+                stale_threshold_seconds=RUNNER_STALE_THRESHOLD,
+                remove_threshold_seconds=RUNNER_REMOVE_THRESHOLD,
+            )
+            if DEBUG:
+                if stale_ids:
+                    print(f"[DEBUG] Runners marked stale: {stale_ids}", flush=True)
+                if removed_ids:
+                    print(f"[DEBUG] Runners removed: {removed_ids}", flush=True)
+                    # Cleanup stop command queue for removed runners
+                    for runner_id in removed_ids:
+                        stop_command_queue.unregister_runner(runner_id)
+        except Exception as e:
+            print(f"[ERROR] Runner lifecycle task error: {e}", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager"""
     init_db()
+
+    # Start runner lifecycle background task
+    lifecycle_task = asyncio.create_task(runner_lifecycle_task())
+
     yield
-    # Close all connections
+
+    # Cancel lifecycle task
+    lifecycle_task.cancel()
+    try:
+        await lifecycle_task
+    except asyncio.CancelledError:
+        pass
+
+    # Close all WebSocket connections
     for ws in connections.copy():
         try:
             await ws.close()
@@ -638,10 +677,14 @@ def update_agent_status(name: str, data: AgentStatusUpdate):
 # ==============================================================================
 
 class RunnerRegisterRequest(BaseModel):
-    """Request body for runner registration with metadata."""
-    hostname: str | None = None
-    project_dir: str | None = None
-    executor_type: str | None = None
+    """Request body for runner registration.
+
+    All properties are required for deterministic runner_id derivation.
+    See ADR-012 for runner identity design.
+    """
+    hostname: str
+    project_dir: str
+    executor_type: str
 
 
 class RunnerRegisterResponse(BaseModel):
@@ -676,34 +719,29 @@ class RunStoppedRequest(BaseModel):
 
 
 @app.post("/runner/register")
-async def register_runner(request: RunnerRegisterRequest | None = None):
-    """Register a new runner instance.
+async def register_runner(request: RunnerRegisterRequest):
+    """Register a runner instance.
 
-    Accepts optional metadata about the runner (hostname, project_dir).
+    Required properties (hostname, project_dir, executor_type) are used to
+    derive a deterministic runner_id. If a runner with the same properties
+    already exists, this is treated as a reconnection.
+
     Returns runner_id and configuration for polling.
     """
-    # Handle both empty body and JSON body
-    hostname = request.hostname if request else None
-    project_dir = request.project_dir if request else None
-    executor_type = request.executor_type if request else None
-
     runner = runner_registry.register_runner(
-        hostname=hostname,
-        project_dir=project_dir,
-        executor_type=executor_type,
+        hostname=request.hostname,
+        project_dir=request.project_dir,
+        executor_type=request.executor_type,
     )
 
     # Register with stop command queue for immediate wake-up on stop requests
     stop_command_queue.register_runner(runner.runner_id)
 
     if DEBUG:
-        print(f"[DEBUG] Registered new runner: {runner.runner_id}", flush=True)
-        if hostname:
-            print(f"[DEBUG]   hostname: {hostname}", flush=True)
-        if project_dir:
-            print(f"[DEBUG]   project_dir: {project_dir}", flush=True)
-        if executor_type:
-            print(f"[DEBUG]   executor_type: {executor_type}", flush=True)
+        print(f"[DEBUG] Registered runner: {runner.runner_id}", flush=True)
+        print(f"[DEBUG]   hostname: {request.hostname}", flush=True)
+        print(f"[DEBUG]   project_dir: {request.project_dir}", flush=True)
+        print(f"[DEBUG]   executor_type: {request.executor_type}", flush=True)
 
     return RunnerRegisterResponse(
         runner_id=runner.runner_id,
@@ -940,14 +978,14 @@ async def runner_heartbeat(request: RunnerIdRequest):
 
 
 class RunnerWithStatus(BaseModel):
-    """Runner info with computed status fields."""
+    """Runner info with status from server."""
     runner_id: str
     registered_at: str
     last_heartbeat: str
-    hostname: str | None = None
-    project_dir: str | None = None
-    executor_type: str | None = None
-    status: str  # "online", "stale", or "offline"
+    hostname: str
+    project_dir: str
+    executor_type: str
+    status: str  # "online" or "stale"
     seconds_since_heartbeat: float
 
 
@@ -955,10 +993,9 @@ class RunnerWithStatus(BaseModel):
 async def list_runners():
     """List all registered runners with their status.
 
-    Returns all runners with status:
-    - "online": heartbeat within last 2 minutes
+    Returns all runners with status (managed by background lifecycle task):
+    - "online": heartbeat within threshold
     - "stale": no heartbeat for 2+ minutes (connection may be lost)
-    - "offline": runner has deregistered or been removed
     """
     runners = runner_registry.get_all_runners()
     result = []
@@ -968,12 +1005,6 @@ async def list_runners():
         if seconds is None:
             continue  # Shouldn't happen, but skip if it does
 
-        # Determine status based on heartbeat age
-        if seconds < RUNNER_HEARTBEAT_TIMEOUT:
-            status = "online"
-        else:
-            status = "stale"
-
         result.append(RunnerWithStatus(
             runner_id=runner.runner_id,
             registered_at=runner.registered_at,
@@ -981,7 +1012,7 @@ async def list_runners():
             hostname=runner.hostname,
             project_dir=runner.project_dir,
             executor_type=runner.executor_type,
-            status=status,
+            status=runner.status,
             seconds_since_heartbeat=seconds,
         ))
 

@@ -64,31 +64,30 @@ class CoordinatorAPIClient:
 
     def register(
         self,
-        hostname: Optional[str] = None,
-        project_dir: Optional[str] = None,
-        executor_type: Optional[str] = None,
+        hostname: str,
+        project_dir: str,
+        executor_type: str,
     ) -> RegistrationResponse:
         """Register this runner with Agent Coordinator.
+
+        All parameters are required for deterministic runner_id derivation.
+        Same parameters produce the same runner_id (enables reconnection recognition).
 
         Args:
             hostname: The machine hostname where the runner is running
             project_dir: The default project directory for this runner
             executor_type: The type of executor (folder name, e.g., 'claude-code')
 
-        Returns registration info including runner_id.
+        Returns:
+            Registration info including runner_id derived from properties
         """
-        # Build metadata payload
-        metadata = {}
-        if hostname:
-            metadata["hostname"] = hostname
-        if project_dir:
-            metadata["project_dir"] = project_dir
-        if executor_type:
-            metadata["executor_type"] = executor_type
-
         response = self._client.post(
             f"{self.base_url}/runner/register",
-            json=metadata if metadata else None,
+            json={
+                "hostname": hostname,
+                "project_dir": project_dir,
+                "executor_type": executor_type,
+            },
         )
         response.raise_for_status()
         data = response.json()

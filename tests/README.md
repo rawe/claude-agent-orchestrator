@@ -189,6 +189,9 @@ The MCP server must be started **before** running test cases that use the `agent
 - `06-concurrent-callbacks.md` - Multiple child agents with concurrent callbacks (race condition detection)
 - `07-callback-on-child-failure.md` - Parent receives failure callback when child agent fails
 
+### Category 3: Runner Management
+- `08-runner-identity.md` - Deterministic runner ID and reconnection recognition (ADR-012)
+
 ## Tools Reference
 
 ### ws-monitor
