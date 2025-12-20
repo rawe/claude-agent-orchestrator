@@ -1160,7 +1160,7 @@ async def create_run(run_create: RunCreate):
     if run_create.type == RunType.START_SESSION:
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
-            create_session(
+            new_session = create_session(
                 session_id=run.session_id,
                 timestamp=timestamp,
                 status="pending",
@@ -1171,6 +1171,15 @@ async def create_run(run_create: RunCreate):
             )
             if DEBUG:
                 print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id} (mode={run.execution_mode.value})", flush=True)
+
+            # Broadcast session_created to WebSocket clients
+            message = json.dumps({"type": "session_created", "session": new_session})
+            for ws in connections.copy():
+                try:
+                    await ws.send_text(message)
+                except:
+                    connections.discard(ws)
+
         except Exception as e:
             if "UNIQUE constraint failed" in str(e):
                 # Session already exists - this shouldn't happen for start runs
