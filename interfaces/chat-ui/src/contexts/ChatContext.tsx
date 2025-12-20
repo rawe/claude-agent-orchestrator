@@ -42,7 +42,6 @@ function messageExists(
 // State interface
 interface ChatState {
   messages: ChatMessage[];
-  sessionName: string | null;
   sessionId: string | null;
   agentStatus: AgentStatus;
   isLoading: boolean;
@@ -63,7 +62,6 @@ type ChatAction =
   | { type: 'REMOVE_SYSTEM_MESSAGES' }
   | { type: 'ADD_TOOL_CALL'; tool: ToolCall }
   | { type: 'UPDATE_TOOL_CALL'; id: string; updates: Partial<ToolCall> }
-  | { type: 'SET_SESSION'; sessionName: string; sessionId: string }
   | { type: 'SET_SESSION_ID'; sessionId: string }
   | { type: 'SET_AGENT_STATUS'; status: AgentStatus }
   | { type: 'SET_LOADING'; loading: boolean }
@@ -74,7 +72,6 @@ type ChatAction =
 // Initial state
 const initialState: ChatState = {
   messages: [],
-  sessionName: null,
   sessionId: null,
   agentStatus: 'idle',
   isLoading: false,
@@ -187,13 +184,6 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ),
       };
 
-    case 'SET_SESSION':
-      return {
-        ...state,
-        sessionName: action.sessionName,
-        sessionId: action.sessionId,
-      };
-
     case 'SET_SESSION_ID':
       return {
         ...state,
@@ -246,18 +236,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Refs to avoid stale closures in WebSocket handler
   // These are updated SYNCHRONOUSLY to prevent race conditions in StrictMode
-  const sessionNameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pendingMessageIdRef = useRef<string | null>(null);
 
   // Wrapper functions that update refs synchronously with dispatch
   // This prevents StrictMode double-mount issues where refs lag behind state
-  const setSession = useCallback((sessionName: string, sessionId: string) => {
-    sessionNameRef.current = sessionName;
-    sessionIdRef.current = sessionId;
-    dispatch({ type: 'SET_SESSION', sessionName, sessionId });
-  }, []);
-
   const setSessionId = useCallback((sessionId: string) => {
     sessionIdRef.current = sessionId;
     dispatch({ type: 'SET_SESSION_ID', sessionId });
@@ -274,7 +257,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetChatState = useCallback(() => {
-    sessionNameRef.current = null;
     sessionIdRef.current = null;
     pendingMessageIdRef.current = null;
     dispatch({ type: 'RESET_CHAT' });
@@ -302,30 +284,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_AGENT_STATUS', status: 'starting' });
 
     try {
-      const { sessionName } = await chatService.startSession('start');
-      setSession(sessionName, '');
+      const { sessionId } = await chatService.startSession('start');
+      setSessionId(sessionId);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize session';
       dispatch({ type: 'SET_ERROR', error: errorMessage });
       completeAssistantMessage();
     }
-  }, [addPendingAssistantMessage, setSession, completeAssistantMessage]);
+  }, [addPendingAssistantMessage, setSessionId, completeAssistantMessage]);
 
   // Handle WebSocket messages
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
-    // Check if message belongs to our session
+    // Check if message belongs to our session (uses session_id only per ADR-010)
     const isOurSession = (msg: WebSocketMessage): boolean => {
+      if (!sessionIdRef.current) return false;
       if ('session' in msg && msg.session) {
-        return (
-          msg.session.session_id === sessionIdRef.current ||
-          msg.session.session_name === sessionNameRef.current
-        );
+        return msg.session.session_id === sessionIdRef.current;
       }
       if ('data' in msg && msg.data) {
-        return (
-          msg.data.session_id === sessionIdRef.current ||
-          msg.data.session_name === sessionNameRef.current
-        );
+        return msg.data.session_id === sessionIdRef.current;
       }
       return false;
     };
@@ -467,20 +444,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_AGENT_STATUS', status: 'starting' });
 
     try {
-      if (!state.sessionName) {
+      if (!state.sessionId) {
         // First message: start new session
-        const { sessionName } = await chatService.startSession(prompt);
-        setSession(sessionName, '');
+        const { sessionId } = await chatService.startSession(prompt);
+        setSessionId(sessionId);
       } else {
         // Session exists (status=finished means idle, ready to resume)
-        await chatService.resumeSession(state.sessionName, prompt);
+        await chatService.resumeSession(state.sessionId, prompt);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       dispatch({ type: 'SET_ERROR', error: errorMessage });
       completeAssistantMessage();
     }
-  }, [state.sessionName, addPendingAssistantMessage, setSession, completeAssistantMessage]);
+  }, [state.sessionId, addPendingAssistantMessage, setSessionId, completeAssistantMessage]);
 
   // Stop agent
   const stopAgent = useCallback(async () => {

@@ -13,7 +13,6 @@ export interface ContentBlock {
 export interface SessionEvent {
   event_type: 'session_start' | 'session_stop' | 'pre_tool' | 'post_tool' | 'message';
   session_id: string;
-  session_name?: string;
   timestamp: string;
 
   // Tool events
@@ -34,7 +33,6 @@ export interface SessionEvent {
 // Session object
 export interface Session {
   session_id: string;
-  session_name: string;
   /**
    * Session status:
    * - 'running': Agent is actively processing
@@ -45,7 +43,7 @@ export interface Session {
   project_dir?: string;
   agent_name?: string;
   last_resumed_at?: string;
-  parent_session_name?: string;
+  parent_session_id?: string;
 }
 
 // WebSocket message types
@@ -59,16 +57,17 @@ export type WebSocketMessage =
 // Run request (POST /runs)
 export interface RunRequest {
   type: 'start_session' | 'resume_session';
-  session_name: string;
+  session_id?: string;  // Required for resume_session
   prompt: string;
   agent_name?: string;
   project_dir?: string;
-  parent_session_name?: string;
+  parent_session_id?: string;
 }
 
 // Run response
 export interface RunResponse {
   run_id: string;
+  session_id: string;
   status: string;
 }
 
