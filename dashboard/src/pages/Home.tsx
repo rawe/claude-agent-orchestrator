@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MessageSquare, Activity, Settings, Server, ArrowDown, Database, Zap } from 'lucide-react';
+import { MessageSquare, Activity, Settings, Server, ArrowDown, Database, Zap, GitBranch } from 'lucide-react';
 
 export function Home() {
   return (
@@ -44,8 +44,8 @@ export function Home() {
               <p className="text-sm text-gray-500">Define reusable agent configurations with custom prompts and MCP servers</p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <Zap className="w-6 h-6 text-orange-600" />
+              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <GitBranch className="w-6 h-6 text-amber-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-1">Callback Coordination</h3>
               <p className="text-sm text-gray-500">Parent agents spawn workers and receive automatic completion notifications</p>
@@ -219,7 +219,7 @@ export function Home() {
               </p>
             </Link>
 
-            {/* Sessions */}
+            {/* Agent Sessions */}
             <Link
               to="/sessions"
               className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-green-300 hover:-translate-y-1 transition-all"
@@ -233,6 +233,23 @@ export function Home() {
               <p className="text-sm text-gray-600 leading-relaxed">
                 Monitor running and completed sessions in real-time. View event
                 timelines, session status, and execution results.
+              </p>
+            </Link>
+
+            {/* Agent Runs */}
+            <Link
+              to="/runs"
+              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-orange-300 hover:-translate-y-1 transition-all"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-orange-100 rounded-xl group-hover:bg-orange-200 transition-colors">
+                  <Zap className="w-5 h-5 text-orange-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">Agent Runs</h3>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Track distributed task execution across runners. Monitor run
+                status, execution timelines, and runner assignments in real-time.
               </p>
             </Link>
 
