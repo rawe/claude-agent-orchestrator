@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home } from 'lucide-react';
+import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home, Zap } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -12,6 +12,7 @@ const navItems: NavItem[] = [
   { to: '/', icon: <Home className="w-5 h-5" />, label: 'Home' },
   { to: '/chat', icon: <MessageSquare className="w-5 h-5" />, label: 'Chat' },
   { to: '/sessions', icon: <Activity className="w-5 h-5" />, label: 'Agent Sessions' },
+  { to: '/runs', icon: <Zap className="w-5 h-5" />, label: 'Agent Runs' },
   { to: '/context-store', icon: <Database className="w-5 h-5" />, label: 'Context Store' },
   { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Blueprints' },
   { to: '/runners', icon: <Server className="w-5 h-5" />, label: 'Agent Runners' },

@@ -1241,6 +1241,17 @@ async def create_run(run_create: RunCreate):
     return {"run_id": run.run_id, "session_id": run.session_id, "status": run.status}
 
 
+@app.get("/runs")
+async def list_runs():
+    """List all runs in the queue.
+
+    Returns all runs (pending, running, completed, failed, stopped).
+    Runs are stored in-memory and not persisted to database.
+    """
+    runs = run_queue.get_all_runs()
+    return {"runs": [run.model_dump() for run in runs]}
+
+
 @app.get("/runs/{run_id}")
 async def get_run(run_id: str):
     """Get run status and details."""
