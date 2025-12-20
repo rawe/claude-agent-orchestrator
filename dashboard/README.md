@@ -105,8 +105,6 @@ The Dashboard requires the following backend services:
 1. **Agent Coordinator** (port 8765) - Session/event management and agent blueprint CRUD
 2. **Context Store** (port 8766) - Document storage and retrieval
 
-See `docs/BACKEND-TODO.md` for details on missing backend endpoints.
-
 ## Technology Stack
 
 - React 18 + TypeScript
