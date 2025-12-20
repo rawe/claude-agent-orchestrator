@@ -39,7 +39,7 @@ See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
   "session": Session
 }
 ```
-Sent when a new session is created via POST /sessions.
+Sent when a new session is created via POST /sessions or POST /runs (for start_session).
 
 **Session Update:**
 ```json
@@ -54,10 +54,21 @@ Sent when session metadata is updated or session status changes.
 ```json
 {
   "type": "session_deleted",
-  "session_id": "abc-123"
+  "session_id": "ses_abc123"
 }
 ```
 Sent when a session is deleted via DELETE endpoint.
+
+**Run Failed:**
+```json
+{
+  "type": "run_failed",
+  "run_id": "run_abc123",
+  "session_id": "ses_abc123",
+  "error": "Error message"
+}
+```
+Sent when a run fails (e.g., no matching runner within timeout).
 
 ### Event Types
 
@@ -100,11 +111,11 @@ Create a new session with full metadata.
 **Request Body:**
 ```json
 {
-  "session_id": "abc-123",
-  "session_name": "My Session",
+  "session_id": "ses_abc123def456",
   "project_dir": "/path/to/project",    // optional
   "agent_name": "researcher",           // optional
-  "parent_session_name": "parent-task"  // optional
+  "parent_session_id": "ses_parent123", // optional
+  "execution_mode": "sync"              // optional, default: sync
 }
 ```
 
@@ -123,6 +134,10 @@ Create a new session with full metadata.
 }
 ```
 **Status Code:** `409 Conflict`
+
+**Notes:**
+- `session_id` is coordinator-generated (format: `ses_{12-char-hex}`)
+- `execution_mode` controls parent-child session interaction: `sync`, `async_poll`, `async_callback`
 
 #### GET /sessions/{session_id}
 
@@ -163,6 +178,53 @@ Get the result text from the last assistant message.
 - `404 Not Found` - Session doesn't exist
 - `400 Bad Request` - Session not finished
 
+#### GET /sessions/{session_id}/affinity
+
+Get session affinity information for resume routing.
+
+**Response:**
+```json
+{
+  "affinity": {
+    "hostname": "macbook-pro",
+    "project_dir": "/path/to/project",
+    "executor_type": "claude-code",
+    "executor_session_id": "uuid-from-claude-sdk"
+  }
+}
+```
+
+**Notes:**
+- Used to route resume requests to the correct runner
+- Returns the runner/executor information from the last execution
+
+#### POST /sessions/{session_id}/bind
+
+Bind executor information to a session after framework starts.
+
+**Request Body:**
+```json
+{
+  "executor_session_id": "uuid-from-claude-sdk",
+  "hostname": "macbook-pro",
+  "executor_type": "claude-code",
+  "project_dir": "/path/to/project"  // optional
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "session": Session
+}
+```
+
+**Notes:**
+- Called by agent runner after Claude Code framework starts
+- Updates session status from `pending` to `running`
+- Stores executor information for session affinity
+
 #### POST /sessions/{session_id}/stop
 
 Stop a running session by signaling its runner.
@@ -200,9 +262,12 @@ Update session metadata.
 **Request Body:**
 ```json
 {
-  "session_name": "New Name",      // optional
-  "project_dir": "/new/path",      // optional
-  "agent_name": "new-agent"        // optional
+  "project_dir": "/new/path",           // optional
+  "agent_name": "new-agent",            // optional
+  "last_resumed_at": "ISO 8601",        // optional
+  "executor_session_id": "uuid",        // optional
+  "executor_type": "claude-code",       // optional
+  "hostname": "macbook-pro"             // optional
 }
 ```
 
@@ -307,6 +372,9 @@ Manage agent blueprints (templates for creating agents).
 
 List all agent blueprints.
 
+**Query Parameters:**
+- `tags` (optional) - Comma-separated list of tags to filter agents (AND logic)
+
 **Response:**
 ```json
 [
@@ -323,12 +391,22 @@ List all agent blueprints.
       }
     },
     "skills": ["research", "web-search"],
+    "tags": ["research"],
+    "demands": {
+      "hostname": null,
+      "project_dir": null,
+      "executor_type": null,
+      "tags": ["web-access"]
+    },
     "status": "active",
     "created_at": "2025-12-10T10:00:00Z",
     "modified_at": "2025-12-10T10:00:00Z"
   }
 ]
 ```
+
+**Notes:**
+- `demands` are blueprint demands that are merged with run's `additional_demands`
 
 #### GET /agents/{name}
 
@@ -360,14 +438,25 @@ Create a new agent blueprint.
   "name": "researcher",
   "description": "Research agent",
   "system_prompt": "You are...",  // optional
-  "mcp_servers": {},               // optional
-  "skills": []                     // optional
+  "mcp_servers": {},              // optional
+  "skills": [],                   // optional
+  "tags": [],                     // optional
+  "demands": {                    // optional
+    "hostname": null,
+    "project_dir": null,
+    "executor_type": null,
+    "tags": ["web-access"]
+  }
 }
 ```
 
 **Response:** `201 Created` with Agent object.
 
 **Error:** `409 Conflict` if agent name already exists.
+
+**Notes:**
+- `demands` specify blueprint demands for runner matching
+- These demands are merged with `additional_demands` when a run is created
 
 #### PATCH /agents/{name}
 
@@ -379,7 +468,9 @@ Update an existing agent blueprint (partial update).
   "description": "Updated description",  // optional
   "system_prompt": "...",                // optional
   "mcp_servers": {},                     // optional
-  "skills": []                           // optional
+  "skills": [],                          // optional
+  "tags": [],                            // optional
+  "demands": {}                          // optional
 }
 ```
 
@@ -426,7 +517,7 @@ Update agent status (active/inactive).
 
 ### Runs API
 
-Queue and manage runs for runners to execute.
+Queue and manage runs for runners to execute. See [RUNS_API.md](./RUNS_API.md) for comprehensive documentation.
 
 #### POST /runs
 
@@ -436,11 +527,15 @@ Create a new run for a runner to execute.
 ```json
 {
   "type": "start_session" | "resume_session",
-  "session_name": "my-task",
-  "agent_name": "researcher",           // optional
+  "session_id": null,                        // coordinator-generated if not provided
+  "agent_name": "researcher",                // optional
   "prompt": "Research quantum computing",
-  "project_dir": "/path/to/project",    // optional
-  "parent_session_name": "parent-task"  // optional
+  "project_dir": "/path/to/project",         // optional
+  "parent_session_id": "ses_parent123",      // optional
+  "execution_mode": "sync",                  // optional: sync, async_poll, async_callback
+  "additional_demands": {                    // optional
+    "tags": ["research"]
+  }
 }
 ```
 
@@ -448,9 +543,15 @@ Create a new run for a runner to execute.
 ```json
 {
   "run_id": "run_abc123",
+  "session_id": "ses_abc123",
   "status": "pending"
 }
 ```
+
+**Notes:**
+- For `start_session`, creates a pending session and broadcasts `session_created`
+- Demands from agent blueprint are merged with `additional_demands`
+- Runs with demands get a 5-minute timeout for matching
 
 #### GET /runs/{run_id}
 
@@ -461,18 +562,26 @@ Get run status and details.
 {
   "run_id": "run_abc123",
   "type": "start_session",
-  "session_name": "my-task",
+  "session_id": "ses_abc123",
   "agent_name": "researcher",
   "prompt": "Research quantum computing",
   "project_dir": "/path/to/project",
-  "parent_session_name": "parent-task",
+  "parent_session_id": "ses_parent123",
+  "execution_mode": "async_callback",
+  "demands": {
+    "hostname": null,
+    "project_dir": null,
+    "executor_type": null,
+    "tags": ["research"]
+  },
   "status": "completed",
-  "runner_id": "lnch_xyz789",
+  "runner_id": "lnch_xyz789abc",
   "error": null,
   "created_at": "2025-12-10T10:00:00Z",
   "claimed_at": "2025-12-10T10:00:01Z",
   "started_at": "2025-12-10T10:00:02Z",
-  "completed_at": "2025-12-10T10:05:00Z"
+  "completed_at": "2025-12-10T10:05:00Z",
+  "timeout_at": null
 }
 ```
 
@@ -482,7 +591,7 @@ Get run status and details.
 - `running` - Run execution started
 - `stopping` - Stop requested, waiting for runner to terminate process
 - `completed` - Run completed successfully
-- `failed` - Run execution failed
+- `failed` - Run execution failed (or no matching runner within timeout)
 - `stopped` - Run was stopped (terminated by stop command)
 
 **Error:** `404 Not Found` if run doesn't exist.
@@ -496,7 +605,7 @@ Stop a running run by signaling its runner.
 {
   "ok": true,
   "run_id": "run_abc123",
-  "session_name": "my-task",
+  "session_id": "ses_abc123",
   "status": "stopping"
 }
 ```
@@ -525,21 +634,41 @@ Register a new runner instance.
 **Request Body:**
 ```json
 {
-  "hostname": "macbook-pro",    // optional
-  "project_dir": "/path",       // optional
-  "executor_type": "claude-code" // optional - executor folder name
+  "hostname": "macbook-pro",
+  "project_dir": "/path/to/project",
+  "executor_type": "claude-code",
+  "tags": ["research", "web-access"]  // optional capability tags
 }
 ```
 
 **Response:**
 ```json
 {
-  "runner_id": "lnch_abc123",
+  "runner_id": "lnch_abc123xyz",
   "poll_endpoint": "/runner/runs",
   "poll_timeout_seconds": 30,
   "heartbeat_interval_seconds": 60
 }
 ```
+
+**Notes:**
+- `runner_id` is deterministically derived from (hostname, project_dir, executor_type)
+- Returns `409 Conflict` if an online runner with the same identity already exists
+- Stale runners with the same identity are treated as reconnections
+- `tags` are capability tags for demand matching
+
+**Error (Duplicate Runner):**
+```json
+{
+  "error": "DuplicateRunnerError",
+  "message": "An online runner with this identity already exists",
+  "runner_id": "lnch_abc123xyz",
+  "hostname": "macbook-pro",
+  "project_dir": "/path/to/project",
+  "executor_type": "claude-code"
+}
+```
+**Status Code:** `409 Conflict`
 
 #### GET /runner/runs
 
@@ -554,14 +683,16 @@ Long-poll for available runs or stop commands (used by runner).
   "run": {
     "run_id": "run_abc123",
     "type": "start_session",
-    "session_name": "my-task",
+    "session_id": "ses_abc123",
     "prompt": "Do something",
+    "execution_mode": "sync",
+    "demands": null,
     ...
   }
 }
 ```
 
-**Response (Stop Commands):**
+**Response (Stop Commands - highest priority):**
 ```json
 {
   "stop_runs": ["run_abc123", "run_def456"]
@@ -578,9 +709,9 @@ Long-poll for available runs or stop commands (used by runner).
 ```
 
 **Notes:**
-- Holds connection open for up to `poll_timeout_seconds`
-- Returns immediately if run or stop command available
-- Stop commands wake up the poll immediately (no waiting)
+- Stop commands are checked first (highest priority) and wake up the poll immediately
+- Demand matching is applied: only runs matching runner's capabilities are returned
+- Holds connection open for up to `poll_timeout_seconds` if no runs available
 - Returns `deregistered: true` if runner has been deregistered
 
 #### POST /runner/runs/{run_id}/started
@@ -590,7 +721,7 @@ Report that run execution has started.
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123"
+  "runner_id": "lnch_abc123xyz"
 }
 ```
 
@@ -601,6 +732,10 @@ Report that run execution has started.
 }
 ```
 
+**Notes:**
+- Updates run status to `running`
+- Links `parent_session_id` to the session for hierarchy tracking
+
 #### POST /runner/runs/{run_id}/completed
 
 Report that run completed successfully.
@@ -608,7 +743,7 @@ Report that run completed successfully.
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123",
+  "runner_id": "lnch_abc123xyz",
   "status": "success"  // optional
 }
 ```
@@ -620,6 +755,10 @@ Report that run completed successfully.
 }
 ```
 
+**Notes:**
+- Updates run status to `completed`
+- If `execution_mode` is `async_callback`, triggers callback to parent session
+
 #### POST /runner/runs/{run_id}/failed
 
 Report that run execution failed.
@@ -627,7 +766,7 @@ Report that run execution failed.
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123",
+  "runner_id": "lnch_abc123xyz",
   "error": "Error message"
 }
 ```
@@ -639,6 +778,10 @@ Report that run execution failed.
 }
 ```
 
+**Notes:**
+- Updates run status to `failed`
+- If `execution_mode` is `async_callback`, triggers callback to parent session with error
+
 #### POST /runner/runs/{run_id}/stopped
 
 Report that run was stopped (terminated by stop command).
@@ -646,7 +789,7 @@ Report that run was stopped (terminated by stop command).
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123",
+  "runner_id": "lnch_abc123xyz",
   "signal": "SIGTERM"  // or "SIGKILL" if force killed
 }
 ```
@@ -659,8 +802,9 @@ Report that run was stopped (terminated by stop command).
 ```
 
 **Notes:**
-- Called by runner after terminating a process in response to a stop command
-- Signal indicates which signal was used to terminate the process
+- Updates run status to `stopped` and session status to `stopped`
+- Signal indicates which signal was used to terminate the process (`SIGTERM` or `SIGKILL`)
+- If `execution_mode` is `async_callback`, triggers callback to parent session
 
 #### POST /runner/heartbeat
 
@@ -693,12 +837,13 @@ List all registered runners with their status.
 {
   "runners": [
     {
-      "runner_id": "lnch_abc123",
+      "runner_id": "lnch_abc123xyz",
       "registered_at": "2025-12-10T10:00:00Z",
       "last_heartbeat": "2025-12-10T10:05:00Z",
       "hostname": "macbook-pro",
       "project_dir": "/path/to/project",
       "executor_type": "claude-code",
+      "tags": ["research", "web-access"],
       "status": "online",
       "seconds_since_heartbeat": 15.5
     }
@@ -709,6 +854,10 @@ List all registered runners with their status.
 **Runner Status Values:**
 - `online` - Heartbeat within last 2 minutes
 - `stale` - No heartbeat for 2+ minutes (connection may be lost)
+
+**Notes:**
+- `tags` are capability tags that runners advertise for demand matching
+- `runner_id` is deterministically derived from (hostname, project_dir, executor_type)
 
 #### DELETE /runners/{runner_id}
 

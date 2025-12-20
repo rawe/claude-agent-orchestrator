@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from config import RunnerConfig
-from api_client import CoordinatorAPIClient
+from api_client import CoordinatorAPIClient, DuplicateRunnerError
 from registry import RunningRunsRegistry
 from executor import RunExecutor, list_executors, resolve_executor_name, get_executor_type
 from poller import RunPoller
@@ -252,6 +252,12 @@ def main(
         "-p",
         help="Default project directory (env: PROJECT_DIR)",
     ),
+    tags: str = typer.Option(
+        None,
+        "--tags",
+        "-t",
+        help="Comma-separated capability tags (env: RUNNER_TAGS). E.g., 'python,docker,nodejs'",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -289,6 +295,8 @@ def main(
         config.agent_coordinator_url = coordinator_url
     if project_dir:
         config.project_dir = project_dir
+    if tags:
+        config.tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
 
     # Set executor path via env var (executor.py reads from env)
     if executor:
@@ -325,6 +333,25 @@ def main(
         # Wait for shutdown
         runner.wait_for_shutdown()
 
+    except DuplicateRunnerError as e:
+        logger.error("=" * 60)
+        logger.error("DUPLICATE RUNNER ERROR")
+        logger.error("=" * 60)
+        logger.error(f"A runner with this identity is already online:")
+        logger.error(f"  Runner ID:     {e.runner_id}")
+        logger.error(f"  Hostname:      {e.hostname}")
+        logger.error(f"  Project Dir:   {e.project_dir}")
+        logger.error(f"  Executor Type: {e.executor_type}")
+        logger.error("")
+        logger.error("Each unique combination of (hostname, project_dir, executor_type)")
+        logger.error("can only have one active runner at a time.")
+        logger.error("")
+        logger.error("Options:")
+        logger.error("  1. Use a different --project-dir for the second runner")
+        logger.error("  2. Stop the existing runner first")
+        logger.error("  3. Deregister the existing runner from the dashboard")
+        logger.error("=" * 60)
+        sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Interrupted")
     except Exception as e:

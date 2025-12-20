@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 # Import run queue and runner registry services
 from services.run_queue import run_queue, RunCreate, Run, RunStatus, RunType
-from services.runner_registry import runner_registry, RunnerInfo
+from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError
 from services.stop_command_queue import stop_command_queue
 from services import callback_processor
 
@@ -799,19 +799,35 @@ async def register_runner(request: RunnerRegisterRequest):
     """Register a runner instance.
 
     Required properties (hostname, project_dir, executor_type) are used to
-    derive a deterministic runner_id. If a runner with the same properties
-    already exists, this is treated as a reconnection.
+    derive a deterministic runner_id. Registration fails if a runner with
+    the same identity is already online (409 Conflict).
+
+    If the existing runner is stale, this is treated as a reconnection
+    (the old runner probably crashed).
 
     Optional tags are capabilities the runner offers (ADR-011).
 
     Returns runner_id and configuration for polling.
     """
-    runner = runner_registry.register_runner(
-        hostname=request.hostname,
-        project_dir=request.project_dir,
-        executor_type=request.executor_type,
-        tags=request.tags,
-    )
+    try:
+        runner = runner_registry.register_runner(
+            hostname=request.hostname,
+            project_dir=request.project_dir,
+            executor_type=request.executor_type,
+            tags=request.tags,
+        )
+    except DuplicateRunnerError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "duplicate_runner",
+                "message": str(e),
+                "runner_id": e.runner_id,
+                "hostname": e.hostname,
+                "project_dir": e.project_dir,
+                "executor_type": e.executor_type,
+            }
+        )
 
     # Register with stop command queue for immediate wake-up on stop requests
     stop_command_queue.register_runner(runner.runner_id)
@@ -1071,6 +1087,7 @@ class RunnerWithStatus(BaseModel):
     hostname: str
     project_dir: str
     executor_type: str
+    tags: list[str] = []  # Capability tags (ADR-011)
     status: str  # "online" or "stale"
     seconds_since_heartbeat: float
 
@@ -1098,6 +1115,7 @@ async def list_runners():
             hostname=runner.hostname,
             project_dir=runner.project_dir,
             executor_type=runner.executor_type,
+            tags=runner.tags,
             status=runner.status,
             seconds_since_heartbeat=seconds,
         ))

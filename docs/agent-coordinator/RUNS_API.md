@@ -9,46 +9,45 @@ ao-* CLI / Dashboard / MCP Server
               │
               │ POST /runs
               ▼
-┌─────────────────────────────────┐
-│       Agent Coordinator :8765       │
-│  ┌───────────────────────────┐  │
-│  │   In-Memory Run Queue     │  │
-│  │  (thread-safe, singleton) │  │
-│  └───────────────────────────┘  │
-└──────────────┬──────────────────┘
+┌─────────────────────────────────────────┐
+│       Agent Coordinator :8765           │
+│  ┌───────────────────────────┐          │
+│  │   In-Memory Run Queue     │          │
+│  │  (thread-safe, singleton) │          │
+│  └───────────────────────────┘          │
+└──────────────┬──────────────────────────┘
                │ Long-poll GET /runner/runs
                ▼
-┌─────────────────────────────────┐
-│        Agent Runner             │
-│  - Polls for pending runs       │
-│  - Concurrent execution         │
-│  - Reports run status           │
-│  - Heartbeat monitoring         │
-└──────────────┬──────────────────┘
+┌─────────────────────────────────────────┐
+│        Agent Runner                     │
+│  - Polls for pending runs               │
+│  - Concurrent execution                 │
+│  - Reports run status                   │
+│  - Heartbeat monitoring                 │
+└──────────────┬──────────────────────────┘
                │ Subprocess
                ▼
-┌─────────────────────────────────┐
-│    Claude Code Executors        │
-│  - ao-start: Start new sessions │
-│  - ao-resume: Resume sessions   │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│    Claude Code Executors                │
+│  - ao-*-exec: Start or Resumes sessions │
+└─────────────────────────────────────────┘
 ```
 
 ## Run Lifecycle
 
-Runs follow a state machine with five statuses:
+Runs follow a state machine with seven statuses:
 
 ```
 ┌─────────┐    claim    ┌─────────┐   started   ┌─────────┐
 │ PENDING │────────────►│ CLAIMED │────────────►│ RUNNING │
-└─────────┘             └─────────┘             └────┬────┘
-                                                     │
-                                    ┌────────────────┼────────────────┐
-                                    │                                 │
-                                    ▼                                 ▼
-                             ┌───────────┐                     ┌────────┐
-                             │ COMPLETED │                     │ FAILED │
-                             └───────────┘                     └────────┘
+└────┬────┘             └─────────┘             └────┬────┘
+     │                                               │
+     │ timeout                      ┌────────────────┼────────────────┐
+     │ (no match)                   │                │                │
+     ▼                              ▼                ▼                ▼
+┌────────┐                   ┌───────────┐    ┌──────────┐     ┌────────┐
+│ FAILED │                   │ COMPLETED │    │ STOPPING │────►│ STOPPED│
+└────────┘                   └───────────┘    └──────────┘     └────────┘
 ```
 
 | Status | Description |
@@ -56,8 +55,10 @@ Runs follow a state machine with five statuses:
 | `pending` | Run created, waiting for a runner to claim it |
 | `claimed` | Runner claimed the run, preparing to execute |
 | `running` | Run execution has started |
+| `stopping` | Stop requested, waiting for runner to terminate process |
 | `completed` | Run completed successfully |
-| `failed` | Run execution failed |
+| `failed` | Run execution failed (or no matching runner within timeout) |
+| `stopped` | Run was stopped (terminated by stop command) |
 
 ## Data Model
 
@@ -67,18 +68,26 @@ Runs follow a state machine with five statuses:
 {
   "run_id": "run_abc123def456",
   "type": "start_session",
-  "session_name": "my-research-task",
+  "session_id": "ses_abc123def456",
   "agent_name": "researcher",
   "prompt": "Research quantum computing advances",
   "project_dir": "/path/to/project",
-  "parent_session_name": "orchestrator-main",
+  "parent_session_id": "ses_xyz789",
+  "execution_mode": "async_callback",
+  "demands": {
+    "hostname": null,
+    "project_dir": null,
+    "executor_type": null,
+    "tags": ["research", "web-access"]
+  },
   "status": "running",
-  "runner_id": "lnch_xyz789",
+  "runner_id": "lnch_xyz789abc",
   "error": null,
   "created_at": "2025-12-10T10:00:00Z",
   "claimed_at": "2025-12-10T10:00:01Z",
   "started_at": "2025-12-10T10:00:02Z",
-  "completed_at": null
+  "completed_at": null,
+  "timeout_at": "2025-12-10T10:05:00Z"
 }
 ```
 
@@ -86,11 +95,13 @@ Runs follow a state machine with five statuses:
 |-------|------|-------------|
 | `run_id` | string | Unique identifier (e.g., `run_abc123def456`) |
 | `type` | enum | `start_session` or `resume_session` |
-| `session_name` | string | Name of the session to start/resume |
+| `session_id` | string | Coordinator-generated session ID (format: `ses_{12-char-hex}`) |
 | `agent_name` | string? | Optional agent blueprint to use |
 | `prompt` | string | User prompt/instruction for the agent |
 | `project_dir` | string? | Optional project directory path |
-| `parent_session_name` | string? | Parent session name for callback support |
+| `parent_session_id` | string? | Parent session ID for callback support |
+| `execution_mode` | enum | `sync`, `async_poll`, or `async_callback` (default: `sync`) |
+| `demands` | object? | Runner demands for capability matching (see below) |
 | `status` | enum | Current run status |
 | `runner_id` | string? | ID of the runner that claimed/executed the run |
 | `error` | string? | Error message if run failed |
@@ -98,6 +109,32 @@ Runs follow a state machine with five statuses:
 | `claimed_at` | ISO 8601? | Timestamp when runner claimed the run |
 | `started_at` | ISO 8601? | Timestamp when execution started |
 | `completed_at` | ISO 8601? | Timestamp when run completed or failed |
+| `timeout_at` | ISO 8601? | Timestamp when run will fail if no matching runner found |
+
+### Execution Modes
+
+| Mode | Description |
+|------|-------------|
+| `sync` | Parent waits for child completion, receives result directly |
+| `async_poll` | Parent continues immediately, polls for child status/result |
+| `async_callback` | Parent continues immediately, coordinator auto-resumes parent when child completes |
+
+### Runner Demands
+
+Runs can specify requirements for which runners can execute them:
+
+```json
+{
+  "hostname": "macbook-pro",     // Property demand: exact match on hostname
+  "project_dir": "/path/to/project",  // Property demand: exact match on project_dir
+  "executor_type": "claude-code", // Property demand: exact match on executor_type
+  "tags": ["research", "web-access"]  // Capability demands: runner must have ALL tags
+}
+```
+
+- **Property demands** (hostname, project_dir, executor_type): Require exact match if specified
+- **Tag demands**: Runner must have ALL specified tags in its capabilities
+- Runs with demands have a 5-minute timeout; if no matching runner claims the run, it fails
 
 ### Run Types
 
@@ -120,30 +157,43 @@ POST /runs
 ```json
 {
   "type": "start_session",
-  "session_name": "my-task",
+  "session_id": null,
   "agent_name": "researcher",
   "prompt": "Research quantum computing",
   "project_dir": "/path/to/project",
-  "parent_session_name": "parent-task"
+  "parent_session_id": "ses_parent123",
+  "execution_mode": "async_callback",
+  "additional_demands": {
+    "tags": ["research"]
+  }
 }
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `type` | Yes | `start_session` or `resume_session` |
-| `session_name` | Yes | Name for the session |
+| `session_id` | No | Coordinator-generated if not provided (for `start_session`) |
 | `prompt` | Yes | Task prompt for the agent |
-| `agent_name` | No | Agent blueprint to use |
+| `agent_name` | No | Agent blueprint to use (demands merged from blueprint) |
 | `project_dir` | No | Project directory path |
-| `parent_session_name` | No | Parent session for callbacks |
+| `parent_session_id` | No | Parent session ID for hierarchy tracking |
+| `execution_mode` | No | `sync` (default), `async_poll`, or `async_callback` |
+| `additional_demands` | No | Additional runner demands (merged with blueprint demands) |
 
 **Response:**
 ```json
 {
   "run_id": "run_abc123",
+  "session_id": "ses_abc123",
   "status": "pending"
 }
 ```
+
+**Notes:**
+- For `start_session`, creates a pending session immediately
+- Broadcasts `session_created` to WebSocket clients
+- If agent has demands in its blueprint, they are merged with `additional_demands`
+- Runs with demands get a 5-minute timeout for matching
 
 ### Get Run
 
@@ -158,30 +208,119 @@ GET /runs/{run_id}
 {
   "run_id": "run_abc123",
   "type": "start_session",
-  "session_name": "my-task",
+  "session_id": "ses_abc123",
   "agent_name": "researcher",
   "prompt": "Research quantum computing",
   "project_dir": "/path/to/project",
-  "parent_session_name": "parent-task",
+  "parent_session_id": "ses_parent123",
+  "execution_mode": "async_callback",
+  "demands": {
+    "hostname": null,
+    "project_dir": null,
+    "executor_type": null,
+    "tags": ["research"]
+  },
   "status": "completed",
-  "runner_id": "lnch_xyz789",
+  "runner_id": "lnch_xyz789abc",
   "error": null,
   "created_at": "2025-12-10T10:00:00Z",
   "claimed_at": "2025-12-10T10:00:01Z",
   "started_at": "2025-12-10T10:00:02Z",
-  "completed_at": "2025-12-10T10:05:00Z"
+  "completed_at": "2025-12-10T10:05:00Z",
+  "timeout_at": null
 }
 ```
 
 **Error:** `404 Not Found` if run doesn't exist.
 
+### Stop Run
+
+Stop a running run by signaling its runner.
+
+```
+POST /runs/{run_id}/stop
+```
+
+**Response (Success):**
+```json
+{
+  "ok": true,
+  "run_id": "run_abc123",
+  "session_id": "ses_abc123",
+  "status": "stopping"
+}
+```
+
+**Error Responses:**
+- `404 Not Found` - Run not found
+- `400 Bad Request` - Run cannot be stopped (not in `claimed` or `running` status)
+- `400 Bad Request` - Run not claimed by any runner
+
+**Notes:**
+- Queues a stop command for the runner
+- Runner receives the stop command immediately (wakes up from long-poll)
+- Runner sends SIGTERM first, then SIGKILL after 5 seconds if process doesn't respond
+
 ## Runner Endpoints
 
 These endpoints are used by the Agent Runner to poll for and report on runs.
 
+### Register Runner
+
+Register a new runner instance.
+
+```
+POST /runner/register
+```
+
+**Request Body:**
+```json
+{
+  "hostname": "macbook-pro",
+  "project_dir": "/path/to/project",
+  "executor_type": "claude-code",
+  "tags": ["research", "web-access"]
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `hostname` | Yes | Machine hostname |
+| `project_dir` | Yes | Default project directory |
+| `executor_type` | Yes | Executor type (e.g., `claude-code`) |
+| `tags` | No | Capability tags for demand matching |
+
+**Response:**
+```json
+{
+  "runner_id": "lnch_abc123xyz",
+  "poll_endpoint": "/runner/runs",
+  "poll_timeout_seconds": 30,
+  "heartbeat_interval_seconds": 60
+}
+```
+
+**Notes:**
+- `runner_id` is deterministically derived from (hostname, project_dir, executor_type)
+- Returns `409 Conflict` if an online runner with the same identity already exists
+- Stale runners with the same identity are treated as reconnections
+
+**Error (Duplicate Runner):**
+```json
+{
+  "error": "DuplicateRunnerError",
+  "message": "An online runner with this identity already exists",
+  "runner_id": "lnch_abc123xyz",
+  "hostname": "macbook-pro",
+  "project_dir": "/path/to/project",
+  "executor_type": "claude-code"
+}
+```
+**Status Code:** `409 Conflict`
+
 ### Poll for Runs
 
-Long-poll for available runs. Returns immediately if a run is available, otherwise holds the connection open.
+Long-poll for available runs or stop commands. Returns immediately if a run or stop command is available, otherwise holds the connection open.
 
 ```
 GET /runner/runs?runner_id={runner_id}
@@ -198,10 +337,19 @@ GET /runner/runs?runner_id={runner_id}
   "run": {
     "run_id": "run_abc123",
     "type": "start_session",
-    "session_name": "my-task",
+    "session_id": "ses_abc123",
     "prompt": "Do something",
+    "execution_mode": "sync",
+    "demands": null,
     ...
   }
+}
+```
+
+**Response (Stop Commands - highest priority):**
+```json
+{
+  "stop_runs": ["run_abc123", "run_def456"]
 }
 ```
 
@@ -214,6 +362,11 @@ GET /runner/runs?runner_id={runner_id}
 }
 ```
 
+**Notes:**
+- Stop commands are checked first (highest priority) and wake up the poll immediately
+- Demand matching is applied: only runs matching runner's capabilities are returned
+- Connection held up to 30 seconds if no runs available
+
 ### Report Run Started
 
 Report that run execution has started.
@@ -225,7 +378,7 @@ POST /runner/runs/{run_id}/started
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123"
+  "runner_id": "lnch_abc123xyz"
 }
 ```
 
@@ -235,6 +388,10 @@ POST /runner/runs/{run_id}/started
   "ok": true
 }
 ```
+
+**Notes:**
+- Updates run status to `running`
+- Links `parent_session_id` to the session for hierarchy tracking
 
 ### Report Run Completed
 
@@ -247,7 +404,7 @@ POST /runner/runs/{run_id}/completed
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123",
+  "runner_id": "lnch_abc123xyz",
   "status": "success"
 }
 ```
@@ -258,6 +415,10 @@ POST /runner/runs/{run_id}/completed
   "ok": true
 }
 ```
+
+**Notes:**
+- Updates run status to `completed`
+- If `execution_mode` is `async_callback`, triggers callback to parent session
 
 ### Report Run Failed
 
@@ -270,7 +431,7 @@ POST /runner/runs/{run_id}/failed
 **Request Body:**
 ```json
 {
-  "runner_id": "lnch_abc123",
+  "runner_id": "lnch_abc123xyz",
   "error": "Error message describing what went wrong"
 }
 ```
@@ -282,6 +443,38 @@ POST /runner/runs/{run_id}/failed
 }
 ```
 
+**Notes:**
+- Updates run status to `failed`
+- If `execution_mode` is `async_callback`, triggers callback to parent session with error
+
+### Report Run Stopped
+
+Report that run was stopped (terminated by stop command).
+
+```
+POST /runner/runs/{run_id}/stopped
+```
+
+**Request Body:**
+```json
+{
+  "runner_id": "lnch_abc123xyz",
+  "signal": "SIGTERM"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Notes:**
+- Updates run status to `stopped` and session status to `stopped`
+- `signal` indicates which signal was used to terminate (`SIGTERM` or `SIGKILL`)
+- If `execution_mode` is `async_callback`, triggers callback to parent session
+
 ## Implementation Details
 
 ### Run Queue
@@ -292,18 +485,43 @@ The run queue is an in-memory, thread-safe singleton that stores runs in a dicti
 
 ```python
 class RunQueue:
-    def add_run(run_create: RunCreate) -> Run
-    def claim_run(runner_id: str) -> Optional[Run]
+    def add_run(run_create: RunCreate, demands: Optional[RunnerDemands] = None) -> Run
+    def claim_run(runner_id: str, runner_info: RunnerInfo) -> Optional[Run]
     def get_run(run_id: str) -> Optional[Run]
     def update_run_status(run_id: str, status: RunStatus, error: str = None) -> Optional[Run]
-    def get_run_by_session_name(session_name: str) -> Optional[Run]
+    def get_run_by_session_id(session_id: str) -> Optional[Run]
+    def fail_timed_out_runs() -> List[Run]
 ```
 
 Key characteristics:
 - Runs are **not persisted** to SQLite (in-memory only)
 - Thread-safe with `threading.Lock` for concurrent access
 - FIFO ordering for run claiming
+- Demand matching applied during `claim_run`
+- Timeout checking via `fail_timed_out_runs` (runs every 30 seconds)
 - Module-level singleton: `run_queue`
+
+### Runner Registry
+
+**File:** `servers/agent-coordinator/services/runner_registry.py`
+
+Manages runner registration, lifecycle, and capability matching.
+
+```python
+class RunnerRegistry:
+    def register(hostname: str, project_dir: str, executor_type: str, tags: List[str]) -> RunnerInfo
+    def update_heartbeat(runner_id: str) -> bool
+    def deregister(runner_id: str) -> bool
+    def get_runner(runner_id: str) -> Optional[RunnerInfo]
+    def list_runners() -> List[RunnerWithStatus]
+    def update_lifecycle() -> None
+```
+
+Key characteristics:
+- Deterministic runner_id from (hostname, project_dir, executor_type)
+- Prevents duplicate online runner registration (409 Conflict)
+- Stale runner detection via background task (runs every 30 seconds)
+- Tags stored for capability-based demand matching
 
 ### Agent Runner Components
 
@@ -332,11 +550,11 @@ The dashboard creates runs when users start or resume sessions:
 // dashboard/src/services/chatService.ts
 const response = await agentOrchestratorApi.post('/runs', {
   type: 'start_session',
-  session_name: sessionName,
   agent_name: agentName,
   prompt: prompt,
   project_dir: projectDir
 });
+// Response includes: run_id, session_id, status
 ```
 
 ### CLI Commands
@@ -347,34 +565,43 @@ The orchestrator plugin uses `RunClient` to create runs and wait for completion:
 # plugins/orchestrator/skills/orchestrator/commands/lib/run_client.py
 client = RunClient(api_url)
 result = client.start_session(
-    session_name="my-task",
     prompt="Do something",
-    agent_name="researcher"
+    agent_name="researcher",
+    execution_mode="async_callback"
 )
 ```
 
-### Parent-Child Callbacks
+### Parent-Child Callbacks (Execution Modes)
 
-Runs support hierarchical orchestration through `parent_session_name`:
+Runs support three execution modes for parent-child orchestration:
 
-1. Parent agent starts child with `parent_session_name` set
-2. Agent Coordinator tracks the relationship
-3. When child completes, Callback Processor notifies parent
-4. Parent resumes with child's result
+| Mode | Behavior |
+|------|----------|
+| `sync` | Parent waits for child, receives result directly |
+| `async_poll` | Parent continues, polls `/runs/{run_id}` for status |
+| `async_callback` | Parent continues, coordinator auto-resumes parent |
+
+For `async_callback` mode:
+
+1. Parent agent starts child with `parent_session_id` and `execution_mode: async_callback`
+2. Parent continues working (non-blocking)
+3. When child completes, Callback Processor queues notification
+4. When parent becomes idle, coordinator creates resume run with child's result
 
 ```
 Parent (orchestrator)          Child (worker)
        │                            │
        │ POST /runs                 │
-       │ parent_session_name=self   │
+       │ parent_session_id=self     │
+       │ execution_mode=async_cb    │
        │───────────────────────────►│
        │                            │
        │ continues work...          │ executes task...
        │                            │
        │ becomes idle               │ completes
        │                            │
-       │◄─── callback notification ─┤
-       │     (via resume run)       │
+       │◄─── callback processor ────┤
+       │     creates resume run     │
        │                            │
        ▼
   resumes with child result

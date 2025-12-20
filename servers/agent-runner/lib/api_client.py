@@ -14,6 +14,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class DuplicateRunnerError(Exception):
+    """Raised when trying to register a runner with an identity that's already online."""
+
+    def __init__(self, runner_id: str, hostname: str, project_dir: str, executor_type: str, message: str):
+        self.runner_id = runner_id
+        self.hostname = hostname
+        self.project_dir = project_dir
+        self.executor_type = executor_type
+        super().__init__(message)
+
+
 @dataclass
 class RegistrationResponse:
     """Response from runner registration."""
@@ -101,6 +112,19 @@ class CoordinatorAPIClient:
             f"{self.base_url}/runner/register",
             json=payload,
         )
+
+        # Handle duplicate runner error (409 Conflict)
+        if response.status_code == 409:
+            data = response.json()
+            detail = data.get("detail", {})
+            raise DuplicateRunnerError(
+                runner_id=detail.get("runner_id", "unknown"),
+                hostname=detail.get("hostname", hostname),
+                project_dir=detail.get("project_dir", project_dir),
+                executor_type=detail.get("executor_type", executor_type),
+                message=detail.get("message", "A runner with this identity is already online"),
+            )
+
         response.raise_for_status()
         data = response.json()
 

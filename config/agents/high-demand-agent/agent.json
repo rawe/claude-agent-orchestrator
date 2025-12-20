@@ -1,0 +1,9 @@
+{
+  "name": "high-demand-agent",
+  "description": "an agent with non fulfillable demands",
+  "demands": {
+    "tags": [
+      "non-existing-demand"
+    ]
+  }
+}

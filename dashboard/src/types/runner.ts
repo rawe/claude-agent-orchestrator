@@ -7,6 +7,7 @@ export interface Runner {
   hostname: string | null;
   project_dir: string | null;
   executor_type: string | null;
+  tags: string[];  // Capability tags (ADR-011)
   status: RunnerStatus;
   seconds_since_heartbeat: number;
 }

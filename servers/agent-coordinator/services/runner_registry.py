@@ -13,6 +13,20 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
+class DuplicateRunnerError(Exception):
+    """Raised when attempting to register a runner with an identity that's already online."""
+
+    def __init__(self, runner_id: str, hostname: str, project_dir: str, executor_type: str):
+        self.runner_id = runner_id
+        self.hostname = hostname
+        self.project_dir = project_dir
+        self.executor_type = executor_type
+        super().__init__(
+            f"Runner with identity ({hostname}, {project_dir}, {executor_type}) "
+            f"is already registered and online as {runner_id}"
+        )
+
+
 def derive_runner_id(hostname: str, project_dir: str, executor_type: str) -> str:
     """
     Deterministically derive runner_id from identifying properties.
@@ -77,8 +91,10 @@ class RunnerRegistry:
     ) -> RunnerInfo:
         """Register a runner and return its info.
 
-        If a runner with the same (hostname, project_dir, executor_type) already exists,
-        this is treated as a reconnection: the existing record is updated and returned.
+        If a runner with the same (hostname, project_dir, executor_type) already exists:
+        - If ONLINE: Raises DuplicateRunnerError (cannot have two runners with same identity)
+        - If STALE: Treated as reconnection (old runner probably crashed)
+
         Otherwise, a new runner record is created.
 
         Args:
@@ -89,6 +105,9 @@ class RunnerRegistry:
 
         Returns:
             RunnerInfo with the runner_id derived from the properties
+
+        Raises:
+            DuplicateRunnerError: If an online runner with the same identity already exists
         """
         # Derive deterministic runner_id from properties
         runner_id = derive_runner_id(hostname, project_dir, executor_type)
@@ -97,7 +116,16 @@ class RunnerRegistry:
         with self._lock:
             existing = self._runners.get(runner_id)
             if existing:
-                # Reconnection: update existing runner
+                # Check if existing runner is online (reject duplicate)
+                if existing.status == RunnerStatus.ONLINE:
+                    raise DuplicateRunnerError(
+                        runner_id=runner_id,
+                        hostname=hostname,
+                        project_dir=project_dir,
+                        executor_type=executor_type,
+                    )
+
+                # Stale runner: treat as reconnection (old runner probably crashed)
                 existing.last_heartbeat = now
                 existing.status = RunnerStatus.ONLINE
                 # Update tags on reconnection (runner may have new capabilities)

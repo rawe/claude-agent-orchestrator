@@ -1,5 +1,14 @@
 export type AgentStatus = 'active' | 'inactive';
 
+// Agent Demands (ADR-011)
+// Requirements the agent demands to be satisfied before a session can run
+export interface AgentDemands {
+  hostname?: string;      // Must run on this specific host
+  project_dir?: string;   // Must run in this directory
+  executor_type?: string; // Must use this executor type
+  tags?: string[];        // Must have ALL these capability tags
+}
+
 export interface MCPServerStdio {
   type?: 'stdio';
   command: string;
@@ -22,6 +31,7 @@ export interface Agent {
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[] | null;
   tags: string[];
+  demands: AgentDemands | null;
   status: AgentStatus;
   created_at: string;
   modified_at: string;
@@ -34,6 +44,7 @@ export interface AgentCreate {
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
   tags?: string[];
+  demands?: AgentDemands | null;
 }
 
 export interface AgentUpdate {
@@ -42,6 +53,7 @@ export interface AgentUpdate {
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
   tags?: string[];
+  demands?: AgentDemands | null;
 }
 
 // Predefined skills available for selection

@@ -3,7 +3,7 @@ import { runnerService } from '@/services';
 import { Runner, RunnerStatus } from '@/types';
 import { ConfirmModal } from '@/components/common';
 import { formatRelativeTime, formatAbsoluteTime, getLastPathSegment } from '@/utils/formatters';
-import { RefreshCw, Server, Folder, Clock, Activity, Power, AlertTriangle, Terminal } from 'lucide-react';
+import { RefreshCw, Server, Folder, Clock, Activity, Power, AlertTriangle, Terminal, Tag } from 'lucide-react';
 
 interface RunnerCardProps {
   runner: Runner;
@@ -105,6 +105,25 @@ function RunnerCard({ runner, isDeregistering, onDeregister }: RunnerCardProps) 
           <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-2">
             <Terminal className="w-3.5 h-3.5 text-gray-400" />
             <span className="truncate">{runner.executor_type}</span>
+          </div>
+        )}
+
+        {/* Capability Tags */}
+        {runner.tags && runner.tags.length > 0 && (
+          <div className="mb-2">
+            <div className="flex items-start gap-1.5 text-xs text-gray-600">
+              <Tag className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-wrap gap-1 min-w-0">
+                {runner.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex px-1.5 py-0.5 text-xs bg-blue-50 text-blue-700 rounded border border-blue-200 whitespace-nowrap"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

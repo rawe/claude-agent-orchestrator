@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
-import { Agent, AgentCreate, MCPServerConfig, SKILLS } from '@/types';
+import { Agent, AgentCreate, AgentDemands, MCPServerConfig, SKILLS } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { Eye, Code, X, AlertCircle, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -23,6 +23,7 @@ interface FormData {
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
   tags: string[];
+  demands: AgentDemands | null;
 }
 
 export function AgentEditor({
@@ -55,6 +56,7 @@ export function AgentEditor({
       mcp_servers: null,
       skills: [],
       tags: [],
+      demands: null,
     },
   });
 
@@ -73,6 +75,7 @@ export function AgentEditor({
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
         tags: agent.tags || [],
+        demands: agent.demands,
       });
     } else {
       reset({
@@ -82,6 +85,7 @@ export function AgentEditor({
         mcp_servers: null,
         skills: [],
         tags: [],
+        demands: null,
       });
     }
     setNameAvailable(null);
@@ -132,6 +136,21 @@ export function AgentEditor({
       // Convert form data to AgentCreate/AgentUpdate format
       // Always send mcp_servers, skills, and tags so clearing them works on update
       // Empty object {} for mcp_servers means "clear/delete"
+      // Clean up demands - convert empty strings to undefined, remove empty object
+      let cleanDemands: AgentDemands | undefined = undefined;
+      if (data.demands) {
+        const d = data.demands;
+        const cleaned: AgentDemands = {};
+        if (d.hostname?.trim()) cleaned.hostname = d.hostname.trim();
+        if (d.project_dir?.trim()) cleaned.project_dir = d.project_dir.trim();
+        if (d.executor_type?.trim()) cleaned.executor_type = d.executor_type.trim();
+        if (d.tags && d.tags.length > 0) cleaned.tags = d.tags;
+        // Only include demands if at least one field is set
+        if (Object.keys(cleaned).length > 0) {
+          cleanDemands = cleaned;
+        }
+      }
+
       const createData: AgentCreate = {
         name: data.name,
         description: data.description,
@@ -139,6 +158,7 @@ export function AgentEditor({
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
         tags: data.tags,                       // empty array clears tags
+        demands: cleanDemands ?? null,         // null clears demands
       };
       await onSave(createData);
       onClose();
@@ -382,6 +402,88 @@ export function AgentEditor({
                 <span>Consider adding at least one capability for the agent</span>
               </div>
             )}
+          </div>
+
+          {/* Runner Demands (ADR-011) */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-900">Runner Demands</h3>
+            <div className="flex items-start gap-2 text-xs text-gray-500 mb-3">
+              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p>
+                Optional constraints that must be satisfied by a runner before this agent can execute.
+                Leave empty to allow any runner to execute this agent.
+              </p>
+            </div>
+
+            {/* Hostname */}
+            <div>
+              <label className="label">Hostname</label>
+              <Controller
+                name="demands.hostname"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    value={field.value || ''}
+                    placeholder="e.g., my-macbook (must run on this specific host)"
+                    className="input"
+                  />
+                )}
+              />
+            </div>
+
+            {/* Project Directory */}
+            <div>
+              <label className="label">Project Directory</label>
+              <Controller
+                name="demands.project_dir"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    value={field.value || ''}
+                    placeholder="e.g., /Users/me/projects/my-app (must run in this directory)"
+                    className="input font-mono text-sm"
+                  />
+                )}
+              />
+            </div>
+
+            {/* Executor Type */}
+            <div>
+              <label className="label">Executor Type</label>
+              <Controller
+                name="demands.executor_type"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    value={field.value || ''}
+                    placeholder="e.g., claude-code (must use this executor)"
+                    className="input"
+                  />
+                )}
+              />
+            </div>
+
+            {/* Demand Tags */}
+            <div>
+              <label className="label">Required Runner Tags</label>
+              <Controller
+                name="demands.tags"
+                control={control}
+                render={({ field }) => (
+                  <TagSelector
+                    value={field.value || []}
+                    onChange={field.onChange}
+                    placeholder="Add required tags (e.g., python, docker, nodejs)..."
+                  />
+                )}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Runner must have ALL specified tags to execute this agent.
+              </p>
+            </div>
           </div>
         </div>
 
