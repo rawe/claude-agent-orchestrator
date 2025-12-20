@@ -4,6 +4,7 @@ Thread-safe in-memory run queue for Agent Runner.
 Runs are created via POST /runs and claimed by the Runner via GET /runner/runs.
 Supports demand-based matching per ADR-011.
 Session ID is coordinator-generated at run creation per ADR-010.
+Execution mode controls callback behavior per ADR-003.
 """
 
 import threading
@@ -14,8 +15,11 @@ from enum import Enum
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from models import RunnerDemands
+    from models import RunnerDemands, ExecutionMode as ExecutionModeType
     from services.runner_registry import RunnerInfo
+
+# Import ExecutionMode for runtime use
+from models import ExecutionMode
 
 
 class RunType(str, Enum):
@@ -37,6 +41,7 @@ class RunCreate(BaseModel):
     """Request body for creating a new run.
 
     session_id is optional - coordinator generates it if not provided (ADR-010).
+    execution_mode controls callback behavior per ADR-003.
     """
     type: RunType
     session_id: Optional[str] = None  # Coordinator generates if not provided
@@ -44,6 +49,7 @@ class RunCreate(BaseModel):
     prompt: str
     project_dir: Optional[str] = None
     parent_session_id: Optional[str] = None
+    execution_mode: ExecutionMode = ExecutionMode.SYNC
     # Additional demands to merge with blueprint demands (additive only)
     additional_demands: Optional[dict] = None
 
@@ -57,6 +63,7 @@ class Run(BaseModel):
     prompt: str
     project_dir: Optional[str] = None
     parent_session_id: Optional[str] = None
+    execution_mode: ExecutionMode = ExecutionMode.SYNC  # ADR-003
     # Merged demands (blueprint + additional) - stored as dict for serialization
     demands: Optional[dict] = None
     status: RunStatus = RunStatus.PENDING
@@ -162,6 +169,7 @@ class RunQueue:
             prompt=run_create.prompt,
             project_dir=run_create.project_dir,
             parent_session_id=run_create.parent_session_id,
+            execution_mode=run_create.execution_mode,
             status=RunStatus.PENDING,
             created_at=now,
         )

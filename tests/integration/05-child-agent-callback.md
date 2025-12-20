@@ -1,6 +1,8 @@
 # Test: Child Agent with Callback
 
-Verify that an orchestrator agent can spawn a child agent in callback mode with parent-child relationship.
+Verify that an orchestrator agent can spawn a child agent in callback mode (`mode=async_callback`) with parent-child relationship.
+
+**Note**: As of ADR-003, `parent_session_id` is always set for child sessions regardless of execution mode. The `execution_mode` field controls callback behavior.
 
 ## Prerequisites
 
@@ -56,8 +58,8 @@ curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "par
 ## Expected Behavior
 
 1. Parent session starts
-2. Parent calls MCP tool with `callback=true`
-3. Child session created with `parent_session_id` set
+2. Parent calls MCP tool with `mode=async_callback`
+3. Child session created with `parent_session_id` set and `execution_mode=async_callback`
 4. Parent session pauses (waiting for callback)
 5. Child executes and completes
 6. Parent session resumes with callback message
@@ -66,6 +68,7 @@ curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "par
 ## Verification Checklist
 
 - [ ] Child session has `parent_session_id` set to parent's `session_id`
+- [ ] Child session has `execution_mode` set to `async_callback`
 - [ ] Both session IDs follow format `ses_...`
 - [ ] Parent receives callback message: "The child agent session ... has completed"
 - [ ] Parent session resumes after child completes
@@ -75,6 +78,7 @@ curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "par
 
 | Aspect | Sync Mode | Callback Mode |
 |--------|-----------|---------------|
-| `parent_session_id` | `null` | Set to parent |
+| `execution_mode` | `sync` | `async_callback` |
+| `parent_session_id` | Set to parent | Set to parent |
 | Parent waits | Blocks during call | Pauses, resumes on callback |
 | Use case | Quick tasks | Long-running child tasks |

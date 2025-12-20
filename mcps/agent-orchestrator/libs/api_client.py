@@ -5,6 +5,7 @@ This module provides an async HTTP client using httpx to communicate
 with the Agent Coordinator API for agent run management and session operations.
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
+Execution mode controls callback behavior per ADR-003.
 """
 
 import asyncio
@@ -86,6 +87,7 @@ class APIClient:
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
         parent_session_id: Optional[str] = None,
+        execution_mode: str = "sync",
         additional_demands: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, str]:
         """Create an agent run. Returns dict with run_id and session_id.
@@ -97,6 +99,7 @@ class APIClient:
             agent_name: Blueprint name (for start_session)
             project_dir: Project directory
             parent_session_id: Parent session for orchestration (ADR-010)
+            execution_mode: Callback behavior: sync, async_poll, async_callback (ADR-003)
             additional_demands: Additional demands to merge with blueprint (ADR-011)
 
         Returns:
@@ -105,6 +108,7 @@ class APIClient:
         data: Dict[str, Any] = {
             "type": run_type,
             "prompt": prompt,
+            "execution_mode": execution_mode,
         }
         if session_id:
             data["session_id"] = session_id

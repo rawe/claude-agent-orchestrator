@@ -17,7 +17,8 @@ from database import (
 )
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
-    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands
+    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
+    ExecutionMode
 )
 import agent_storage
 from validation import validate_agent_name
@@ -526,13 +527,14 @@ async def add_session_event(session_id: str, event: Event):
                 connections.discard(ws)
 
         # Callback processing: handle child completion and pending notifications
-        # TODO: REMOVE - Move success callback to POST /runner/runs/{run_id}/completed
-        # This callback logic should be unified with failure/stopped callbacks in the Runner API.
-        # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
+        # Check execution_mode to determine if callback should be triggered (ADR-003)
+        # parent_session_id is always set for hierarchy tracking, but callbacks only
+        # trigger when execution_mode == ASYNC_CALLBACK
         parent_session_id = updated_session.get("parent_session_id")
+        execution_mode = updated_session.get("execution_mode", "sync")
 
-        if parent_session_id:
-            # This is a child session completing - notify parent
+        if parent_session_id and execution_mode == ExecutionMode.ASYNC_CALLBACK.value:
+            # This is a child session with callback mode - notify parent
             parent_session = get_session_by_id(parent_session_id)
             parent_status = parent_session["status"] if parent_session else "not_found"
 
@@ -540,7 +542,7 @@ async def add_session_event(session_id: str, event: Event):
             child_result = get_session_result(session_id)
 
             if DEBUG:
-                print(f"[DEBUG] Child '{session_id}' completed, parent '{parent_session_id}' status={parent_status}", flush=True)
+                print(f"[DEBUG] Child '{session_id}' completed (mode=async_callback), parent '{parent_session_id}' status={parent_status}", flush=True)
 
             callback_processor.on_child_completed(
                 child_session_id=session_id,
@@ -987,13 +989,14 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
     if DEBUG:
         print(f"[DEBUG] Run {run_id} failed: {request.error}", flush=True)
 
-    # Notify parent if this was a callback run
-    if run.parent_session_id:
+    # Notify parent if this was a callback run (ADR-003)
+    # Only trigger callback if execution_mode == ASYNC_CALLBACK
+    if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK:
         parent_session = get_session_by_id(run.parent_session_id)
         parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run failed for child '{run.session_id}', notifying parent '{run.parent_session_id}'", flush=True)
+            print(f"[DEBUG] Run failed for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}'", flush=True)
 
         callback_processor.on_child_completed(
             child_session_id=run.session_id,
@@ -1025,13 +1028,14 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     if DEBUG:
         print(f"[DEBUG] Run {run_id} stopped by runner {request.runner_id} (signal={request.signal})", flush=True)
 
-    # Notify parent if this was a callback run (treat as failure)
-    if run.parent_session_id:
+    # Notify parent if this was a callback run (treat as failure) (ADR-003)
+    # Only trigger callback if execution_mode == ASYNC_CALLBACK
+    if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK:
         parent_session = get_session_by_id(run.parent_session_id)
         parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run stopped for child '{run.session_id}', notifying parent '{run.parent_session_id}'", flush=True)
+            print(f"[DEBUG] Run stopped for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}'", flush=True)
 
         callback_processor.on_child_completed(
             child_session_id=run.session_id,
@@ -1163,9 +1167,10 @@ async def create_run(run_create: RunCreate):
                 project_dir=run_create.project_dir,
                 agent_name=run_create.agent_name,
                 parent_session_id=run_create.parent_session_id,
+                execution_mode=run.execution_mode.value,
             )
             if DEBUG:
-                print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id}", flush=True)
+                print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id} (mode={run.execution_mode.value})", flush=True)
         except Exception as e:
             if "UNIQUE constraint failed" in str(e):
                 # Session already exists - this shouldn't happen for start runs

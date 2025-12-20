@@ -2,6 +2,8 @@
 
 Verify that multiple child agents completing in rapid succession all have their callbacks properly received by the parent agent. This test is designed to detect race conditions where callbacks may be "swallowed" or overwritten.
 
+Uses `mode=async_callback` for all child agents per ADR-003.
+
 ## Prerequisites
 
 - Agent Coordinator running

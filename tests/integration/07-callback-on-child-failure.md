@@ -2,6 +2,8 @@
 
 Verify that when a child agent fails, the parent receives a failure callback with error details.
 
+Uses `mode=async_callback` for the child agent per ADR-003.
+
 ## Prerequisites
 
 - Agent Coordinator running

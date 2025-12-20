@@ -1,3 +1,4 @@
+from enum import Enum
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, List, Literal, Union
 
@@ -129,6 +130,26 @@ class RunnerDemands(BaseModel):
 
 
 # ==============================================================================
+# Execution Mode (ADR-003)
+# ==============================================================================
+
+class ExecutionMode(str, Enum):
+    """
+    Execution mode for agent sessions.
+
+    Controls how the parent session interacts with child sessions:
+    - SYNC: Parent waits for child to complete, receives result directly
+    - ASYNC_POLL: Parent continues immediately, polls for child status/result
+    - ASYNC_CALLBACK: Parent continues immediately, coordinator auto-resumes parent
+
+    See ADR-003 for details.
+    """
+    SYNC = "sync"
+    ASYNC_POLL = "async_poll"
+    ASYNC_CALLBACK = "async_callback"
+
+
+# ==============================================================================
 # Session Models (ADR-010)
 # ==============================================================================
 
@@ -137,11 +158,13 @@ class SessionCreate(BaseModel):
 
     session_id is coordinator-generated at run creation.
     No session_name - that concept is removed per ADR-010.
+    execution_mode controls callback behavior per ADR-003.
     """
     session_id: str
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
     parent_session_id: Optional[str] = None
+    execution_mode: ExecutionMode = ExecutionMode.SYNC
 
 
 class SessionBind(BaseModel):
