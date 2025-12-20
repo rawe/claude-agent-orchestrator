@@ -49,7 +49,6 @@ export function SessionList({
       const searchLower = search.toLowerCase();
       filtered = filtered.filter(
         (s) =>
-          s.session_name?.toLowerCase().includes(searchLower) ||
           s.session_id.toLowerCase().includes(searchLower) ||
           s.agent_name?.toLowerCase().includes(searchLower)
       );

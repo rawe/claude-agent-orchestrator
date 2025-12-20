@@ -11,8 +11,10 @@ Test Executor - Simple dummy executor for testing.
 Echoes prompts back as responses. Does not use any AI SDK.
 Stores session data in local .test-executor-data/ folder.
 
+Uses session_id (coordinator-generated) per ADR-010.
+
 Usage:
-    echo '{"schema_version":"1.0","mode":"start","session_name":"test","prompt":"Hello"}' | uv run ao-test-exec
+    echo '{"schema_version":"1.0","mode":"start","session_id":"ses_abc123","prompt":"Hello"}' | uv run ao-test-exec
 """
 
 import json
@@ -38,28 +40,28 @@ from executor_config import get_api_url
 DATA_DIR = Path(__file__).parent / ".test-executor-data"
 
 
-def get_storage_path(session_name: str) -> Path:
+def get_storage_path(session_id: str) -> Path:
     """Get path to session data file."""
     DATA_DIR.mkdir(exist_ok=True)
-    return DATA_DIR / f"{session_name}.json"
+    return DATA_DIR / f"{session_id}.json"
 
 
-def load_session_data(session_name: str) -> dict | None:
+def load_session_data(session_id: str) -> dict | None:
     """Load session data from file."""
-    path = get_storage_path(session_name)
+    path = get_storage_path(session_id)
     if path.exists():
         return json.loads(path.read_text())
     return None
 
 
-def save_session_data(session_name: str, data: dict) -> None:
+def save_session_data(session_id: str, data: dict) -> None:
     """Save session data to file."""
-    path = get_storage_path(session_name)
+    path = get_storage_path(session_id)
     path.write_text(json.dumps(data, indent=2))
 
 
-def generate_session_id() -> str:
-    """Generate a unique session ID."""
+def generate_executor_session_id() -> str:
+    """Generate an executor session ID (simulates Claude SDK session UUID)."""
     return str(uuid.uuid4())
 
 
@@ -73,30 +75,34 @@ def run_start(inv: ExecutorInvocation) -> None:
     api_url = get_api_url()
     client = SessionClient(api_url)
 
-    # Check if session already exists
-    existing = load_session_data(inv.session_name)
+    session_id = inv.session_id
+
+    # Check if session already exists locally
+    existing = load_session_data(session_id)
     if existing:
-        print(f"Error: Session '{inv.session_name}' already exists", file=sys.stderr)
+        print(f"Error: Session '{session_id}' already exists locally", file=sys.stderr)
         sys.exit(1)
 
-    # Generate session ID
-    session_id = generate_session_id()
+    # Generate executor session ID (simulates what Claude SDK would generate)
+    executor_session_id = generate_executor_session_id()
 
-    # Create session via API
+    # Bind this executor to the session (per ADR-010)
     try:
-        client.create_session(
+        import socket
+        hostname = socket.gethostname()
+        client.bind_session_executor(
             session_id=session_id,
-            session_name=inv.session_name,
-            project_dir=inv.project_dir,
-            agent_name=inv.agent_name,
+            executor_session_id=executor_session_id,
+            hostname=hostname,
+            executor_type="test-executor",
         )
     except SessionClientError as e:
-        print(f"Warning: Could not create session via API: {e}", file=sys.stderr)
+        print(f"Warning: Could not bind session executor: {e}", file=sys.stderr)
 
     # Store session data locally
     session_data = {
         "session_id": session_id,
-        "session_name": inv.session_name,
+        "executor_session_id": executor_session_id,
         "created_at": datetime.now(UTC).isoformat(),
         "messages": [],
     }
@@ -113,7 +119,6 @@ def run_start(inv: ExecutorInvocation) -> None:
         client.add_event(session_id, {
             "event_type": "message",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
             "role": "user",
             "content": [{"type": "text", "text": inv.prompt}],
@@ -132,14 +137,13 @@ def run_start(inv: ExecutorInvocation) -> None:
     })
 
     # Save session data
-    save_session_data(inv.session_name, session_data)
+    save_session_data(session_id, session_data)
 
     # Send assistant message event
     try:
         client.add_event(session_id, {
             "event_type": "message",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
             "role": "assistant",
             "content": [{"type": "text", "text": response}],
@@ -152,7 +156,6 @@ def run_start(inv: ExecutorInvocation) -> None:
         client.add_event(session_id, {
             "event_type": "session_stop",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
             "exit_code": 0,
             "reason": "completed",
@@ -169,20 +172,19 @@ def run_resume(inv: ExecutorInvocation) -> None:
     api_url = get_api_url()
     client = SessionClient(api_url)
 
-    # Load existing session
-    session_data = load_session_data(inv.session_name)
-    if not session_data:
-        print(f"Error: Session '{inv.session_name}' not found", file=sys.stderr)
-        sys.exit(1)
+    session_id = inv.session_id
 
-    session_id = session_data["session_id"]
+    # Load existing session
+    session_data = load_session_data(session_id)
+    if not session_data:
+        print(f"Error: Session '{session_id}' not found locally", file=sys.stderr)
+        sys.exit(1)
 
     # Send session_start event (resume)
     try:
         client.add_event(session_id, {
             "event_type": "session_start",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
         })
     except SessionClientError:
@@ -200,7 +202,6 @@ def run_resume(inv: ExecutorInvocation) -> None:
         client.add_event(session_id, {
             "event_type": "message",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
             "role": "user",
             "content": [{"type": "text", "text": inv.prompt}],
@@ -222,14 +223,13 @@ def run_resume(inv: ExecutorInvocation) -> None:
     session_data["last_resumed_at"] = datetime.now(UTC).isoformat()
 
     # Save session data
-    save_session_data(inv.session_name, session_data)
+    save_session_data(session_id, session_data)
 
     # Send assistant message event
     try:
         client.add_event(session_id, {
             "event_type": "message",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
             "role": "assistant",
             "content": [{"type": "text", "text": response}],
@@ -242,7 +242,6 @@ def run_resume(inv: ExecutorInvocation) -> None:
         client.add_event(session_id, {
             "event_type": "session_stop",
             "session_id": session_id,
-            "session_name": inv.session_name,
             "timestamp": datetime.now(UTC).isoformat(),
             "exit_code": 0,
             "reason": "completed",

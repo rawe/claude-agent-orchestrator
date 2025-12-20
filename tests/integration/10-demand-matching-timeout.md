@@ -50,13 +50,17 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "session_name": "demand-test-timeout",
     "agent_name": "special-agent",
     "prompt": "Hello"
   }'
 ```
 
-Record the `run_id` from response.
+Record the `run_id` and `session_id` from response.
+
+**Expected response:**
+```json
+{"run_id":"run_...","session_id":"ses_...","status":"pending"}
+```
 
 ### Step 5: Verify Run Stays Pending
 
@@ -93,3 +97,4 @@ curl -X DELETE http://localhost:8765/agents/special-agent
 - [ ] Run stayed in pending status (not claimed)
 - [ ] Run eventually failed with "No matching runner" error
 - [ ] ws-monitor shows `run_failed` event with timeout error
+- [ ] `session_id` in response follows format `ses_...`

@@ -65,7 +65,6 @@ export function SessionSelector({
       const searchLower = search.toLowerCase();
       filtered = filtered.filter(
         (s) =>
-          s.session_name?.toLowerCase().includes(searchLower) ||
           s.session_id.toLowerCase().includes(searchLower) ||
           s.agent_name?.toLowerCase().includes(searchLower)
       );
@@ -90,7 +89,7 @@ export function SessionSelector({
   const currentSession = sessions.find((s) => s.session_id === currentSessionId);
   const triggerText = mode === 'new'
     ? 'New Chat'
-    : currentSession?.session_name || currentSession?.session_id.slice(0, 12) || 'Select Session';
+    : currentSession?.session_id.slice(0, 16) || 'Select Session';
 
   const handleSelectSession = (session: Session) => {
     onSelectSession(session);
@@ -216,7 +215,7 @@ interface SessionItemProps {
 }
 
 function SessionItem({ session, isSelected, onSelect }: SessionItemProps) {
-  const displayName = session.session_name || session.session_id.slice(0, 12);
+  const displayName = session.session_id.slice(0, 16);
   const projectFolder = session.project_dir ? getLastPathSegment(session.project_dir) : null;
 
   return (

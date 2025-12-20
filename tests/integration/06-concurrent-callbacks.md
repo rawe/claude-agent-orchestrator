@@ -36,28 +36,34 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "session_name": "test-concurrent-parent",
     "agent_name": "agent-orchestrator",
-    "prompt": "Start 5 child agents in callback mode with these session names and wait times:\n- sleeper-agent-001: wait 5 seconds, then respond \"callback-001\"\n- sleeper-agent-002: wait 5 seconds, then respond \"callback-002\"\n- sleeper-agent-003: wait 5 seconds, then respond \"callback-003\"\n- sleeper-agent-004: wait 10 seconds, then respond \"callback-004\"\n- sleeper-agent-005: wait 10 seconds, then respond \"callback-005\"\n\nEach agent must ONLY run: sleep N && echo \"callback-XXX\"\nDo not respond until you have received all callbacks.",
+    "prompt": "Start 5 child agents in callback mode with these wait times:\n- Agent 1: wait 5 seconds, then respond \"callback-001\"\n- Agent 2: wait 5 seconds, then respond \"callback-002\"\n- Agent 3: wait 5 seconds, then respond \"callback-003\"\n- Agent 4: wait 10 seconds, then respond \"callback-004\"\n- Agent 5: wait 10 seconds, then respond \"callback-005\"\n\nEach agent must ONLY run: sleep N && echo \"callback-XXX\"\nDo not respond until you have received all callbacks.",
     "project_dir": "."
   }'
 ```
 
+Expected response:
+```json
+{"run_id":"run_...","session_id":"ses_...","status":"pending"}
+```
+
+Note the parent `session_id`.
+
 ### Step 3: Wait for all agents to complete
 
 Monitor ws-monitor for completion events. Expected timeline:
-- ~5 seconds: sleeper-agent-001, 002, 003 complete (Wave 1)
-- ~10 seconds: sleeper-agent-004, 005 complete (Wave 2)
+- ~5 seconds: Agents 1, 2, 3 complete (Wave 1)
+- ~10 seconds: Agents 4, 5 complete (Wave 2)
 
 Wait approximately 60-90 seconds for parent to process all callbacks.
 
 ### Step 4: Verify all child sessions completed
 
 ```bash
-curl -s http://localhost:8765/sessions | python -m json.tool | grep -E "(session_name|status)" | head -20
+curl -s http://localhost:8765/sessions | python -m json.tool | grep -E "(session_id|status)" | head -20
 ```
 
-All 5 sleeper-agent sessions should show as completed.
+All 5 child sessions should show as completed.
 
 ### Step 5: Resume parent to verify received callbacks
 
@@ -68,8 +74,8 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
-    "session_name": "test-concurrent-parent",
-    "prompt": "IMPORTANT: Check your conversation history ONLY. Do NOT use any tools or API calls.\n\nList ALL child agent callbacks you received in this session. For each callback, state:\n1. The agent session name\n2. The callback message content\n\nThen confirm: Did you receive callbacks from ALL 5 agents (sleeper-agent-001 through sleeper-agent-005)? Answer YES or NO, and list any missing agents."
+    "session_id": "<parent_session_id>",
+    "prompt": "IMPORTANT: Check your conversation history ONLY. Do NOT use any tools or API calls.\n\nList ALL child agent callbacks you received in this session. For each callback, state:\n1. The agent session ID\n2. The callback message content\n\nThen confirm: Did you receive callbacks from ALL 5 agents? Answer YES or NO, and list any missing agents."
   }'
 ```
 
@@ -87,17 +93,17 @@ Wait for the parent to respond. The response will reveal which callbacks were ac
 ### Failure Case (Race Condition Detected)
 1. All 5 child agents complete
 2. Parent's history is missing 1 or more callbacks
-3. Parent confirms: "NO, missing callbacks from: sleeper-agent-XXX"
+3. Parent confirms: "NO, missing callbacks from: [session_id]"
 
 ## Verification Checklist
 
-- [ ] All 5 sleeper-agent sessions created
-- [ ] All 5 sleeper-agent sessions completed (check via API)
-- [ ] Parent received callback from sleeper-agent-001
-- [ ] Parent received callback from sleeper-agent-002
-- [ ] Parent received callback from sleeper-agent-003
-- [ ] Parent received callback from sleeper-agent-004
-- [ ] Parent received callback from sleeper-agent-005
+- [ ] All 5 child sessions created (each with unique `session_id` format `ses_...`)
+- [ ] All 5 child sessions completed (check via API)
+- [ ] Parent received callback from agent 1
+- [ ] Parent received callback from agent 2
+- [ ] Parent received callback from agent 3
+- [ ] Parent received callback from agent 4
+- [ ] Parent received callback from agent 5
 - [ ] Parent confirms all 5 callbacks in history verification step
 
 ## Interpreting Results
@@ -109,22 +115,22 @@ This indicates a race condition in the callback handling system. Possible causes
 - Locking issues in session state management
 
 ### Timing analysis:
-Note which callbacks are missing. If Wave 1 agents (001-003) are affected more than Wave 2, it suggests concurrent callbacks are being overwritten.
+Note which callbacks are missing. If Wave 1 agents (1-3) are affected more than Wave 2, it suggests concurrent callbacks are being overwritten.
 
 ## WebSocket Events to Monitor
 
 ```
 # Wave 1 completions (~5 sec)
-{"type": "event", "data": {"event_type": "session_stop", "session_name": "sleeper-agent-001", ...}}
-{"type": "event", "data": {"event_type": "session_stop", "session_name": "sleeper-agent-002", ...}}
-{"type": "event", "data": {"event_type": "session_stop", "session_name": "sleeper-agent-003", ...}}
+{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child1>", ...}}
+{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child2>", ...}}
+{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child3>", ...}}
 
 # Wave 2 completions (~10 sec)
-{"type": "event", "data": {"event_type": "session_stop", "session_name": "sleeper-agent-004", ...}}
-{"type": "event", "data": {"event_type": "session_stop", "session_name": "sleeper-agent-005", ...}}
+{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child4>", ...}}
+{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child5>", ...}}
 
 # Parent resumes (should see 5 resume events)
-{"type": "event", "data": {"event_type": "session_start", "session_name": "test-concurrent-parent", ...}}
+{"type": "event", "data": {"event_type": "session_start", "session_id": "ses_<parent>", ...}}
 ```
 
 ## Troubleshooting

@@ -12,11 +12,11 @@ import asyncio
 from database import (
     init_db, insert_session, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
-    create_session, get_session_by_id, get_session_result, get_session_by_name,
-    update_session_parent
+    create_session, get_session_by_id, get_session_result,
+    update_session_parent, bind_session_executor, get_session_affinity
 )
 from models import (
-    Event, SessionMetadataUpdate, SessionCreate,
+    Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands
 )
 import agent_storage
@@ -116,7 +116,7 @@ async def run_timeout_task():
                     "type": "run_failed",
                     "run_id": run.run_id,
                     "error": run.error,
-                    "session_name": run.session_name,
+                    "session_id": run.session_id,
                 })
                 for ws in connections.copy():
                     try:
@@ -161,7 +161,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Agent Coordinator",
     description="Unified service for agent session management and agent blueprint registry",
-    version="0.2.0",
+    version="0.3.0",  # Bumped for ADR-010
     lifespan=lifespan
 )
 
@@ -179,6 +179,8 @@ app.add_middleware(
 async def receive_event(event: Event):
     """Receive events from hook scripts and broadcast to WebSocket clients
 
+    Events are posted using session_id (coordinator-generated).
+    
     DEPRECATION NOTE: The session_start event handling below will be removed
     once all clients migrate to POST /sessions for session creation.
     The session_stop handling will also migrate to POST /sessions/{id}/events.
@@ -188,12 +190,12 @@ async def receive_event(event: Event):
     # Debug: Log incoming event
     if DEBUG:
         print(f"[DEBUG] Received event: type={event.event_type}, session_id={event.session_id}", flush=True)
-        print(f"[DEBUG] Event data: {event.dict()}", flush=True)
+        print(f"[DEBUG] Event data: {event.model_dump()}", flush=True)
 
     try:
         # Update database
         if event.event_type == "session_start":
-            insert_session(event.session_id, event.session_name, event.timestamp)
+            insert_session(event.session_id, event.timestamp)
             if DEBUG:
                 print(f"[DEBUG] Inserted session: {event.session_id}", flush=True)
         elif event.event_type == "session_stop":
@@ -207,7 +209,7 @@ async def receive_event(event: Event):
             print(f"[DEBUG] Inserted event successfully", flush=True)
 
         # Broadcast to all connected clients
-        message = json.dumps({"type": "event", "data": event.dict()})
+        message = json.dumps({"type": "event", "data": event.model_dump()})
         broadcast_count = 0
         for ws in connections.copy():
             try:
@@ -223,7 +225,7 @@ async def receive_event(event: Event):
 
     except Exception as e:
         print(f"[ERROR] Failed to process event: {e}", flush=True)
-        print(f"[ERROR] Event that failed: {event.dict()}", flush=True)
+        print(f"[ERROR] Event that failed: {event.model_dump()}", flush=True)
         raise
 
 @app.get("/sessions")
@@ -234,27 +236,29 @@ async def list_sessions():
 
 @app.post("/sessions")
 async def create_session_endpoint(session: SessionCreate):
-    """Create a new session with full metadata"""
+    """Create a new session with full metadata.
+
+    session_id is coordinator-generated and must be provided.
+    """
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    # Determine parent_session_name: prefer run's value over request's value
-    parent_session_name = session.parent_session_name
+    # Determine parent_session_id: prefer run's value over request's value
+    parent_session_id = session.parent_session_id
 
-    # Check if there's a running/claimed run for this session_name
-    run = run_queue.get_run_by_session_name(session.session_name)
-    if run and run.parent_session_name:
-        parent_session_name = run.parent_session_name
+    # Check if there's a running/claimed run for this session_id
+    run = run_queue.get_run_by_session_id(session.session_id)
+    if run and run.parent_session_id:
+        parent_session_id = run.parent_session_id
         if DEBUG:
-            print(f"[DEBUG] Session {session.session_name} inheriting parent {parent_session_name} from run {run.run_id}", flush=True)
+            print(f"[DEBUG] Session {session.session_id} inheriting parent {parent_session_id} from run {run.run_id}", flush=True)
 
     try:
         new_session = create_session(
             session_id=session.session_id,
-            session_name=session.session_name,
             timestamp=timestamp,
             project_dir=session.project_dir,
             agent_name=session.agent_name,
-            parent_session_name=parent_session_name,
+            parent_session_id=parent_session_id,
         )
     except Exception as e:
         if "UNIQUE constraint failed" in str(e):
@@ -272,13 +276,37 @@ async def create_session_endpoint(session: SessionCreate):
     return {"ok": True, "session": new_session}
 
 
-@app.get("/sessions/by-name/{session_name}")
-async def get_session_by_name_endpoint(session_name: str):
-    """Get session by session_name"""
-    session = get_session_by_name(session_name)
-    if session is None:
+@app.post("/sessions/{session_id}/bind")
+async def bind_session_endpoint(session_id: str, binding: SessionBind):
+    """Bind executor information to a session after framework starts.
+
+    Called by executor after it gets the framework's session ID.
+    Updates session status to 'running'.
+    See ADR-010 for details.
+    """
+    result = bind_session_executor(
+        session_id=session_id,
+        executor_session_id=binding.executor_session_id,
+        hostname=binding.hostname,
+        executor_type=binding.executor_type,
+        project_dir=binding.project_dir,
+    )
+
+    if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session": session}
+
+    if DEBUG:
+        print(f"[DEBUG] Session {session_id} bound to executor {binding.executor_session_id}", flush=True)
+
+    # Broadcast to WebSocket clients
+    message = json.dumps({"type": "session_updated", "session": result})
+    for ws in connections.copy():
+        try:
+            await ws.send_text(message)
+        except:
+            connections.discard(ws)
+
+    return {"ok": True, "session": result}
 
 
 @app.get("/sessions/{session_id}")
@@ -316,6 +344,20 @@ async def get_session_result_endpoint(session_id: str):
     return {"result": result}
 
 
+@app.get("/sessions/{session_id}/affinity")
+async def get_session_affinity_endpoint(session_id: str):
+    """Get session affinity information for resume routing.
+
+    Returns hostname, project_dir, executor_type, executor_session_id
+    needed to route resume requests to the correct runner.
+    """
+    affinity = get_session_affinity(session_id)
+    if affinity is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {"affinity": affinity}
+
+
 async def _stop_run(run: Run) -> dict:
     """Shared logic for stopping a run.
 
@@ -323,7 +365,7 @@ async def _stop_run(run: Run) -> dict:
         run: The run to stop (must be in stoppable state: PENDING, CLAIMED, or RUNNING)
 
     Returns:
-        Response dict with ok, run_id, session_name, status, session_id (if found)
+        Response dict with ok, run_id, session_id, status
 
     Raises:
         HTTPException if run cannot be stopped
@@ -331,7 +373,7 @@ async def _stop_run(run: Run) -> dict:
     result = {
         "ok": True,
         "run_id": run.run_id,
-        "session_name": run.session_name,
+        "session_id": run.session_id,
     }
 
     # Handle PENDING runs - not yet claimed by any runner
@@ -342,13 +384,12 @@ async def _stop_run(run: Run) -> dict:
         result["message"] = "Run cancelled before execution"
 
         if DEBUG:
-            print(f"[DEBUG] Pending run {run.run_id} cancelled (session={run.session_name})", flush=True)
+            print(f"[DEBUG] Pending run {run.run_id} cancelled (session={run.session_id})", flush=True)
 
         # Update session status if exists
-        session = get_session_by_name(run.session_name)
+        session = get_session_by_id(run.session_id)
         if session:
-            result["session_id"] = session["session_id"]
-            await update_session_status_and_broadcast(session["session_id"], "stopped")
+            await update_session_status_and_broadcast(run.session_id, "stopped")
 
         return result
 
@@ -371,13 +412,12 @@ async def _stop_run(run: Run) -> dict:
     result["status"] = "stopping"
 
     if DEBUG:
-        print(f"[DEBUG] Stop requested for run {run.run_id} (session={run.session_name}, runner={run.runner_id})", flush=True)
+        print(f"[DEBUG] Stop requested for run {run.run_id} (session={run.session_id}, runner={run.runner_id})", flush=True)
 
     # Update session status to 'stopping' and broadcast to WebSocket clients
-    session = get_session_by_name(run.session_name)
+    session = get_session_by_id(run.session_id)
     if session:
-        result["session_id"] = session["session_id"]
-        await update_session_status_and_broadcast(session["session_id"], "stopping")
+        await update_session_status_and_broadcast(run.session_id, "stopping")
 
     return result
 
@@ -400,14 +440,12 @@ async def stop_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
     session_status = session["status"]
-    session_name = session["session_name"]
 
     # Handle already-stopped states
     if session_status == "stopping":
         return {
             "ok": True,
             "session_id": session_id,
-            "session_name": session_name,
             "status": "stopping",
             "message": "Session is already being stopped"
         }
@@ -416,13 +454,12 @@ async def stop_session(session_id: str):
         return {
             "ok": True,
             "session_id": session_id,
-            "session_name": session_name,
             "status": session_status,
             "message": f"Session already {session_status}"
         }
 
-    # Find the run for this session (check by session_name)
-    run = run_queue.get_run_by_session_name(session_name)
+    # Find the run for this session (check by session_id)
+    run = run_queue.get_run_by_session_id(session_id)
 
     if not run:
         # No active run - session might have finished or never started properly
@@ -432,7 +469,6 @@ async def stop_session(session_id: str):
         return {
             "ok": True,
             "session_id": session_id,
-            "session_name": session_name,
             "status": "stopped",
             "message": "No active run found - session marked as stopped"
         }
@@ -445,15 +481,12 @@ async def stop_session(session_id: str):
         return {
             "ok": True,
             "session_id": session_id,
-            "session_name": session_name,
             "run_id": run.run_id,
             "status": "stopped",
             "message": f"Run already in {run.status} state - session marked as stopped"
         }
 
-    result = await _stop_run(run)
-    result["session_id"] = session_id
-    return result
+    return await _stop_run(run)
 
 
 @app.get("/sessions/{session_id}/events")
@@ -496,36 +529,34 @@ async def add_session_event(session_id: str, event: Event):
         # TODO: REMOVE - Move success callback to POST /runner/runs/{run_id}/completed
         # This callback logic should be unified with failure/stopped callbacks in the Runner API.
         # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
-        session_name = updated_session.get("session_name")
-        parent_session_name = updated_session.get("parent_session_name")
+        parent_session_id = updated_session.get("parent_session_id")
 
-        if parent_session_name:
+        if parent_session_id:
             # This is a child session completing - notify parent
-            parent_session = get_session_by_name(parent_session_name)
+            parent_session = get_session_by_id(parent_session_id)
             parent_status = parent_session["status"] if parent_session else "not_found"
 
             # Get the child's result
             child_result = get_session_result(session_id)
 
             if DEBUG:
-                print(f"[DEBUG] Child '{session_name}' completed, parent '{parent_session_name}' status={parent_status}", flush=True)
+                print(f"[DEBUG] Child '{session_id}' completed, parent '{parent_session_id}' status={parent_status}", flush=True)
 
             callback_processor.on_child_completed(
-                child_session_name=session_name,
-                parent_session_name=parent_session_name,
+                child_session_id=session_id,
+                parent_session_id=parent_session_id,
                 parent_status=parent_status,
                 child_result=child_result,
             )
-        # END TODO: REMOVE
 
         # Check if this session has pending child callbacks to flush
         project_dir = updated_session.get("project_dir")
-        flushed = callback_processor.on_session_stopped(session_name, project_dir)
+        flushed = callback_processor.on_session_stopped(session_id, project_dir)
         if flushed > 0 and DEBUG:
-            print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_name}'", flush=True)
+            print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
 
     # Broadcast event to WebSocket clients
-    message = json.dumps({"type": "event", "data": event.dict()})
+    message = json.dumps({"type": "event", "data": event.model_dump()})
     for ws in connections.copy():
         try:
             await ws.send_text(message)
@@ -542,26 +573,28 @@ async def list_events(session_id: str):
 
 @app.patch("/sessions/{session_id}/metadata")
 async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
-    """Update session metadata (name, project_dir, agent_name)"""
+    """Update session metadata (project_dir, agent_name, executor fields)"""
 
     # Verify session exists
-    sessions = get_sessions()
-    if not any(s['session_id'] == session_id for s in sessions):
+    session = get_session_by_id(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Update metadata
     update_session_metadata(
         session_id=session_id,
-        session_name=metadata.session_name,
         project_dir=metadata.project_dir,
         agent_name=metadata.agent_name,
-        last_resumed_at=metadata.last_resumed_at
+        last_resumed_at=metadata.last_resumed_at,
+        executor_session_id=metadata.executor_session_id,
+        executor_type=metadata.executor_type,
+        hostname=metadata.hostname,
     )
 
-    # Broadcast update to WebSocket clients
-    updated_sessions = get_sessions()
-    updated_session = next(s for s in updated_sessions if s['session_id'] == session_id)
+    # Get updated session
+    updated_session = get_session_by_id(session_id)
 
+    # Broadcast update to WebSocket clients
     message = json.dumps({
         "type": "session_updated",
         "session": updated_session
@@ -877,7 +910,7 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
     if not runner_registry.get_runner(request.runner_id):
         raise HTTPException(status_code=401, detail="Runner not registered")
 
-    # Get run first to access parent_session_name
+    # Get run first to access parent_session_id
     run = run_queue.get_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -885,14 +918,14 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
     # Update run status to running
     run = run_queue.update_run_status(run_id, RunStatus.RUNNING)
 
-    # Link run's parent_session_name to session (for resume case where session already exists)
-    if run.parent_session_name:
-        session = get_session_by_name(run.session_name)
+    # Link run's parent_session_id to session (for resume case where session already exists)
+    if run.parent_session_id:
+        session = get_session_by_id(run.session_id)
         if session:
             # Session exists (resume case) - update parent
-            update_session_parent(session["session_id"], run.parent_session_name)
+            update_session_parent(run.session_id, run.parent_session_id)
             if DEBUG:
-                print(f"[DEBUG] Updated session {run.session_name} parent to {run.parent_session_name}", flush=True)
+                print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
         # If session doesn't exist yet (start case), POST /sessions will pick up parent from run
 
     if DEBUG:
@@ -915,29 +948,28 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
     if DEBUG:
         print(f"[DEBUG] Run {run_id} completed by runner {request.runner_id}", flush=True)
 
-    # TODO: ADD - Move success callback here from POST /sessions/{session_id}/events
+   # TODO: ADD - Move success callback here from POST /sessions/{session_id}/events
     # This will unify callback triggers with failure/stopped callbacks.
     # Implementation pattern (same as report_run_failed and report_run_stopped):
-    #
-    # if run.parent_session_name:
-    #     parent_session = get_session_by_name(run.parent_session_name)
+    # TODO: check for correctnes because this was written as pseudo code
+    # if run.parent_session_id:
+    #     parent_session = get_session_by_id(run.parent_session_id)
     #     parent_status = parent_session["status"] if parent_session else "not_found"
-    #     child_session = get_session_by_name(run.session_name)
+    #     child_session = get_session_by_id(run.session_id)
     #     child_result = get_session_result(child_session["session_id"]) if child_session else None
     #
     #     if DEBUG:
     #         print(f"[DEBUG] Run completed for child '{run.session_name}', notifying parent '{run.parent_session_name}'", flush=True)
     #
     #     callback_processor.on_child_completed(
-    #         child_session_name=run.session_name,
-    #         parent_session_name=run.parent_session_name,
+    #         child_session_id=run.session_id,
+    #         parent_session_id=run.parent_session_id,
     #         parent_status=parent_status,
     #         child_result=child_result,
     #     )
     #
     # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
     # END TODO: ADD
-
     return {"ok": True}
 
 
@@ -956,16 +988,16 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
         print(f"[DEBUG] Run {run_id} failed: {request.error}", flush=True)
 
     # Notify parent if this was a callback run
-    if run.parent_session_name:
-        parent_session = get_session_by_name(run.parent_session_name)
+    if run.parent_session_id:
+        parent_session = get_session_by_id(run.parent_session_id)
         parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run failed for child '{run.session_name}', notifying parent '{run.parent_session_name}'", flush=True)
+            print(f"[DEBUG] Run failed for child '{run.session_id}', notifying parent '{run.parent_session_id}'", flush=True)
 
         callback_processor.on_child_completed(
-            child_session_name=run.session_name,
-            parent_session_name=run.parent_session_name,
+            child_session_id=run.session_id,
+            parent_session_id=run.parent_session_id,
             parent_status=parent_status,
             child_result=None,
             child_failed=True,
@@ -994,16 +1026,16 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
         print(f"[DEBUG] Run {run_id} stopped by runner {request.runner_id} (signal={request.signal})", flush=True)
 
     # Notify parent if this was a callback run (treat as failure)
-    if run.parent_session_name:
-        parent_session = get_session_by_name(run.parent_session_name)
+    if run.parent_session_id:
+        parent_session = get_session_by_id(run.parent_session_id)
         parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run stopped for child '{run.session_name}', notifying parent '{run.parent_session_name}'", flush=True)
+            print(f"[DEBUG] Run stopped for child '{run.session_id}', notifying parent '{run.parent_session_id}'", flush=True)
 
         callback_processor.on_child_completed(
-            child_session_name=run.session_name,
-            parent_session_name=run.parent_session_name,
+            child_session_id=run.session_id,
+            parent_session_id=run.parent_session_id,
             parent_status=parent_status,
             child_result=None,
             child_failed=True,
@@ -1011,9 +1043,9 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
         )
 
     # Update session status to 'stopped' and broadcast to WebSocket clients
-    session = get_session_by_name(run.session_name)
+    session = get_session_by_id(run.session_id)
     if session:
-        await update_session_status_and_broadcast(session["session_id"], "stopped")
+        await update_session_status_and_broadcast(run.session_id, "stopped")
 
     return {"ok": True}
 
@@ -1111,21 +1143,37 @@ async def deregister_runner(
 async def create_run(run_create: RunCreate):
     """Create a new run for the runner to execute.
 
-    Used by Dashboard and future ao-start to queue work.
+    If session_id is not provided, coordinator generates one (ADR-010).
+    Returns both run_id and session_id in the response.
 
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
     """
-    # For start runs, reject if session name already exists
-    if run_create.type == RunType.START_SESSION:
-        existing = get_session_by_name(run_create.session_name)
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Session '{run_create.session_name}' already exists. Please use a different session name."
-            )
-
+    # Create the run (session_id generated if not provided)
     run = run_queue.add_run(run_create)
+
+    # For start runs, create session record immediately with status=pending (ADR-010)
+    if run_create.type == RunType.START_SESSION:
+        timestamp = datetime.now(timezone.utc).isoformat()
+        try:
+            create_session(
+                session_id=run.session_id,
+                timestamp=timestamp,
+                status="pending",
+                project_dir=run_create.project_dir,
+                agent_name=run_create.agent_name,
+                parent_session_id=run_create.parent_session_id,
+            )
+            if DEBUG:
+                print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id}", flush=True)
+        except Exception as e:
+            if "UNIQUE constraint failed" in str(e):
+                # Session already exists - this shouldn't happen for start runs
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Session '{run.session_id}' already exists"
+                )
+            raise
 
     # Merge demands from blueprint and additional_demands (ADR-011)
     merged_demands = None
@@ -1156,9 +1204,9 @@ async def create_run(run_create: RunCreate):
             print(f"[DEBUG] Run {run.run_id} has demands: {merged_demands.model_dump(exclude_none=True)}", flush=True)
 
     if DEBUG:
-        print(f"[DEBUG] Created run {run.run_id}: type={run.type}, session={run.session_name}", flush=True)
+        print(f"[DEBUG] Created run {run.run_id}: type={run.type}, session={run.session_id}", flush=True)
 
-    return {"run_id": run.run_id, "status": run.status}
+    return {"run_id": run.run_id, "session_id": run.session_id, "status": run.status}
 
 
 @app.get("/runs/{run_id}")

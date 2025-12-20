@@ -104,7 +104,7 @@ class RunSupervisor:
             pass
 
         if return_code == 0:
-            logger.info(f"Agent run {run_id} completed successfully (session={running_run.session_name})")
+            logger.info(f"Agent run {run_id} completed successfully (session={running_run.session_id})")
             try:
                 self.api_client.report_completed(self.runner_id, run_id)
             except Exception as e:

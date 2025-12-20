@@ -1,3 +1,10 @@
+/**
+ * Chat Context for Agent Orchestrator Dashboard
+ *
+ * Note: Uses session_id (coordinator-generated) per ADR-010.
+ * Sessions are now identified only by session_id, not by name.
+ */
+
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { useWebSocket } from './WebSocketContext';
 import { sessionService } from '@/services';
@@ -26,7 +33,6 @@ type ChatMode = 'new' | 'linked';
 
 interface ChatState {
   messages: ChatMessage[];
-  sessionName: string | null;
   sessionId: string | null;
   linkedSessionId: string | null;  // When linked to an existing session
   mode: ChatMode;
@@ -40,14 +46,12 @@ interface ChatState {
 interface ChatContextValue {
   state: ChatState;
   setMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
-  setSessionName: (name: string | null) => void;
   setSessionId: (id: string | null) => void;
   setSelectedBlueprint: (blueprint: string) => void;
   setAgentStatus: (status: string) => void;
   setIsLoading: (loading: boolean) => void;
   setPendingMessageId: (id: string | null) => void;
   // Refs for WebSocket callback (avoids stale closures)
-  sessionNameRef: React.MutableRefObject<string | null>;
   sessionIdRef: React.MutableRefObject<string | null>;
   pendingMessageIdRef: React.MutableRefObject<string | null>;
   linkedSessionIdRef: React.MutableRefObject<string | null>;
@@ -60,7 +64,6 @@ interface ChatContextValue {
 
 const initialState: ChatState = {
   messages: [],
-  sessionName: null,
   sessionId: null,
   linkedSessionId: null,
   mode: 'new',
@@ -166,7 +169,6 @@ function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialState.messages);
-  const [sessionName, setSessionNameState] = useState<string | null>(initialState.sessionName);
   const [sessionId, setSessionIdState] = useState<string | null>(initialState.sessionId);
   const [linkedSessionId, setLinkedSessionIdState] = useState<string | null>(initialState.linkedSessionId);
   const [mode, setMode] = useState<ChatMode>(initialState.mode);
@@ -177,7 +179,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [currentToolCalls, setCurrentToolCalls] = useState<ToolCall[]>(initialState.currentToolCalls);
 
   // Refs for WebSocket callbacks - these must be updated synchronously to avoid race conditions
-  const sessionNameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pendingMessageIdRef = useRef<string | null>(null);
   const linkedSessionIdRef = useRef<string | null>(null);
@@ -185,11 +186,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const isLoadingRef = useRef<boolean>(initialState.isLoading);
 
   // Wrappers to keep refs in sync with state (synchronous updates for WebSocket handlers)
-  const setSessionName = (name: string | null) => {
-    setSessionNameState(name);
-    sessionNameRef.current = name;
-  };
-
   const setSessionId = (id: string | null) => {
     setSessionIdState(id);
     sessionIdRef.current = id;
@@ -217,7 +213,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const resetChat = () => {
     setMessages([]);
-    setSessionName(null);
     setSessionId(null);
     setLinkedSessionId(null);
     setMode('new');
@@ -245,10 +240,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages(convertedMessages);
     setSessionId(session.session_id);
     setLinkedSessionId(session.session_id);
-    setSessionName(session.session_name || null);
     setMode('linked');
     // Map session status to agent status
     const statusMap: Record<string, string> = {
+      pending: 'pending',
       running: 'running',
       stopping: 'stopping',
       stopped: 'finished',
@@ -294,7 +289,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     // Get current values from refs (avoids stale closures)
-    const currentSessionName = sessionNameRef.current;
     const currentSessionId = sessionIdRef.current;
     const currentLinkedSessionId = linkedSessionIdRef.current;
     const currentPendingMessageId = pendingMessageIdRef.current;
@@ -304,23 +298,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // -------------------------------------------------------------------------
     // HELPER: Check if this event/session belongs to our chat
     // -------------------------------------------------------------------------
-    const isOurSessionById = (id: string) =>
+    const isOurSession = (id: string) =>
       (currentSessionId && id === currentSessionId) ||
       (currentLinkedSessionId && id === currentLinkedSessionId);
-
-    const isOurSessionByName = (name: string) =>
-      currentSessionName && name === currentSessionName;
 
     // -------------------------------------------------------------------------
     // HANDLER: Session state changes (session_created / session_updated)
     // -------------------------------------------------------------------------
     if ((message.type === 'session_created' || message.type === 'session_updated') && message.session) {
       const session = message.session;
-      const isOurSession =
-        isOurSessionById(session.session_id) ||
-        isOurSessionByName(session.session_name || '');
-
-      if (!isOurSession) return;
+      if (!isOurSession(session.session_id)) return;
 
       // Capture session_id and transition to linked mode
       setSessionId(session.session_id);
@@ -329,7 +316,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // Handle session status changes
       const backendStatus = session.status;
 
-      if (backendStatus === 'running') {
+      if (backendStatus === 'pending') {
+        setAgentStatus('pending');
+      } else if (backendStatus === 'running') {
         setAgentStatus('running');
       } else if (backendStatus === 'stopping') {
         handleSessionStopping();
@@ -346,13 +335,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const event = message.data;
 
       // Check if this event is for our session
-      const isOurSession =
-        isOurSessionById(event.session_id) ||
-        isOurSessionByName(event.session_name || '');
+      if (!isOurSession(event.session_id)) return;
 
-      if (!isOurSession) return;
-
-      // Capture session_id if we matched by name
+      // Capture session_id if we matched by linked session
       if (!currentSessionId && event.session_id) {
         setSessionId(event.session_id);
       }
@@ -585,7 +570,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const state: ChatState = {
     messages,
-    sessionName,
     sessionId,
     linkedSessionId,
     mode,
@@ -601,13 +585,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         setMessages,
-        setSessionName,
         setSessionId,
         setSelectedBlueprint,
         setAgentStatus,
         setIsLoading,
         setPendingMessageId,
-        sessionNameRef,
         sessionIdRef,
         pendingMessageIdRef,
         linkedSessionIdRef,

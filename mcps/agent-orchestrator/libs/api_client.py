@@ -3,6 +3,8 @@ HTTP client for Agent Coordinator API.
 
 This module provides an async HTTP client using httpx to communicate
 with the Agent Coordinator API for agent run management and session operations.
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import asyncio
@@ -79,43 +81,44 @@ class APIClient:
     async def create_run(
         self,
         run_type: str,
-        session_name: str,
         prompt: str,
+        session_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
-        parent_session_name: Optional[str] = None,
+        parent_session_id: Optional[str] = None,
         additional_demands: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Create an agent run. Returns run_id.
+    ) -> Dict[str, str]:
+        """Create an agent run. Returns dict with run_id and session_id.
 
         Args:
             run_type: "start_session" or "resume_session"
-            session_name: Name for the session
             prompt: The prompt to send
+            session_id: Session ID (coordinator generates if not provided for start)
             agent_name: Blueprint name (for start_session)
             project_dir: Project directory
-            parent_session_name: Parent session for orchestration
+            parent_session_id: Parent session for orchestration (ADR-010)
             additional_demands: Additional demands to merge with blueprint (ADR-011)
 
         Returns:
-            run_id
+            Dict with run_id and session_id
         """
         data: Dict[str, Any] = {
             "type": run_type,
-            "session_name": session_name,
             "prompt": prompt,
         }
+        if session_id:
+            data["session_id"] = session_id
         if agent_name:
             data["agent_name"] = agent_name
         if project_dir:
             data["project_dir"] = project_dir
-        if parent_session_name:
-            data["parent_session_name"] = parent_session_name
+        if parent_session_id:
+            data["parent_session_id"] = parent_session_id
         if additional_demands:
             data["additional_demands"] = additional_demands
 
         result = await self._request("POST", "/runs", data)
-        return result["run_id"]
+        return {"run_id": result["run_id"], "session_id": result["session_id"]}
 
     async def get_run(self, run_id: str) -> Dict[str, Any]:
         """Get agent run status."""
@@ -151,10 +154,10 @@ class APIClient:
     # Sessions API
     # -------------------------------------------------------------------------
 
-    async def get_session_by_name(self, session_name: str) -> Optional[Dict[str, Any]]:
-        """Get session by name. Returns None if not found."""
+    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get session by ID. Returns None if not found."""
         try:
-            result = await self._request("GET", f"/sessions/by-name/{session_name}")
+            result = await self._request("GET", f"/sessions/{session_id}")
             return result.get("session")
         except APIError as e:
             if e.status_code == 404:

@@ -5,6 +5,8 @@ Handles parsing and validation of JSON payloads for the unified ao-*-exec entryp
 Replaces individual CLI arguments with a structured, versioned schema.
 
 Schema version: 1.0
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 from dataclasses import dataclass, field
@@ -27,7 +29,7 @@ INVOCATION_SCHEMA = {
     "title": "ExecutorInvocation",
     "description": "Payload schema for ao-*-exec unified executor",
     "type": "object",
-    "required": ["schema_version", "mode", "session_name", "prompt"],
+    "required": ["schema_version", "mode", "session_id", "prompt"],
     "properties": {
         "schema_version": {
             "type": "string",
@@ -39,10 +41,10 @@ INVOCATION_SCHEMA = {
             "enum": ["start", "resume"],
             "description": "Execution mode",
         },
-        "session_name": {
+        "session_id": {
             "type": "string",
             "minLength": 1,
-            "description": "Unique session identifier",
+            "description": "Coordinator-generated session identifier (ADR-010)",
         },
         "prompt": {
             "type": "string",
@@ -73,7 +75,7 @@ class ExecutorInvocation:
     Attributes:
         schema_version: Schema version for forward compatibility
         mode: Execution mode ('start' or 'resume')
-        session_name: Unique session identifier
+        session_id: Coordinator-generated session identifier (ADR-010)
         prompt: User input text
         agent_name: Agent blueprint name (start mode only)
         project_dir: Working directory path (start mode only)
@@ -82,7 +84,7 @@ class ExecutorInvocation:
 
     schema_version: str
     mode: Literal["start", "resume"]
-    session_name: str
+    session_id: str
     prompt: str
     agent_name: Optional[str] = None
     project_dir: Optional[str] = None
@@ -128,7 +130,7 @@ class ExecutorInvocation:
             raise ValueError(f"Invalid JSON: {e}")
 
         # Validate required fields
-        required_fields = ("schema_version", "mode", "session_name", "prompt")
+        required_fields = ("schema_version", "mode", "session_id", "prompt")
         for f in required_fields:
             if f not in data:
                 raise ValueError(f"Missing required field: {f}")
@@ -157,7 +159,7 @@ class ExecutorInvocation:
         known_fields = {
             "schema_version",
             "mode",
-            "session_name",
+            "session_id",
             "prompt",
             "agent_name",
             "project_dir",
@@ -170,7 +172,7 @@ class ExecutorInvocation:
         return cls(
             schema_version=data["schema_version"],
             mode=data["mode"],
-            session_name=data["session_name"],
+            session_id=data["session_id"],
             prompt=data["prompt"],
             agent_name=data.get("agent_name"),
             project_dir=data.get("project_dir"),
@@ -182,7 +184,7 @@ class ExecutorInvocation:
         d = {
             "schema_version": self.schema_version,
             "mode": self.mode,
-            "session_name": self.session_name,
+            "session_id": self.session_id,
             "prompt": self.prompt,
         }
         if self.agent_name:
@@ -201,10 +203,10 @@ class ExecutorInvocation:
         """
         Log invocation summary without sensitive data.
 
-        Logs schema version, mode, session name, and prompt length
+        Logs schema version, mode, session ID, and prompt length
         (not the actual prompt content for security).
         """
         logger.info(
             f"Invocation: version={self.schema_version} mode={self.mode} "
-            f"session={self.session_name} prompt_len={len(self.prompt)}"
+            f"session={self.session_id} prompt_len={len(self.prompt)}"
         )

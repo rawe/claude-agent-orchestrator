@@ -1,5 +1,7 @@
 """
 Constants for Agent Orchestrator MCP Server
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import os
@@ -14,18 +16,14 @@ def get_api_url() -> str:
     return os.environ.get(ENV_API_URL, DEFAULT_API_URL)
 
 
-# Session name constraints
-MAX_SESSION_NAME_LENGTH = 60
-SESSION_NAME_PATTERN = r"^[a-zA-Z0-9_-]+$"
-
 # Character limit for responses
 CHARACTER_LIMIT = 25000
 
-# HTTP Header for parent session (in HTTP mode)
-HEADER_AGENT_SESSION_NAME = "X-Agent-Session-Name"
+# HTTP Header for parent session ID (in HTTP mode) - ADR-010
+HEADER_AGENT_SESSION_ID = "X-Agent-Session-Id"
 
-# Environment variable for parent session (in stdio mode)
-ENV_AGENT_SESSION_NAME = "AGENT_SESSION_NAME"
+# Environment variable for parent session ID (in stdio mode) - ADR-010
+ENV_AGENT_SESSION_ID = "AGENT_SESSION_ID"
 
 # HTTP Header for tag filtering (in HTTP mode)
 HEADER_AGENT_TAGS = "X-Agent-Tags"

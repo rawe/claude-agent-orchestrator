@@ -3,6 +3,7 @@ Thread-safe in-memory run queue for Agent Runner.
 
 Runs are created via POST /runs and claimed by the Runner via GET /runner/runs.
 Supports demand-based matching per ADR-011.
+Session ID is coordinator-generated at run creation per ADR-010.
 """
 
 import threading
@@ -33,13 +34,16 @@ class RunStatus(str, Enum):
 
 
 class RunCreate(BaseModel):
-    """Request body for creating a new run."""
+    """Request body for creating a new run.
+
+    session_id is optional - coordinator generates it if not provided (ADR-010).
+    """
     type: RunType
-    session_name: str
+    session_id: Optional[str] = None  # Coordinator generates if not provided
     agent_name: Optional[str] = None
     prompt: str
     project_dir: Optional[str] = None
-    parent_session_name: Optional[str] = None
+    parent_session_id: Optional[str] = None
     # Additional demands to merge with blueprint demands (additive only)
     additional_demands: Optional[dict] = None
 
@@ -48,11 +52,11 @@ class Run(BaseModel):
     """Full run representation."""
     run_id: str
     type: RunType
-    session_name: str
+    session_id: str  # Coordinator-generated (ADR-010)
     agent_name: Optional[str] = None
     prompt: str
     project_dir: Optional[str] = None
-    parent_session_name: Optional[str] = None
+    parent_session_id: Optional[str] = None
     # Merged demands (blueprint + additional) - stored as dict for serialization
     demands: Optional[dict] = None
     status: RunStatus = RunStatus.PENDING
@@ -64,6 +68,15 @@ class Run(BaseModel):
     completed_at: Optional[str] = None
     # Timeout for no-match scenarios (ISO timestamp)
     timeout_at: Optional[str] = None
+
+
+def generate_session_id() -> str:
+    """Generate a coordinator session_id per ADR-010.
+
+    Format: ses_{12-char-hex}
+    Example: ses_abc123def456
+    """
+    return f"ses_{uuid.uuid4().hex[:12]}"
 
 
 # Default timeout for runs waiting for a matching runner (5 minutes)
@@ -131,18 +144,24 @@ class RunQueue:
         self._lock = threading.Lock()
 
     def add_run(self, run_create: RunCreate) -> Run:
-        """Create a new run with pending status."""
+        """Create a new run with pending status.
+
+        If session_id is not provided, generates one per ADR-010.
+        """
         run_id = f"run_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat()
+
+        # Generate session_id if not provided (ADR-010)
+        session_id = run_create.session_id or generate_session_id()
 
         run = Run(
             run_id=run_id,
             type=run_create.type,
-            session_name=run_create.session_name,
+            session_id=session_id,
             agent_name=run_create.agent_name,
             prompt=run_create.prompt,
             project_dir=run_create.project_dir,
-            parent_session_name=run_create.parent_session_name,
+            parent_session_id=run_create.parent_session_id,
             status=RunStatus.PENDING,
             created_at=now,
         )
@@ -223,16 +242,16 @@ class RunQueue:
         with self._lock:
             return list(self._runs.values())
 
-    def get_run_by_session_name(self, session_name: str) -> Optional[Run]:
-        """Find an active run by session_name.
+    def get_run_by_session_id(self, session_id: str) -> Optional[Run]:
+        """Find an active run by session_id.
 
-        Used to link run's parent_session_name to newly created sessions,
+        Used to link run's parent_session_id to newly created sessions,
         and to find runs for stop commands.
         """
         with self._lock:
             for run in self._runs.values():
-                if run.session_name == session_name and run.status in (
-                    RunStatus.CLAIMED, RunStatus.RUNNING, RunStatus.STOPPING
+                if run.session_id == session_id and run.status in (
+                    RunStatus.PENDING, RunStatus.CLAIMED, RunStatus.RUNNING, RunStatus.STOPPING
                 ):
                     return run
         return None

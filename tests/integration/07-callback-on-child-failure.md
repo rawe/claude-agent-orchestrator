@@ -22,12 +22,18 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "session_name": "test-parent-fail-cb",
     "agent_name": "agent-orchestrator",
-    "prompt": "Start a child agent session with session_name=\"test-child-fail\" using the agent_blueprint_name=\"super-fancy-unicorn-agent\" in callback mode. The prompt should be: just say hello. Wait for the callback result.",
+    "prompt": "Start a child agent using the agent_blueprint_name=\"super-fancy-unicorn-agent\" in callback mode. The prompt should be: just say hello. Wait for the callback result.",
     "project_dir": "."
   }'
 ```
+
+Expected response:
+```json
+{"run_id":"run_...","session_id":"ses_...","status":"pending"}
+```
+
+Note the parent `session_id`.
 
 Note: `super-fancy-unicorn-agent` does not exist and will cause the child to fail.
 
@@ -35,7 +41,7 @@ Note: `super-fancy-unicorn-agent` does not exist and will cause the child to fai
 
 The parent will:
 1. Call MCP tool `start_agent_session` with non-existent blueprint
-2. Child run is created
+2. Child run is created (with a new `session_id`)
 3. Executor fails (agent blueprint not found)
 4. Parent receives failure callback
 
@@ -48,7 +54,7 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "resume_session",
-    "session_name": "test-parent-fail-cb",
+    "session_id": "<parent_session_id>",
     "prompt": "What happened with the child agent you tried to start? What was the error?",
     "project_dir": "."
   }'
@@ -61,12 +67,13 @@ curl -X POST http://localhost:8765/runs \
 3. `report_run_failed` called by runner
 4. Callback triggered to parent with failure message
 5. Parent receives resume with prompt containing:
-   - `"test-child-fail" has failed`
+   - Child session ID and "has failed"
    - Error details
 
 ## Verification Checklist
 
 - [ ] Child run shows status `failed` in `/runs/{run_id}`
+- [ ] Child session has `parent_session_id` set to parent's `session_id`
 - [ ] Parent session was resumed automatically after child failure
 - [ ] Parent can explain what error occurred
 - [ ] Error message mentions the non-existent agent blueprint

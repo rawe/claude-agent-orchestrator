@@ -28,12 +28,18 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "session_name": "test-orchestrator-002",
     "agent_name": "agent-orchestrator",
-    "prompt": "Start a child agent with session name test-child-002 in callback mode. The child should just say hello and exit.",
+    "prompt": "Start a child agent in callback mode. The child should just say hello and exit.",
     "project_dir": "."
   }'
 ```
+
+Expected response:
+```json
+{"run_id":"run_...","session_id":"ses_...","status":"pending"}
+```
+
+Note the `session_id` - this is the parent session.
 
 Note: The key difference is **"in callback mode"** in the prompt.
 
@@ -44,14 +50,14 @@ Both parent and child sessions should complete. The parent will be resumed after
 ### Step 4: Verify parent-child relationship
 
 ```bash
-curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "test-child-002"
+curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "parent_session_id"
 ```
 
 ## Expected Behavior
 
 1. Parent session starts
 2. Parent calls MCP tool with `callback=true`
-3. Child session created with `parent_session_name` set
+3. Child session created with `parent_session_id` set
 4. Parent session pauses (waiting for callback)
 5. Child executes and completes
 6. Parent session resumes with callback message
@@ -59,7 +65,8 @@ curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "tes
 
 ## Verification Checklist
 
-- [ ] Child session has `parent_session_name: "test-orchestrator-002"`
+- [ ] Child session has `parent_session_id` set to parent's `session_id`
+- [ ] Both session IDs follow format `ses_...`
 - [ ] Parent receives callback message: "The child agent session ... has completed"
 - [ ] Parent session resumes after child completes
 - [ ] Both sessions complete successfully
@@ -68,6 +75,6 @@ curl -s http://localhost:8765/sessions | python -m json.tool | grep -B2 -A8 "tes
 
 | Aspect | Sync Mode | Callback Mode |
 |--------|-----------|---------------|
-| `parent_session_name` | `null` | Set to parent |
+| `parent_session_id` | `null` | Set to parent |
 | Parent waits | Blocks during call | Pauses, resumes on callback |
 | Use case | Quick tasks | Long-running child tasks |

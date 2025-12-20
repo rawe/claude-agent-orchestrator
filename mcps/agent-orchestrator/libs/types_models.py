@@ -1,5 +1,7 @@
 """
 Type definitions for Agent Orchestrator MCP Server
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 from enum import Enum
@@ -24,17 +26,29 @@ class AgentInfo(BaseModel):
 
 
 class SessionInfo(BaseModel):
-    """Information about an agent session"""
+    """Information about an agent session
+
+    Uses session_id (coordinator-generated) per ADR-010.
+    executor_session_id is the framework's ID (e.g., Claude SDK UUID).
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
-    session_id: str = Field(description="Session ID")
-    session_name: str = Field(description="Session name")
+    session_id: str = Field(description="Coordinator-generated session ID (ADR-010)")
     status: str = Field(description="Session status")
     project_dir: Optional[str] = Field(default=None, description="Project directory path")
     agent_name: Optional[str] = Field(default=None, description="Agent blueprint name")
-    parent_session_name: Optional[str] = Field(
-        default=None, description="Parent session name for callbacks"
+    parent_session_id: Optional[str] = Field(
+        default=None, description="Parent session ID for callbacks"
+    )
+    executor_session_id: Optional[str] = Field(
+        default=None, description="Framework's session ID (e.g., Claude SDK UUID)"
+    )
+    executor_type: Optional[str] = Field(
+        default=None, description="Executor type (e.g., 'claude-code')"
+    )
+    hostname: Optional[str] = Field(
+        default=None, description="Machine where session runs"
     )
 
 

@@ -3,6 +3,9 @@ Session Client
 
 HTTP client for Agent Session Manager API.
 Replaces file-based session operations with API calls.
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
+Sessions are created by the coordinator at run creation time.
 """
 
 import httpx
@@ -50,29 +53,6 @@ class SessionClient:
         except httpx.RequestError as e:
             raise SessionClientError(f"Request failed: {e}")
 
-    def create_session(
-        self,
-        session_id: str,
-        session_name: str,
-        project_dir: Optional[str] = None,
-        agent_name: Optional[str] = None,
-        parent_session_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Create new session with full metadata."""
-        data = {
-            "session_id": session_id,
-            "session_name": session_name,
-        }
-        if project_dir is not None:
-            data["project_dir"] = project_dir
-        if agent_name is not None:
-            data["agent_name"] = agent_name
-        if parent_session_name is not None:
-            data["parent_session_name"] = parent_session_name
-
-        result = self._request("POST", "/sessions", json_data=data)
-        return result.get("session", result)
-
     def get_session(self, session_id: str) -> Dict[str, Any]:
         """Get session details. Raises SessionNotFoundError if not found."""
         result = self._request("GET", f"/sessions/{session_id}")
@@ -100,16 +80,53 @@ class SessionClient:
         event_data["session_id"] = session_id
         self._request("POST", f"/sessions/{session_id}/events", json_data=event_data)
 
+    def bind_session_executor(
+        self,
+        session_id: str,
+        executor_session_id: str,
+        hostname: str,
+        executor_type: str = "claude-code",
+    ) -> Dict[str, Any]:
+        """
+        Bind executor to session after Claude SDK starts (ADR-010).
+
+        Called by executor after getting the Claude SDK session ID.
+        Updates session with executor_session_id, hostname, executor_type
+        and sets status to 'running'.
+
+        Args:
+            session_id: Coordinator-generated session ID
+            executor_session_id: Claude SDK's session UUID
+            hostname: Machine hostname where executor runs
+            executor_type: Type of executor (default: "claude-code")
+
+        Returns:
+            Updated session data
+        """
+        data = {
+            "executor_session_id": executor_session_id,
+            "hostname": hostname,
+            "executor_type": executor_type,
+        }
+        result = self._request("POST", f"/sessions/{session_id}/bind", json_data=data)
+        return result.get("session", result)
+
+    def get_affinity(self, session_id: str) -> Dict[str, Any]:
+        """
+        Get session affinity data for resume routing.
+
+        Returns hostname, executor_type, project_dir for routing decisions.
+        """
+        result = self._request("GET", f"/sessions/{session_id}/affinity")
+        return result
+
     def update_session(
         self,
         session_id: str,
-        session_name: Optional[str] = None,
         last_resumed_at: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update session metadata."""
         data = {}
-        if session_name is not None:
-            data["session_name"] = session_name
         if last_resumed_at is not None:
             data["last_resumed_at"] = last_resumed_at
 
@@ -123,14 +140,6 @@ class SessionClient:
             return True
         except SessionNotFoundError:
             return False
-
-    def get_session_by_name(self, session_name: str) -> Optional[Dict[str, Any]]:
-        """Find session by name. Returns None if not found."""
-        sessions = self.list_sessions()
-        for s in sessions:
-            if s.get('session_name') == session_name:
-                return s
-        return None
 
 
 def get_client(base_url: str) -> SessionClient:

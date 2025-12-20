@@ -33,7 +33,7 @@ export function SessionHeader({ session }: SessionHeaderProps) {
     return () => clearInterval(interval);
   }, [session.created_at, session.modified_at, session.status]);
 
-  const displayName = session.session_name || 'Unnamed Session';
+  const displayName = session.session_id.slice(0, 16);
 
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-3">

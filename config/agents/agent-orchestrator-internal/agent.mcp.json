@@ -4,7 +4,7 @@
       "type": "http",
       "url": "http://localhost:9500/mcp",
       "headers": {
-        "X-Agent-Session-Name": "${AGENT_SESSION_NAME}",
+        "X-Agent-Session-Id": "${AGENT_SESSION_ID}",
         "X-Agent-Tags": "internal,research"
       }
     }

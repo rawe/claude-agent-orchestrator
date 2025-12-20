@@ -10,15 +10,23 @@ See `tests/README.md` for full documentation.
 
 ## Your Task
 
-1. **Stop background processes**:
-   - Stop Agent Coordinator (the uv run python -m main process)
-   - Stop Agent Runner (the agent-runner process)
-   - Stop WebSocket Monitor (the ws-monitor process)
+1. **Stop background processes** (check your tracked tasks first):
+   - Use `/tasks` to list active background shells you started during testing
+   - Use `KillShell` tool to stop each active background task by ID
+   - This should include:
+     - Agent Coordinator (`uv run python -m main`)
+     - Agent Runner (`agent-runner`)
+     - WebSocket Monitor (`ws-monitor`)
+     - MCP Server (`agent-orchestrator-mcp`) if started for testing
 
-2. **Reset database**: `./tests/scripts/reset-db`
+2. **Cleanup any remaining processes** (only if background tasks didn't cover them):
+   - Check: `lsof -i :8765` - kill any remaining processes on that port
+   - Check: `pgrep -af "python -m main|agent-runner|ws-monitor|agent-orchestrator-mcp"`
 
-3. **Verify cleanup**:
+3. **Reset database**: `./tests/scripts/reset-db`
+
+4. **Verify cleanup**:
    - Confirm port 8765 is free: `lsof -i :8765` should return nothing
-   - Confirm no orphan processes
+   - Confirm no orphan test processes
 
-4. **Report** which processes were stopped
+5. **Report** which processes/tasks were stopped

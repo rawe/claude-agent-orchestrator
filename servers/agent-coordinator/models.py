@@ -1,41 +1,5 @@
-import re
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, List, Literal, Union
-
-
-# ==============================================================================
-# Validators
-# ==============================================================================
-
-SESSION_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
-SESSION_NAME_MAX_LENGTH = 60
-
-
-def validate_session_name(name: str) -> str:
-    """
-    Validate session name format.
-
-    Rules:
-    - Not empty
-    - Max 60 characters
-    - Only alphanumeric, dash, underscore: ^[a-zA-Z0-9_-]+$
-
-    Returns the validated name or raises ValueError.
-    """
-    if not name:
-        raise ValueError("Session name cannot be empty")
-
-    if len(name) > SESSION_NAME_MAX_LENGTH:
-        raise ValueError(
-            f"Session name too long (max {SESSION_NAME_MAX_LENGTH} characters, got {len(name)})"
-        )
-
-    if not SESSION_NAME_PATTERN.match(name):
-        raise ValueError(
-            "Session name can only contain alphanumeric characters, dashes, and underscores"
-        )
-
-    return name
 
 
 # ==============================================================================
@@ -165,40 +129,57 @@ class RunnerDemands(BaseModel):
 
 
 # ==============================================================================
-# Session Models
+# Session Models (ADR-010)
 # ==============================================================================
+
+class SessionCreate(BaseModel):
+    """Model for creating a new session.
+
+    session_id is coordinator-generated at run creation.
+    No session_name - that concept is removed per ADR-010.
+    """
+    session_id: str
+    project_dir: Optional[str] = None
+    agent_name: Optional[str] = None
+    parent_session_id: Optional[str] = None
+
+
+class SessionBind(BaseModel):
+    """Model for binding executor information to a session.
+
+    Called by executor after framework session starts.
+    See ADR-010 for details.
+    """
+    executor_session_id: str
+    hostname: str
+    executor_type: str
+    project_dir: Optional[str] = None
+
 
 class SessionMetadataUpdate(BaseModel):
     """Model for updating session metadata"""
-    session_name: Optional[str] = None
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
     last_resumed_at: Optional[str] = None
+    executor_session_id: Optional[str] = None
+    executor_type: Optional[str] = None
+    hostname: Optional[str] = None
 
-
-class SessionCreate(BaseModel):
-    """Model for creating a new session"""
-    session_id: str
-    session_name: str
-    project_dir: Optional[str] = None
-    agent_name: Optional[str] = None
-    parent_session_name: Optional[str] = None
-
-    @field_validator("session_name")
-    @classmethod
-    def check_session_name(cls, v: str) -> str:
-        return validate_session_name(v)
 
 class MessageContent(BaseModel):
     """Content block within a message"""
     type: str  # 'text' (only text supported for now)
     text: str
 
+
 class Event(BaseModel):
-    """Event model for hook data"""
+    """Event model for hook data.
+
+    session_id is the coordinator-generated ID.
+    executor_session_id is the framework's ID (optional, for correlation).
+    """
     event_type: str  # 'session_start' | 'pre_tool' | 'post_tool' | 'session_stop' | 'message'
     session_id: str
-    session_name: str
     timestamp: str
     # Tool-related fields (pre_tool and post_tool)
     tool_name: Optional[str] = None
@@ -211,8 +192,3 @@ class Event(BaseModel):
     # Message fields
     role: Optional[str] = None  # 'assistant' | 'user'
     content: Optional[List[dict]] = None  # Array of content blocks
-
-    @field_validator("session_name")
-    @classmethod
-    def check_session_name(cls, v: str) -> str:
-        return validate_session_name(v)

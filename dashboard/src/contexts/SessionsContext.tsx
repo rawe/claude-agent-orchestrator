@@ -72,7 +72,6 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
             return [
               {
                 session_id: event.session_id,
-                session_name: event.session_name,
                 status: 'running',
                 created_at: event.timestamp,
               },

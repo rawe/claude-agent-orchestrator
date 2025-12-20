@@ -54,13 +54,17 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "session_name": "demand-test-success",
     "agent_name": "python-agent",
     "prompt": "Hello"
   }'
 ```
 
-Record the `run_id` from response.
+Record the `run_id` and `session_id` from response.
+
+**Expected response:**
+```json
+{"run_id":"run_...","session_id":"ses_...","status":"pending"}
+```
 
 ### Step 6: Verify Run Claimed and Completed
 
@@ -76,8 +80,8 @@ curl -s http://localhost:8765/runs/<run_id> | python3 -m json.tool
 # Delete test agent
 curl -X DELETE http://localhost:8765/agents/python-agent
 
-# Delete test session
-curl -X DELETE http://localhost:8765/sessions/by-name/demand-test-success
+# Delete test session (use session_id from step 5)
+curl -X DELETE http://localhost:8765/sessions/<session_id>
 ```
 
 ## Verification
@@ -86,3 +90,4 @@ curl -X DELETE http://localhost:8765/sessions/by-name/demand-test-success
 - [ ] Runner registered with tags: ["python"]
 - [ ] Run was claimed by matching runner
 - [ ] Run completed successfully
+- [ ] `session_id` in response follows format `ses_...`

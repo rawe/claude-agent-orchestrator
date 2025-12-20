@@ -113,14 +113,14 @@ class RunPoller:
 
     def _handle_run(self, run: Run) -> None:
         """Handle a received agent run by spawning subprocess."""
-        logger.debug(f"Received agent run {run.run_id}: type={run.type}, session={run.session_name}")
+        logger.debug(f"Received agent run {run.run_id}: type={run.type}, session={run.session_id}")
 
         try:
             # Spawn subprocess
             process = self.executor.execute_run(run)
 
             # Add to registry
-            self.registry.add_run(run.run_id, run.session_name, process)
+            self.registry.add_run(run.run_id, run.session_id, process)
 
             # Report started
             self.api_client.report_started(self.runner_id, run.run_id)
@@ -142,7 +142,7 @@ class RunPoller:
             logger.debug(f"Stop command for agent run {run_id} ignored - run not running")
             return
 
-        logger.info(f"Stopping agent run {run_id} (session={running_run.session_name}, pid={running_run.process.pid})")
+        logger.info(f"Stopping agent run {run_id} (session={running_run.session_id}, pid={running_run.process.pid})")
 
         signal_used = "SIGTERM"
 

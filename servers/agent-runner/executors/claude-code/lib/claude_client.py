@@ -7,6 +7,9 @@ Uses SessionClient for API-based session management.
 NOTE: This module expects the runner lib to already be in sys.path.
       The parent executor (ao-claude-code-exec) is responsible for
       setting up the path before importing this module.
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
+      The Claude SDK's session_id is stored as executor_session_id.
 """
 
 from pathlib import Path
@@ -15,6 +18,7 @@ import asyncio
 import copy
 import os
 import re
+import socket
 from datetime import datetime, UTC
 
 from session_client import SessionClient, SessionClientError
@@ -41,12 +45,12 @@ def _process_mcp_servers(mcp_servers: dict) -> dict:
     """
     Process MCP server config to replace environment variable placeholders.
 
-    Handles ${AGENT_SESSION_NAME} and similar placeholders in header values.
+    Handles ${AGENT_SESSION_ID} and similar placeholders in header values.
     Creates a deep copy to avoid modifying the original config.
 
     Example:
-        Input:  {"headers": {"X-Agent-Session-Name": "${AGENT_SESSION_NAME}"}}
-        Output: {"headers": {"X-Agent-Session-Name": "orchestrator"}}
+        Input:  {"headers": {"X-Agent-Session-Id": "${AGENT_SESSION_ID}"}}
+        Output: {"headers": {"X-Agent-Session-Id": "ses_abc123def456"}}
     """
     result = copy.deepcopy(mcp_servers)
 
@@ -74,19 +78,16 @@ def _process_mcp_servers(mcp_servers: dict) -> dict:
 # =============================================================================
 _session_client: Optional[SessionClient] = None
 _current_session_id: Optional[str] = None
-_current_session_name: Optional[str] = None
 
 
 def _set_hook_context(
     client: SessionClient,
     session_id: str,
-    session_name: Optional[str] = None
 ) -> None:
     """Set the session context for hook functions."""
-    global _session_client, _current_session_id, _current_session_name
+    global _session_client, _current_session_id
     _session_client = client
     _current_session_id = session_id
-    _current_session_name = session_name
 
 
 # =============================================================================
@@ -106,7 +107,6 @@ async def post_tool_hook(
             _session_client.add_event(_current_session_id, {
                 "event_type": "post_tool",
                 "session_id": _current_session_id,
-                "session_name": _current_session_name or _current_session_id,
                 "timestamp": datetime.now(UTC).isoformat(),
                 "tool_name": input_data.get("tool_name", "unknown"),
                 "tool_input": input_data.get("tool_input", {}),
@@ -121,11 +121,12 @@ async def post_tool_hook(
 async def run_claude_session(
     prompt: str,
     project_dir: Path,
-    session_name: Optional[str] = None,
+    session_id: str,
     mcp_servers: Optional[dict] = None,
-    resume_session_id: Optional[str] = None,
+    resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
+    executor_type: str = "claude-code",
 ) -> tuple[str, str]:
     """
     Run Claude session with API-based session management.
@@ -133,21 +134,19 @@ async def run_claude_session(
     This function uses the Claude Agent SDK to create or resume a session,
     with session state managed via the AgentCoordinator API.
 
-    NOTE: parent_session_name is now handled automatically by Agent Coordinator
-    via the Runs API. The runner sets AGENT_SESSION_NAME env var which
-    flows through the run to the session. See mcp-server-api-refactor.md.
-
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
         project_dir: Working directory for Claude (sets cwd)
-        session_name: Session name for the session manager
+        session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
-        resume_session_id: If provided, resume existing session
+        resume_executor_session_id: If provided, resume existing Claude SDK session
         api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
+        executor_type: Executor type for bind call (default: "claude-code")
 
     Returns:
-        Tuple of (session_id, result)
+        Tuple of (executor_session_id, result) where executor_session_id is
+        the Claude SDK's session UUID
 
     Raises:
         ValueError: If session_id or result not found in messages
@@ -156,14 +155,17 @@ async def run_claude_session(
 
     Example:
         >>> project_dir = Path.cwd()
-        >>> session_id, result = await run_claude_session(
+        >>> executor_session_id, result = await run_claude_session(
         ...     prompt="What is 2+2?",
         ...     project_dir=project_dir,
-        ...     session_name="test"
+        ...     session_id="ses_abc123def456"
         ... )
     """
     # Create session client for API calls
     session_client = SessionClient(api_url)
+
+    # Get hostname for bind call
+    hostname = socket.gethostname()
 
     # Import SDK here to give better error message if not installed
     try:
@@ -199,16 +201,16 @@ async def run_claude_session(
             file=sys.stderr
         )
 
-    # Add resume session ID if provided
-    if resume_session_id:
-        options.resume = resume_session_id
+    # Add resume session ID if provided (use executor_session_id for SDK resume)
+    if resume_executor_session_id:
+        options.resume = resume_executor_session_id
 
     # Add MCP servers if provided (with placeholder replacement)
     if mcp_servers:
         options.mcp_servers = _process_mcp_servers(mcp_servers)
 
     # Initialize tracking variables
-    session_id = None
+    executor_session_id = None
     result = None
 
     # Stream session using ClaudeSDKClient
@@ -221,27 +223,36 @@ async def run_claude_session(
             async for message in client.receive_response():
                 # Extract session_id from FIRST SystemMessage (arrives early!)
                 # SystemMessage with subtype='init' contains session_id in data dict
-                if isinstance(message, SystemMessage) and session_id is None:
+                if isinstance(message, SystemMessage) and executor_session_id is None:
                     # Extract session_id from SystemMessage.data
+                    # This is the Claude SDK's session UUID
                     if message.subtype == 'init' and message.data:
                         extracted_session_id = message.data.get('session_id')
                         if extracted_session_id:
-                            session_id = extracted_session_id
+                            executor_session_id = extracted_session_id
 
-                            # Create or update session via API
+                            # Bind session executor (ADR-010)
+                            # This stores the Claude SDK's session_id as executor_session_id
+                            # and sets session status to 'running'
                             try:
-                                if not resume_session_id:
-                                    # New session: create via API
-                                    # NOTE: parent_session_name is set by Agent Coordinator
-                                    # from the Run's parent_session_name field
-                                    session_client.create_session(
-                                        session_id=session_id,
-                                        session_name=session_name or session_id,
-                                        project_dir=str(project_dir),
-                                        agent_name=agent_name,
-                                    )
-                                else:
-                                    # Resume: update last_resumed_at
+                                session_client.bind_session_executor(
+                                    session_id=session_id,
+                                    executor_session_id=executor_session_id,
+                                    hostname=hostname,
+                                    executor_type=executor_type,
+                                    project_dir=str(project_dir),
+                                )
+                            except SessionClientError as e:
+                                # Don't fail the session if bind fails
+                                import sys
+                                print(f"Warning: Session bind failed: {e}", file=sys.stderr)
+
+                            # Set hook context so post_tool_hook can send events
+                            _set_hook_context(session_client, session_id)
+
+                            # For resume, update last_resumed_at
+                            if resume_executor_session_id:
+                                try:
                                     session_client.update_session(
                                         session_id=session_id,
                                         last_resumed_at=datetime.now(UTC).isoformat()
@@ -250,36 +261,29 @@ async def run_claude_session(
                                     session_client.add_event(session_id, {
                                         "event_type": "session_start",
                                         "session_id": session_id,
-                                        "session_name": session_name or session_id,
                                         "timestamp": datetime.now(UTC).isoformat(),
                                     })
+                                except SessionClientError as e:
+                                    import sys
+                                    print(f"Warning: Session update failed: {e}", file=sys.stderr)
 
-                                # Set hook context so post_tool_hook can send events
-                                _set_hook_context(
-                                    session_client,
-                                    session_id,
-                                    session_name
-                                )
-
-                                # Send user message event
+                            # Send user message event
+                            try:
                                 session_client.add_event(session_id, {
                                     "event_type": "message",
                                     "session_id": session_id,
-                                    "session_name": session_name or session_id,
                                     "timestamp": datetime.now(UTC).isoformat(),
                                     "role": "user",
                                     "content": [{"type": "text", "text": prompt}]
                                 })
-                            except SessionClientError as e:
-                                # Don't fail the session if API call fails
-                                import sys
-                                print(f"Warning: Session API error: {e}", file=sys.stderr)
+                            except SessionClientError:
+                                pass  # Silent failure
 
                 # Extract result from ResultMessage
                 if isinstance(message, ResultMessage):
-                    # Capture session_id if we somehow didn't get it from SystemMessage
-                    if session_id is None:
-                        session_id = message.session_id
+                    # Capture executor_session_id if we somehow didn't get it from SystemMessage
+                    if executor_session_id is None:
+                        executor_session_id = message.session_id
 
                     # Capture result (overwrite each time to get final result)
                     result = message.result
@@ -290,7 +294,6 @@ async def run_claude_session(
                             session_client.add_event(session_id, {
                                 "event_type": "message",
                                 "session_id": session_id,
-                                "session_name": session_name or session_id,
                                 "timestamp": datetime.now(UTC).isoformat(),
                                 "role": "assistant",
                                 "content": [{"type": "text", "text": message.result}]
@@ -304,7 +307,6 @@ async def run_claude_session(
                     session_client.add_event(session_id, {
                         "event_type": "session_stop",
                         "session_id": session_id,
-                        "session_name": session_name or session_id,
                         "timestamp": datetime.now(UTC).isoformat(),
                         "exit_code": 0,
                         "reason": "completed"
@@ -317,7 +319,7 @@ async def run_claude_session(
         raise Exception(f"Claude SDK error during session execution: {e}") from e
 
     # Validate we received required data
-    if not session_id:
+    if not executor_session_id:
         raise ValueError(
             "No session_id received from Claude SDK. "
             "This may indicate an SDK version mismatch or API error."
@@ -329,17 +331,18 @@ async def run_claude_session(
             "The session may have been interrupted or encountered an error."
         )
 
-    return session_id, result
+    return executor_session_id, result
 
 
 def run_session_sync(
     prompt: str,
     project_dir: Path,
-    session_name: Optional[str] = None,
+    session_id: str,
     mcp_servers: Optional[dict] = None,
-    resume_session_id: Optional[str] = None,
+    resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
+    executor_type: str = "claude-code",
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -347,20 +350,18 @@ def run_session_sync(
     This allows command scripts to remain synchronous while using
     the SDK's async API internally.
 
-    NOTE: parent_session_name is now handled automatically by Agent Coordinator
-    via the Runs API. See mcp-server-api-refactor.md.
-
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
         project_dir: Working directory for Claude (sets cwd)
-        session_name: Session name for the session manager
+        session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
-        resume_session_id: If provided, resume existing session
+        resume_executor_session_id: If provided, resume existing Claude SDK session
         api_url: Base URL of Agent Orchestrator API
         agent_name: Agent name (optional, for session metadata)
+        executor_type: Executor type for bind call (default: "claude-code")
 
     Returns:
-        Tuple of (session_id, result)
+        Tuple of (executor_session_id, result)
 
     Raises:
         ValueError: If session_id or result not found in messages
@@ -369,20 +370,21 @@ def run_session_sync(
 
     Example:
         >>> project_dir = Path.cwd()
-        >>> session_id, result = run_session_sync(
+        >>> executor_session_id, result = run_session_sync(
         ...     prompt="What is 2+2?",
         ...     project_dir=project_dir,
-        ...     session_name="test"
+        ...     session_id="ses_abc123def456"
         ... )
     """
     return asyncio.run(
         run_claude_session(
             prompt=prompt,
             project_dir=project_dir,
-            session_name=session_name,
+            session_id=session_id,
             mcp_servers=mcp_servers,
-            resume_session_id=resume_session_id,
+            resume_executor_session_id=resume_executor_session_id,
             api_url=api_url,
             agent_name=agent_name,
+            executor_type=executor_type,
         )
     )

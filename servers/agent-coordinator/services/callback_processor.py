@@ -12,6 +12,8 @@ Additionally, a "resume in-flight" lock prevents multiple concurrent callbacks
 from creating duplicate resume runs. When a resume run is created, the parent
 is marked as "in-flight". Subsequent callbacks are queued until the parent
 session stops (meaning the resume was processed).
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import threading
@@ -20,7 +22,7 @@ from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
-# In-memory queue: parent_session_name -> [(child_name, result, failed, error), ...]
+# In-memory queue: parent_session_id -> [(child_id, result, failed, error), ...]
 # Thread-safe access via lock
 _pending_notifications: Dict[str, List[tuple]] = {}
 
@@ -32,7 +34,7 @@ _lock = threading.Lock()
 
 
 # Callback resume prompt templates
-CALLBACK_PROMPT_TEMPLATE = """The child agent session "{child_session}" has completed.
+CALLBACK_PROMPT_TEMPLATE = """The child agent session "{child_session_id}" has completed.
 
 ## Child Result
 
@@ -40,7 +42,7 @@ CALLBACK_PROMPT_TEMPLATE = """The child agent session "{child_session}" has comp
 
 Please continue with the orchestration based on this result."""
 
-CALLBACK_FAILED_PROMPT_TEMPLATE = """The child agent session "{child_session}" has failed.
+CALLBACK_FAILED_PROMPT_TEMPLATE = """The child agent session "{child_session_id}" has failed.
 
 ## Error
 
@@ -56,8 +58,8 @@ Please continue with the orchestration based on these results."""
 
 
 def on_child_completed(
-    child_session_name: str,
-    parent_session_name: str,
+    child_session_id: str,
+    parent_session_id: str,
     parent_status: str,
     child_result: Optional[str] = None,
     child_failed: bool = False,
@@ -66,8 +68,8 @@ def on_child_completed(
     """Handle child session completion.
 
     Args:
-        child_session_name: Name of the completed child session
-        parent_session_name: Name of the parent session to callback
+        child_session_id: ID of the completed child session
+        parent_session_id: ID of the parent session to callback
         parent_status: Current status of parent ("running", "finished", etc.)
         child_result: Result text from the child session
         child_failed: Whether the child failed
@@ -77,42 +79,42 @@ def on_child_completed(
         True if callback was delivered immediately, False if queued
     """
     # Prevent self-loop
-    if child_session_name == parent_session_name:
-        logger.warning(f"Skipping callback: session {child_session_name} is its own parent")
+    if child_session_id == parent_session_id:
+        logger.warning(f"Skipping callback: session {child_session_id} is its own parent")
         return False
 
-    callback_data = (child_session_name, child_result, child_failed, child_error)
+    callback_data = (child_session_id, child_result, child_failed, child_error)
     should_create_run = False
 
     with _lock:
         # Check if a resume run is already pending for this parent
-        if parent_session_name in _resume_in_flight:
+        if parent_session_id in _resume_in_flight:
             # Resume already in progress - queue this callback
-            logger.info(f"Parent '{parent_session_name}' has resume in-flight, queuing callback from '{child_session_name}'")
-            _pending_notifications.setdefault(parent_session_name, []).append(callback_data)
+            logger.info(f"Parent '{parent_session_id}' has resume in-flight, queuing callback from '{child_session_id}'")
+            _pending_notifications.setdefault(parent_session_id, []).append(callback_data)
             return False
 
         if parent_status == "finished":
             # Parent is idle and no resume in-flight - deliver immediately
             # Mark as in-flight to prevent duplicate resume runs
-            _resume_in_flight.add(parent_session_name)
+            _resume_in_flight.add(parent_session_id)
             should_create_run = True
-            logger.info(f"Parent '{parent_session_name}' is idle, delivering callback from '{child_session_name}' (marked in-flight)")
+            logger.info(f"Parent '{parent_session_id}' is idle, delivering callback from '{child_session_id}' (marked in-flight)")
         else:
             # Parent is busy - queue for later
-            logger.info(f"Parent '{parent_session_name}' is busy (status={parent_status}), queuing callback from '{child_session_name}'")
-            _pending_notifications.setdefault(parent_session_name, []).append(callback_data)
+            logger.info(f"Parent '{parent_session_id}' is busy (status={parent_status}), queuing callback from '{child_session_id}'")
+            _pending_notifications.setdefault(parent_session_id, []).append(callback_data)
             return False
 
     # Create run outside lock to avoid holding lock during I/O
     if should_create_run:
-        _create_resume_run(parent_session_name, [callback_data])
+        _create_resume_run(parent_session_id, [callback_data])
         return True
 
     return False
 
 
-def on_session_stopped(session_name: str, project_dir: Optional[str] = None) -> int:
+def on_session_stopped(session_id: str, project_dir: Optional[str] = None) -> int:
     """Handle any session stopping - check for pending callbacks.
 
     Called when ANY session stops. If this session has pending child
@@ -123,7 +125,7 @@ def on_session_stopped(session_name: str, project_dir: Optional[str] = None) -> 
     in-flight flag is set again.
 
     Args:
-        session_name: Name of the session that just stopped
+        session_id: ID of the session that just stopped
         project_dir: Project directory of the session (for resume run)
 
     Returns:
@@ -134,61 +136,61 @@ def on_session_stopped(session_name: str, project_dir: Optional[str] = None) -> 
 
     with _lock:
         # Clear in-flight flag - the resume (if any) has been processed
-        was_in_flight = session_name in _resume_in_flight
-        _resume_in_flight.discard(session_name)
+        was_in_flight = session_id in _resume_in_flight
+        _resume_in_flight.discard(session_id)
 
         if was_in_flight:
-            logger.debug(f"Cleared in-flight flag for '{session_name}'")
+            logger.debug(f"Cleared in-flight flag for '{session_id}'")
 
         # Check for pending callbacks
-        if session_name not in _pending_notifications:
+        if session_id not in _pending_notifications:
             return 0
 
-        pending = _pending_notifications.pop(session_name)
+        pending = _pending_notifications.pop(session_id)
 
         if pending:
             # Set in-flight again for the new resume run
-            _resume_in_flight.add(session_name)
+            _resume_in_flight.add(session_id)
             should_create_run = True
-            logger.info(f"Session '{session_name}' stopped with {len(pending)} pending callbacks, flushing (marked in-flight)")
+            logger.info(f"Session '{session_id}' stopped with {len(pending)} pending callbacks, flushing (marked in-flight)")
 
     # Create run outside lock
     if should_create_run and pending:
-        _create_resume_run(session_name, pending, project_dir)
+        _create_resume_run(session_id, pending, project_dir)
         return len(pending)
 
     return 0
 
 
 def _queue_notification(
-    parent_session_name: str,
-    child_session_name: str,
+    parent_session_id: str,
+    child_session_id: str,
     child_result: Optional[str],
     child_failed: bool,
     child_error: Optional[str],
 ) -> None:
     """Queue a callback notification for later delivery."""
     with _lock:
-        if parent_session_name not in _pending_notifications:
-            _pending_notifications[parent_session_name] = []
+        if parent_session_id not in _pending_notifications:
+            _pending_notifications[parent_session_id] = []
 
-        _pending_notifications[parent_session_name].append(
-            (child_session_name, child_result, child_failed, child_error)
+        _pending_notifications[parent_session_id].append(
+            (child_session_id, child_result, child_failed, child_error)
         )
 
-    logger.debug(f"Queued callback: {child_session_name} -> {parent_session_name}")
+    logger.debug(f"Queued callback: {child_session_id} -> {parent_session_id}")
 
 
 def _create_resume_run(
-    parent_session_name: str,
-    children: List[tuple],  # [(child_name, result, failed, error), ...]
+    parent_session_id: str,
+    children: List[tuple],  # [(child_id, result, failed, error), ...]
     project_dir: Optional[str] = None,
 ) -> Optional[str]:
     """Create a resume run for the parent with child results.
 
     Args:
-        parent_session_name: Session to resume
-        children: List of (child_name, result, failed, error) tuples
+        parent_session_id: Session ID to resume
+        children: List of (child_id, result, failed, error) tuples
         project_dir: Project directory for the resume run
 
     Returns:
@@ -198,21 +200,21 @@ def _create_resume_run(
 
     # Build the callback prompt
     if len(children) == 1:
-        child_name, result, failed, error = children[0]
+        child_id, result, failed, error = children[0]
         if failed:
             prompt = CALLBACK_FAILED_PROMPT_TEMPLATE.format(
-                child_session=child_name,
+                child_session_id=child_id,
                 child_error=error or "Unknown error",
             )
         else:
             prompt = CALLBACK_PROMPT_TEMPLATE.format(
-                child_session=child_name,
+                child_session_id=child_id,
                 child_result=result or "(No result available)",
             )
     else:
         # Multiple children - aggregate results
         results_parts = []
-        for child_name, result, failed, error in children:
+        for child_id, result, failed, error in children:
             if failed:
                 status = "FAILED"
                 child_result = error or "Unknown error"
@@ -220,7 +222,7 @@ def _create_resume_run(
                 status = "completed"
                 child_result = result or "(No result available)"
 
-            results_parts.append(f"### Child: {child_name} ({status})\n\n{child_result}")
+            results_parts.append(f"### Child: {child_id} ({status})\n\n{child_result}")
 
         prompt = AGGREGATED_CALLBACK_PROMPT_TEMPLATE.format(
             children_results="\n\n---\n\n".join(results_parts)
@@ -229,24 +231,24 @@ def _create_resume_run(
     try:
         run = run_queue.add_run(RunCreate(
             type=RunType.RESUME_SESSION,
-            session_name=parent_session_name,
+            session_id=parent_session_id,
             prompt=prompt,
             project_dir=project_dir,
         ))
-        logger.info(f"Created callback resume run {run.run_id} for parent '{parent_session_name}' with {len(children)} child result(s)")
+        logger.info(f"Created callback resume run {run.run_id} for parent '{parent_session_id}' with {len(children)} child result(s)")
         return run.run_id
     except Exception as e:
-        logger.error(f"Failed to create callback run for '{parent_session_name}': {e}")
+        logger.error(f"Failed to create callback run for '{parent_session_id}': {e}")
         return None
 
 
-def get_pending_count(parent_session_name: str) -> int:
+def get_pending_count(parent_session_id: str) -> int:
     """Get the number of pending callbacks for a parent session.
 
     Useful for debugging and monitoring.
     """
     with _lock:
-        return len(_pending_notifications.get(parent_session_name, []))
+        return len(_pending_notifications.get(parent_session_id, []))
 
 
 def get_all_pending() -> Dict[str, int]:
@@ -258,7 +260,7 @@ def get_all_pending() -> Dict[str, int]:
         return {k: len(v) for k, v in _pending_notifications.items()}
 
 
-def clear_pending(parent_session_name: str) -> int:
+def clear_pending(parent_session_id: str) -> int:
     """Clear pending callbacks for a parent (e.g., if parent is deleted).
 
     Also clears the in-flight flag if set.
@@ -267,23 +269,23 @@ def clear_pending(parent_session_name: str) -> int:
     """
     with _lock:
         # Clear in-flight flag
-        _resume_in_flight.discard(parent_session_name)
+        _resume_in_flight.discard(parent_session_id)
 
-        if parent_session_name in _pending_notifications:
-            count = len(_pending_notifications[parent_session_name])
-            del _pending_notifications[parent_session_name]
-            logger.info(f"Cleared {count} pending callbacks for deleted parent '{parent_session_name}'")
+        if parent_session_id in _pending_notifications:
+            count = len(_pending_notifications[parent_session_id])
+            del _pending_notifications[parent_session_id]
+            logger.info(f"Cleared {count} pending callbacks for deleted parent '{parent_session_id}'")
             return count
     return 0
 
 
-def is_resume_in_flight(parent_session_name: str) -> bool:
+def is_resume_in_flight(parent_session_id: str) -> bool:
     """Check if a resume run is pending for the given parent.
 
     Useful for debugging and monitoring.
     """
     with _lock:
-        return parent_session_name in _resume_in_flight
+        return parent_session_id in _resume_in_flight
 
 
 def get_all_in_flight() -> Set[str]:

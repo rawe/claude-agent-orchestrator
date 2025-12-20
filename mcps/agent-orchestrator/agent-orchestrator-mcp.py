@@ -30,7 +30,7 @@ Usage:
 
 Environment Variables:
     AGENT_ORCHESTRATOR_API_URL  - Optional: Agent Coordinator API URL (default: http://127.0.0.1:8765)
-    AGENT_SESSION_NAME          - Optional: Parent session name for callback support (stdio mode)
+    AGENT_SESSION_ID            - Optional: Parent session ID for callback support (stdio mode, ADR-010)
     MCP_SERVER_DEBUG            - Optional: Enable debug logging (true/false)
 """
 

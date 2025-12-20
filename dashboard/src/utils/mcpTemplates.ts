@@ -25,7 +25,7 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
     type: 'http',
     url: 'http://localhost:9500/mcp',
     headers: {
-      'X-Agent-Session-Name': '${AGENT_SESSION_NAME}',
+      'X-Agent-Session-Id': '${AGENT_SESSION_ID}',
       'X-Agent-Tags': '<your-tags>',
       'X-Additional-Demands': '{"hostname": null, "project_dir": null, "executor_type": null, "tags": []}',
     },

@@ -17,17 +17,26 @@ from typing import Optional
 
 from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, RunnerDemands
 
+# Debug logging toggle - matches main.py
+DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
+
 
 def get_agents_dir() -> Path:
     """Get agents directory from environment or default."""
     # Check explicit agents dir override first
     agents_dir = os.environ.get("AGENT_ORCHESTRATOR_AGENTS_DIR")
     if agents_dir:
-        return Path(agents_dir)
+        path = Path(agents_dir)
+        if DEBUG:
+            print(f"[DEBUG] agent_storage: Using AGENT_ORCHESTRATOR_AGENTS_DIR={path}", flush=True)
+        return path
 
     # Fall back to project_dir/.agent-orchestrator/agents
     project_dir = os.environ.get("AGENT_ORCHESTRATOR_PROJECT_DIR", os.getcwd())
-    return Path(project_dir) / ".agent-orchestrator" / "agents"
+    path = Path(project_dir) / ".agent-orchestrator" / "agents"
+    if DEBUG:
+        print(f"[DEBUG] agent_storage: Using agents_dir={path} (project_dir={project_dir})", flush=True)
+    return path
 
 
 def _get_file_times(agent_dir: Path) -> tuple[str, str]:

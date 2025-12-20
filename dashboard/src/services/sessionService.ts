@@ -6,7 +6,6 @@ interface StopSessionResponse {
   ok: boolean;
   session_id: string;
   run_id: string;
-  session_name: string;
   status: string;
 }
 

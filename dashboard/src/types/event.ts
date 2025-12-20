@@ -13,7 +13,6 @@ export interface MessageContent {
 export interface SessionEvent {
   id?: number;
   session_id: string;
-  session_name?: string;
   event_type: EventType;
   timestamp: string;
   // Tool events

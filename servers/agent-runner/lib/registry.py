@@ -17,7 +17,7 @@ class RunningRun:
     process: subprocess.Popen
     started_at: datetime
     run_id: str
-    session_name: str
+    session_id: str
 
 
 class RunningRunsRegistry:
@@ -27,13 +27,13 @@ class RunningRunsRegistry:
         self._runs: dict[str, RunningRun] = {}
         self._lock = threading.Lock()
 
-    def add_run(self, run_id: str, session_name: str, process: subprocess.Popen) -> None:
+    def add_run(self, run_id: str, session_id: str, process: subprocess.Popen) -> None:
         """Add a running agent run to the registry."""
         running_run = RunningRun(
             process=process,
             started_at=datetime.now(),
             run_id=run_id,
-            session_name=session_name,
+            session_id=session_id,
         )
 
         with self._lock:

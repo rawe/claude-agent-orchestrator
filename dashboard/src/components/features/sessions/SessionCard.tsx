@@ -1,7 +1,13 @@
+/**
+ * Session Card Component
+ *
+ * Note: Uses session_id (coordinator-generated) per ADR-010.
+ */
+
 import { Session } from '@/types';
 import { StatusBadge, CopyButton } from '@/components/common';
 import { formatRelativeTime, formatAbsoluteTime, getLastPathSegment } from '@/utils/formatters';
-import { Folder, Trash2, Square, Bot, CornerDownRight } from 'lucide-react';
+import { Folder, Trash2, Square, Bot, CornerDownRight, Server } from 'lucide-react';
 
 interface SessionCardProps {
   session: Session;
@@ -13,6 +19,8 @@ interface SessionCardProps {
 
 function getStatusAccentColor(status: Session['status']): string {
   switch (status) {
+    case 'pending':
+      return 'bg-yellow-400';
     case 'running':
       return 'bg-emerald-500';
     case 'stopping':
@@ -33,7 +41,7 @@ export function SessionCard({
   onStop,
   onDelete,
 }: SessionCardProps) {
-  const displayName = session.session_name || session.session_id.slice(0, 12);
+  const displayName = session.session_id.slice(0, 16);
   const projectFolder = session.project_dir ? getLastPathSegment(session.project_dir) : null;
   const accentColor = getStatusAccentColor(session.status);
 
@@ -51,27 +59,25 @@ export function SessionCard({
 
       {/* Main content */}
       <div className="flex-1 min-w-0 p-3">
-        {/* Header: Name and Status */}
+        {/* Header: Session ID and Status */}
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-medium text-gray-900 truncate" title={session.session_name || session.session_id}>
+            <h3 className="text-sm font-medium text-gray-900 truncate" title={session.session_id}>
               {displayName}
             </h3>
           </div>
           <StatusBadge status={session.status} />
         </div>
 
-        {/* Session ID (if has name) */}
-        {session.session_name && (
-          <div className="flex items-center gap-1 mb-1.5">
-            <span className="text-xs text-gray-400 font-mono truncate" title={session.session_id}>
-              {session.session_id.slice(0, 8)}...
-            </span>
-            <CopyButton text={session.session_id} />
-          </div>
-        )}
+        {/* Full Session ID with copy */}
+        <div className="flex items-center gap-1 mb-1.5">
+          <span className="text-xs text-gray-400 font-mono truncate" title={session.session_id}>
+            {session.session_id}
+          </span>
+          <CopyButton text={session.session_id} />
+        </div>
 
-        {/* Agent, Parent, and Project - stacked vertically */}
+        {/* Agent, Parent, Hostname, and Project - stacked vertically */}
         <div className="space-y-1 mb-2">
           {session.agent_name && (
             <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -79,11 +85,19 @@ export function SessionCard({
               <span className="truncate font-medium">{session.agent_name}</span>
             </div>
           )}
-          {session.parent_session_name && (
+          {session.parent_session_id && (
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <CornerDownRight className="w-3 h-3 text-gray-400" />
-              <span className="truncate" title={`Parent: ${session.parent_session_name}`}>
-                {session.parent_session_name}
+              <span className="truncate" title={`Parent: ${session.parent_session_id}`}>
+                {session.parent_session_id.slice(0, 12)}...
+              </span>
+            </div>
+          )}
+          {session.hostname && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Server className="w-3 h-3 text-gray-400" />
+              <span className="truncate" title={`Host: ${session.hostname}`}>
+                {session.hostname}
               </span>
             </div>
           )}

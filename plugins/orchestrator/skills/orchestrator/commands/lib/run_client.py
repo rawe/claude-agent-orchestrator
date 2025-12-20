@@ -3,11 +3,13 @@ Run Client
 
 HTTP client for Agent Coordinator Runs API.
 Creates runs and polls for completion.
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import httpx
 import time
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class RunClientError(Exception):
@@ -46,42 +48,47 @@ class RunClient:
     def _create_run(
         self,
         run_type: str,
-        session_name: str,
         prompt: str,
+        session_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
-    ) -> str:
+        parent_session_id: Optional[str] = None,
+    ) -> Tuple[str, str]:
         """
         Create a run via POST /runs.
 
         Request body (RunCreate):
             type: "start_session" | "resume_session"
-            session_name: str
             prompt: str
-            agent_name: Optional[str]
-            project_dir: Optional[str]
+            session_id: Optional[str] - only for resume_session
+            agent_name: Optional[str] - only for start_session
+            project_dir: Optional[str] - only for start_session
+            parent_session_id: Optional[str] - for callback support
 
         Response:
-            {"run_id": "run_xxx", "status": "pending"}
+            {"run_id": "run_xxx", "session_id": "ses_xxx", "status": "pending"}
 
-        Returns the run_id.
+        Returns tuple of (run_id, session_id).
         """
         url = f"{self.base_url}/runs"
         data = {
             "type": run_type,
-            "session_name": session_name,
             "prompt": prompt,
         }
+        if session_id:
+            data["session_id"] = session_id
         if agent_name:
             data["agent_name"] = agent_name
         if project_dir:
             data["project_dir"] = project_dir
+        if parent_session_id:
+            data["parent_session_id"] = parent_session_id
 
         try:
             response = httpx.post(url, json=data, timeout=self.timeout)
             response.raise_for_status()
             result = response.json()
-            return result["run_id"]
+            return result["run_id"], result["session_id"]
         except httpx.HTTPStatusError as e:
             raise RunClientError(f"Failed to create run: {e.response.text}")
         except httpx.RequestError as e:
@@ -94,7 +101,7 @@ class RunClient:
         Response (Run):
             run_id: str
             type: "start_session" | "resume_session"
-            session_name: str
+            session_id: str
             agent_name: Optional[str]
             prompt: str
             project_dir: Optional[str]
@@ -116,14 +123,14 @@ class RunClient:
         except httpx.RequestError as e:
             raise RunClientError(f"Request failed: {e}")
 
-    def _get_session_by_name(self, session_name: str) -> Optional[dict]:
+    def _get_session(self, session_id: str) -> Optional[dict]:
         """
-        Get session by name via GET /sessions/by-name/{session_name}.
+        Get session by ID via GET /sessions/{session_id}.
 
         Response:
             {"session": {...}} or 404 if not found
         """
-        url = f"{self.base_url}/sessions/by-name/{session_name}"
+        url = f"{self.base_url}/sessions/{session_id}"
         try:
             response = httpx.get(url, timeout=self.timeout)
             if response.status_code == 404:
@@ -152,7 +159,7 @@ class RunClient:
         except httpx.RequestError as e:
             raise RunClientError(f"Request failed: {e}")
 
-    def _wait_for_completion(self, run_id: str, session_name: str) -> str:
+    def _wait_for_completion(self, run_id: str, session_id: str) -> str:
         """
         Wait for run to complete and return the session result.
 
@@ -173,20 +180,8 @@ class RunClient:
             status = run.get("status")
 
             if status == "completed":
-                # Run completed - get result from session
-                session = self._get_session_by_name(session_name)
-                if session:
-                    session_id = session.get("session_id")
-                    if session_id:
-                        return self._get_session_result(session_id)
-                    else:
-                        raise RunClientError(
-                            f"Session '{session_name}' has no session_id"
-                        )
-                else:
-                    raise RunClientError(
-                        f"Session '{session_name}' not found after run completed"
-                    )
+                # Run completed - get result from session using session_id directly
+                return self._get_session_result(session_id)
 
             elif status == "failed":
                 error = run.get("error", "Unknown error")
@@ -201,50 +196,56 @@ class RunClient:
 
     def start_session(
         self,
-        session_name: str,
         prompt: str,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
-    ) -> str:
+        parent_session_id: Optional[str] = None,
+    ) -> Tuple[str, str]:
         """
         Create a start_session run and wait for completion.
 
+        Session ID is generated by the coordinator (ADR-010).
+
         Args:
-            session_name: Name for the new session
             prompt: User prompt
             agent_name: Optional agent blueprint name
             project_dir: Optional project directory path
+            parent_session_id: Optional parent session for callbacks
 
         Returns:
-            The session result text
+            Tuple of (session_id, result_text)
         """
-        run_id = self._create_run(
+        run_id, session_id = self._create_run(
             run_type="start_session",
-            session_name=session_name,
             prompt=prompt,
             agent_name=agent_name,
             project_dir=project_dir,
+            parent_session_id=parent_session_id,
         )
-        return self._wait_for_completion(run_id, session_name)
+        result = self._wait_for_completion(run_id, session_id)
+        return session_id, result
 
     def resume_session(
         self,
-        session_name: str,
+        session_id: str,
         prompt: str,
+        parent_session_id: Optional[str] = None,
     ) -> str:
         """
         Create a resume_session run and wait for completion.
 
         Args:
-            session_name: Name of existing session to resume
+            session_id: ID of existing session to resume (coordinator-generated)
             prompt: Continuation prompt
+            parent_session_id: Optional parent session for callbacks
 
         Returns:
             The session result text
         """
-        run_id = self._create_run(
+        run_id, _ = self._create_run(
             run_type="resume_session",
-            session_name=session_name,
+            session_id=session_id,
             prompt=prompt,
+            parent_session_id=parent_session_id,
         )
-        return self._wait_for_completion(run_id, session_name)
+        return self._wait_for_completion(run_id, session_id)

@@ -49,7 +49,6 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "session_name": "test-agent-001",
     "agent_name": "<agent-name-from-step-1>",
     "prompt": "Hello, what can you do?",
     "project_dir": "."
@@ -58,14 +57,14 @@ curl -X POST http://localhost:8765/runs \
 
 Expected response:
 ```json
-{"run_id":"run_...","status":"pending"}
+{"run_id":"run_...","session_id":"ses_...","status":"pending"}
 ```
 
 ### Step 3: Wait for execution
 
 Watch the runner terminal for:
 ```
-[INFO] executor: Starting session: test-agent-001 (agent=<agent-name>)
+[INFO] executor: Starting session: ses_... (agent=<agent-name>)
 ```
 
 ### Step 4: Observe WebSocket events
@@ -74,36 +73,41 @@ Watch the ws-monitor output.
 
 ## Expected Events (in order)
 
-1. **session_created**
+1. **session_created** (status: pending)
    ```json
-   {"type": "session_created", "session": {"session_id": "<uuid>", "session_name": "test-agent-001", "status": "running", "agent_name": "<agent-name>", ...}}
+   {"type": "session_created", "session": {"session_id": "ses_...", "status": "pending", "agent_name": "<agent-name>", ...}}
    ```
 
-2. **message (user)**
+2. **session_updated** (status: running)
    ```json
-   {"type": "event", "data": {"event_type": "message", "session_id": "<uuid>", "session_name": "test-agent-001", "role": "user", "content": [{"type": "text", "text": "Hello, what can you do?"}], ...}}
+   {"type": "session_updated", "session": {"session_id": "ses_...", "status": "running", "agent_name": "<agent-name>", ...}}
    ```
 
-3. **message (assistant)**
+3. **message (user)**
    ```json
-   {"type": "event", "data": {"event_type": "message", "session_id": "<uuid>", "session_name": "test-agent-001", "role": "assistant", "content": [{"type": "text", "text": "<response from executor>"}], ...}}
+   {"type": "event", "data": {"event_type": "message", "session_id": "ses_...", "role": "user", "content": [{"type": "text", "text": "Hello, what can you do?"}], ...}}
    ```
 
-4. **session_updated**
+4. **message (assistant)**
    ```json
-   {"type": "session_updated", "session": {"session_id": "<uuid>", "session_name": "test-agent-001", "status": "finished", "agent_name": "<agent-name>", ...}}
+   {"type": "event", "data": {"event_type": "message", "session_id": "ses_...", "role": "assistant", "content": [{"type": "text", "text": "<response from executor>"}], ...}}
    ```
 
-5. **session_stop**
+5. **session_updated** (status: finished)
    ```json
-   {"type": "event", "data": {"event_type": "session_stop", "session_id": "<uuid>", "session_name": "test-agent-001", "exit_code": 0, "reason": "completed", ...}}
+   {"type": "session_updated", "session": {"session_id": "ses_...", "status": "finished", "agent_name": "<agent-name>", ...}}
+   ```
+
+6. **session_stop**
+   ```json
+   {"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
    ```
 
 ## Verification Checklist
 
 - [ ] GET /agents returns at least one agent blueprint
-- [ ] All 5 events received in correct order
-- [ ] `session_id` is consistent across all events
+- [ ] All events received in correct order
+- [ ] `session_id` is consistent across all events (format: `ses_...`)
 - [ ] `agent_name` in session_created matches the requested agent
 - [ ] `agent_name` in session_updated matches the requested agent
 - [ ] With `claude-code`: Response reflects the agent's system_prompt/capabilities

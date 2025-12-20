@@ -2,6 +2,8 @@
 HTTP client for communicating with Agent Coordinator.
 
 Wraps the Runner API endpoints with typed methods.
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import httpx
@@ -23,13 +25,17 @@ class RegistrationResponse:
 
 @dataclass
 class Run:
-    """Agent run to execute."""
+    """Agent run to execute.
+
+    session_id is coordinator-generated per ADR-010.
+    """
     run_id: str
     type: str  # "start_session" or "resume_session"
-    session_name: str
+    session_id: str
     agent_name: Optional[str]
     prompt: str
     project_dir: Optional[str]
+    parent_session_id: Optional[str] = None
 
 
 @dataclass
@@ -139,10 +145,11 @@ class CoordinatorAPIClient:
             run = Run(
                 run_id=run_data["run_id"],
                 type=run_data["type"],
-                session_name=run_data["session_name"],
+                session_id=run_data["session_id"],
                 agent_name=run_data.get("agent_name"),
                 prompt=run_data["prompt"],
                 project_dir=run_data.get("project_dir"),
+                parent_session_id=run_data.get("parent_session_id"),
             )
             return PollResult(run=run)
         except httpx.TimeoutException:
@@ -207,14 +214,14 @@ class CoordinatorAPIClient:
             # Don't fail shutdown if deregistration fails
             logger.warning(f"Failed to deregister: {e}")
 
-    def get_session_by_name(self, session_name: str) -> Optional[dict]:
-        """Get session by session_name.
+    def get_session(self, session_id: str) -> Optional[dict]:
+        """Get session by session_id.
 
         Returns session dict if found, None if not found.
         """
         try:
             response = self._client.get(
-                f"{self.base_url}/sessions/by-name/{session_name}",
+                f"{self.base_url}/sessions/{session_id}",
             )
             if response.status_code == 404:
                 return None
@@ -222,25 +229,34 @@ class CoordinatorAPIClient:
             data = response.json()
             return data.get("session")
         except Exception as e:
-            logger.error(f"Failed to get session {session_name}: {e}")
+            logger.error(f"Failed to get session {session_id}: {e}")
             return None
 
-    def get_session_result(self, session_name: str) -> Optional[str]:
-        """Get result text from a finished session by session_name.
+    def get_session_affinity(self, session_id: str) -> Optional[dict]:
+        """Get session affinity information for resume routing.
+
+        Returns affinity dict (hostname, project_dir, executor_type, executor_session_id)
+        or None if not found.
+        """
+        try:
+            response = self._client.get(
+                f"{self.base_url}/sessions/{session_id}/affinity",
+            )
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            data = response.json()
+            return data.get("affinity")
+        except Exception as e:
+            logger.error(f"Failed to get session affinity {session_id}: {e}")
+            return None
+
+    def get_session_result(self, session_id: str) -> Optional[str]:
+        """Get result text from a finished session.
 
         Returns result text if found and session is finished, None otherwise.
         """
         try:
-            # First get session to get session_id
-            session = self.get_session_by_name(session_name)
-            if not session:
-                return None
-
-            session_id = session.get("session_id")
-            if not session_id:
-                return None
-
-            # Get result
             response = self._client.get(
                 f"{self.base_url}/sessions/{session_id}/result",
             )
@@ -249,12 +265,12 @@ class CoordinatorAPIClient:
             data = response.json()
             return data.get("result")
         except Exception as e:
-            logger.debug(f"Failed to get result for session {session_name}: {e}")
+            logger.debug(f"Failed to get result for session {session_id}: {e}")
             return None
 
     def create_resume_run(
         self,
-        session_name: str,
+        session_id: str,
         prompt: str,
         project_dir: Optional[str] = None,
     ) -> Optional[str]:
@@ -265,7 +281,7 @@ class CoordinatorAPIClient:
         try:
             run_request = {
                 "type": "resume_session",
-                "session_name": session_name,
+                "session_id": session_id,
                 "prompt": prompt,
             }
             if project_dir:
@@ -279,5 +295,5 @@ class CoordinatorAPIClient:
             data = response.json()
             return data.get("run_id")
         except Exception as e:
-            logger.error(f"Failed to create resume run for {session_name}: {e}")
+            logger.error(f"Failed to create resume run for {session_id}: {e}")
             return None

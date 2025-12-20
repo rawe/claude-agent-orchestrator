@@ -3,6 +3,8 @@ Run Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
 
 Maps agent run types to execution modes and handles subprocess spawning.
 Uses unified ao-*-exec entrypoint with structured JSON payloads.
+
+Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import json
@@ -138,12 +140,12 @@ class RunExecutor:
 
         logger.debug(f"Executor path: {self.executor_path}")
 
-    def execute_run(self, run: Run, parent_session_name: Optional[str] = None) -> subprocess.Popen:
+    def execute_run(self, run: Run, parent_session_id: Optional[str] = None) -> subprocess.Popen:
         """Execute an agent run by spawning ao-*-exec with JSON payload via stdin.
 
         Args:
             run: The agent run to execute
-            parent_session_name: Optional parent session name for callback context
+            parent_session_id: Optional parent session ID for callback context
 
         Returns:
             The spawned subprocess.Popen object
@@ -171,7 +173,7 @@ class RunExecutor:
         payload = {
             "schema_version": SCHEMA_VERSION,
             "mode": mode,
-            "session_name": run.session_name,
+            "session_id": run.session_id,
             "prompt": run.prompt,
         }
 
@@ -205,24 +207,24 @@ class RunExecutor:
         # Build environment
         env = os.environ.copy()
 
-        # Set AGENT_SESSION_NAME so the session knows its own identity.
-        # This allows MCP servers to include the session name in HTTP headers
-        # for callback support (X-Agent-Session-Name header).
-        # Flow: Runner sets env -> ao-*-exec replaces ${AGENT_SESSION_NAME} in MCP config
-        #       -> Claude sends X-Agent-Session-Name header -> MCP server reads it
-        env["AGENT_SESSION_NAME"] = run.session_name
+        # Set AGENT_SESSION_ID so the session knows its own identity.
+        # This allows MCP servers to include the session ID in HTTP headers
+        # for callback support (X-Agent-Session-Id header).
+        # Flow: Runner sets env -> ao-*-exec replaces ${AGENT_SESSION_ID} in MCP config
+        #       -> Claude sends X-Agent-Session-Id header -> MCP server reads it
+        env["AGENT_SESSION_ID"] = run.session_id
 
         # Log action (don't log full payload - prompt may be large/sensitive)
         if mode == "start":
             logger.info(
-                f"Starting session: {run.session_name}"
+                f"Starting session: {run.session_id}"
                 + (f" (agent={run.agent_name})" if run.agent_name else "")
             )
         else:
-            logger.info(f"Resuming session: {run.session_name}")
+            logger.info(f"Resuming session: {run.session_id}")
 
         logger.debug(
-            f"Executing ao-*-exec: mode={mode} session={run.session_name} "
+            f"Executing ao-*-exec: mode={mode} session={run.session_id} "
             f"prompt_len={len(run.prompt)}"
         )
 

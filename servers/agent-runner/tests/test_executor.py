@@ -38,7 +38,7 @@ class TestBuildPayload:
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="test-session",
+            session_id="ses_test123",
             agent_name=None,
             prompt="Hello world",
             project_dir=None,
@@ -48,7 +48,7 @@ class TestBuildPayload:
 
         assert payload["schema_version"] == SCHEMA_VERSION
         assert payload["mode"] == "start"
-        assert payload["session_name"] == "test-session"
+        assert payload["session_id"] == "ses_test123"
         assert payload["prompt"] == "Hello world"
         # Uses default project_dir
         assert payload["project_dir"] == "/default/path"
@@ -60,7 +60,7 @@ class TestBuildPayload:
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="test-session",
+            session_id="ses_test123",
             agent_name="security-auditor",
             prompt="Hello world",
             project_dir="/custom/path",
@@ -76,7 +76,7 @@ class TestBuildPayload:
         run = Run(
             run_id="run-1",
             type="resume_session",
-            session_name="test-session",
+            session_id="ses_test123",
             agent_name="should-be-ignored",
             prompt="Continue please",
             project_dir="/should/be/ignored",
@@ -86,7 +86,7 @@ class TestBuildPayload:
 
         assert payload["schema_version"] == SCHEMA_VERSION
         assert payload["mode"] == "resume"
-        assert payload["session_name"] == "test-session"
+        assert payload["session_id"] == "ses_test123"
         assert payload["prompt"] == "Continue please"
         # Resume should NOT include agent_name or project_dir
         assert "agent_name" not in payload
@@ -97,7 +97,7 @@ class TestBuildPayload:
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="test-session",
+            session_id="ses_test123",
             agent_name="agent",
             prompt="Hello 世界! 😀",
             project_dir="/path",
@@ -129,7 +129,7 @@ class TestExecuteWithPayload:
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="test-session",
+            session_id="ses_test123",
             agent_name=None,
             prompt="Hello",
             project_dir=None,
@@ -153,7 +153,7 @@ class TestExecuteWithPayload:
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="test-session",
+            session_id="ses_test123",
             agent_name=None,
             prompt="Hello",
             project_dir=None,
@@ -173,17 +173,17 @@ class TestExecuteWithPayload:
             # Should be valid JSON
             payload = json.loads(written)
             assert payload["schema_version"] == SCHEMA_VERSION
-            assert payload["session_name"] == "test-session"
+            assert payload["session_id"] == "ses_test123"
 
             # Should close stdin
             mock_process.stdin.close.assert_called_once()
 
-    def test_execute_sets_agent_session_name_env(self, executor):
-        """Execute sets AGENT_SESSION_NAME environment variable."""
+    def test_execute_sets_agent_session_id_env(self, executor):
+        """Execute sets AGENT_SESSION_ID environment variable."""
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="my-session",
+            session_id="ses_my123456",
             agent_name=None,
             prompt="Hello",
             project_dir=None,
@@ -199,7 +199,7 @@ class TestExecuteWithPayload:
             # Check env passed to Popen
             call_kwargs = mock_popen.call_args[1]
             env = call_kwargs["env"]
-            assert env["AGENT_SESSION_NAME"] == "my-session"
+            assert env["AGENT_SESSION_ID"] == "ses_my123456"
 
 
 class TestExecute:
@@ -220,7 +220,7 @@ class TestExecute:
         run = Run(
             run_id="run-1",
             type="start_session",
-            session_name="test",
+            session_id="ses_testid1",
             agent_name=None,
             prompt="Hello",
             project_dir=None,
@@ -236,7 +236,7 @@ class TestExecute:
         run = Run(
             run_id="run-1",
             type="resume_session",
-            session_name="test",
+            session_id="ses_testid1",
             agent_name=None,
             prompt="Hello",
             project_dir=None,
@@ -252,7 +252,7 @@ class TestExecute:
         run = Run(
             run_id="run-1",
             type="unknown_type",
-            session_name="test",
+            session_id="ses_testid1",
             agent_name=None,
             prompt="Hello",
             project_dir=None,

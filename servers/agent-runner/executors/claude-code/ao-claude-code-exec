@@ -21,7 +21,7 @@ Usage:
     uv run ao-claude-code-exec --schema
 
 Configuration:
-    AGENT_SESSION_NAME: Session name for MCP headers
+    AGENT_SESSION_ID: Coordinator-generated session ID for MCP headers (ADR-010)
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://127.0.0.1:8765)
     AGENT_ORCHESTRATOR_ENABLE_LOGGING: Enable debug logging
 """
@@ -67,7 +67,7 @@ JSON PAYLOAD FORMAT:
     {
       "schema_version": "1.0",       // Required: schema version
       "mode": "start" | "resume",    // Required: execution mode
-      "session_name": "<string>",    // Required: session identifier
+      "session_id": "<string>",      // Required: coordinator-generated ID (ADR-010)
       "prompt": "<string>",          // Required: user input
       "agent_name": "<string>",      // Optional: agent blueprint (start only)
       "project_dir": "<path>",       // Optional: working dir (start only)
@@ -76,17 +76,17 @@ JSON PAYLOAD FORMAT:
 
 EXAMPLES:
     # Start a new session
-    echo '{"schema_version":"1.0","mode":"start","session_name":"s1","prompt":"Hello"}' | uv run ao-claude-code-exec
+    echo '{"schema_version":"1.0","mode":"start","session_id":"ses_abc123","prompt":"Hello"}' | uv run ao-claude-code-exec
 
     # Resume an existing session
-    echo '{"schema_version":"1.0","mode":"resume","session_name":"s1","prompt":"Continue"}' | uv run ao-claude-code-exec
+    echo '{"schema_version":"1.0","mode":"resume","session_id":"ses_abc123","prompt":"Continue"}' | uv run ao-claude-code-exec
 
 EXIT CODES:
     0    Success
     1    Error (invalid input, session error, SDK error)
 
 ENVIRONMENT:
-    AGENT_SESSION_NAME                  Session name for MCP headers
+    AGENT_SESSION_ID                    Coordinator-generated session ID (ADR-010)
     AGENT_ORCHESTRATOR_API_URL          Coordinator API (default: http://127.0.0.1:8765)
     AGENT_ORCHESTRATOR_ENABLE_LOGGING   Enable debug logging
 
@@ -141,7 +141,7 @@ def main(
     # DEBUG LOGGING - Parsed invocation
     debug_log("COMMAND - ao-claude-code-exec parsed", {
         "mode": invocation.mode,
-        "session_name": invocation.session_name,
+        "session_id": invocation.session_id,
         "agent_name": invocation.agent_name or "None",
         "project_dir": invocation.project_dir or "None",
         "prompt_length": len(invocation.prompt),
@@ -167,14 +167,10 @@ def run_start(inv: ExecutorInvocation):
     """
     Start a new session.
 
-    Mirrors logic from ao-start:
-    1. Load configuration
-    2. Check session doesn't exist
-    3. Load agent blueprint if specified
-    4. Run Claude session
+    Session is already created in coordinator with status='pending' (ADR-010).
+    Executor binds to session after Claude SDK starts.
     """
     from executor_config import load_config
-    from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import debug_log
@@ -184,19 +180,7 @@ def run_start(inv: ExecutorInvocation):
         cli_project_dir=inv.project_dir,
     )
 
-    # 2. Check session doesn't already exist
-    try:
-        client = SessionClient(config.api_url)
-        existing_session = client.get_session_by_name(inv.session_name)
-        if existing_session:
-            raise ValueError(
-                f"Session '{inv.session_name}' already exists. "
-                "Use mode='resume' to continue or choose a different name"
-            )
-    except SessionClientError as e:
-        print(f"Warning: Could not check session existence: {e}", file=sys.stderr)
-
-    # 3. Load agent from API if specified
+    # 2. Load agent from API if specified
     final_prompt = inv.prompt
     mcp_servers = None
     agent_name = None
@@ -227,18 +211,18 @@ def run_start(inv: ExecutorInvocation):
 
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_start", {
-        "session_name": inv.session_name,
+        "session_id": inv.session_id,
         "project_dir": str(config.project_dir),
         "agent_name": agent_name or "None",
         "has_mcp_servers": mcp_servers is not None,
         "final_prompt_length": len(final_prompt),
     })
 
-    # 4. Run Claude session
-    session_id, result = run_session_sync(
+    # 3. Run Claude session (binds to coordinator session automatically)
+    executor_session_id, result = run_session_sync(
         prompt=final_prompt,
         project_dir=config.project_dir,
-        session_name=inv.session_name,
+        session_id=inv.session_id,
         mcp_servers=mcp_servers,
         api_url=config.api_url,
         agent_name=agent_name,
@@ -252,11 +236,7 @@ def run_resume(inv: ExecutorInvocation):
     """
     Resume an existing session.
 
-    Mirrors logic from ao-resume:
-    1. Get API URL
-    2. Check session exists and load metadata
-    3. Load agent MCP config if session has agent
-    4. Run Claude session with resume
+    Fetches session affinity to get executor_session_id for Claude SDK resume.
     """
     from executor_config import get_api_url
     from session_client import SessionClient, SessionClientError
@@ -267,29 +247,29 @@ def run_resume(inv: ExecutorInvocation):
     # 1. Get API URL
     api_url = get_api_url()
 
-    # 2. Check session exists and load metadata
+    # 2. Get session and affinity data
     try:
         client = SessionClient(api_url)
-        session_data = client.get_session_by_name(inv.session_name)
+        session_data = client.get_session(inv.session_id)
     except SessionClientError as e:
         raise ValueError(f"Failed to connect to session manager: {e}")
 
     if not session_data:
         raise ValueError(
-            f"Session '{inv.session_name}' does not exist. "
+            f"Session '{inv.session_id}' does not exist. "
             "Use mode='start' to create it"
         )
 
     # Extract session data
-    resume_session_id = session_data.get("session_id")
+    executor_session_id = session_data.get("executor_session_id")
     session_project_dir = Path(session_data.get("project_dir", str(Path.cwd())))
     session_agent = session_data.get("agent_name")
 
-    # Validate session_id exists
-    if not resume_session_id:
+    # Validate executor_session_id exists (needed for Claude SDK resume)
+    if not executor_session_id:
         raise ValueError(
-            f"Session '{inv.session_name}' has no session_id. "
-            "Cannot resume incomplete session"
+            f"Session '{inv.session_id}' has no executor_session_id. "
+            "Cannot resume - session may not have started successfully"
         )
 
     # 3. Load agent MCP configuration if session has agent
@@ -316,20 +296,20 @@ def run_resume(inv: ExecutorInvocation):
 
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_resume", {
-        "session_name": inv.session_name,
-        "session_id": resume_session_id,
+        "session_id": inv.session_id,
+        "executor_session_id": executor_session_id,
         "project_dir": str(session_project_dir),
         "agent_name": session_agent or "None",
         "has_mcp_servers": mcp_servers is not None,
     })
 
-    # 4. Run Claude session with resume
-    session_id, result = run_session_sync(
+    # 4. Run Claude session with resume (uses executor_session_id for SDK resume)
+    new_executor_session_id, result = run_session_sync(
         prompt=inv.prompt,  # No system prompt prepended!
         project_dir=session_project_dir,
-        session_name=inv.session_name,
+        session_id=inv.session_id,
         mcp_servers=mcp_servers,
-        resume_session_id=resume_session_id,
+        resume_executor_session_id=executor_session_id,
         api_url=api_url,
         agent_name=session_agent,
     )

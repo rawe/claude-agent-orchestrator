@@ -31,6 +31,8 @@ tests/
 
 ## Test Environment Setup
 
+**All setup commands run from project root** unless otherwise noted.
+
 **Important**: The database can only be reset when services are stopped. The `reset-db` script deletes the SQLite file, and the Agent Coordinator creates tables on startup. If you need a fresh database, you must restart all services.
 
 ### 1. Reset Database
@@ -47,7 +49,7 @@ For tests that require agent blueprints (test cases 03-07), copy them **before**
 
 ### 3. Start Agent Coordinator
 
-In a terminal (or background process):
+In a terminal (or background process). **Must run from `servers/agent-coordinator/`** (the coordinator uses relative paths for database and agent storage):
 
 ```bash
 cd servers/agent-coordinator
@@ -140,15 +142,15 @@ Agent blueprints define specialized agents with system prompts and MCP servers.
 
 **Important**: Agent blueprints must be copied **before** starting the Agent Coordinator, as blueprints are only discovered on startup.
 
-**Copying agent blueprints:**
+**Copying agent blueprints (from project root):**
 
 Complex agents that require MCP servers (like `agent-orchestrator`) must be copied from the central config directory to the coordinator's local agents folder. Do NOT create these files manually.
 
 ```bash
-# Create the agents directory if it doesn't exist
+# From project root - create the agents directory if it doesn't exist
 mkdir -p servers/agent-coordinator/.agent-orchestrator/agents
 
-# Copy a specific agent blueprint (e.g., agent-orchestrator)
+# From project root - copy a specific agent blueprint (e.g., agent-orchestrator)
 cp -r config/agents/agent-orchestrator servers/agent-coordinator/.agent-orchestrator/agents/
 ```
 
