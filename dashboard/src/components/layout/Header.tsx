@@ -1,8 +1,8 @@
-import { useWebSocket } from '@/contexts';
+import { useSSE } from '@/contexts';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
 export function Header() {
-  const { connected, reconnect } = useWebSocket();
+  const { connected, reconnect } = useSSE();
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">

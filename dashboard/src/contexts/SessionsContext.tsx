@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useWebSocket } from './WebSocketContext';
+import { useSSE } from './SSEContext';
 import { useNotification } from './NotificationContext';
 import { sessionService } from '@/services';
 import type { Session, WebSocketMessage } from '@/types';
@@ -18,7 +18,7 @@ const SessionsContext = createContext<SessionsContextValue | null>(null);
 export function SessionsProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const { subscribe } = useWebSocket();
+  const { subscribe } = useSSE();
   const { showError } = useNotification();
 
   // Initial fetch
@@ -38,7 +38,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
     fetchSessions();
   }, [fetchSessions]);
 
-  // Subscribe to WebSocket updates - this runs at app level, always active
+  // Subscribe to SSE updates - this runs at app level, always active
   useEffect(() => {
     const handleMessage = (message: WebSocketMessage) => {
       if (message.type === 'init' && message.sessions) {

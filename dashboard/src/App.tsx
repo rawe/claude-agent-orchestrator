@@ -1,17 +1,17 @@
 import { RouterProvider } from 'react-router-dom';
-import { WebSocketProvider, NotificationProvider, ChatProvider, SessionsProvider } from '@/contexts';
+import { SSEProvider, NotificationProvider, ChatProvider, SessionsProvider } from '@/contexts';
 import { router } from './router';
 
 function App() {
   return (
     <NotificationProvider>
-      <WebSocketProvider>
+      <SSEProvider>
         <SessionsProvider>
           <ChatProvider>
             <RouterProvider router={router} />
           </ChatProvider>
         </SessionsProvider>
-      </WebSocketProvider>
+      </SSEProvider>
     </NotificationProvider>
   );
 }
