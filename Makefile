@@ -364,7 +364,7 @@ start-agent-runner:
 	echo "  Coordinator: $${AGENT_ORCHESTRATOR_API_URL:-http://localhost:8765}"; \
 	echo "  Log file:    $(AGENT_RUNNER_LOG_FILE)"; \
 	echo ""; \
-	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) >> $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
+	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
 	echo $$! > $(AGENT_RUNNER_PID_FILE); \
 	sleep 2; \
 	echo "Agent Runner started (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \

@@ -3,8 +3,8 @@
 export const AGENT_ORCHESTRATOR_API_URL = import.meta.env.VITE_AGENT_ORCHESTRATOR_API_URL || 'http://localhost:8765';
 export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || 'http://localhost:8766';
 
-// SSE endpoint for real-time updates (ADR-013)
-export const SSE_URL = import.meta.env.VITE_SSE_URL || 'http://localhost:8765/sse/sessions';
+// SSE endpoint for real-time updates (ADR-013) - derived from API URL
+export const SSE_URL = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
 
 // Status colors
 export const STATUS_COLORS = {

@@ -133,7 +133,7 @@ uv run --script commands/ao-resume docs -p "Include error handling section"
 - Conversation history persistence
 
 ### Real-time Observability
-- Event streaming via WebSocket
+- Event streaming via SSE
 - Tool call tracking
 - Dashboard visualization
 

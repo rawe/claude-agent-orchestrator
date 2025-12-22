@@ -12,11 +12,11 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { SSE_URL } from '@/utils/constants';
-import type { WebSocketMessage } from '@/types';
+import type { StreamMessage } from '@/types';
 
 interface SSEContextValue {
   connected: boolean;
-  subscribe: (callback: (message: WebSocketMessage) => void) => () => void;
+  subscribe: (callback: (message: StreamMessage) => void) => () => void;
   reconnect: () => void;
 }
 
@@ -24,7 +24,7 @@ const SSEContext = createContext<SSEContextValue | null>(null);
 
 /**
  * SSE Event Types from the server (ADR-013)
- * These map to WebSocketMessage.type for backwards compatibility
+ * These map to StreamMessage.type for backwards compatibility
  */
 const SSE_EVENT_TYPES = [
   'init',
@@ -38,7 +38,7 @@ const SSE_EVENT_TYPES = [
 export function SSEProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const subscribersRef = useRef<Set<(message: WebSocketMessage) => void>>(new Set());
+  const subscribersRef = useRef<Set<(message: StreamMessage) => void>>(new Set());
 
   const connect = useCallback(() => {
     // Close existing connection if any
@@ -69,8 +69,8 @@ export function SSEProvider({ children }: { children: React.ReactNode }) {
         try {
           const data = JSON.parse(event.data);
 
-          // Convert SSE event to WebSocketMessage format for backwards compatibility
-          const message: WebSocketMessage = {
+          // Convert SSE event to StreamMessage format
+          const message: StreamMessage = {
             type: eventType,
             ...data,
           };
@@ -91,7 +91,7 @@ export function SSEProvider({ children }: { children: React.ReactNode }) {
     connect();
   }, [connect]);
 
-  const subscribe = useCallback((callback: (message: WebSocketMessage) => void) => {
+  const subscribe = useCallback((callback: (message: StreamMessage) => void) => {
     subscribersRef.current.add(callback);
     return () => {
       subscribersRef.current.delete(callback);

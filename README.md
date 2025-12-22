@@ -177,7 +177,7 @@ The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) ar
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
-| Agent Coordinator | http://localhost:8765 | Session management, WebSocket events, Blueprint API |
+| Agent Coordinator | http://localhost:8765 | Session management, SSE events, Blueprint API |
 | Context Store | http://localhost:8766 | Document storage API |
 | Neo4j Browser | http://localhost:7475 | Graph database UI (neo4j/agent-orchestrator) |
 

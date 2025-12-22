@@ -15,7 +15,7 @@ The Chat tab provides a live chat interface for interacting with AI agents using
          ▼                                      │
 ┌─────────────────┐                             │
 │  ChatContext    │ ◄───────────────────────────┘
-│  (App level)    │       WebSocket
+│  (App level)    │         SSE
 │                 │    (message events)
 └─────────────────┘
 ```
@@ -24,7 +24,7 @@ The Chat tab provides a live chat interface for interacting with AI agents using
 
 | File | Purpose |
 |------|---------|
-| `src/contexts/ChatContext.tsx` | Global chat state and WebSocket message handling |
+| `src/contexts/ChatContext.tsx` | Global chat state and SSE message handling |
 | `src/pages/Chat.tsx` | Chat UI component |
 | `src/services/chatService.ts` | API client for Agent Orchestrator |
 | `src/services/api.ts` | Axios instance (`agentOrchestratorApi`) |
@@ -63,9 +63,9 @@ POST /api/runs
 ```
 Creates a run to resume an existing session with a new prompt.
 
-## WebSocket Integration
+## SSE Integration
 
-The Chat tab reuses the **existing WebSocket connection** from the dashboard. The WebSocket subscription is managed in `ChatContext` at the App level, ensuring messages are received even when navigating to other tabs.
+The Chat tab reuses the **existing SSE connection** from the dashboard. The SSE subscription is managed in `ChatContext` at the App level, ensuring messages are received even when navigating to other tabs.
 
 ### Event Flow
 
@@ -76,7 +76,7 @@ The Chat tab reuses the **existing WebSocket connection** from the dashboard. Th
    - `data.session_id` matches our session
 3. **Extract content**: Get text from `data.content[].text`
 
-### WebSocket Message Types Used
+### SSE Message Types Used
 
 ```typescript
 // Capture session_id
@@ -220,7 +220,7 @@ Chat state is managed in `ChatContext` which is mounted at the App level. This p
 ## Features
 
 - **Agent Selection**: Dropdown to choose agent blueprint (or "Generic Agent") with refresh button
-- **Connection Status**: Shows WebSocket connected/disconnected state
+- **Connection Status**: Shows SSE connected/disconnected state
 - **New Chat**: Clears UI and starts fresh session
 - **Markdown Rendering**: Agent responses rendered with ReactMarkdown
 - **Auto-scroll**: Messages area scrolls to bottom on new messages

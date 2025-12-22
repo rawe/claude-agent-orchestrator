@@ -8,7 +8,7 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { useSSE } from './SSEContext';
 import { sessionService } from '@/services';
-import type { WebSocketMessage, SessionEvent, Session } from '@/types';
+import type { StreamMessage, SessionEvent, Session } from '@/types';
 
 export interface ToolCall {
   id: string;
@@ -185,7 +185,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const agentStatusRef = useRef<string>(initialState.agentStatus);
   const isLoadingRef = useRef<boolean>(initialState.isLoading);
 
-  // Wrappers to keep refs in sync with state (synchronous updates for WebSocket handlers)
+  // Wrappers to keep refs in sync with state (synchronous updates for SSE handlers)
   const setSessionId = (id: string | null) => {
     setSessionIdState(id);
     sessionIdRef.current = id;
@@ -287,7 +287,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // This handles callback mode where user messages come from the backend.
   // ============================================================================
 
-  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
+  const handleStreamMessage = useCallback((message: StreamMessage) => {
     // Get current values from refs (avoids stale closures)
     const currentSessionId = sessionIdRef.current;
     const currentLinkedSessionId = linkedSessionIdRef.current;
@@ -557,13 +557,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to SSE at context level
   // Use a ref to ensure stable handler reference across StrictMode's double-effect behavior
-  const handleSSEMessageRef = useRef(handleWebSocketMessage);
-  handleSSEMessageRef.current = handleWebSocketMessage;
+  const handleSSEMessageRef = useRef(handleStreamMessage);
+  handleSSEMessageRef.current = handleStreamMessage;
 
   useEffect(() => {
     // Create a stable wrapper that delegates to the ref
     // This ensures we have ONE subscription even if effect runs twice
-    const stableHandler = (msg: WebSocketMessage) => handleSSEMessageRef.current(msg);
+    const stableHandler = (msg: StreamMessage) => handleSSEMessageRef.current(msg);
     const unsubscribe = subscribe(stableHandler);
     return () => unsubscribe();
   }, [subscribe]);

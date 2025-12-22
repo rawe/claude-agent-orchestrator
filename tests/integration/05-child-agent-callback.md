@@ -8,7 +8,7 @@ Verify that an orchestrator agent can spawn a child agent in callback mode (`mod
 
 - Agent Coordinator running
 - Agent Runner running with `claude-code` executor
-- ws-monitor running
+- sse-monitor running
 - Agent Orchestrator MCP server running on port 9500:
   ```bash
   uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500

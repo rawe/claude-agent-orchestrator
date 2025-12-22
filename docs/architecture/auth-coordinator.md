@@ -46,7 +46,7 @@ Authentication applies **only to the Agent Coordinator** (port 8765). Explicitly
 | `POST /runner/heartbeat` | ✓ | ✓ | ✗ |
 | `POST /runs` (start agent run) | ✓ | ✗ | ✓ (filtered) |
 | `GET /sessions/{id}` | ✓ | ✗ | ✓ (own runs) |
-| `WS /sessions/stream` | ✓ | ✗ | ✓ (own runs) |
+| `GET /sse/sessions` | ✓ | ✗ | ✓ (own runs) |
 | `GET /blueprints` | ✓ | ✗ | ✓ (allowed only) |
 | All other endpoints | ✓ | ✗ | ✗ |
 
@@ -81,14 +81,6 @@ API_KEYS = {
     "ak_user_g7h8i9...": {"role": "user", "allowed_blueprints": ["agent-1", "agent-2"]},
 }
 ```
-
-### WebSocket Authentication
-
-Pass key as query parameter during handshake:
-```
-ws://coordinator:8765/sessions/stream?token=ak_user_xxxx
-```
-Validate before upgrading connection. Reject invalid tokens with HTTP 401.
 
 ### Client Configuration
 
@@ -137,13 +129,6 @@ POST /auth/token  (Admin-only)
   "expires_in_days": 30
 }
 → Returns: { "token": "eyJ..." }
-```
-
-### WebSocket Authentication
-
-Same as API Keys - pass in query param:
-```
-ws://coordinator:8765/sessions/stream?token=eyJhbG...
 ```
 
 ### Client Configuration
@@ -217,214 +202,7 @@ ROLE_MAPPING = {
 
 ---
 
-## WebSocket Authentication Methods
-
-**Good news: WebSocket authentication is straightforward.** Multiple methods available with different trade-offs.
-
-### Method 1: Query Parameter
-
-```javascript
-const ws = new WebSocket("ws://coordinator:8765/sessions/stream?token=xxx");
-```
-
-```python
-@app.websocket("/sessions/stream")
-async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
-    if not validate_token(token):
-        await websocket.close(code=4001)
-        return
-    await websocket.accept()
-```
-
-| Pros | Cons |
-|------|------|
-| Simple, works everywhere | Token appears in server logs |
-| Pre-accept validation | Visible in browser history |
-| Easy to implement | May leak via Referer header |
-
-**Mitigation:** Use short-lived tokens (minutes, not days).
-
----
-
-### Method 2: HTTP Header (Authorization)
-
-```python
-# Python/Node.js client - works
-import websockets
-async with websockets.connect(url, extra_headers={"Authorization": "Bearer xxx"}) as ws:
-    ...
-```
-
-```javascript
-// Browser - does NOT work!
-const ws = new WebSocket(url, { headers: { "Authorization": "Bearer xxx" } });  // Ignored
-```
-
-| Pros | Cons |
-|------|------|
-| Token not in URL/logs | **Not supported in browsers** |
-| Standard auth pattern | Only for server-to-server |
-| Pre-accept validation | Native apps, Node.js clients |
-
-**Verdict:** Good for Agent Runner, not viable for Dashboard.
-
----
-
-### Method 3: Cookies (Session-Based)
-
-```python
-# Server sets cookie on login
-response.set_cookie("session_token", token, httponly=True, secure=True, samesite="strict")
-
-# WebSocket handler reads cookie automatically
-@app.websocket("/sessions/stream")
-async def ws_endpoint(websocket: WebSocket):
-    token = websocket.cookies.get("session_token")
-    if not validate_token(token):
-        await websocket.close(code=4001)
-        return
-    await websocket.accept()
-```
-
-| Pros | Cons |
-|------|------|
-| No token in URL/logs | Requires session management |
-| HttpOnly prevents XSS theft | Cross-origin complexity |
-| Secure flag enforces HTTPS | Doesn't fit Agent Runner |
-| SameSite prevents CSRF | Cookie-based state |
-
-**Verdict:** Good for Dashboard if using cookie-based sessions.
-
----
-
-### Method 4: First Message Authentication
-
-Accept connection, require token as first message:
-
-```python
-@app.websocket("/sessions/stream")
-async def ws_endpoint(websocket: WebSocket):
-    await websocket.accept()
-
-    # First message must be auth token
-    try:
-        auth_msg = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
-        if not validate_token(auth_msg.get("token")):
-            await websocket.close(code=4001)
-            return
-    except asyncio.TimeoutError:
-        await websocket.close(code=4001)
-        return
-
-    # Authenticated - proceed with normal messages
-    await stream_events(websocket)
-```
-
-```javascript
-// Client
-const ws = new WebSocket("ws://coordinator:8765/sessions/stream");
-ws.onopen = () => ws.send(JSON.stringify({ token: "xxx" }));
-```
-
-| Pros | Cons |
-|------|------|
-| No token in URL/logs | Connection briefly open before auth |
-| Works with all clients | Resource exhaustion risk |
-| Browser + native support | Slightly more complex protocol |
-
-**Mitigation:** Short timeout (5s), connection rate limiting.
-
----
-
-### Method 5: Sec-WebSocket-Protocol Header
-
-Browsers allow setting the `Sec-WebSocket-Protocol` header:
-
-```javascript
-// Browser - token encoded in subprotocol
-const ws = new WebSocket(url, ["bearer.eyJhbGciOiJIUzI1NiIs..."]);
-```
-
-```python
-@app.websocket("/sessions/stream")
-async def ws_endpoint(websocket: WebSocket):
-    protocols = websocket.headers.get("sec-websocket-protocol", "").split(",")
-    token = None
-    for p in protocols:
-        p = p.strip()
-        if p.startswith("bearer."):
-            token = p[7:]  # Remove "bearer." prefix
-            break
-
-    if not validate_token(token):
-        await websocket.close(code=4001)
-        return
-
-    await websocket.accept(subprotocol=f"bearer.{token}")
-```
-
-| Pros | Cons |
-|------|------|
-| Works in browsers | Misuse of protocol header (hacky) |
-| Token not in URL/logs | Some proxies may log this header |
-| Pre-accept validation | Visible in browser dev tools |
-
----
-
-### Security Comparison
-
-| Method | Token in Logs | Browser Support | Pre-Accept Validation | Complexity |
-|--------|---------------|-----------------|----------------------|------------|
-| Query Param | Yes | ✓ | ✓ | Low |
-| HTTP Header | No | ✗ | ✓ | Low |
-| Cookies | No | ✓ | ✓ | Medium |
-| First Message | No | ✓ | ✗ | Medium |
-| Subprotocol | No* | ✓ | ✓ | Medium |
-
-### Recommended: Multi-Method Support
-
-Support multiple methods on the server to accommodate different clients:
-
-```python
-@app.websocket("/sessions/stream")
-async def ws_endpoint(websocket: WebSocket, token: Optional[str] = Query(None)):
-    validated_token = None
-
-    # Method 1: Authorization header (Agent Runner, CLI tools)
-    auth_header = websocket.headers.get("authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        validated_token = auth_header[7:]
-
-    # Method 2: Cookie (Dashboard with session management)
-    if not validated_token:
-        validated_token = websocket.cookies.get("session_token")
-
-    # Method 3: Query param fallback (simple clients, development)
-    if not validated_token:
-        validated_token = token
-
-    # Validate
-    if not validated_token or not validate_token(validated_token):
-        await websocket.close(code=4001)
-        return
-
-    await websocket.accept()
-    await stream_events(websocket, validated_token)
-```
-
-| Client | Recommended Method |
-|--------|-------------------|
-| Agent Runner (Python) | HTTP Header |
-| Dashboard (Browser) | Cookie or First Message |
-| CLI tools | HTTP Header or Query Param |
-| Development/Testing | Query Param |
-
-**Verdict: No architecture change needed.** WebSocket protection is not significantly harder than REST protection. The multi-method approach provides flexibility for all client types.
-
----
-
 ## Next Steps
 
 1. Choose approach (recommend starting with #1)
 2. Detail the implementation for chosen approach
-3. Define migration path for local → public deployment

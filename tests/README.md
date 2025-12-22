@@ -23,7 +23,7 @@ tests/
 │   └── 02-session-resume.md
 │   └── ... (more test cases)
 ├── tools/
-│   └── ws-monitor         # WebSocket event monitor
+│   └── sse-monitor         # SSE event monitor
 ├── scripts/
 │   └── reset-db           # Database reset script
 └── README.md              # This file
@@ -74,15 +74,15 @@ In another terminal (or background process):
 ./servers/agent-runner/agent-runner -x claude-code
 ```
 
-### 5. Start WebSocket Monitor
+### 5. Start SSE Monitor
 
 In another terminal (or background process):
 
 ```bash
-./tests/tools/ws-monitor
+./tests/tools/sse-monitor
 ```
 
-This prints all WebSocket events as JSON lines to stdout.
+This prints all SSE events as JSON lines to stdout.
 
 ## Running Tests
 
@@ -94,7 +94,7 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 
 | Command | Description |
 |---------|-------------|
-| `/tests:setup [executor]` | Start core services (Coordinator, Runner, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
+| `/tests:setup [executor]` | Start core services (Coordinator, Runner, sse-monitor). Optional executor: `test-executor` (default) or `claude-code` |
 | `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct executor, handles test-specific setup |
 | `/tests:run` | Run all tests sequentially with automatic setup and teardown |
 | `/tests:teardown` | Stop all services and cleanup |
@@ -200,12 +200,12 @@ The MCP server must be started **before** running test cases that use the `agent
 
 ## Tools Reference
 
-### ws-monitor
+### sse-monitor
 
-Connects to `ws://localhost:8765/ws` and prints events as raw JSON lines.
+Connects to `http://localhost:8765/sse/sessions` and prints events as raw JSON lines.
 
 ```bash
-./tests/tools/ws-monitor
+./tests/tools/sse-monitor
 ```
 
 Outputs raw JSON lines - one event per line.
@@ -222,7 +222,7 @@ Removes the SQLite database and test-executor session data:
 
 - **Agent Coordinator**: `Ctrl+C` in terminal or kill process
 - **Agent Runner**: `Ctrl+C` in terminal or kill process
-- **ws-monitor**: `Ctrl+C` in terminal
+- **sse-monitor**: `Ctrl+C` in terminal
 
 ## Troubleshooting
 
@@ -234,6 +234,6 @@ Removes the SQLite database and test-executor session data:
 - Verify Agent Runner is registered (check runner logs)
 - Ensure using `-x test-executor` flag
 
-### No WebSocket events
-- Verify ws-monitor connected successfully
+### No SSE events
+- Verify sse-monitor connected successfully
 - Check Agent Coordinator logs for errors

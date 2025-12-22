@@ -6,7 +6,7 @@ Verify that starting a session with a specific agent blueprint works correctly.
 
 - Agent Coordinator running
 - Agent Runner running
-- ws-monitor running
+- sse-monitor running
 - At least one agent blueprint registered (for `claude-code` executor)
 
 ## Test Steps
@@ -69,7 +69,7 @@ Watch the runner terminal for:
 
 ### Step 4: Observe WebSocket events
 
-Watch the ws-monitor output.
+Watch the sse-monitor output.
 
 ## Expected Events (in order)
 

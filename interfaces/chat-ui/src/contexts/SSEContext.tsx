@@ -7,9 +7,9 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { config } from '../config';
-import type { WebSocketMessage } from '../types';
+import type { StreamMessage } from '../types';
 
-type MessageHandler = (message: WebSocketMessage) => void;
+type MessageHandler = (message: StreamMessage) => void;
 
 interface SSEContextValue {
   connected: boolean;
@@ -63,8 +63,8 @@ export function SSEProvider({ children }: { children: ReactNode }) {
         try {
           const data = JSON.parse(event.data);
 
-          // Convert SSE event to WebSocketMessage format for backwards compatibility
-          const message: WebSocketMessage = {
+          // Convert SSE event to StreamMessage format
+          const message: StreamMessage = {
             type: eventType,
             ...data,
           };

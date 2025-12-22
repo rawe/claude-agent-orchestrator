@@ -4,15 +4,15 @@ from typing import Optional, Any, List, Literal, Union
 
 
 # ==============================================================================
-# Stream Event Types (WebSocket/SSE broadcasts)
+# Stream Event Types (SSE broadcasts)
 # ==============================================================================
 
 class StreamEventType(str, Enum):
     """
-    Event types for real-time streaming (WebSocket and SSE).
+    Event types for real-time streaming via Server-Sent Events (SSE).
 
-    These are the event types sent to connected clients for real-time updates.
-    Both WebSocket (/ws) and SSE (/sse/sessions) use the same event types.
+    These are the event types sent to connected clients for real-time updates
+    via the /sse/sessions endpoint.
 
     See ADR-013 for SSE migration details.
     """

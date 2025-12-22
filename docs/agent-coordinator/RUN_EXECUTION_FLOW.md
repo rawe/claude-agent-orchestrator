@@ -193,7 +193,7 @@ Clients can:
 1. Poll `GET /runs/{run_id}` to check status
 2. Once `completed`, call `GET /sessions/{session_id}/result` to get the final output
 
-**Alternative:** Use WebSocket connection to receive real-time session updates without polling.
+**Alternative:** Use SSE connection to receive real-time session updates without polling.
 
 ## Runner Internal Architecture
 

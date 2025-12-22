@@ -5,7 +5,7 @@ A unified React dashboard for the Agent Orchestrator Framework, providing real-t
 ## Features
 
 ### Agent Sessions (Observability)
-- Real-time session monitoring via WebSocket
+- Real-time session monitoring via SSE
 - Event timeline with expandable details
 - Session filtering by status and agent
 - Stop and delete session actions
@@ -61,9 +61,9 @@ Copy `.env.example` to `.env` and configure:
 
 ```bash
 # Agent Orchestrator API handles sessions, events, and agent blueprints (unified service)
+# SSE endpoint is automatically derived as {API_URL}/sse/sessions
 VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
 VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-VITE_WEBSOCKET_URL=ws://localhost:8765/ws
 ```
 
 ### Production Build

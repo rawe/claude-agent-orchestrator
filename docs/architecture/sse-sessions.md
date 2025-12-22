@@ -6,12 +6,11 @@ Server-Sent Events implementation for real-time session streaming.
 
 ## Overview
 
-Replace the existing WebSocket endpoint (`/ws`) with an SSE endpoint (`/sse/sessions`) that provides:
+The SSE endpoint (`/sse/sessions`) provides real-time session streaming with:
 
 - Standard HTTP authentication
 - Server-side filtering by session/user
 - Built-in reconnection with resume support
-- Same event types and payloads as current WebSocket
 
 ## Endpoint Design
 
@@ -322,8 +321,6 @@ class SSEConnection:
 
 ### Broadcasting Events
 
-Replace WebSocket broadcast with SSE broadcast:
-
 ```python
 async def broadcast_event(event_type: str, data: dict):
     """Broadcast to all SSE connections (with filtering)."""
@@ -432,27 +429,6 @@ async def subscribe_to_sessions(token: str, session_id: Optional[str] = None):
                     event_type = line[7:]
                     # Next data line belongs to this event type
 ```
-
-## Migration Path
-
-### Phase 1: Add SSE Endpoint
-
-1. Implement `/sse/sessions` endpoint
-2. Add to Coordinator alongside existing `/ws`
-3. Test with curl/httpie
-
-### Phase 2: Update Dashboard
-
-1. Create `useSSE` hook
-2. Replace `WebSocketContext` with `SSEContext`
-3. Update components to use new context
-4. Test reconnection, filtering
-
-### Phase 3: Deprecate WebSocket
-
-1. Add deprecation warning to `/ws`
-2. Monitor for remaining WebSocket usage
-3. Remove `/ws` endpoint after migration period
 
 ## Testing
 

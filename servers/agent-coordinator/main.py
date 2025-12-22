@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Header, Request
+from fastapi import FastAPI, HTTPException, Query, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -45,12 +45,8 @@ RUNNER_LIFECYCLE_INTERVAL = int(os.getenv("RUNNER_LIFECYCLE_INTERVAL", "30"))  #
 # Run demand timeout (ADR-011)
 RUN_NO_MATCH_TIMEOUT = int(os.getenv("RUN_NO_MATCH_TIMEOUT", "300"))  # 5 minutes
 
-# WebSocket connections (in-memory set)
-connections: set[WebSocket] = set()
-
-
 async def update_session_status_and_broadcast(session_id: str, status: str) -> dict | None:
-    """Update session status in DB and broadcast to WebSocket and SSE clients.
+    """Update session status in DB and broadcast to SSE clients.
 
     Args:
         session_id: The session ID to update
@@ -63,14 +59,6 @@ async def update_session_status_and_broadcast(session_id: str, status: str) -> d
     updated_session = get_session_by_id(session_id)
     if not updated_session:
         return None
-
-    # Broadcast to WebSocket clients
-    message = json.dumps({"type": StreamEventType.SESSION_UPDATED.value, "session": updated_session})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
 
     # Broadcast to SSE clients
     await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
@@ -125,14 +113,6 @@ async def run_timeout_task():
                     "session_id": run.session_id,
                 }
 
-                # Broadcast run failure to WebSocket clients
-                message = json.dumps({"type": StreamEventType.RUN_FAILED.value, **run_failed_data})
-                for ws in connections.copy():
-                    try:
-                        await ws.send_text(message)
-                    except:
-                        connections.discard(ws)
-
                 # Broadcast to SSE clients
                 await sse_manager.broadcast(StreamEventType.RUN_FAILED, run_failed_data, session_id=run.session_id)
         except Exception as e:
@@ -162,13 +142,6 @@ async def lifespan(app: FastAPI):
         await timeout_task
     except asyncio.CancelledError:
         pass
-
-    # Close all WebSocket connections
-    for ws in connections.copy():
-        try:
-            await ws.close()
-        except:
-            pass
 
     # Clear all SSE connections (they will close on their own when clients disconnect)
     sse_manager.clear_all()
@@ -224,22 +197,9 @@ async def receive_event(event: Event):
         if DEBUG:
             print(f"[DEBUG] Inserted event successfully", flush=True)
 
-        # Broadcast to all connected WebSocket clients
-        event_data = {"data": event.model_dump()}
-        message = json.dumps({"type": StreamEventType.EVENT.value, **event_data})
-        broadcast_count = 0
-        for ws in connections.copy():
-            try:
-                await ws.send_text(message)
-                broadcast_count += 1
-            except:
-                connections.discard(ws)
-
         # Broadcast to SSE clients
+        event_data = {"data": event.model_dump()}
         await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=event.session_id)
-
-        if DEBUG:
-            print(f"[DEBUG] Broadcasted to {broadcast_count} WebSocket clients", flush=True)
 
         return {"ok": True}
 
@@ -285,14 +245,6 @@ async def create_session_endpoint(session: SessionCreate):
             raise HTTPException(status_code=409, detail="Session already exists")
         raise
 
-    # Broadcast to WebSocket clients
-    message = json.dumps({"type": StreamEventType.SESSION_CREATED.value, "session": new_session})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
-
     # Broadcast to SSE clients
     await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=session.session_id)
 
@@ -320,14 +272,6 @@ async def bind_session_endpoint(session_id: str, binding: SessionBind):
 
     if DEBUG:
         print(f"[DEBUG] Session {session_id} bound to executor {binding.executor_session_id}", flush=True)
-
-    # Broadcast to WebSocket clients
-    message = json.dumps({"type": StreamEventType.SESSION_UPDATED.value, "session": result})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
 
     # Broadcast to SSE clients
     await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": result}, session_id=session_id)
@@ -544,12 +488,6 @@ async def add_session_event(session_id: str, event: Event):
 
         # Get updated session and broadcast session_updated
         updated_session = get_session_by_id(session_id)
-        session_message = json.dumps({"type": StreamEventType.SESSION_UPDATED.value, "session": updated_session})
-        for ws in connections.copy():
-            try:
-                await ws.send_text(session_message)
-            except:
-                connections.discard(ws)
 
         # Broadcast to SSE clients
         await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
@@ -585,16 +523,8 @@ async def add_session_event(session_id: str, event: Event):
         if flushed > 0 and DEBUG:
             print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
 
-    # Broadcast event to WebSocket clients
+    # Broadcast event to SSE clients
     event_data = {"data": event.model_dump()}
-    message = json.dumps({"type": StreamEventType.EVENT.value, **event_data})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
-
-    # Broadcast to SSE clients
     await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=session_id)
 
     return {"ok": True}
@@ -628,18 +558,6 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
     # Get updated session
     updated_session = get_session_by_id(session_id)
 
-    # Broadcast update to WebSocket clients
-    message = json.dumps({
-        "type": StreamEventType.SESSION_UPDATED.value,
-        "session": updated_session
-    })
-
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
-
     # Broadcast to SSE clients
     await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
 
@@ -656,18 +574,6 @@ async def delete_session_endpoint(session_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Broadcast deletion to WebSocket clients
-    message = json.dumps({
-        "type": StreamEventType.SESSION_DELETED.value,
-        "session_id": session_id
-    })
-
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
-
     # Broadcast to SSE clients
     await sse_manager.broadcast(StreamEventType.SESSION_DELETED, {"session_id": session_id}, session_id=session_id)
 
@@ -676,27 +582,6 @@ async def delete_session_endpoint(session_id: str):
         "session_id": session_id,
         "deleted": result
     }
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time updates"""
-    await websocket.accept()
-    connections.add(websocket)
-
-    # Send initial state
-    sessions = get_sessions()
-    await websocket.send_text(json.dumps({
-        "type": StreamEventType.INIT.value,
-        "sessions": sessions
-    }))
-
-    try:
-        # Keep connection alive
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        connections.discard(websocket)
 
 
 # ==============================================================================
@@ -1311,14 +1196,6 @@ async def create_run(run_create: RunCreate):
             )
             if DEBUG:
                 print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id} (mode={run.execution_mode.value})", flush=True)
-
-            # Broadcast session_created to WebSocket clients
-            message = json.dumps({"type": StreamEventType.SESSION_CREATED.value, "session": new_session})
-            for ws in connections.copy():
-                try:
-                    await ws.send_text(message)
-                except:
-                    connections.discard(ws)
 
             # Broadcast to SSE clients
             await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)

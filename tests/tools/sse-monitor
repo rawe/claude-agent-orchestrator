@@ -1,0 +1,96 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+# ]
+# ///
+"""
+SSE Monitor - Connects to Agent Coordinator SSE endpoint and prints events as JSON lines.
+
+Usage:
+    uv run tests/tools/sse-monitor
+
+    # Or make executable
+    chmod +x tests/tools/sse-monitor
+    ./tests/tools/sse-monitor
+
+    # Filter by session_id
+    ./tests/tools/sse-monitor --session-id abc123
+"""
+
+import argparse
+import signal
+import sys
+
+import httpx
+
+# Configuration - modify these as needed
+SSE_URL = "http://localhost:8765/sse/sessions"
+
+
+def monitor(session_id: str | None = None):
+    """Connect to SSE endpoint and print all events."""
+    url = SSE_URL
+    if session_id:
+        url = f"{SSE_URL}?session_id={session_id}"
+
+    print(f"Connecting to {url}...", file=sys.stderr)
+
+    try:
+        with httpx.Client(timeout=None) as client:
+            with client.stream("GET", url) as response:
+                if response.status_code != 200:
+                    print(f"Error: HTTP {response.status_code}", file=sys.stderr)
+                    sys.exit(1)
+
+                print("Connected. Listening for events...", file=sys.stderr)
+                print("---", file=sys.stderr)
+
+                # Buffer for multi-line SSE events
+                event_data = []
+
+                for line in response.iter_lines():
+                    # SSE format: lines starting with "data:" contain JSON
+                    # Empty line marks end of event
+                    if line.startswith("data:"):
+                        # Extract JSON after "data: "
+                        json_data = line[5:].strip()
+                        if json_data:
+                            event_data.append(json_data)
+                    elif line.startswith(":"):
+                        # Comment line (heartbeat), ignore
+                        pass
+                    elif line == "" and event_data:
+                        # End of event - print accumulated data
+                        for data in event_data:
+                            print(data, flush=True)
+                        event_data = []
+
+    except httpx.ConnectError:
+        print(f"Error: Could not connect to {url}", file=sys.stderr)
+        print("Is the Agent Coordinator running?", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nStopping monitor...", file=sys.stderr)
+
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description="Monitor SSE events from Agent Coordinator")
+    parser.add_argument("--session-id", "-s", help="Filter events to a specific session")
+    args = parser.parse_args()
+
+    # Handle Ctrl+C gracefully
+    def signal_handler(sig, frame):
+        print("\nStopping monitor...", file=sys.stderr)
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    monitor(session_id=args.session_id)
+
+
+if __name__ == "__main__":
+    main()

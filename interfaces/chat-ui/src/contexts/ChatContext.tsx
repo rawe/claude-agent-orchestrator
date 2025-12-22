@@ -5,7 +5,7 @@ import type {
   ChatMessage,
   ToolCall,
   AgentStatus,
-  WebSocketMessage,
+  StreamMessage,
   SessionEvent,
   ContentBlock,
 } from '../types';
@@ -294,9 +294,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [addPendingAssistantMessage, setSessionId, completeAssistantMessage]);
 
   // Handle SSE messages
-  const handleSSEMessage = useCallback((message: WebSocketMessage) => {
+  const handleSSEMessage = useCallback((message: StreamMessage) => {
     // Check if message belongs to our session (uses session_id only per ADR-010)
-    const isOurSession = (msg: WebSocketMessage): boolean => {
+    const isOurSession = (msg: StreamMessage): boolean => {
       if (!sessionIdRef.current) return false;
       if ('session' in msg && msg.session) {
         return msg.session.session_id === sessionIdRef.current;
@@ -415,7 +415,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   handlerRef.current = handleSSEMessage;
 
   useEffect(() => {
-    const stableHandler = (msg: WebSocketMessage) => handlerRef.current(msg);
+    const stableHandler = (msg: StreamMessage) => handlerRef.current(msg);
     const unsubscribe = subscribe(stableHandler);
     return () => unsubscribe();
   }, [subscribe]);

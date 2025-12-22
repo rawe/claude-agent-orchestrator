@@ -55,7 +55,7 @@ Claude Code / AI Framework
 ### Servers
 
 **Agent Coordinator** (`servers/agent-coordinator/`) - Port 8765
-- FastAPI + WebSocket server
+- FastAPI server with SSE
 - Persists sessions and events in SQLite
 - Broadcasts real-time updates to dashboard
 - Agent blueprint registry (CRUD API for agent definitions)
@@ -96,7 +96,7 @@ Claude Code / AI Framework
 - `doc-read`, `doc-query`, `doc-info`, `doc-delete` - Document operations
 
 ### Dashboard (`dashboard/`)
-- Real-time session monitoring via WebSocket
+- Real-time session monitoring via SSE
 - Event timeline and tool call visualization
 
 ## Component Interactions
@@ -122,8 +122,8 @@ Claude Code / AI Framework
 │  - Runner registry                  │   │   - Semantic search             │
 │  - Callback processor               │   └─────────────────┬───────────────┘
 │  - SQLite persistence               │                     │
-│  - WebSocket broadcast              │◄──────────────┐     │ HTTP
-│  - Agent blueprint registry         │          WS   │     │
+│  - SSE broadcast                    │◄──────────────┐     │ HTTP
+│  - Agent blueprint registry         │          SSE  │     │
 └──────────┬──────────────────────────┘               │     │
            │                                          │     │
            │ Long-poll (Agent Runs)             ┌─────┴─────┴─────┐
@@ -161,7 +161,7 @@ Claude Code / AI Framework
 | doc-* commands | Context Store | HTTP | Document operations |
 | Dashboard | Agent Coordinator | HTTP | Agent Runs API, Sessions API, Blueprints API |
 | Dashboard | Agent Coordinator | HTTP | Runner management |
-| Dashboard | Agent Coordinator | WebSocket | Real-time session updates |
+| Dashboard | Agent Coordinator | SSE | Real-time session updates |
 | Dashboard | Context Store | HTTP | Document listing/viewing |
 | Agent Runner | Agent Coordinator | HTTP | Long-poll for agent runs, report status |
 | Agent Runner | Agent Coordinator | HTTP | Registration, heartbeat |

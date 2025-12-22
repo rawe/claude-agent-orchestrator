@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useSSE } from './SSEContext';
 import { useNotification } from './NotificationContext';
 import { sessionService } from '@/services';
-import type { Session, WebSocketMessage } from '@/types';
+import type { Session, StreamMessage } from '@/types';
 
 interface SessionsContextValue {
   sessions: Session[];
@@ -40,7 +40,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to SSE updates - this runs at app level, always active
   useEffect(() => {
-    const handleMessage = (message: WebSocketMessage) => {
+    const handleMessage = (message: StreamMessage) => {
       if (message.type === 'init' && message.sessions) {
         setSessions(message.sessions);
       } else if (message.type === 'session_created' && message.session) {

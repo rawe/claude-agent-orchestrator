@@ -28,7 +28,7 @@ export interface SessionEvent {
   content?: MessageContent[];
 }
 
-export interface WebSocketMessage {
+export interface StreamMessage {
   type: 'init' | 'event' | 'session_created' | 'session_updated' | 'session_deleted';
   sessions?: import('./session').Session[];
   data?: SessionEvent;
