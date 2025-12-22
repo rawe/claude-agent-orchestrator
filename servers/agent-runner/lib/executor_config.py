@@ -21,12 +21,18 @@ ENV_ENABLE_LOGGING = "AGENT_ORCHESTRATOR_ENABLE_LOGGING"
 
 # Agent Orchestrator API configuration (unified service for sessions + blueprints)
 ENV_API_URL = "AGENT_ORCHESTRATOR_API_URL"
+ENV_API_KEY = "AGENT_ORCHESTRATOR_API_KEY"
 DEFAULT_API_URL = "http://127.0.0.1:8765"
 
 
 def get_api_url() -> str:
     """Get Agent Orchestrator API URL from environment or default."""
     return os.environ.get(ENV_API_URL, DEFAULT_API_URL)
+
+
+def get_api_key() -> str:
+    """Get Agent Orchestrator API key from environment."""
+    return os.environ.get(ENV_API_KEY, "")
 
 
 @dataclass

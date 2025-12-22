@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from config import RunnerConfig
-from api_client import CoordinatorAPIClient, DuplicateRunnerError
+from api_client import CoordinatorAPIClient, DuplicateRunnerError, AuthenticationError
 from registry import RunningRunsRegistry
 from executor import RunExecutor, list_executors, resolve_executor_name, get_executor_type
 from poller import RunPoller
@@ -113,6 +113,7 @@ class Runner:
         self.config = config
         self.api_client = CoordinatorAPIClient(
             config.agent_coordinator_url,
+            api_key=config.api_key,
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
         self.registry = RunningRunsRegistry()
@@ -150,6 +151,9 @@ class Runner:
             logger.info(f"  Project directory: {self.config.project_dir}")
             if self.config.tags:
                 logger.info(f"  Tags: {self.config.tags}")
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise SystemExit(1)
         except Exception as e:
             logger.error(f"Failed to register: {e}")
             raise

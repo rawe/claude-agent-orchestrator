@@ -63,6 +63,7 @@ Claude Code / AI Framework
 - Runner registry with health monitoring
 - Callback processor for parent-child session coordination
 - Stop command queue for immediate session termination
+- API key authentication (see [auth-coordinator.md](architecture/auth-coordinator.md))
 
 **Agent Runner** (`servers/agent-runner/`)
 - Polls Agent Coordinator for pending agent runs and stop commands
@@ -177,6 +178,8 @@ Claude Code / AI Framework
 | `VITE_AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Dashboard |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | cwd | ao-* CLI commands, MCP Server |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Coordinator |
+| `AUTH_DISABLED` | `false` | Agent Coordinator (set `true` to disable auth for development) |
+| `ADMIN_API_KEY` | (required) | Agent Coordinator (API key for all endpoints) |
 | `DEBUG_LOGGING` | `false` | Agent Coordinator |
 | `POLL_TIMEOUT` | `30` | Agent Runner |
 | `HEARTBEAT_INTERVAL` | `60` | Agent Runner |

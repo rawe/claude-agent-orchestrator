@@ -24,9 +24,13 @@ class SessionNotFoundError(SessionClientError):
 class SessionClient:
     """HTTP client for Agent Session Manager API."""
 
-    def __init__(self, base_url: str, timeout: float = 5.0):
+    def __init__(self, base_url: str, api_key: str = "", timeout: float = 5.0):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
+
+        self._headers = {}
+        if api_key:
+            self._headers["Authorization"] = f"Bearer {api_key}"
 
     def _request(
         self,
@@ -41,6 +45,7 @@ class SessionClient:
                 method=method,
                 url=url,
                 json=json_data,
+                headers=self._headers,
                 timeout=self.timeout
             )
             if response.status_code == 404:
@@ -177,6 +182,6 @@ class SessionClient:
             return False
 
 
-def get_client(base_url: str) -> SessionClient:
+def get_client(base_url: str, api_key: str = "") -> SessionClient:
     """Get a SessionClient instance."""
-    return SessionClient(base_url)
+    return SessionClient(base_url, api_key=api_key)

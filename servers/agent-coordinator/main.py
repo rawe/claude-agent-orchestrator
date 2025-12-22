@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Query, Header, Request
+from fastapi import FastAPI, HTTPException, Query, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ from database import (
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity
 )
+from auth import validate_startup_config, verify_api_key, AUTH_DISABLED, AuthConfigError
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
@@ -122,6 +123,16 @@ async def run_timeout_task():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager"""
+    # Validate auth configuration before starting
+    try:
+        validate_startup_config()
+    except AuthConfigError as e:
+        print(f"[FATAL] {e}", flush=True)
+        raise SystemExit(1)
+
+    if AUTH_DISABLED:
+        print("[WARNING] Authentication is DISABLED. Do not use in production!", flush=True)
+
     init_db()
 
     # Start runner lifecycle background task
@@ -150,8 +161,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Agent Coordinator",
     description="Unified service for agent session management and agent blueprint registry",
-    version="0.3.0",  # Bumped for ADR-010
-    lifespan=lifespan
+    version="0.4.0",  # Bumped for auth support
+    lifespan=lifespan,
+    dependencies=[Depends(verify_api_key)],
 )
 
 # Enable CORS for frontend
@@ -670,9 +682,9 @@ async def sse_sessions(
 # Agent Registry Routes (merged from agent-registry service)
 # ==============================================================================
 
-@app.get("/health")
+@app.get("/health", dependencies=[])
 def health_check():
-    """Health check endpoint."""
+    """Health check endpoint (public, no auth required)."""
     return {"status": "healthy"}
 
 

@@ -125,6 +125,7 @@ async def run_claude_session(
     mcp_servers: Optional[dict] = None,
     resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
+    api_key: str = "",
     agent_name: Optional[str] = None,
     executor_type: str = "claude-code",
 ) -> tuple[str, str]:
@@ -162,7 +163,7 @@ async def run_claude_session(
         ... )
     """
     # Create session client for API calls
-    session_client = SessionClient(api_url)
+    session_client = SessionClient(api_url, api_key=api_key)
 
     # Get hostname for bind call
     hostname = socket.gethostname()
@@ -341,6 +342,7 @@ def run_session_sync(
     mcp_servers: Optional[dict] = None,
     resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
+    api_key: str = "",
     agent_name: Optional[str] = None,
     executor_type: str = "claude-code",
 ) -> tuple[str, str]:
@@ -384,6 +386,7 @@ def run_session_sync(
             mcp_servers=mcp_servers,
             resume_executor_session_id=resume_executor_session_id,
             api_url=api_url,
+            api_key=api_key,
             agent_name=agent_name,
             executor_type=executor_type,
         )

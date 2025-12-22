@@ -202,7 +202,64 @@ ROLE_MAPPING = {
 
 ---
 
-## Next Steps
+## Current Implementation
 
-1. Choose approach (recommend starting with #1)
-2. Detail the implementation for chosen approach
+**Status**: Approach 1 (Static API Keys) implemented with Admin key only.
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTH_DISABLED` | No | `false` | Set to `true` to disable authentication (development only) |
+| `ADMIN_API_KEY` | Yes* | - | API key for all endpoints (*required unless `AUTH_DISABLED=true`) |
+
+### Startup Behavior
+
+The Agent Coordinator validates authentication configuration on startup:
+
+- If `AUTH_DISABLED=false` (default) and `ADMIN_API_KEY` is not set → **Server fails to start**
+- If `AUTH_DISABLED=true` → Warning logged, all requests allowed without authentication
+- If `ADMIN_API_KEY` is set → All requests require valid API key
+
+### Client Authentication
+
+Clients must include the API key in the `Authorization` header:
+
+```
+Authorization: Bearer <api_key>
+```
+
+### HTTP Response Codes
+
+| Code | Meaning |
+|------|---------|
+| 401 | Missing or malformed `Authorization` header |
+| 403 | Invalid API key |
+
+### Files
+
+- `servers/agent-coordinator/auth.py` - Authentication module
+- `servers/agent-coordinator/main.py` - Integration (startup validation, route protection)
+
+### Client Implementation Status
+
+All clients read from `AGENT_ORCHESTRATOR_API_KEY` environment variable.
+
+| Client | Status | Files |
+|--------|--------|-------|
+| Agent Runner | Done | `lib/config.py`, `lib/api_client.py` |
+| Claude Code Executor | Done | `lib/executor_config.py`, `lib/session_client.py`, `ao-claude-code-exec` |
+| Test Executor | Done | `ao-test-exec` |
+| Dashboard | Done | `src/utils/constants.ts`, `src/services/api.ts` |
+| Chat UI | Done | `src/config/index.ts`, `src/services/api.ts` |
+| Agent Orchestrator MCP | Pending | `mcps/agent-orchestrator/` |
+| ao-* CLI commands | Pending | `plugins/orchestrator/` |
+
+**Docker:** `docker-compose.yml` passes `AGENT_ORCHESTRATOR_API_KEY` to dashboard via `VITE_AGENT_ORCHESTRATOR_API_KEY`.
+
+### Future Extensions
+
+When role-based access (Runner, User) is needed:
+1. Add `RUNNER_API_KEY` and/or user key configuration
+2. Extend `verify_api_key()` to return role information
+3. Add role-based route protection per the Permission Matrix above

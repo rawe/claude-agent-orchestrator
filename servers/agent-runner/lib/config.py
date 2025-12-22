@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 # Environment variable names
 ENV_COORDINATOR_URL = "AGENT_ORCHESTRATOR_API_URL"
+ENV_API_KEY = "AGENT_ORCHESTRATOR_API_KEY"
 ENV_POLL_TIMEOUT = "POLL_TIMEOUT"
 ENV_HEARTBEAT_INTERVAL = "HEARTBEAT_INTERVAL"
 ENV_PROJECT_DIR = "PROJECT_DIR"
@@ -33,6 +34,7 @@ class RunnerConfig:
     """Configuration for the Agent Runner."""
 
     agent_coordinator_url: str
+    api_key: str
     poll_timeout: int
     heartbeat_interval: int
     project_dir: str
@@ -43,6 +45,7 @@ class RunnerConfig:
         """Load configuration from environment variables."""
         return cls(
             agent_coordinator_url=os.environ.get(ENV_COORDINATOR_URL, DEFAULT_COORDINATOR_URL),
+            api_key=os.environ.get(ENV_API_KEY, ""),
             poll_timeout=int(os.environ.get(ENV_POLL_TIMEOUT, DEFAULT_POLL_TIMEOUT)),
             heartbeat_interval=int(
                 os.environ.get(ENV_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL)

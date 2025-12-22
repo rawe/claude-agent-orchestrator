@@ -170,7 +170,7 @@ def run_start(inv: ExecutorInvocation):
     Session is already created in coordinator with status='pending' (ADR-010).
     Executor binds to session after Claude SDK starts.
     """
-    from executor_config import load_config
+    from executor_config import load_config, get_api_key
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import debug_log
@@ -225,6 +225,7 @@ def run_start(inv: ExecutorInvocation):
         session_id=inv.session_id,
         mcp_servers=mcp_servers,
         api_url=config.api_url,
+        api_key=get_api_key(),
         agent_name=agent_name,
     )
 
@@ -238,18 +239,19 @@ def run_resume(inv: ExecutorInvocation):
 
     Fetches session affinity to get executor_session_id for Claude SDK resume.
     """
-    from executor_config import get_api_url
+    from executor_config import get_api_url, get_api_key
     from session_client import SessionClient, SessionClientError
     from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import debug_log
 
-    # 1. Get API URL
+    # 1. Get API URL and key
     api_url = get_api_url()
+    api_key = get_api_key()
 
     # 2. Get session and affinity data
     try:
-        client = SessionClient(api_url)
+        client = SessionClient(api_url, api_key=api_key)
         session_data = client.get_session(inv.session_id)
     except SessionClientError as e:
         raise ValueError(f"Failed to connect to session manager: {e}")
@@ -311,6 +313,7 @@ def run_resume(inv: ExecutorInvocation):
         mcp_servers=mcp_servers,
         resume_executor_session_id=executor_session_id,
         api_url=api_url,
+        api_key=api_key,
         agent_name=session_agent,
     )
 

@@ -8,6 +8,8 @@ export const config = {
   apiUrl,
   // SSE endpoint derived from API URL (ADR-013)
   sseUrl: `${apiUrl}/sse/sessions`,
+  // API authentication
+  apiKey: import.meta.env.VITE_AGENT_ORCHESTRATOR_API_KEY || '',
 
   // Agent configuration
   agentBlueprint: import.meta.env.VITE_AGENT_BLUEPRINT || 'default-agent',

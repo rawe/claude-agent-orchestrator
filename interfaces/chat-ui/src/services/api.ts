@@ -2,18 +2,29 @@ import axios, { AxiosError } from 'axios';
 import { config } from '../config';
 import type { RunRequest, RunResponse } from '../types';
 
-// Create axios instance
+// Create axios instance with auth header
 const api = axios.create({
   baseURL: config.apiUrl,
   headers: {
     'Content-Type': 'application/json',
+    ...(config.apiKey && { 'Authorization': `Bearer ${config.apiKey}` }),
   },
 });
 
-// Error handler
+// Error handler with auth-specific messages
 function handleError(error: unknown): never {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<{ detail?: string; message?: string }>;
+    const status = axiosError.response?.status;
+
+    // Auth-specific error messages
+    if (status === 401) {
+      throw new Error('Authentication required. Check VITE_AGENT_ORCHESTRATOR_API_KEY.');
+    }
+    if (status === 403) {
+      throw new Error('Access denied. Invalid API key.');
+    }
+
     const message = axiosError.response?.data?.detail
       || axiosError.response?.data?.message
       || axiosError.message

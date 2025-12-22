@@ -13,9 +13,8 @@ services:
     environment:
       # These are baked in at build time via Vite
       - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
-      - VITE_AGENT_CONTROL_API_URL=http://localhost:9500
       - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-      - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
+      - VITE_AGENT_ORCHESTRATOR_API_KEY=${AGENT_ORCHESTRATOR_API_KEY}
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -39,6 +38,10 @@ services:
       - ${AGENT_DIR:-./config/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
+      # Authentication (see docs/architecture/auth-coordinator.md)
+      # Default true: docker-compose is for local development only, not production
+      - AUTH_DISABLED=${AUTH_DISABLED:-true}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
       # Enable verbose debug logging for troubleshooting (set to true to enable)
       - DEBUG_LOGGING=false
       - CORS_ORIGINS=*

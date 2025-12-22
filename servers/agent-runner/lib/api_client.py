@@ -14,6 +14,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class AuthenticationError(Exception):
+    """Raised when API key is missing or invalid."""
+
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        super().__init__(message)
+
+
 class DuplicateRunnerError(Exception):
     """Raised when trying to register a runner with an identity that's already online."""
 
@@ -64,16 +72,22 @@ class PollResult:
 class CoordinatorAPIClient:
     """HTTP client for Agent Coordinator Runner API."""
 
-    def __init__(self, base_url: str, timeout: float = 35.0):
-        """Initialize client with base URL.
+    def __init__(self, base_url: str, api_key: str = "", timeout: float = 35.0):
+        """Initialize client with base URL and optional API key.
 
         Args:
             base_url: Agent Coordinator URL (e.g., http://localhost:8765)
+            api_key: API key for authentication (optional if auth disabled on server)
             timeout: Request timeout in seconds (slightly longer than poll timeout)
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self._client = httpx.Client(timeout=timeout)
+
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        self._client = httpx.Client(timeout=timeout, headers=headers)
 
     def close(self):
         """Close the HTTP client."""
@@ -112,6 +126,12 @@ class CoordinatorAPIClient:
             f"{self.base_url}/runner/register",
             json=payload,
         )
+
+        # Handle authentication errors
+        if response.status_code == 401:
+            raise AuthenticationError(401, "Missing or invalid API key. Set AGENT_ORCHESTRATOR_API_KEY.")
+        if response.status_code == 403:
+            raise AuthenticationError(403, "API key rejected. Check AGENT_ORCHESTRATOR_API_KEY value.")
 
         # Handle duplicate runner error (409 Conflict)
         if response.status_code == 409:
