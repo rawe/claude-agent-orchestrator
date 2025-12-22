@@ -12,10 +12,14 @@ Environment Variables:
 Usage:
     Clients must include the API key in requests:
         Authorization: Bearer <api_key>
+
+    For SSE/EventSource (which doesn't support custom headers):
+        ?api_key=<api_key>
 """
 
 import os
-from fastapi import HTTPException, Security
+from typing import Optional
+from fastapi import HTTPException, Security, Query
 from fastapi.security import APIKeyHeader
 
 # Environment variables
@@ -44,34 +48,47 @@ def validate_startup_config() -> None:
         )
 
 
-async def verify_api_key(authorization: str = Security(api_key_header)) -> dict | None:
+async def verify_api_key(
+    authorization: str = Security(api_key_header),
+    api_key: Optional[str] = Query(None, description="API key (for SSE/EventSource)")
+) -> dict | None:
     """FastAPI dependency to verify API key.
+
+    Supports two authentication methods:
+    1. Authorization header: Bearer <api_key>
+    2. Query parameter: ?api_key=<api_key> (for SSE/EventSource which doesn't support headers)
 
     Returns:
         dict with role info if authenticated, None if auth disabled.
 
     Raises:
-        HTTPException 401: Missing or malformed Authorization header.
+        HTTPException 401: Missing or malformed credentials.
         HTTPException 403: Invalid API key.
     """
     if AUTH_DISABLED:
         return None
 
-    if not authorization:
+    token = None
+
+    # Try Authorization header first
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+        else:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid Authorization header format. Use 'Bearer <token>'"
+            )
+    # Fall back to query parameter (for SSE/EventSource)
+    elif api_key:
+        token = api_key
+
+    if not token:
         raise HTTPException(
             status_code=401,
-            detail="Missing Authorization header"
+            detail="Missing credentials. Use 'Authorization: Bearer <token>' header or '?api_key=<token>' query parameter."
         )
-
-    # Extract token from "Bearer <token>" format
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid Authorization header format. Use 'Bearer <token>'"
-        )
-
-    token = parts[1]
 
     # Validate against admin key
     if token == ADMIN_API_KEY:

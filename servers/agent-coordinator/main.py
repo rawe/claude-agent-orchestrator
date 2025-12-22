@@ -682,9 +682,9 @@ async def sse_sessions(
 # Agent Registry Routes (merged from agent-registry service)
 # ==============================================================================
 
-@app.get("/health", dependencies=[])
+@app.get("/health")
 def health_check():
-    """Health check endpoint (public, no auth required)."""
+    """Health check endpoint."""
     return {"status": "healthy"}
 
 

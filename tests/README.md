@@ -25,7 +25,10 @@ tests/
 ├── tools/
 │   └── sse-monitor         # SSE event monitor
 ├── scripts/
-│   └── reset-db           # Database reset script
+│   ├── reset-db            # Database reset script
+│   ├── start-coordinator   # Start Agent Coordinator with .env
+│   ├── start-runner        # Start Agent Runner with .env
+│   └── start-sse-monitor   # Start SSE monitor with .env
 └── README.md              # This file
 ```
 
@@ -49,9 +52,16 @@ For tests that require agent blueprints (test cases 03-07), copy them **before**
 
 ### 3. Start Agent Coordinator
 
-In a terminal (or background process). **Must run from `servers/agent-coordinator/`** (the coordinator uses relative paths for database and agent storage):
+In a terminal (or background process). Use the helper script which handles `.env` sourcing and port checks:
 
 ```bash
+./tests/scripts/start-coordinator
+```
+
+Or manually (must run from `servers/agent-coordinator/` directory):
+
+```bash
+set -a; source .env; set +a  # Export all .env variables
 cd servers/agent-coordinator
 uv run python -m main
 ```
@@ -64,21 +74,35 @@ curl http://localhost:8765/health
 
 ### 4. Start Agent Runner
 
-In another terminal (or background process):
+In another terminal (or background process). Use the helper script:
 
 ```bash
 # With test-executor (fast, deterministic)
-./servers/agent-runner/agent-runner -x test-executor
+./tests/scripts/start-runner test-executor
 
 # Or with claude-code (real AI)
-./servers/agent-runner/agent-runner -x claude-code
+./tests/scripts/start-runner claude-code
+```
+
+Or manually:
+
+```bash
+set -a; source .env; set +a
+./servers/agent-runner/agent-runner -x test-executor
 ```
 
 ### 5. Start SSE Monitor
 
-In another terminal (or background process):
+In another terminal (or background process). Use the helper script:
 
 ```bash
+./tests/scripts/start-sse-monitor
+```
+
+Or manually:
+
+```bash
+set -a; source .env; set +a
 ./tests/tools/sse-monitor
 ```
 
@@ -178,7 +202,10 @@ curl -s http://localhost:9500/mcp
 
 The MCP server must be started **before** running test cases that use the `agent-orchestrator` blueprint.
 
-## Test Case
+## Test Cases
+
+### Category 0: Authentication
+- `00-auth-basic.md` - Verify authentication works end-to-end with Runner and Executor
 
 ### Category 1: Basic Session Lifecycle
 - `01-basic-session-start.md` - Start a new session, verify events
@@ -224,6 +251,59 @@ Removes the SQLite database and test-executor session data:
 - **Agent Runner**: `Ctrl+C` in terminal or kill process
 - **sse-monitor**: `Ctrl+C` in terminal
 
+## Authentication Testing
+
+When testing with authentication enabled, ensure all components have the API key.
+
+### Required Environment Variables
+
+The `.env` file must contain:
+- `ADMIN_API_KEY` - Used by Agent Coordinator for authentication
+- `AGENT_ORCHESTRATOR_API_KEY` - Used by Agent Runner and SSE monitor
+
+### Option 1: Use helper scripts (recommended)
+
+The helper scripts automatically source `.env` and export variables:
+
+```bash
+./tests/scripts/reset-db
+./tests/scripts/start-coordinator   # in background
+./tests/scripts/start-runner        # in background
+./tests/scripts/start-sse-monitor   # in background
+```
+
+### Option 2: Manual with set -a
+
+Use `set -a` to auto-export all variables when sourcing:
+
+```bash
+set -a; source .env; set +a
+./tests/scripts/reset-db
+cd servers/agent-coordinator && uv run python -m main  # in background
+./servers/agent-runner/agent-runner -x test-executor   # in background
+./tests/tools/sse-monitor                              # in background
+```
+
+**Note**: Plain `source .env` does NOT export variables to subprocesses.
+
+### Option 3: Disable auth for tests
+
+```bash
+cd servers/agent-coordinator && AUTH_DISABLED=true uv run python -m main
+```
+
+### Curl commands with auth
+
+When auth is enabled, add the Authorization header to curl commands:
+
+```bash
+source .env
+curl -X POST http://localhost:8765/runs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $AGENT_ORCHESTRATOR_API_KEY" \
+  -d '{"type": "start_session", "prompt": "Hello", "project_dir": "."}'
+```
+
 ## Troubleshooting
 
 ### "Connection refused" errors
@@ -237,3 +317,8 @@ Removes the SQLite database and test-executor session data:
 ### No SSE events
 - Verify sse-monitor connected successfully
 - Check Agent Coordinator logs for errors
+
+### Authentication errors (401/403)
+- Ensure `AGENT_ORCHESTRATOR_API_KEY` is set in environment
+- Source `.env` file before starting services: `source .env`
+- Or disable auth: `AUTH_DISABLED=true`

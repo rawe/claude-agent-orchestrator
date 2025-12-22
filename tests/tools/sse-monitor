@@ -17,9 +17,14 @@ Usage:
 
     # Filter by session_id
     ./tests/tools/sse-monitor --session-id abc123
+
+    # With authentication (reads AGENT_ORCHESTRATOR_API_KEY from env)
+    export AGENT_ORCHESTRATOR_API_KEY=your-key
+    ./tests/tools/sse-monitor
 """
 
 import argparse
+import os
 import signal
 import sys
 
@@ -27,13 +32,24 @@ import httpx
 
 # Configuration - modify these as needed
 SSE_URL = "http://localhost:8765/sse/sessions"
+ENV_API_KEY = "AGENT_ORCHESTRATOR_API_KEY"
 
 
 def monitor(session_id: str | None = None):
     """Connect to SSE endpoint and print all events."""
-    url = SSE_URL
+    # Build URL with query parameters
+    params = []
     if session_id:
-        url = f"{SSE_URL}?session_id={session_id}"
+        params.append(f"session_id={session_id}")
+
+    # Add API key if configured (SSE/EventSource doesn't support custom headers)
+    api_key = os.environ.get(ENV_API_KEY, "")
+    if api_key:
+        params.append(f"api_key={api_key}")
+
+    url = SSE_URL
+    if params:
+        url = f"{SSE_URL}?{'&'.join(params)}"
 
     print(f"Connecting to {url}...", file=sys.stderr)
 

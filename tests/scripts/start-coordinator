@@ -1,0 +1,42 @@
+#!/bin/bash
+# Start Agent Coordinator with environment variables from .env
+#
+# Usage:
+#   ./tests/scripts/start-coordinator
+#
+# The script:
+#   - Sources .env and exports all variables
+#   - Checks port 8765 is available
+#   - Starts the coordinator from the correct directory
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Source and export all variables from .env
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+else
+    echo "ERROR: .env file not found at $PROJECT_ROOT/.env" >&2
+    exit 1
+fi
+
+# Check required variables
+if [ -z "$ADMIN_API_KEY" ]; then
+    echo "ERROR: ADMIN_API_KEY not set in .env" >&2
+    exit 1
+fi
+
+# Check port availability
+if lsof -ti :8765 >/dev/null 2>&1; then
+    echo "ERROR: Port 8765 already in use" >&2
+    echo "Run: lsof -ti :8765 | xargs kill" >&2
+    exit 1
+fi
+
+# Start coordinator from its directory (required for relative paths)
+cd "$PROJECT_ROOT/servers/agent-coordinator"
+exec uv run python -m main

@@ -7,7 +7,11 @@ export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || '
 export const AGENT_ORCHESTRATOR_API_KEY = import.meta.env.VITE_AGENT_ORCHESTRATOR_API_KEY || '';
 
 // SSE endpoint for real-time updates (ADR-013) - derived from API URL
-export const SSE_URL = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
+// Note: EventSource doesn't support custom headers, so API key is passed as query param
+const sseBaseUrl = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
+export const SSE_URL = AGENT_ORCHESTRATOR_API_KEY
+  ? `${sseBaseUrl}?api_key=${encodeURIComponent(AGENT_ORCHESTRATOR_API_KEY)}`
+  : sseBaseUrl;
 
 // Status colors
 export const STATUS_COLORS = {

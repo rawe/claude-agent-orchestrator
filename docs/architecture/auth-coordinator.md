@@ -223,11 +223,19 @@ The Agent Coordinator validates authentication configuration on startup:
 
 ### Client Authentication
 
-Clients must include the API key in the `Authorization` header:
+Clients must include the API key in requests using one of two methods:
 
+**1. Authorization Header (preferred)**
 ```
 Authorization: Bearer <api_key>
 ```
+
+**2. Query Parameter (for SSE/EventSource)**
+```
+?api_key=<api_key>
+```
+
+The query parameter method exists because the browser's `EventSource` API (used for SSE) doesn't support custom headers. Frontend applications use this method for SSE connections.
 
 ### HTTP Response Codes
 

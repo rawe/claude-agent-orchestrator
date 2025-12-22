@@ -1,0 +1,38 @@
+#!/bin/bash
+# Start Agent Runner with environment variables from .env
+#
+# Usage:
+#   ./tests/scripts/start-runner [executor]
+#
+# Arguments:
+#   executor  - Executor type: test-executor (default) or claude-code
+#
+# The script:
+#   - Sources .env and exports all variables
+#   - Starts the runner with the specified executor
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+EXECUTOR="${1:-test-executor}"
+
+# Source and export all variables from .env
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+else
+    echo "ERROR: .env file not found at $PROJECT_ROOT/.env" >&2
+    exit 1
+fi
+
+# Check required variables
+if [ -z "$AGENT_ORCHESTRATOR_API_KEY" ]; then
+    echo "ERROR: AGENT_ORCHESTRATOR_API_KEY not set in .env" >&2
+    exit 1
+fi
+
+# Start runner
+exec "$PROJECT_ROOT/servers/agent-runner/agent-runner" -x "$EXECUTOR"

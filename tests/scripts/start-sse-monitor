@@ -1,0 +1,33 @@
+#!/bin/bash
+# Start SSE Monitor with environment variables from .env
+#
+# Usage:
+#   ./tests/scripts/start-sse-monitor [--session-id <id>]
+#
+# The script:
+#   - Sources .env and exports all variables
+#   - Starts the SSE monitor tool
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Source and export all variables from .env
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    set -a
+    source "$PROJECT_ROOT/.env"
+    set +a
+else
+    echo "ERROR: .env file not found at $PROJECT_ROOT/.env" >&2
+    exit 1
+fi
+
+# Check required variables
+if [ -z "$AGENT_ORCHESTRATOR_API_KEY" ]; then
+    echo "ERROR: AGENT_ORCHESTRATOR_API_KEY not set in .env" >&2
+    exit 1
+fi
+
+# Start SSE monitor, passing through any arguments
+exec "$PROJECT_ROOT/tests/tools/sse-monitor" "$@"
