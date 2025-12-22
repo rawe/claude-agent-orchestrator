@@ -7,6 +7,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { config } from '../config';
+import { fetchAccessToken, isOidcConfigured } from '../services/auth';
 import type { StreamMessage } from '../types';
 
 type MessageHandler = (message: StreamMessage) => void;
@@ -31,20 +32,46 @@ const SSE_EVENT_TYPES = [
   'run_failed',
 ] as const;
 
+/**
+ * Build SSE URL with authentication token.
+ * EventSource doesn't support custom headers, so token is passed as query param.
+ */
+async function buildSSEUrl(): Promise<string> {
+  const baseUrl = `${config.apiUrl}/sse/sessions`;
+
+  // Try OIDC token first
+  if (isOidcConfigured()) {
+    const token = await fetchAccessToken();
+    if (token) {
+      return `${baseUrl}?api_key=${encodeURIComponent(token)}`;
+    }
+  }
+
+  // Fall back to static API key
+  if (config.apiKey) {
+    return `${baseUrl}?api_key=${encodeURIComponent(config.apiKey)}`;
+  }
+
+  return baseUrl;
+}
+
 export function SSEProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const subscribersRef = useRef<Set<MessageHandler>>(new Set());
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     // Close existing connection if any
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
 
-    console.log('[SSE] Connecting to', config.sseUrl);
-    const eventSource = new EventSource(config.sseUrl);
+    // Build URL with current auth token
+    const sseUrl = await buildSSEUrl();
+    console.log('[SSE] Connecting to', sseUrl.replace(/api_key=[^&]+/, 'api_key=***'));
+
+    const eventSource = new EventSource(sseUrl);
 
     eventSource.onopen = () => {
       console.log('[SSE] Connected');

@@ -1,14 +1,33 @@
 import axios, { AxiosError } from 'axios';
 import { config } from '../config';
+import { fetchAccessToken, isOidcConfigured } from './auth';
 import type { RunRequest, RunResponse } from '../types';
 
-// Create axios instance with auth header
+// Create axios instance
 const api = axios.create({
   baseURL: config.apiUrl,
   headers: {
     'Content-Type': 'application/json',
-    ...(config.apiKey && { 'Authorization': `Bearer ${config.apiKey}` }),
   },
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(async (requestConfig) => {
+  // Try OIDC token first if configured
+  if (isOidcConfigured()) {
+    const token = await fetchAccessToken();
+    if (token) {
+      requestConfig.headers.Authorization = `Bearer ${token}`;
+      return requestConfig;
+    }
+  }
+
+  // Fall back to static API key
+  if (config.apiKey) {
+    requestConfig.headers.Authorization = `Bearer ${config.apiKey}`;
+  }
+
+  return requestConfig;
 });
 
 // Error handler with auth-specific messages

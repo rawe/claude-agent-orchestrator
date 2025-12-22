@@ -1,13 +1,32 @@
 import axios from 'axios';
 import { AGENT_ORCHESTRATOR_API_URL, AGENT_ORCHESTRATOR_API_KEY, DOCUMENT_SERVER_URL } from '@/utils/constants';
+import { fetchAccessToken, isOidcConfigured } from './auth';
 
 // Axios instance for Agent Orchestrator API (sessions, events, agent blueprints, runs)
 export const agentOrchestratorApi = axios.create({
   baseURL: AGENT_ORCHESTRATOR_API_URL,
   headers: {
     'Content-Type': 'application/json',
-    ...(AGENT_ORCHESTRATOR_API_KEY && { 'Authorization': `Bearer ${AGENT_ORCHESTRATOR_API_KEY}` }),
   },
+});
+
+// Request interceptor to add auth token
+agentOrchestratorApi.interceptors.request.use(async (config) => {
+  // Try OIDC token first if configured
+  if (isOidcConfigured()) {
+    const token = await fetchAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      return config;
+    }
+  }
+
+  // Fall back to static API key
+  if (AGENT_ORCHESTRATOR_API_KEY) {
+    config.headers.Authorization = `Bearer ${AGENT_ORCHESTRATOR_API_KEY}`;
+  }
+
+  return config;
 });
 
 // Axios instance for context store server

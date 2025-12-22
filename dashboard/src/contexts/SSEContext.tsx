@@ -11,7 +11,8 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { SSE_URL } from '@/utils/constants';
+import { AGENT_ORCHESTRATOR_API_URL, AGENT_ORCHESTRATOR_API_KEY } from '@/utils/constants';
+import { fetchAccessToken, isOidcConfigured } from '@/services/auth';
 import type { StreamMessage } from '@/types';
 
 interface SSEContextValue {
@@ -35,22 +36,46 @@ const SSE_EVENT_TYPES = [
   'run_failed',
 ] as const;
 
+/**
+ * Build SSE URL with authentication token.
+ * EventSource doesn't support custom headers, so token is passed as query param.
+ */
+async function buildSSEUrl(): Promise<string> {
+  const baseUrl = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
+
+  // Try OIDC token first
+  if (isOidcConfigured()) {
+    const token = await fetchAccessToken();
+    if (token) {
+      return `${baseUrl}?api_key=${encodeURIComponent(token)}`;
+    }
+  }
+
+  // Fall back to static API key
+  if (AGENT_ORCHESTRATOR_API_KEY) {
+    return `${baseUrl}?api_key=${encodeURIComponent(AGENT_ORCHESTRATOR_API_KEY)}`;
+  }
+
+  return baseUrl;
+}
+
 export function SSEProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const subscribersRef = useRef<Set<(message: StreamMessage) => void>>(new Set());
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     // Close existing connection if any
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
 
-    console.log('SSE: Connecting to', SSE_URL);
-    // Note: withCredentials will be needed when cookie-based auth is implemented
-    // For now, omit it to avoid CORS issues with credentials
-    const eventSource = new EventSource(SSE_URL);
+    // Build URL with current auth token
+    const sseUrl = await buildSSEUrl();
+    console.log('SSE: Connecting to', sseUrl.replace(/api_key=[^&]+/, 'api_key=***'));
+
+    const eventSource = new EventSource(sseUrl);
 
     eventSource.onopen = () => {
       console.log('SSE: Connected');

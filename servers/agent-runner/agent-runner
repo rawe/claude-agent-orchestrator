@@ -45,10 +45,12 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import typer
 from config import RunnerConfig
 from api_client import CoordinatorAPIClient, DuplicateRunnerError, AuthenticationError
+from auth0_client import Auth0M2MClient
 from registry import RunningRunsRegistry
 from executor import RunExecutor, list_executors, resolve_executor_name, get_executor_type
 from poller import RunPoller
 from supervisor import RunSupervisor
+from coordinator_proxy import CoordinatorProxy
 
 # Configure logging
 logging.basicConfig(
@@ -111,11 +113,34 @@ class Runner:
 
     def __init__(self, config: RunnerConfig):
         self.config = config
+
+        # Create Auth0 client if configured
+        self.auth0_client: Auth0M2MClient | None = None
+        if config.use_oidc:
+            self.auth0_client = Auth0M2MClient(
+                domain=config.auth0_domain,
+                client_id=config.auth0_client_id,
+                client_secret=config.auth0_client_secret,
+                audience=config.auth0_audience,
+            )
+            logger.info("Auth0 M2M authentication enabled")
+
         self.api_client = CoordinatorAPIClient(
             config.agent_coordinator_url,
             api_key=config.api_key,
+            auth0_client=self.auth0_client,
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
+
+        # Create proxy for executor communication
+        # Executors connect to this proxy instead of the coordinator directly
+        # The proxy handles authentication transparently
+        self.proxy = CoordinatorProxy(
+            coordinator_url=config.agent_coordinator_url,
+            api_key=config.api_key,
+            auth0_client=self.auth0_client,
+        )
+
         self.registry = RunningRunsRegistry()
         self.executor = RunExecutor(config.project_dir)
         self.runner_id: str | None = None
@@ -163,6 +188,14 @@ class Runner:
         if not self.runner_id:
             raise RuntimeError("Must register before starting")
 
+        # Start the proxy server for executor communication
+        # This must happen before spawning any executors
+        self.proxy.start()
+
+        # Set environment variable so executors use the proxy
+        # This is transparent - executors don't know they're using a proxy
+        os.environ["AGENT_ORCHESTRATOR_API_URL"] = self.proxy.url
+
         # Create components
         self.poller = RunPoller(
             self.api_client,
@@ -207,6 +240,9 @@ class Runner:
             self.supervisor.stop()
         if self.heartbeat:
             self.heartbeat.stop()
+
+        # Stop the proxy server
+        self.proxy.stop()
 
         # Deregister from Agent Coordinator (only if not already deregistered externally)
         if self.runner_id and not self._externally_deregistered:

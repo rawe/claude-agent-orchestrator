@@ -2,6 +2,7 @@
 Runner Configuration
 
 Configuration for the Agent Runner process that polls Agent Coordinator for runs.
+Supports both API key and Auth0 M2M authentication.
 """
 
 import os
@@ -15,6 +16,12 @@ ENV_POLL_TIMEOUT = "POLL_TIMEOUT"
 ENV_HEARTBEAT_INTERVAL = "HEARTBEAT_INTERVAL"
 ENV_PROJECT_DIR = "PROJECT_DIR"
 ENV_RUNNER_TAGS = "RUNNER_TAGS"  # Comma-separated capability tags (ADR-011)
+
+# Auth0 M2M environment variables
+ENV_AUTH0_DOMAIN = "AUTH0_DOMAIN"
+ENV_AUTH0_CLIENT_ID = "AUTH0_CLIENT_ID"
+ENV_AUTH0_CLIENT_SECRET = "AUTH0_CLIENT_SECRET"
+ENV_AUTH0_AUDIENCE = "AUTH0_AUDIENCE"
 
 # Defaults
 DEFAULT_COORDINATOR_URL = "http://localhost:8765"
@@ -40,6 +47,22 @@ class RunnerConfig:
     project_dir: str
     tags: list[str]  # Capability tags (ADR-011)
 
+    # Auth0 M2M configuration
+    auth0_domain: str
+    auth0_client_id: str
+    auth0_client_secret: str
+    auth0_audience: str
+
+    @property
+    def use_oidc(self) -> bool:
+        """Check if Auth0 OIDC is configured."""
+        return bool(
+            self.auth0_domain
+            and self.auth0_client_id
+            and self.auth0_client_secret
+            and self.auth0_audience
+        )
+
     @classmethod
     def from_env(cls) -> "RunnerConfig":
         """Load configuration from environment variables."""
@@ -52,4 +75,9 @@ class RunnerConfig:
             ),
             project_dir=os.environ.get(ENV_PROJECT_DIR, os.getcwd()),
             tags=_parse_tags(os.environ.get(ENV_RUNNER_TAGS, "")),
+            # Auth0 M2M
+            auth0_domain=os.environ.get(ENV_AUTH0_DOMAIN, ""),
+            auth0_client_id=os.environ.get(ENV_AUTH0_CLIENT_ID, ""),
+            auth0_client_secret=os.environ.get(ENV_AUTH0_CLIENT_SECRET, ""),
+            auth0_audience=os.environ.get(ENV_AUTH0_AUDIENCE, ""),
         )

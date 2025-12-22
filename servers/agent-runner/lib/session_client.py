@@ -5,6 +5,13 @@ HTTP client for Agent Session Manager API.
 Replaces file-based session operations with API calls.
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
+
+Authentication Note:
+    This client is used by executors which communicate via the Agent Coordinator
+    Proxy. The proxy handles all authentication (Auth0 M2M or API key), so this
+    client does not need to add Authorization headers when used behind the proxy.
+    The api_key parameter is kept for backwards compatibility but will be removed
+    once the proxy is fully integrated.
 """
 
 import httpx
