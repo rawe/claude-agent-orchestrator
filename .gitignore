@@ -77,6 +77,8 @@ $RECYCLE.BIN/
 .mcp-agent-orchestrator.pid
 .mcp-context-store.pid
 .chat-ui.pid
+.agent-runner.pid
+.agent-runner.log
 
 # Docker Compose local overrides (use docker-compose.override.yml.template as starting point)
 docker-compose.override.yml
