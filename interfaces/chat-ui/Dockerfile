@@ -13,7 +13,17 @@ RUN npm ci
 # Copy source code and environment file
 COPY . .
 
-# Build the application (VITE_* vars are injected at build time from .env)
+# Vite env vars must be available at build time
+ARG VITE_API_URL
+ARG VITE_AGENT_ORCHESTRATOR_API_KEY
+ARG VITE_AGENT_BLUEPRINT
+ARG VITE_APP_TITLE
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_AGENT_ORCHESTRATOR_API_KEY=$VITE_AGENT_ORCHESTRATOR_API_KEY
+ENV VITE_AGENT_BLUEPRINT=$VITE_AGENT_BLUEPRINT
+ENV VITE_APP_TITLE=$VITE_APP_TITLE
+
+# Build the application
 RUN npm run build
 
 # Stage 2: Serve with nginx
