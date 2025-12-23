@@ -13,20 +13,15 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use(async (requestConfig) => {
-  // Try OIDC token first if configured
+  // Add OIDC token if configured and available
   if (isOidcConfigured()) {
     const token = await fetchAccessToken();
     if (token) {
       requestConfig.headers.Authorization = `Bearer ${token}`;
-      return requestConfig;
     }
   }
-
-  // Fall back to static API key
-  if (config.apiKey) {
-    requestConfig.headers.Authorization = `Bearer ${config.apiKey}`;
-  }
-
+  // When OIDC is not configured, requests go without auth
+  // (for local development with AUTH_ENABLED=false on coordinator)
   return requestConfig;
 });
 
@@ -38,10 +33,10 @@ function handleError(error: unknown): never {
 
     // Auth-specific error messages
     if (status === 401) {
-      throw new Error('Authentication required. Check VITE_AGENT_ORCHESTRATOR_API_KEY.');
+      throw new Error('Authentication required. Please log in.');
     }
     if (status === 403) {
-      throw new Error('Access denied. Invalid API key.');
+      throw new Error('Access denied. Invalid or expired token.');
     }
 
     const message = axiosError.response?.data?.detail

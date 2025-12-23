@@ -37,22 +37,17 @@ const SSE_EVENT_TYPES = [
  * EventSource doesn't support custom headers, so token is passed as query param.
  */
 async function buildSSEUrl(): Promise<string> {
-  const baseUrl = `${config.apiUrl}/sse/sessions`;
-
-  // Try OIDC token first
+  // Add OIDC token if configured and available
   if (isOidcConfigured()) {
     const token = await fetchAccessToken();
     if (token) {
-      return `${baseUrl}?api_key=${encodeURIComponent(token)}`;
+      return `${config.sseBaseUrl}?api_key=${encodeURIComponent(token)}`;
     }
   }
 
-  // Fall back to static API key
-  if (config.apiKey) {
-    return `${baseUrl}?api_key=${encodeURIComponent(config.apiKey)}`;
-  }
-
-  return baseUrl;
+  // When OIDC is not configured, connect without auth
+  // (for local development with AUTH_ENABLED=false on coordinator)
+  return config.sseBaseUrl;
 }
 
 export function SSEProvider({ children }: { children: ReactNode }) {
