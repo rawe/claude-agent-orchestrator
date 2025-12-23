@@ -16,7 +16,7 @@ from database import (
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity
 )
-from auth import validate_startup_config, verify_api_key, AUTH_DISABLED, AuthConfigError
+from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
@@ -130,7 +130,7 @@ async def lifespan(app: FastAPI):
         print(f"[FATAL] {e}", flush=True)
         raise SystemExit(1)
 
-    if AUTH_DISABLED:
+    if not AUTH_ENABLED:
         print("[WARNING] Authentication is DISABLED. Do not use in production!", flush=True)
 
     init_db()

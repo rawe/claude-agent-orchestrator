@@ -1,17 +1,16 @@
 """Authentication module for Agent Coordinator.
 
-Supports both API key and OIDC (Auth0) authentication.
+Supports OIDC (Auth0) authentication.
 See docs/architecture/auth-coordinator.md for design rationale.
 
 Environment Variables:
-    AUTH_DISABLED: Set to 'true' to disable authentication (development only).
-    ADMIN_API_KEY: API key for admin access (optional if using OIDC).
+    AUTH_ENABLED: Set to 'true' to enable authentication (default: false).
     AUTH0_DOMAIN: Auth0 tenant domain (e.g., 'your-org.auth0.com').
     AUTH0_AUDIENCE: API identifier configured in Auth0.
 
 Usage:
     Clients can authenticate via:
-    1. Authorization header: Bearer <api_key_or_jwt>
+    1. Authorization header: Bearer <jwt>
     2. Query parameter: ?api_key=<token> (for SSE/EventSource)
 """
 
@@ -28,8 +27,7 @@ from fastapi.security import APIKeyHeader
 logger = logging.getLogger(__name__)
 
 # Environment variables
-AUTH_DISABLED = os.getenv("AUTH_DISABLED", "").lower() in ("true", "1", "yes")
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "").lower() in ("true", "1", "yes")
 
 # Auth0/OIDC configuration
 AUTH0_DOMAIN = os.getenv("AUTH0_DOMAIN", "")
@@ -143,35 +141,26 @@ def validate_startup_config() -> None:
     Raises:
         AuthConfigError: If authentication is enabled but not properly configured.
     """
-    if AUTH_DISABLED:
+    if not AUTH_ENABLED:
         logger.warning("Authentication is DISABLED - all requests will be allowed")
         return
 
-    has_api_key = bool(ADMIN_API_KEY)
-    has_oidc = bool(AUTH0_DOMAIN and AUTH0_AUDIENCE)
-
-    if not has_api_key and not has_oidc:
+    if not AUTH0_DOMAIN or not AUTH0_AUDIENCE:
         raise AuthConfigError(
-            "Authentication is enabled but no auth method configured. "
-            "Set ADMIN_API_KEY for API key auth, or AUTH0_DOMAIN + AUTH0_AUDIENCE for OIDC, "
-            "or set AUTH_DISABLED=true for development."
+            "AUTH_ENABLED=true but AUTH0_DOMAIN and AUTH0_AUDIENCE are not set. "
+            "Configure Auth0 OIDC or set AUTH_ENABLED=false for development."
         )
 
-    if has_oidc:
-        logger.info(f"OIDC authentication enabled (Auth0 domain: {AUTH0_DOMAIN})")
-    if has_api_key:
-        logger.info("API key authentication enabled")
+    logger.info(f"OIDC authentication enabled (Auth0 domain: {AUTH0_DOMAIN})")
 
 
 async def verify_api_key(
     authorization: str = Security(api_key_header),
-    api_key: Optional[str] = Query(None, description="API key or JWT (for SSE/EventSource)")
+    api_key: Optional[str] = Query(None, description="JWT token (for SSE/EventSource)")
 ) -> dict | None:
     """FastAPI dependency to verify authentication.
 
-    Supports:
-    1. API key authentication (static key)
-    2. OIDC JWT authentication (Auth0)
+    Supports OIDC JWT authentication (Auth0).
 
     Returns:
         dict with auth info if authenticated, None if auth disabled.
@@ -180,7 +169,7 @@ async def verify_api_key(
         HTTPException 401: Missing or malformed credentials.
         HTTPException 403: Invalid credentials.
     """
-    if AUTH_DISABLED:
+    if not AUTH_ENABLED:
         return None
 
     token = None
@@ -204,10 +193,6 @@ async def verify_api_key(
             status_code=401,
             detail="Missing credentials. Use 'Authorization: Bearer <token>' header or '?api_key=<token>' query parameter."
         )
-
-    # Check if it's an API key (not a JWT)
-    if ADMIN_API_KEY and token == ADMIN_API_KEY:
-        return {"role": "admin", "auth_type": "api_key"}
 
     # Try JWT validation if it looks like a JWT
     if _is_jwt(token) and AUTH0_DOMAIN:
@@ -234,4 +219,4 @@ async def verify_api_key(
                 "permissions": permissions,
             }
 
-    raise HTTPException(status_code=403, detail="Invalid credentials")
+    raise HTTPException(status_code=403, detail="Invalid or expired token")

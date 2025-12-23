@@ -24,12 +24,6 @@ else
     exit 1
 fi
 
-# Check required variables
-if [ -z "$ADMIN_API_KEY" ]; then
-    echo "ERROR: ADMIN_API_KEY not set in .env" >&2
-    exit 1
-fi
-
 # Check port availability
 if lsof -ti :8765 >/dev/null 2>&1; then
     echo "ERROR: Port 8765 already in use" >&2
