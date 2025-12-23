@@ -23,11 +23,5 @@ else
     exit 1
 fi
 
-# Check required variables
-if [ -z "$AGENT_ORCHESTRATOR_API_KEY" ]; then
-    echo "ERROR: AGENT_ORCHESTRATOR_API_KEY not set in .env" >&2
-    exit 1
-fi
-
 # Start SSE monitor, passing through any arguments
 exec "$PROJECT_ROOT/tests/tools/sse-monitor" "$@"

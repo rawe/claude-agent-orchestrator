@@ -204,9 +204,6 @@ The MCP server must be started **before** running test cases that use the `agent
 
 ## Test Cases
 
-### Category 0: Authentication
-- `00-auth-basic.md` - Verify authentication works end-to-end with Runner and Executor
-
 ### Category 1: Basic Session Lifecycle
 - `01-basic-session-start.md` - Start a new session, verify events
 - `02-session-resume.md` - Resume an existing session
@@ -251,58 +248,11 @@ Removes the SQLite database and test-executor session data:
 - **Agent Runner**: `Ctrl+C` in terminal or kill process
 - **sse-monitor**: `Ctrl+C` in terminal
 
-## Authentication Testing
+## Authentication
 
-When testing with authentication enabled, ensure all components have the API key.
+Authentication is **disabled** for all integration tests. The helper scripts explicitly set `AUTH_ENABLED=false` when starting the Agent Coordinator.
 
-### Required Environment Variables
-
-The `.env` file must contain:
-- `ADMIN_API_KEY` - Used by Agent Coordinator for authentication
-- `AGENT_ORCHESTRATOR_API_KEY` - Used by Agent Runner and SSE monitor
-
-### Option 1: Use helper scripts (recommended)
-
-The helper scripts automatically source `.env` and export variables:
-
-```bash
-./tests/scripts/reset-db
-./tests/scripts/start-coordinator   # in background
-./tests/scripts/start-runner        # in background
-./tests/scripts/start-sse-monitor   # in background
-```
-
-### Option 2: Manual with set -a
-
-Use `set -a` to auto-export all variables when sourcing:
-
-```bash
-set -a; source .env; set +a
-./tests/scripts/reset-db
-cd servers/agent-coordinator && uv run python -m main  # in background
-./servers/agent-runner/agent-runner -x test-executor   # in background
-./tests/tools/sse-monitor                              # in background
-```
-
-**Note**: Plain `source .env` does NOT export variables to subprocesses.
-
-### Option 3: Disable auth for tests
-
-```bash
-cd servers/agent-coordinator && AUTH_DISABLED=true uv run python -m main
-```
-
-### Curl commands with auth
-
-When auth is enabled, add the Authorization header to curl commands:
-
-```bash
-source .env
-curl -X POST http://localhost:8765/runs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $AGENT_ORCHESTRATOR_API_KEY" \
-  -d '{"type": "start_session", "prompt": "Hello", "project_dir": "."}'
-```
+If you need to test authentication behavior, do so in a separate environment with `AUTH_ENABLED=true` and Auth0 configured.
 
 ## Troubleshooting
 
@@ -317,8 +267,3 @@ curl -X POST http://localhost:8765/runs \
 ### No SSE events
 - Verify sse-monitor connected successfully
 - Check Agent Coordinator logs for errors
-
-### Authentication errors (401/403)
-- Ensure `AGENT_ORCHESTRATOR_API_KEY` is set in environment
-- Source `.env` file before starting services: `source .env`
-- Or disable auth: `AUTH_DISABLED=true`

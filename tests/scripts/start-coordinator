@@ -33,4 +33,8 @@ fi
 
 # Start coordinator from its directory (required for relative paths)
 cd "$PROJECT_ROOT/servers/agent-coordinator"
+
+# Ensure auth is disabled for integration tests
+export AUTH_ENABLED=false
+
 exec uv run python -m main

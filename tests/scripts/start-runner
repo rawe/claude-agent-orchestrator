@@ -28,11 +28,5 @@ else
     exit 1
 fi
 
-# Check required variables
-if [ -z "$AGENT_ORCHESTRATOR_API_KEY" ]; then
-    echo "ERROR: AGENT_ORCHESTRATOR_API_KEY not set in .env" >&2
-    exit 1
-fi
-
 # Start runner
 exec "$PROJECT_ROOT/servers/agent-runner/agent-runner" -x "$EXECUTOR"
