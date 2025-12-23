@@ -3,15 +3,9 @@
 export const AGENT_ORCHESTRATOR_API_URL = import.meta.env.VITE_AGENT_ORCHESTRATOR_API_URL || 'http://localhost:8765';
 export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || 'http://localhost:8766';
 
-// API authentication
-export const AGENT_ORCHESTRATOR_API_KEY = import.meta.env.VITE_AGENT_ORCHESTRATOR_API_KEY || '';
-
 // SSE endpoint for real-time updates (ADR-013) - derived from API URL
-// Note: EventSource doesn't support custom headers, so API key is passed as query param
-const sseBaseUrl = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
-export const SSE_URL = AGENT_ORCHESTRATOR_API_KEY
-  ? `${sseBaseUrl}?api_key=${encodeURIComponent(AGENT_ORCHESTRATOR_API_KEY)}`
-  : sseBaseUrl;
+// Note: Token is added at runtime via auth service (EventSource doesn't support headers)
+export const SSE_BASE_URL = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
 
 // Status colors
 export const STATUS_COLORS = {

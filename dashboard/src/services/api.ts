@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AGENT_ORCHESTRATOR_API_URL, AGENT_ORCHESTRATOR_API_KEY, DOCUMENT_SERVER_URL } from '@/utils/constants';
+import { AGENT_ORCHESTRATOR_API_URL, DOCUMENT_SERVER_URL } from '@/utils/constants';
 import { fetchAccessToken, isOidcConfigured } from './auth';
 
 // Axios instance for Agent Orchestrator API (sessions, events, agent blueprints, runs)
@@ -12,20 +12,15 @@ export const agentOrchestratorApi = axios.create({
 
 // Request interceptor to add auth token
 agentOrchestratorApi.interceptors.request.use(async (config) => {
-  // Try OIDC token first if configured
+  // Add OIDC token if configured and available
   if (isOidcConfigured()) {
     const token = await fetchAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      return config;
     }
   }
-
-  // Fall back to static API key
-  if (AGENT_ORCHESTRATOR_API_KEY) {
-    config.headers.Authorization = `Bearer ${AGENT_ORCHESTRATOR_API_KEY}`;
-  }
-
+  // When OIDC is not configured, requests go without auth
+  // (for local development with AUTH_ENABLED=false on coordinator)
   return config;
 });
 
@@ -44,12 +39,12 @@ const handleError = (error: unknown) => {
 
     // Auth-specific error messages
     if (status === 401) {
-      const message = 'Authentication required. Check VITE_AGENT_ORCHESTRATOR_API_KEY.';
+      const message = 'Authentication required. Please log in.';
       console.error('API Error:', message);
       throw new Error(message);
     }
     if (status === 403) {
-      const message = 'Access denied. Invalid API key.';
+      const message = 'Access denied. Invalid or expired token.';
       console.error('API Error:', message);
       throw new Error(message);
     }

@@ -189,8 +189,10 @@ Claude Code / AI Framework
 | `VITE_AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Dashboard |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | cwd | ao-* CLI commands, MCP Server |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Coordinator |
-| `AUTH_DISABLED` | `false` | Agent Coordinator (set `true` to disable auth for development) |
-| `ADMIN_API_KEY` | (required) | Agent Coordinator (API key for all endpoints) |
+| `AUTH_ENABLED` | `false` | Agent Coordinator (set `true` to enable Auth0 OIDC) |
+| `AUTH0_DOMAIN` | (none) | Agent Coordinator, Dashboard (Auth0 tenant domain) |
+| `AUTH0_AUDIENCE` | (none) | Agent Coordinator, Dashboard (API identifier) |
+| `AUTH0_DASHBOARD_CLIENT_ID` | (none) | Dashboard (SPA client ID) |
 | `DEBUG_LOGGING` | `false` | Agent Coordinator |
 | `POLL_TIMEOUT` | `30` | Agent Runner |
 | `HEARTBEAT_INTERVAL` | `60` | Agent Runner |

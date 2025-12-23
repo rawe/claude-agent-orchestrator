@@ -11,7 +11,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { AGENT_ORCHESTRATOR_API_URL, AGENT_ORCHESTRATOR_API_KEY } from '@/utils/constants';
+import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
 import { fetchAccessToken, isOidcConfigured } from '@/services/auth';
 import type { StreamMessage } from '@/types';
 
@@ -43,7 +43,7 @@ const SSE_EVENT_TYPES = [
 async function buildSSEUrl(): Promise<string> {
   const baseUrl = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
 
-  // Try OIDC token first
+  // Add OIDC token if configured
   if (isOidcConfigured()) {
     const token = await fetchAccessToken();
     if (token) {
@@ -51,11 +51,8 @@ async function buildSSEUrl(): Promise<string> {
     }
   }
 
-  // Fall back to static API key
-  if (AGENT_ORCHESTRATOR_API_KEY) {
-    return `${baseUrl}?api_key=${encodeURIComponent(AGENT_ORCHESTRATOR_API_KEY)}`;
-  }
-
+  // When OIDC is not configured, connect without auth
+  // (for local development with AUTH_ENABLED=false on coordinator)
   return baseUrl;
 }
 
