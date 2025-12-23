@@ -23,7 +23,7 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-chat-ui-docker stop-chat-ui-docker start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner
 
 # Default target
 help:
@@ -91,10 +91,8 @@ help:
 	@echo "  make stop-all       - Stop everything"
 	@echo ""
 	@echo "Applications (interfaces/):"
-	@echo "  make start-chat-ui         - Start Chat UI (npm/vite preview)"
-	@echo "  make stop-chat-ui          - Stop Chat UI (npm)"
-	@echo "  make start-chat-ui-docker  - Start Chat UI (Docker/nginx)"
-	@echo "  make stop-chat-ui-docker   - Stop Chat UI (Docker)"
+	@echo "  make start-chat-ui         - Start Chat UI (Docker)"
+	@echo "  make stop-chat-ui          - Stop Chat UI (Docker)"
 
 # Build all images
 build:
@@ -588,52 +586,11 @@ stop-all:
 # Applications using Agent Orchestrator Framework (interfaces/)
 # ============================================================================
 
-# Chat UI - npm-based (vite preview)
+# Chat UI (Docker-based)
 CHAT_UI_DIR := interfaces/chat-ui
-CHAT_UI_PID_FILE := .chat-ui.pid
 
 start-chat-ui:
-	@echo "Starting Chat UI (npm/vite preview)..."
-	@if [ -f $(CHAT_UI_PID_FILE) ] && kill -0 $$(cat $(CHAT_UI_PID_FILE)) 2>/dev/null; then \
-		echo "Chat UI already running (PID: $$(cat $(CHAT_UI_PID_FILE)))"; \
-		exit 1; \
-	fi
-	@if [ ! -f $(CHAT_UI_DIR)/.env ]; then \
-		echo "No .env file found. Copying from .env.example..."; \
-		cp $(CHAT_UI_DIR)/.env.example $(CHAT_UI_DIR)/.env; \
-		echo "Created $(CHAT_UI_DIR)/.env - edit if needed"; \
-	fi
-	@echo "Installing dependencies..."
-	@cd $(CHAT_UI_DIR) && npm install
-	@echo "Building application..."
-	@cd $(CHAT_UI_DIR) && npm run build
-	@echo "Starting preview server..."
-	@cd $(CHAT_UI_DIR) && npm run preview & \
-	echo $$! > $(CHAT_UI_PID_FILE)
-	@sleep 2
-	@echo ""
-	@echo "Chat UI started (PID: $$(cat $(CHAT_UI_PID_FILE)))"
-	@echo "URL: http://localhost:3010"
-
-stop-chat-ui:
-	@echo "Stopping Chat UI (npm)..."
-	@if [ -f $(CHAT_UI_PID_FILE) ]; then \
-		PID=$$(cat $(CHAT_UI_PID_FILE)); \
-		if kill -0 $$PID 2>/dev/null; then \
-			kill $$PID; \
-			echo "Chat UI stopped (PID: $$PID)"; \
-		else \
-			echo "Chat UI not running (stale PID file)"; \
-		fi; \
-		rm -f $(CHAT_UI_PID_FILE); \
-	else \
-		echo "No PID file found. Trying to find and kill process..."; \
-		pkill -f "vite preview" 2>/dev/null && echo "Chat UI stopped" || echo "No Chat UI process found"; \
-	fi
-
-# Chat UI - Docker-based (nginx)
-start-chat-ui-docker:
-	@echo "Starting Chat UI (Docker/nginx)..."
+	@echo "Starting Chat UI..."
 	@if [ ! -f $(CHAT_UI_DIR)/.env ]; then \
 		echo "No .env file found. Copying from .env.example..."; \
 		cp $(CHAT_UI_DIR)/.env.example $(CHAT_UI_DIR)/.env; \
@@ -642,10 +599,10 @@ start-chat-ui-docker:
 	@echo "Building and starting Docker container..."
 	@cd $(CHAT_UI_DIR) && docker compose up -d --build
 	@echo ""
-	@echo "Chat UI started (Docker)"
+	@echo "Chat UI started"
 	@echo "URL: http://localhost:3010"
 
-stop-chat-ui-docker:
-	@echo "Stopping Chat UI (Docker)..."
+stop-chat-ui:
+	@echo "Stopping Chat UI..."
 	@cd $(CHAT_UI_DIR) && docker compose down
-	@echo "Chat UI stopped (Docker)"
+	@echo "Chat UI stopped"
