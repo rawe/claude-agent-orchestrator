@@ -64,7 +64,7 @@ Claude Code / AI Framework
 - Runner registry with health monitoring
 - Callback processor for parent-child session coordination
 - Stop command queue for immediate session termination
-- API key authentication (see [auth-coordinator.md](architecture/auth-coordinator.md))
+- OIDC authentication with Auth0 (see [auth-oidc.md](architecture/auth-oidc.md))
 
 **Agent Runner** (`servers/agent-runner/`)
 - Polls Agent Coordinator for pending agent runs and stop commands
@@ -79,7 +79,7 @@ Claude Code / AI Framework
 **Agent Coordinator Proxy** (`servers/agent-runner/lib/coordinator_proxy.py`)
 - Local HTTP proxy started by Agent Runner on a dynamic port
 - Forwards all executor HTTP requests to Agent Coordinator
-- Handles authentication transparently (Auth0 M2M or API key)
+- Handles authentication transparently (Auth0 M2M tokens)
 - Executors don't need authentication credentials
 - Supports multiple runners on the same machine (each gets own port)
 

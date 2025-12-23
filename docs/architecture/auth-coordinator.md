@@ -183,91 +183,56 @@ ROLE_MAPPING = {
 
 ---
 
-## Recommendation
+## Decision
 
-**Start with Approach 1 (API Keys)** for initial deployment:
-- Simplest to implement
-- Sufficient for controlled access
-- Easy to migrate to JWT later if needed
+**OIDC with Auth0 is the chosen authentication method.**
 
-**Upgrade to Approach 2 (JWT)** when you need:
-- Token expiration
-- Per-user tracking
-- Dynamic user provisioning
+The framework evaluated three approaches:
+- Approach 1: Static API Keys - Simple but no expiration, manual rotation
+- Approach 2: JWT Tokens - Better than API keys but still self-managed
+- Approach 3: OAuth2/OIDC with External IdP - Industry standard, chosen for production
 
-**Consider Approach 3** only for:
-- Enterprise integration
-- Existing IdP infrastructure
-- Regulatory requirements
+See `docs/architecture/auth-oidc.md` for the OIDC architecture details.
+See `docs/setup/auth0-setup.md` for configuration instructions.
 
 ---
 
 ## Current Implementation
 
-**Status**: Approach 1 (Static API Keys) implemented with Admin key only.
+**Status**: OIDC authentication with Auth0.
 
 ### Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `AUTH_DISABLED` | No | `false` | Set to `true` to disable authentication (development only) |
-| `ADMIN_API_KEY` | Yes* | - | API key for all endpoints (*required unless `AUTH_DISABLED=true`) |
+| `AUTH_ENABLED` | No | `false` | Set to `true` to enable authentication |
+| `AUTH0_DOMAIN` | Yes* | - | Auth0 tenant domain (*required when `AUTH_ENABLED=true`) |
+| `AUTH0_AUDIENCE` | Yes* | - | API identifier in Auth0 (*required when `AUTH_ENABLED=true`) |
 
 ### Startup Behavior
 
-The Agent Coordinator validates authentication configuration on startup:
-
-- If `AUTH_DISABLED=false` (default) and `ADMIN_API_KEY` is not set → **Server fails to start**
-- If `AUTH_DISABLED=true` → Warning logged, all requests allowed without authentication
-- If `ADMIN_API_KEY` is set → All requests require valid API key
+- If `AUTH_ENABLED=false` (default) → Warning logged, all requests allowed
+- If `AUTH_ENABLED=true` without Auth0 config → **Server fails to start**
+- If `AUTH_ENABLED=true` with Auth0 config → All requests require valid JWT
 
 ### Client Authentication
 
-Clients must include the API key in requests using one of two methods:
+Clients include JWT tokens from Auth0:
 
-**1. Authorization Header (preferred)**
+**Authorization Header:**
 ```
-Authorization: Bearer <api_key>
-```
-
-**2. Query Parameter (for SSE/EventSource)**
-```
-?api_key=<api_key>
+Authorization: Bearer <jwt_token>
 ```
 
-The query parameter method exists because the browser's `EventSource` API (used for SSE) doesn't support custom headers. Frontend applications use this method for SSE connections.
+**Query Parameter (for SSE/EventSource):**
+```
+?api_key=<jwt_token>
+```
 
-### HTTP Response Codes
+Note: The query parameter is named `api_key` for backwards compatibility but expects a JWT token.
 
-| Code | Meaning |
-|------|---------|
-| 401 | Missing or malformed `Authorization` header |
-| 403 | Invalid API key |
+### Architecture Reference
 
-### Files
-
-- `servers/agent-coordinator/auth.py` - Authentication module
-- `servers/agent-coordinator/main.py` - Integration (startup validation, route protection)
-
-### Client Implementation Status
-
-All clients read from `AGENT_ORCHESTRATOR_API_KEY` environment variable.
-
-| Client | Status | Files |
-|--------|--------|-------|
-| Agent Runner | Done | `lib/config.py`, `lib/api_client.py` |
-| Claude Code Executor | Done | `lib/executor_config.py`, `lib/session_client.py`, `ao-claude-code-exec` |
-| Test Executor | Done | `ao-test-exec` |
-| Dashboard | Done | `src/utils/constants.ts`, `src/services/api.ts` |
-| Chat UI | Done | `src/config/index.ts`, `src/services/api.ts` |
-| Agent Orchestrator MCP | Pending | `mcps/agent-orchestrator/` |
-| ao-* CLI commands | Pending | `plugins/orchestrator/` |
-
-**Docker:** `docker-compose.yml` passes `AGENT_ORCHESTRATOR_API_KEY` to dashboard via `VITE_AGENT_ORCHESTRATOR_API_KEY`.
-
-### Future Extensions
-
-When role-based access (Runner, User) is needed:
-1. Add `RUNNER_API_KEY` and/or user key configuration
-2. Extend `verify_api_key()` to return role information
-3. Add role-based route protection per the Permission Matrix above
+See:
+- `docs/architecture/auth-oidc.md` - OIDC flow diagrams and component details
+- `docs/setup/auth0-setup.md` - Step-by-step Auth0 configuration

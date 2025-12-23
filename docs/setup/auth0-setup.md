@@ -154,7 +154,6 @@ Create or update `dashboard/.env.local`:
 # Existing configuration
 VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
 VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-VITE_AGENT_ORCHESTRATOR_API_KEY=your-api-key-here
 
 # Auth0 Configuration
 VITE_AUTH0_DOMAIN=your-org.auth0.com
@@ -170,12 +169,7 @@ VITE_AUTH0_AUDIENCE=https://agent-coordinator.local
 
 ### 2.2 Behavior
 
-With Auth0 configured:
-
-| State | UI Shows | API Auth |
-|-------|----------|----------|
-| Not logged in | Login button | Falls back to `VITE_AGENT_ORCHESTRATOR_API_KEY` |
-| Logged in | User name + avatar + logout | Uses Auth0 access token |
+With Auth0 configured, the dashboard requires login. Users authenticate via Auth0 and the dashboard uses the access token for all API calls.
 
 ### 2.3 Testing
 
@@ -205,25 +199,19 @@ With Auth0 configured:
 Add to root `.env` or set in your environment:
 
 ```bash
+# Enable authentication
+AUTH_ENABLED=true
+
 # Auth0 Configuration
 AUTH0_DOMAIN=your-org.auth0.com
 AUTH0_AUDIENCE=https://agent-coordinator.local
-
-# Legacy API Key (keep during migration)
-ADMIN_API_KEY=your-current-api-key
-
-# Disable auth for development (optional)
-AUTH_DISABLED=false
 ```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `AUTH0_DOMAIN` | Yes* | Your Auth0 tenant domain |
-| `AUTH0_AUDIENCE` | Yes* | API identifier (for token validation) |
-| `ADMIN_API_KEY` | Yes* | Legacy API key (for migration period) |
-| `AUTH_DISABLED` | No | Set `true` to disable all auth |
-
-*At least one auth method (API key or OIDC) must be configured.
+| `AUTH_ENABLED` | No | Set `true` to enable authentication (default: `false`) |
+| `AUTH0_DOMAIN` | Yes* | Your Auth0 tenant domain (*required when `AUTH_ENABLED=true`) |
+| `AUTH0_AUDIENCE` | Yes* | API identifier (*required when `AUTH_ENABLED=true`) |
 
 ### 3.2 Token Validation
 
@@ -238,30 +226,7 @@ The Agent Coordinator validates JWT tokens by:
    - `aud` (audience) = `{AUTH0_AUDIENCE}`
    - `exp` (expiration) > current time
 
-### 3.3 Dual-Auth Period
-
-Both authentication methods work simultaneously:
-
-```
-Request with Bearer token
-         │
-         ▼
-┌─────────────────────┐
-│ Is it API key?      │──Yes──▶ Return role: admin, auth_type: api_key
-└─────────────────────┘
-         │ No
-         ▼
-┌─────────────────────┐
-│ Is it a JWT?        │──Yes──▶ Validate with Auth0 JWKS
-└─────────────────────┘         │
-         │ No                   ▼
-         ▼              ┌─────────────────────┐
-    403 Forbidden       │ Extract permissions │
-                        │ Map to role         │
-                        └─────────────────────┘
-```
-
-### 3.4 Role Mapping
+### 3.3 Role Mapping
 
 The coordinator maps Auth0 permissions to roles:
 
@@ -272,15 +237,11 @@ The coordinator maps Auth0 permissions to roles:
 | `user:runs` or `user:sessions` | `user` |
 | (valid JWT, no permissions) | `authenticated` |
 
-### 3.5 Auth Info Returned
+### 3.4 Auth Info Returned
 
-On successful authentication, `verify_api_key()` returns:
+On successful authentication, `verify_token()` returns:
 
 ```python
-# API Key auth
-{"role": "admin", "auth_type": "api_key"}
-
-# OIDC auth
 {
     "role": "user",           # Mapped from permissions
     "auth_type": "oidc",
@@ -290,7 +251,7 @@ On successful authentication, `verify_api_key()` returns:
 }
 ```
 
-### 3.6 Testing
+### 3.5 Testing
 
 1. Start coordinator with Auth0 env vars set
 2. Login to Dashboard
@@ -311,20 +272,16 @@ AUTH0_DOMAIN=your-org.auth0.com
 AUTH0_CLIENT_ID=your-runner-client-id
 AUTH0_CLIENT_SECRET=your-runner-client-secret
 AUTH0_AUDIENCE=https://agent-coordinator.local
-
-# Legacy API Key (keep during migration)
-AGENT_ORCHESTRATOR_API_KEY=your-current-api-key
 ```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `AUTH0_DOMAIN` | Yes* | Your Auth0 tenant domain |
-| `AUTH0_CLIENT_ID` | Yes* | M2M application Client ID |
-| `AUTH0_CLIENT_SECRET` | Yes* | M2M application Client Secret |
-| `AUTH0_AUDIENCE` | Yes* | API identifier |
-| `AGENT_ORCHESTRATOR_API_KEY` | No | Legacy API key (fallback) |
+| `AUTH0_DOMAIN` | Yes | Your Auth0 tenant domain |
+| `AUTH0_CLIENT_ID` | Yes | M2M application Client ID |
+| `AUTH0_CLIENT_SECRET` | Yes | M2M application Client Secret |
+| `AUTH0_AUDIENCE` | Yes | API identifier |
 
-*All four Auth0 variables must be set for OIDC authentication. Falls back to API key if not configured.
+All four Auth0 variables must be set for authentication.
 
 ### 4.2 Token Flow
 
@@ -352,15 +309,8 @@ The Agent Runner uses Client Credentials flow:
 The `Auth0M2MClient` automatically:
 - Caches access tokens in memory
 - Refreshes 60 seconds before expiry
-- Falls back to API key if token request fails
 
-### 4.4 Auth Priority
-
-The API client uses this order:
-1. **Auth0 token** (if all 4 env vars configured)
-2. **API key** (fallback if Auth0 not configured or token fails)
-
-### 4.5 Testing
+### 4.4 Testing
 
 Start the runner and check logs for:
 ```
@@ -381,7 +331,6 @@ Create `interfaces/chat-ui/.env.local`:
 ```bash
 # Existing configuration
 VITE_API_URL=http://localhost:8765
-VITE_AGENT_ORCHESTRATOR_API_KEY=your-api-key-here
 
 # Auth0 Configuration
 VITE_AUTH0_DOMAIN=your-org.auth0.com

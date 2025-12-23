@@ -184,9 +184,9 @@ The Agent Coordinator validates tokens by:
 
 | Variable | Description |
 |----------|-------------|
+| `AUTH_ENABLED` | Set to `true` to enable authentication |
 | `AUTH0_DOMAIN` | Auth0 tenant domain |
 | `AUTH0_AUDIENCE` | API identifier |
-| `ADMIN_API_KEY` | Legacy API key (fallback) |
 
 ### Dashboard / Chat UI
 
