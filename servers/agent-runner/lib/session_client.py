@@ -8,10 +8,8 @@ Note: Uses session_id (coordinator-generated) per ADR-010.
 
 Authentication Note:
     This client is used by executors which communicate via the Agent Coordinator
-    Proxy. The proxy handles all authentication (Auth0 M2M or API key), so this
-    client does not need to add Authorization headers when used behind the proxy.
-    The api_key parameter is kept for backwards compatibility but will be removed
-    once the proxy is fully integrated.
+    Proxy. The proxy handles all authentication (Auth0 M2M), so this client
+    does not need to add Authorization headers.
 """
 
 import httpx
@@ -31,13 +29,10 @@ class SessionNotFoundError(SessionClientError):
 class SessionClient:
     """HTTP client for Agent Session Manager API."""
 
-    def __init__(self, base_url: str, api_key: str = "", timeout: float = 5.0):
+    def __init__(self, base_url: str, timeout: float = 5.0):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
-
         self._headers = {}
-        if api_key:
-            self._headers["Authorization"] = f"Bearer {api_key}"
 
     def _request(
         self,
@@ -189,6 +184,6 @@ class SessionClient:
             return False
 
 
-def get_client(base_url: str, api_key: str = "") -> SessionClient:
+def get_client(base_url: str) -> SessionClient:
     """Get a SessionClient instance."""
-    return SessionClient(base_url, api_key=api_key)
+    return SessionClient(base_url)

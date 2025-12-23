@@ -125,7 +125,6 @@ async def run_claude_session(
     mcp_servers: Optional[dict] = None,
     resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
-    api_key: str = "",
     agent_name: Optional[str] = None,
     executor_type: str = "claude-code",
 ) -> tuple[str, str]:
@@ -135,13 +134,15 @@ async def run_claude_session(
     This function uses the Claude Agent SDK to create or resume a session,
     with session state managed via the AgentCoordinator API.
 
+    Note: Auth is handled by the Agent Coordinator Proxy - no credentials needed.
+
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
         project_dir: Working directory for Claude (sets cwd)
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_executor_session_id: If provided, resume existing Claude SDK session
-        api_url: Base URL of Agent Orchestrator API
+        api_url: Base URL of Agent Orchestrator API (via proxy)
         agent_name: Agent name (optional, for session metadata)
         executor_type: Executor type for bind call (default: "claude-code")
 
@@ -162,8 +163,8 @@ async def run_claude_session(
         ...     session_id="ses_abc123def456"
         ... )
     """
-    # Create session client for API calls
-    session_client = SessionClient(api_url, api_key=api_key)
+    # Create session client for API calls (auth handled by proxy)
+    session_client = SessionClient(api_url)
 
     # Get hostname for bind call
     hostname = socket.gethostname()
@@ -342,7 +343,6 @@ def run_session_sync(
     mcp_servers: Optional[dict] = None,
     resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
-    api_key: str = "",
     agent_name: Optional[str] = None,
     executor_type: str = "claude-code",
 ) -> tuple[str, str]:
@@ -352,13 +352,15 @@ def run_session_sync(
     This allows command scripts to remain synchronous while using
     the SDK's async API internally.
 
+    Note: Auth is handled by the Agent Coordinator Proxy - no credentials needed.
+
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
         project_dir: Working directory for Claude (sets cwd)
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_executor_session_id: If provided, resume existing Claude SDK session
-        api_url: Base URL of Agent Orchestrator API
+        api_url: Base URL of Agent Orchestrator API (via proxy)
         agent_name: Agent name (optional, for session metadata)
         executor_type: Executor type for bind call (default: "claude-code")
 
@@ -386,7 +388,6 @@ def run_session_sync(
             mcp_servers=mcp_servers,
             resume_executor_session_id=resume_executor_session_id,
             api_url=api_url,
-            api_key=api_key,
             agent_name=agent_name,
             executor_type=executor_type,
         )

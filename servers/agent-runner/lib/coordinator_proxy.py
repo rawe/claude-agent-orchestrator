@@ -8,7 +8,7 @@ direct access to authentication credentials.
 The proxy:
 - Binds to a dynamic port (127.0.0.1:0) to support multiple runners on same machine
 - Forwards all HTTP requests to the Agent Coordinator
-- Injects Authorization headers using Auth0 M2M tokens (preferred) or API key
+- Injects Authorization headers using Auth0 M2M tokens when configured
 - Is localhost-only for security
 
 Usage:
@@ -38,7 +38,6 @@ class CoordinatorProxyHandler(http.server.BaseHTTPRequestHandler):
 
     # Class-level configuration (set by CoordinatorProxy before starting)
     coordinator_url: str = ""
-    api_key: str = ""
     auth0_client: Optional["Auth0M2MClient"] = None
 
     def log_message(self, format: str, *args) -> None:
@@ -46,18 +45,14 @@ class CoordinatorProxyHandler(http.server.BaseHTTPRequestHandler):
         logger.debug(f"Proxy: {format % args}")
 
     def _get_auth_header(self) -> Optional[str]:
-        """Get authorization header value, preferring Auth0 over API key."""
-        # Try Auth0 first
+        """Get authorization header value from Auth0 M2M client."""
         if self.auth0_client and self.auth0_client.is_configured:
             token = self.auth0_client.get_access_token()
             if token:
                 return f"Bearer {token}"
-            logger.warning("Auth0 configured but failed to get token, falling back to API key")
+            logger.warning("Auth0 configured but failed to get token")
 
-        # Fall back to API key
-        if self.api_key:
-            return f"Bearer {self.api_key}"
-
+        # No auth header when Auth0 is not configured
         return None
 
     def do_GET(self) -> None:
@@ -176,7 +171,6 @@ class CoordinatorProxy:
     def __init__(
         self,
         coordinator_url: str,
-        api_key: str = "",
         auth0_client: Optional["Auth0M2MClient"] = None,
     ):
         """
@@ -184,11 +178,9 @@ class CoordinatorProxy:
 
         Args:
             coordinator_url: Base URL of Agent Coordinator (e.g., http://localhost:8765)
-            api_key: API key for authentication (fallback if Auth0 not configured)
-            auth0_client: Auth0 M2M client for OIDC authentication (preferred)
+            auth0_client: Auth0 M2M client for OIDC authentication
         """
         self.coordinator_url = coordinator_url.rstrip("/")
-        self.api_key = api_key
         self.auth0_client = auth0_client
         self._server: Optional[ThreadedHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
@@ -213,7 +205,6 @@ class CoordinatorProxy:
         """
         # Configure handler with coordinator details and auth
         CoordinatorProxyHandler.coordinator_url = self.coordinator_url
-        CoordinatorProxyHandler.api_key = self.api_key
         CoordinatorProxyHandler.auth0_client = self.auth0_client
 
         # Bind to port 0 to get a dynamic port assignment

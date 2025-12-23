@@ -2,7 +2,7 @@
 HTTP client for communicating with Agent Coordinator.
 
 Wraps the Runner API endpoints with typed methods.
-Supports both API key and Auth0 M2M authentication.
+Supports Auth0 M2M authentication when coordinator has AUTH_ENABLED=true.
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
 """
@@ -76,14 +76,12 @@ class PollResult:
 class CoordinatorAPIClient:
     """HTTP client for Agent Coordinator Runner API.
 
-    Supports both API key and Auth0 M2M authentication.
-    Auth0 is preferred if configured, falls back to API key.
+    Supports Auth0 M2M authentication when coordinator has AUTH_ENABLED=true.
     """
 
     def __init__(
         self,
         base_url: str,
-        api_key: str = "",
         auth0_client: Optional["Auth0M2MClient"] = None,
         timeout: float = 35.0,
     ):
@@ -91,30 +89,25 @@ class CoordinatorAPIClient:
 
         Args:
             base_url: Agent Coordinator URL (e.g., http://localhost:8765)
-            api_key: API key for authentication (fallback if Auth0 not configured)
-            auth0_client: Auth0 M2M client for OIDC authentication (preferred)
+            auth0_client: Auth0 M2M client for OIDC authentication
             timeout: Request timeout in seconds (slightly longer than poll timeout)
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self.api_key = api_key
         self.auth0_client = auth0_client
 
         self._client = httpx.Client(timeout=timeout)
 
     def _get_auth_headers(self) -> dict:
-        """Get authorization headers, preferring Auth0 over API key."""
-        # Try Auth0 first
+        """Get authorization headers from Auth0 M2M client."""
         if self.auth0_client and self.auth0_client.is_configured:
             token = self.auth0_client.get_access_token()
             if token:
                 return {"Authorization": f"Bearer {token}"}
-            logger.warning("Auth0 configured but failed to get token, falling back to API key")
+            logger.warning("Auth0 configured but failed to get token")
 
-        # Fall back to API key
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
-
+        # No auth headers when Auth0 is not configured
+        # (works with coordinator when AUTH_ENABLED=false)
         return {}
 
     def close(self):
@@ -160,9 +153,9 @@ class CoordinatorAPIClient:
 
         # Handle authentication errors
         if response.status_code == 401:
-            raise AuthenticationError(401, "Missing or invalid API key. Set AGENT_ORCHESTRATOR_API_KEY.")
+            raise AuthenticationError(401, "Missing or invalid credentials. Configure Auth0 M2M or disable auth on coordinator.")
         if response.status_code == 403:
-            raise AuthenticationError(403, "API key rejected. Check AGENT_ORCHESTRATOR_API_KEY value.")
+            raise AuthenticationError(403, "Credentials rejected. Check Auth0 M2M configuration.")
 
         # Handle duplicate runner error (409 Conflict)
         if response.status_code == 409:

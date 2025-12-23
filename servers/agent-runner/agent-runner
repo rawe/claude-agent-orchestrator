@@ -127,7 +127,6 @@ class Runner:
 
         self.api_client = CoordinatorAPIClient(
             config.agent_coordinator_url,
-            api_key=config.api_key,
             auth0_client=self.auth0_client,
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
@@ -137,7 +136,6 @@ class Runner:
         # The proxy handles authentication transparently
         self.proxy = CoordinatorProxy(
             coordinator_url=config.agent_coordinator_url,
-            api_key=config.api_key,
             auth0_client=self.auth0_client,
         )
 

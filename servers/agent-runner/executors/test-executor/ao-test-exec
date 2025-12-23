@@ -34,7 +34,7 @@ sys.path.insert(0, str(runner_lib))
 
 from invocation import ExecutorInvocation
 from session_client import SessionClient, SessionClientError
-from executor_config import get_api_url, get_api_key
+from executor_config import get_api_url
 
 # Storage directory (git-ignored)
 DATA_DIR = Path(__file__).parent / ".test-executor-data"
@@ -72,9 +72,9 @@ def generate_response(prompt: str) -> str:
 
 def run_start(inv: ExecutorInvocation) -> None:
     """Start a new session."""
+    # Auth is handled by Agent Coordinator Proxy
     api_url = get_api_url()
-    api_key = get_api_key()
-    client = SessionClient(api_url, api_key=api_key)
+    client = SessionClient(api_url)
 
     session_id = inv.session_id
 
@@ -170,9 +170,9 @@ def run_start(inv: ExecutorInvocation) -> None:
 
 def run_resume(inv: ExecutorInvocation) -> None:
     """Resume an existing session."""
+    # Auth is handled by Agent Coordinator Proxy
     api_url = get_api_url()
-    api_key = get_api_key()
-    client = SessionClient(api_url, api_key=api_key)
+    client = SessionClient(api_url)
 
     session_id = inv.session_id
 
