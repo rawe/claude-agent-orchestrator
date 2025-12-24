@@ -12,7 +12,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
-import { fetchAccessToken, isOidcConfigured } from '@/services/auth';
+import { fetchAccessToken, isOidcConfigured, waitForTokenReady } from '@/services/auth';
 import type { StreamMessage } from '@/types';
 
 interface SSEContextValue {
@@ -45,10 +45,15 @@ async function buildSSEUrl(): Promise<string> {
 
   // Add OIDC token if configured
   if (isOidcConfigured()) {
+    // Wait for Auth0 to set up the token getter (fixes race condition on mount)
+    await waitForTokenReady();
+
     const token = await fetchAccessToken();
     if (token) {
       return `${baseUrl}?api_key=${encodeURIComponent(token)}`;
     }
+    // Token getter is ready but token fetch failed - log warning
+    console.warn('SSE: Token getter ready but fetchAccessToken returned null');
   }
 
   // When OIDC is not configured, connect without auth

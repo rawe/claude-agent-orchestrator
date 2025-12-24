@@ -6,14 +6,39 @@
  */
 
 type TokenGetter = () => Promise<string>;
+type TokenReadyCallback = () => void;
 
 let getAccessToken: TokenGetter | null = null;
+let tokenReadyCallbacks: TokenReadyCallback[] = [];
 
 /**
  * Set the token getter function (called from Auth0 context).
  */
 export function setTokenGetter(getter: TokenGetter) {
   getAccessToken = getter;
+  // Notify all waiting subscribers that token is ready
+  tokenReadyCallbacks.forEach(cb => cb());
+  tokenReadyCallbacks = [];
+}
+
+/**
+ * Check if token getter is ready.
+ */
+export function isTokenGetterReady(): boolean {
+  return getAccessToken !== null;
+}
+
+/**
+ * Wait for token getter to be set.
+ * Resolves immediately if already set.
+ */
+export function waitForTokenReady(): Promise<void> {
+  if (getAccessToken !== null) {
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    tokenReadyCallbacks.push(resolve);
+  });
 }
 
 /**

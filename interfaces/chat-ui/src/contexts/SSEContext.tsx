@@ -7,7 +7,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { config } from '../config';
-import { fetchAccessToken, isOidcConfigured } from '../services/auth';
+import { fetchAccessToken, isOidcConfigured, waitForTokenReady } from '../services/auth';
 import type { StreamMessage } from '../types';
 
 type MessageHandler = (message: StreamMessage) => void;
@@ -39,10 +39,15 @@ const SSE_EVENT_TYPES = [
 async function buildSSEUrl(): Promise<string> {
   // Add OIDC token if configured and available
   if (isOidcConfigured()) {
+    // Wait for Auth0 to set up the token getter (fixes race condition on mount)
+    await waitForTokenReady();
+
     const token = await fetchAccessToken();
     if (token) {
       return `${config.sseBaseUrl}?api_key=${encodeURIComponent(token)}`;
     }
+    // Token getter is ready but token fetch failed - log warning
+    console.warn('[SSE] Token getter ready but fetchAccessToken returned null');
   }
 
   // When OIDC is not configured, connect without auth
