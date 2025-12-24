@@ -140,24 +140,40 @@ def claim_run(self, runner_id: str) -> Optional[Run]:
 **Sequence:**
 1. Runner calls `POST /runner/runs/{run_id}/started`
 2. Run status changes: `claimed` → `running`
-3. `RunExecutor` spawns the appropriate subprocess:
+3. **Schema 2.0: Blueprint Resolution** (NEW)
+   - If `agent_name` specified, Runner fetches blueprint from Coordinator: `GET /agents/{name}`
+   - Runner resolves placeholders in `mcp_servers` config:
+     - `${AGENT_ORCHESTRATOR_MCP_URL}` → MCP server URL
+     - `${AGENT_SESSION_ID}` → Current session ID
+   - Resolved `agent_blueprint` is included in the executor payload
+4. `RunExecutor` spawns the appropriate subprocess with JSON payload via stdin:
 
 ```python
-# executor.py
-def _execute_start_session(self, run: Run) -> subprocess.Popen:
-    cmd = [
-        self.ao_start_path,
-        "--session-name", run.session_name,
-        "--prompt", run.prompt,
-    ]
-    if run.agent_name:
-        cmd.extend(["--agent", run.agent_name])
-
-    env = os.environ.copy()
-    env["AGENT_SESSION_NAME"] = run.session_name
-
-    return subprocess.Popen(cmd, env=env, ...)
+# executor.py - Schema 2.0 payload
+payload = {
+    "schema_version": "2.0",
+    "mode": "start",
+    "session_id": run.session_id,
+    "prompt": run.prompt,
+    "project_dir": run.project_dir,
+    "agent_blueprint": {  # Fully resolved by Runner
+        "name": "worker-agent",
+        "system_prompt": "...",
+        "mcp_servers": {
+            "orchestrator": {
+                "url": "http://127.0.0.1:54321",  # Resolved from placeholder
+                "headers": {"X-Agent-Session-Id": "ses_abc123"}
+            }
+        }
+    }
+}
+# Spawned via: uv run --script ao-claude-code-exec < payload.json
 ```
+
+**Schema 2.0 Benefits:**
+- Executor no longer needs to call Coordinator API to fetch blueprints
+- Placeholders are resolved before executor starts (enables dynamic MCP server URLs)
+- Authentication credentials stay in Runner (not exposed to executor)
 
 **Process supervision:**
 - `RunSupervisor` thread monitors all running subprocesses

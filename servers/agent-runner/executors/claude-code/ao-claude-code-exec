@@ -63,23 +63,27 @@ DESCRIPTION:
     payload received via stdin. This script is invoked by agent-runner,
     not directly by users.
 
-JSON PAYLOAD FORMAT:
+JSON PAYLOAD FORMAT (Schema 2.0):
     {
-      "schema_version": "1.0",       // Required: schema version
+      "schema_version": "2.0",       // Required: schema version
       "mode": "start" | "resume",    // Required: execution mode
       "session_id": "<string>",      // Required: coordinator-generated ID (ADR-010)
       "prompt": "<string>",          // Required: user input
-      "agent_name": "<string>",      // Optional: agent blueprint (start only)
       "project_dir": "<path>",       // Optional: working dir (start only)
+      "agent_blueprint": {           // Optional: resolved blueprint from Runner
+        "name": "<string>",
+        "system_prompt": "<string>",
+        "mcp_servers": { ... }
+      },
       "metadata": { ... }            // Optional: extensible metadata
     }
 
 EXAMPLES:
-    # Start a new session
-    echo '{"schema_version":"1.0","mode":"start","session_id":"ses_abc123","prompt":"Hello"}' | uv run ao-claude-code-exec
+    # Start with schema 2.0 (agent_blueprint provided by Runner)
+    echo '{"schema_version":"2.0","mode":"start","session_id":"ses_abc123","prompt":"Hello","agent_blueprint":{"name":"my-agent"}}' | uv run ao-claude-code-exec
 
     # Resume an existing session
-    echo '{"schema_version":"1.0","mode":"resume","session_id":"ses_abc123","prompt":"Continue"}' | uv run ao-claude-code-exec
+    echo '{"schema_version":"2.0","mode":"resume","session_id":"ses_abc123","prompt":"Continue"}' | uv run ao-claude-code-exec
 
 EXIT CODES:
     0    Success
@@ -91,9 +95,8 @@ ENVIRONMENT:
     AGENT_ORCHESTRATOR_ENABLE_LOGGING   Enable debug logging
 
 SCHEMA VERSION:
-    Current: 1.0
-    Forward compatibility: Unknown fields are ignored with a warning.
-    Breaking changes increment the major version.
+    Current: 2.0
+    Schema 2.0: Runner resolves blueprint and passes agent_blueprint to executor.
 """.strip()
 
 
@@ -142,7 +145,7 @@ def main(
     debug_log("COMMAND - ao-claude-code-exec parsed", {
         "mode": invocation.mode,
         "session_id": invocation.session_id,
-        "agent_name": invocation.agent_name or "None",
+        "has_agent_blueprint": invocation.agent_blueprint is not None,
         "project_dir": invocation.project_dir or "None",
         "prompt_length": len(invocation.prompt),
     })
@@ -169,9 +172,10 @@ def run_start(inv: ExecutorInvocation):
 
     Session is already created in coordinator with status='pending' (ADR-010).
     Executor binds to session after Claude SDK starts.
+
+    Schema 2.0: Uses agent_blueprint directly (Runner handles fetching/resolution).
     """
     from executor_config import load_config
-    from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import debug_log
 
@@ -180,34 +184,25 @@ def run_start(inv: ExecutorInvocation):
         cli_project_dir=inv.project_dir,
     )
 
-    # 2. Load agent from API if specified
+    # 2. Get agent config from blueprint (Runner provides resolved blueprint)
     final_prompt = inv.prompt
     mcp_servers = None
     agent_name = None
 
-    if inv.agent_name:
-        try:
-            agent_data = get_agent_api(inv.agent_name)
-        except AgentAPIError as e:
-            raise ValueError(str(e))
+    if inv.agent_blueprint:
+        # Schema 2.0: Use resolved blueprint directly (no API call needed)
+        agent_name = inv.agent_blueprint.get("name")
+        system_prompt = inv.agent_blueprint.get("system_prompt")
+        mcp_servers = inv.agent_blueprint.get("mcp_servers")
 
-        if not agent_data:
-            raise ValueError(f"Agent not found: {inv.agent_name}")
-
-        if agent_data.get("status") == "inactive":
-            raise ValueError(f"Agent '{inv.agent_name}' is inactive")
-
-        agent_name = agent_data.get("name")
-
-        # Prepend system prompt if available
-        system_prompt = agent_data.get("system_prompt")
         if system_prompt:
             final_prompt = f"{system_prompt}\n\n---\n\n{inv.prompt}"
 
-        # Get MCP servers from agent config
-        mcp_servers_data = agent_data.get("mcp_servers")
-        if mcp_servers_data:
-            mcp_servers = mcp_servers_data
+        debug_log("ao-claude-code-exec using agent_blueprint", {
+            "agent_name": agent_name or "unnamed",
+            "has_system_prompt": system_prompt is not None,
+            "has_mcp_servers": mcp_servers is not None,
+        })
 
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_start", {
@@ -216,6 +211,7 @@ def run_start(inv: ExecutorInvocation):
         "agent_name": agent_name or "None",
         "has_mcp_servers": mcp_servers is not None,
         "final_prompt_length": len(final_prompt),
+        "schema_version": inv.schema_version,
     })
 
     # 3. Run Claude session (binds to coordinator session automatically)
@@ -238,10 +234,11 @@ def run_resume(inv: ExecutorInvocation):
     Resume an existing session.
 
     Fetches session affinity to get executor_session_id for Claude SDK resume.
+
+    Schema 2.0: Uses agent_blueprint for MCP servers (Runner handles fetching/resolution).
     """
     from executor_config import get_api_url
     from session_client import SessionClient, SessionClientError
-    from agent_api import get_agent_api, AgentAPIError
     from claude_client import run_session_sync
     from utils import debug_log
 
@@ -273,35 +270,30 @@ def run_resume(inv: ExecutorInvocation):
             "Cannot resume - session may not have started successfully"
         )
 
-    # 3. Load agent MCP configuration if session has agent
+    # 3. Get MCP servers from blueprint (Runner provides resolved blueprint)
     # NOTE: Do NOT prepend system prompt for resume (only for new sessions)
     mcp_servers = None
+    agent_name = session_agent
 
-    if session_agent:
-        try:
-            agent_data = get_agent_api(session_agent)
-        except AgentAPIError as e:
-            raise ValueError(str(e))
+    if inv.agent_blueprint:
+        # Schema 2.0: Use resolved blueprint directly (no API call needed)
+        mcp_servers = inv.agent_blueprint.get("mcp_servers")
+        # Use agent name from blueprint if available, otherwise from session
+        agent_name = inv.agent_blueprint.get("name") or session_agent
 
-        if not agent_data:
-            raise ValueError(f"Agent not found: {session_agent}")
-
-        if agent_data.get("status") == "inactive":
-            raise ValueError(
-                f"Agent '{session_agent}' is inactive. "
-                "Cannot resume session with deactivated agent blueprint."
-            )
-
-        # Get MCP servers from API response
-        mcp_servers = agent_data.get("mcp_servers")
+        debug_log("ao-claude-code-exec resume using agent_blueprint", {
+            "agent_name": agent_name or "None",
+            "has_mcp_servers": mcp_servers is not None,
+        })
 
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_resume", {
         "session_id": inv.session_id,
         "executor_session_id": executor_session_id,
         "project_dir": str(session_project_dir),
-        "agent_name": session_agent or "None",
+        "agent_name": agent_name or "None",
         "has_mcp_servers": mcp_servers is not None,
+        "schema_version": inv.schema_version,
     })
 
     # 4. Run Claude session with resume (uses executor_session_id for SDK resume)
@@ -313,7 +305,7 @@ def run_resume(inv: ExecutorInvocation):
         mcp_servers=mcp_servers,
         resume_executor_session_id=executor_session_id,
         api_url=api_url,
-        agent_name=session_agent,
+        agent_name=agent_name,
     )
 
     # Print result to stdout

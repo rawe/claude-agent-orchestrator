@@ -10,6 +10,7 @@ Tests cover:
 - Invalid JSON
 - Resume mode ignoring start-only fields
 - Unknown fields (forward compatibility)
+- agent_blueprint handling
 """
 
 import json
@@ -31,88 +32,96 @@ class TestFromJson:
     def test_parse_start_minimal(self):
         """Valid minimal start payload parses correctly."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello world",
         })
 
         inv = ExecutorInvocation.from_json(payload)
 
-        assert inv.schema_version == "1.0"
+        assert inv.schema_version == "2.0"
         assert inv.mode == "start"
-        assert inv.session_name == "test-session"
+        assert inv.session_id == "ses_abc123"
         assert inv.prompt == "Hello world"
-        assert inv.agent_name is None
+        assert inv.agent_blueprint is None
         assert inv.project_dir is None
         assert inv.metadata == {}
 
-    def test_parse_start_full(self):
-        """Valid full start payload parses correctly."""
+    def test_parse_start_with_blueprint(self):
+        """Valid start payload with agent_blueprint parses correctly."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello world",
-            "agent_name": "security-auditor",
             "project_dir": "/path/to/project",
+            "agent_blueprint": {
+                "name": "security-auditor",
+                "system_prompt": "You are a security auditor.",
+                "mcp_servers": {
+                    "orchestrator": {
+                        "type": "http",
+                        "url": "http://127.0.0.1:54321",
+                    }
+                }
+            },
             "metadata": {"key": "value"},
         })
 
         inv = ExecutorInvocation.from_json(payload)
 
-        assert inv.schema_version == "1.0"
+        assert inv.schema_version == "2.0"
         assert inv.mode == "start"
-        assert inv.session_name == "test-session"
+        assert inv.session_id == "ses_abc123"
         assert inv.prompt == "Hello world"
-        assert inv.agent_name == "security-auditor"
+        assert inv.agent_blueprint["name"] == "security-auditor"
+        assert inv.agent_blueprint["system_prompt"] == "You are a security auditor."
+        assert inv.agent_blueprint["mcp_servers"]["orchestrator"]["url"] == "http://127.0.0.1:54321"
         assert inv.project_dir == "/path/to/project"
         assert inv.metadata == {"key": "value"}
 
     def test_parse_resume_minimal(self):
         """Valid minimal resume payload parses correctly."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "resume",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Continue please",
         })
 
         inv = ExecutorInvocation.from_json(payload)
 
-        assert inv.schema_version == "1.0"
+        assert inv.schema_version == "2.0"
         assert inv.mode == "resume"
-        assert inv.session_name == "test-session"
+        assert inv.session_id == "ses_abc123"
         assert inv.prompt == "Continue please"
-        assert inv.agent_name is None
+        assert inv.agent_blueprint is None
         assert inv.project_dir is None
 
-    def test_parse_resume_ignores_agent_name(self):
-        """Resume mode logs warning but parses agent_name (ignored by executor)."""
+    def test_parse_resume_with_blueprint(self):
+        """Resume mode with agent_blueprint parses correctly."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "resume",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Continue",
-            "agent_name": "should-be-ignored",
+            "agent_blueprint": {
+                "name": "worker",
+                "mcp_servers": {}
+            },
         })
 
-        with patch("invocation.logger") as mock_logger:
-            inv = ExecutorInvocation.from_json(payload)
+        inv = ExecutorInvocation.from_json(payload)
 
-            # Should warn about ignored field
-            mock_logger.warning.assert_called()
-            assert "agent_name" in str(mock_logger.warning.call_args)
-
-        # Field is still parsed (executor will ignore it)
-        assert inv.agent_name == "should-be-ignored"
+        assert inv.agent_blueprint["name"] == "worker"
 
     def test_parse_resume_ignores_project_dir(self):
-        """Resume mode logs warning but parses project_dir (ignored by executor)."""
+        """Resume mode logs warning for project_dir."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "resume",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Continue",
             "project_dir": "/should/be/ignored",
         })
@@ -124,15 +133,15 @@ class TestFromJson:
             mock_logger.warning.assert_called()
             assert "project_dir" in str(mock_logger.warning.call_args)
 
-        # Field is still parsed (executor will ignore it)
+        # Field is still parsed
         assert inv.project_dir == "/should/be/ignored"
 
     def test_parse_unicode_prompt(self):
         """Unicode characters in prompt are handled correctly."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello \u4e16\u754c! \U0001F600 \u2764\ufe0f",  # "Hello 世界! 😀 ❤️"
         })
 
@@ -145,9 +154,9 @@ class TestFromJson:
         long_prompt = "x" * 100000  # 100KB prompt
 
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": long_prompt,
         })
 
@@ -159,7 +168,7 @@ class TestFromJson:
         """Missing schema_version raises ValueError."""
         payload = json.dumps({
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello",
         })
 
@@ -169,31 +178,31 @@ class TestFromJson:
     def test_parse_missing_mode(self):
         """Missing mode raises ValueError."""
         payload = json.dumps({
-            "schema_version": "1.0",
-            "session_name": "test-session",
+            "schema_version": "2.0",
+            "session_id": "ses_abc123",
             "prompt": "Hello",
         })
 
         with pytest.raises(ValueError, match="Missing required field: mode"):
             ExecutorInvocation.from_json(payload)
 
-    def test_parse_missing_session_name(self):
-        """Missing session_name raises ValueError."""
+    def test_parse_missing_session_id(self):
+        """Missing session_id raises ValueError."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
             "prompt": "Hello",
         })
 
-        with pytest.raises(ValueError, match="Missing required field: session_name"):
+        with pytest.raises(ValueError, match="Missing required field: session_id"):
             ExecutorInvocation.from_json(payload)
 
     def test_parse_missing_prompt(self):
         """Missing prompt raises ValueError."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
         })
 
         with pytest.raises(ValueError, match="Missing required field: prompt"):
@@ -204,7 +213,7 @@ class TestFromJson:
         payload = json.dumps({
             "schema_version": "99.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello",
         })
 
@@ -214,9 +223,9 @@ class TestFromJson:
     def test_parse_invalid_mode(self):
         """Invalid mode raises ValueError."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "invalid",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello",
         })
 
@@ -241,9 +250,9 @@ class TestFromJson:
     def test_parse_unknown_fields_ignored(self):
         """Unknown fields are logged as warning but parsing succeeds."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test-session",
+            "session_id": "ses_abc123",
             "prompt": "Hello",
             "unknown_field": "should be ignored",
             "another_unknown": 123,
@@ -256,7 +265,7 @@ class TestFromJson:
             assert mock_logger.warning.call_count >= 2
 
         # Parsing should succeed
-        assert inv.session_name == "test-session"
+        assert inv.session_id == "ses_abc123"
 
 
 class TestFromStdin:
@@ -265,16 +274,16 @@ class TestFromStdin:
     def test_from_stdin_reads_input(self):
         """from_stdin reads from sys.stdin."""
         payload = json.dumps({
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "stdin-test",
+            "session_id": "ses_stdin_test",
             "prompt": "From stdin",
         })
 
         with patch("sys.stdin", StringIO(payload)):
             inv = ExecutorInvocation.from_stdin()
 
-        assert inv.session_name == "stdin-test"
+        assert inv.session_id == "ses_stdin_test"
         assert inv.prompt == "From stdin"
 
 
@@ -284,68 +293,78 @@ class TestSerialization:
     def test_to_dict_minimal(self):
         """to_dict returns correct dict for minimal invocation."""
         inv = ExecutorInvocation(
-            schema_version="1.0",
+            schema_version="2.0",
             mode="start",
-            session_name="test",
+            session_id="ses_test",
             prompt="hello",
         )
 
         d = inv.to_dict()
 
         assert d == {
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test",
+            "session_id": "ses_test",
             "prompt": "hello",
         }
 
-    def test_to_dict_full(self):
-        """to_dict returns correct dict for full invocation."""
+    def test_to_dict_with_blueprint(self):
+        """to_dict returns correct dict with agent_blueprint."""
         inv = ExecutorInvocation(
-            schema_version="1.0",
+            schema_version="2.0",
             mode="start",
-            session_name="test",
+            session_id="ses_test",
             prompt="hello",
-            agent_name="agent",
             project_dir="/path",
+            agent_blueprint={
+                "name": "agent",
+                "system_prompt": "You are an agent.",
+            },
             metadata={"key": "value"},
         )
 
         d = inv.to_dict()
 
         assert d == {
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "mode": "start",
-            "session_name": "test",
+            "session_id": "ses_test",
             "prompt": "hello",
-            "agent_name": "agent",
             "project_dir": "/path",
+            "agent_blueprint": {
+                "name": "agent",
+                "system_prompt": "You are an agent.",
+            },
             "metadata": {"key": "value"},
         }
 
     def test_to_json(self):
         """to_json returns valid JSON string."""
         inv = ExecutorInvocation(
-            schema_version="1.0",
+            schema_version="2.0",
             mode="start",
-            session_name="test",
+            session_id="ses_test",
             prompt="hello",
         )
 
         json_str = inv.to_json()
         parsed = json.loads(json_str)
 
-        assert parsed["session_name"] == "test"
+        assert parsed["session_id"] == "ses_test"
 
     def test_roundtrip(self):
         """JSON roundtrip preserves all fields."""
         original = ExecutorInvocation(
-            schema_version="1.0",
+            schema_version="2.0",
             mode="start",
-            session_name="roundtrip-test",
+            session_id="ses_roundtrip_test",
             prompt="test prompt",
-            agent_name="test-agent",
             project_dir="/test/path",
+            agent_blueprint={
+                "name": "test-agent",
+                "system_prompt": "Test prompt.",
+                "mcp_servers": {"srv": {"url": "http://localhost"}},
+            },
             metadata={"nested": {"key": "value"}},
         )
 
@@ -354,9 +373,9 @@ class TestSerialization:
 
         assert restored.schema_version == original.schema_version
         assert restored.mode == original.mode
-        assert restored.session_name == original.session_name
+        assert restored.session_id == original.session_id
         assert restored.prompt == original.prompt
-        assert restored.agent_name == original.agent_name
+        assert restored.agent_blueprint == original.agent_blueprint
         assert restored.project_dir == original.project_dir
         assert restored.metadata == original.metadata
 
@@ -367,9 +386,9 @@ class TestLogSummary:
     def test_log_summary_does_not_include_prompt(self):
         """log_summary logs metadata but not actual prompt content."""
         inv = ExecutorInvocation(
-            schema_version="1.0",
+            schema_version="2.0",
             mode="start",
-            session_name="secret-session",
+            session_id="ses_secret",
             prompt="This is sensitive prompt content that should not be logged",
         )
 
@@ -381,9 +400,9 @@ class TestLogSummary:
             log_message = str(mock_logger.info.call_args)
 
             # Should include metadata
-            assert "1.0" in log_message
+            assert "2.0" in log_message
             assert "start" in log_message
-            assert "secret-session" in log_message
+            assert "ses_secret" in log_message
 
             # Should NOT include actual prompt content
             assert "sensitive" not in log_message
@@ -392,13 +411,48 @@ class TestLogSummary:
             # Should include prompt length
             assert "prompt_len=" in log_message
 
+    def test_log_summary_with_blueprint(self):
+        """log_summary includes blueprint name when present."""
+        inv = ExecutorInvocation(
+            schema_version="2.0",
+            mode="start",
+            session_id="ses_test",
+            prompt="hello",
+            agent_blueprint={"name": "my-agent"},
+        )
+
+        with patch("invocation.logger") as mock_logger:
+            inv.log_summary()
+
+            log_message = str(mock_logger.info.call_args)
+            assert "blueprint=my-agent" in log_message
+
+    def test_log_summary_no_agent(self):
+        """log_summary shows no_agent when no blueprint."""
+        inv = ExecutorInvocation(
+            schema_version="2.0",
+            mode="start",
+            session_id="ses_test",
+            prompt="hello",
+        )
+
+        with patch("invocation.logger") as mock_logger:
+            inv.log_summary()
+
+            log_message = str(mock_logger.info.call_args)
+            assert "no_agent" in log_message
+
 
 class TestSchema:
     """Tests for schema constants."""
 
-    def test_supported_versions_contains_1_0(self):
-        """SUPPORTED_VERSIONS contains '1.0'."""
-        assert "1.0" in SUPPORTED_VERSIONS
+    def test_supported_versions_contains_2_0(self):
+        """SUPPORTED_VERSIONS contains '2.0'."""
+        assert "2.0" in SUPPORTED_VERSIONS
+
+    def test_schema_version_is_2_0(self):
+        """SCHEMA_VERSION is '2.0'."""
+        assert SCHEMA_VERSION == "2.0"
 
     def test_schema_is_valid_json_schema(self):
         """INVOCATION_SCHEMA is a valid JSON Schema structure."""
@@ -406,3 +460,4 @@ class TestSchema:
         assert INVOCATION_SCHEMA["type"] == "object"
         assert "properties" in INVOCATION_SCHEMA
         assert "required" in INVOCATION_SCHEMA
+        assert "agent_blueprint" in INVOCATION_SCHEMA["properties"]

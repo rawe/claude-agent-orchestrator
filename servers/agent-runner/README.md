@@ -122,12 +122,16 @@ servers/agent-runner/
 
 ## Run Types
 
-Runs are passed to the executor as JSON via stdin:
+Runs are passed to the executor as JSON via stdin (Schema 2.0):
 
 | Type | Mode | Parameters |
 |------|------|------------|
-| `start_session` | `start` | `session_name`, `agent_name`, `prompt`, `project_dir` |
-| `resume_session` | `resume` | `session_name`, `prompt` |
+| `start_session` | `start` | `session_id`, `prompt`, `project_dir`, `agent_blueprint` |
+| `resume_session` | `resume` | `session_id`, `prompt`, `agent_blueprint` |
+
+**Schema 2.0 Notes:**
+- `agent_blueprint`: Fully resolved blueprint with placeholders replaced. The Runner fetches the blueprint from the Coordinator and resolves placeholders like `${AGENT_ORCHESTRATOR_MCP_URL}` and `${AGENT_SESSION_ID}` before spawning the executor.
+- Executor uses `agent_blueprint` directly without making Coordinator API calls.
 
 ## How It Works
 

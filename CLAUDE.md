@@ -10,6 +10,15 @@
 - Show the user what files have changed and what the commit message will be
 - Only create a commit after receiving explicit confirmation from the user
 
+### 2. No Silent Fallbacks
+
+**NEVER implement fallback behavior without explicit user approval.**
+
+- Always ask the user before adding fallback/backward-compatibility code
+- Fallbacks can hide bugs and make it harder to verify new implementations work correctly
+- If a feature fails, it should fail explicitly - not silently fall back to old behavior
+- When in doubt, raise an error instead of falling back
+
 ## Python info
 
 **CRITICAL: Always use `uv run` to execute Python scripts and commands.**

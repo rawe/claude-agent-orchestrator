@@ -51,6 +51,7 @@ from executor import RunExecutor, list_executors, resolve_executor_name, get_exe
 from poller import RunPoller
 from supervisor import RunSupervisor
 from coordinator_proxy import CoordinatorProxy
+from blueprint_resolver import BlueprintResolver
 
 # Configure logging
 logging.basicConfig(
@@ -139,8 +140,19 @@ class Runner:
             auth0_client=self.auth0_client,
         )
 
+        # Create blueprint resolver for Schema 2.0
+        # Fetches and resolves blueprints before passing to executor
+        self.blueprint_resolver = BlueprintResolver(
+            coordinator_url=config.agent_coordinator_url,
+            auth0_client=self.auth0_client,
+        )
+
         self.registry = RunningRunsRegistry()
-        self.executor = RunExecutor(config.project_dir)
+        self.executor = RunExecutor(
+            default_project_dir=config.project_dir,
+            blueprint_resolver=self.blueprint_resolver,
+            mcp_server_url=None,  # Will be set when embedded MCP server is implemented
+        )
         self.runner_id: str | None = None
 
         self.poller: RunPoller | None = None
