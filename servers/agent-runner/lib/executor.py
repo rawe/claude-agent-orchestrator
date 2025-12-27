@@ -4,6 +4,9 @@ Run Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
 Maps agent run types to execution modes and handles subprocess spawning.
 Uses unified ao-*-exec entrypoint with structured JSON payloads.
 
+Schema 2.0: Runner fetches and resolves blueprints before spawning executor.
+The executor receives a fully resolved agent_blueprint with placeholders replaced.
+
 Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
@@ -11,11 +14,14 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import logging
 
 from api_client import Run
 from invocation import SCHEMA_VERSION
+
+if TYPE_CHECKING:
+    from blueprint_resolver import BlueprintResolver
 
 logger = logging.getLogger(__name__)
 
@@ -127,18 +133,33 @@ def get_executor_type() -> str:
 
 
 class RunExecutor:
-    """Executes agent runs by spawning executor subprocess with JSON payload."""
+    """Executes agent runs by spawning executor subprocess with JSON payload.
 
-    def __init__(self, default_project_dir: str):
+    Schema 2.0: The executor now fetches and resolves blueprints before spawning,
+    passing a fully resolved agent_blueprint to the executor subprocess.
+    """
+
+    def __init__(
+        self,
+        default_project_dir: str,
+        blueprint_resolver: Optional["BlueprintResolver"] = None,
+        mcp_server_url: Optional[str] = None,
+    ):
         """Initialize executor.
 
         Args:
             default_project_dir: Default project directory if agent run doesn't specify one
+            blueprint_resolver: Optional resolver for fetching and resolving blueprints (schema 2.0)
+            mcp_server_url: Optional MCP server URL for placeholder resolution (schema 2.0)
         """
         self.default_project_dir = default_project_dir
+        self.blueprint_resolver = blueprint_resolver
+        self.mcp_server_url = mcp_server_url
         self.executor_path = get_executor_path()
 
         logger.debug(f"Executor path: {self.executor_path}")
+        if blueprint_resolver:
+            logger.debug("Blueprint resolver enabled (schema 2.0)")
 
     def execute_run(self, run: Run, parent_session_id: Optional[str] = None) -> subprocess.Popen:
         """Execute an agent run by spawning ao-*-exec with JSON payload via stdin.
@@ -163,6 +184,9 @@ class RunExecutor:
     def _build_payload(self, run: Run, mode: str) -> dict:
         """Build JSON payload for ao-*-exec.
 
+        Schema 2.0: If agent_name is specified and blueprint_resolver is configured,
+        fetches and resolves the blueprint, including it as agent_blueprint in the payload.
+
         Args:
             run: The agent run to execute
             mode: Execution mode ('start' or 'resume')
@@ -177,12 +201,27 @@ class RunExecutor:
             "prompt": run.prompt,
         }
 
-        # Add optional fields for start mode
+        # Add project_dir for start mode
         if mode == "start":
-            if run.agent_name:
-                payload["agent_name"] = run.agent_name
             project_dir = run.project_dir or self.default_project_dir
             payload["project_dir"] = project_dir
+
+        # Schema 2.0: Resolve blueprint if resolver is available
+        if run.agent_name and self.blueprint_resolver:
+            try:
+                agent_blueprint = self.blueprint_resolver.resolve(
+                    agent_name=run.agent_name,
+                    session_id=run.session_id,
+                    mcp_server_url=self.mcp_server_url,
+                )
+                payload["agent_blueprint"] = agent_blueprint
+                logger.debug(
+                    f"Resolved blueprint '{run.agent_name}' for session {run.session_id}:\n"
+                    f"{json.dumps(agent_blueprint, indent=2)}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to resolve blueprint '{run.agent_name}': {e}")
+                raise
 
         return payload
 

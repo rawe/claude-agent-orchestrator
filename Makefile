@@ -23,7 +23,7 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-chat-ui-docker stop-chat-ui-docker
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner
 
 # Default target
 help:
@@ -45,10 +45,33 @@ help:
 	@echo "  make clean-docs     - Remove ONLY the document storage volume"
 	@echo "  make clean-sessions - Remove ONLY the session storage volume"
 	@echo ""
-	@echo "Individual service commands:"
-	@echo "  make restart-dashboard - Restart dashboard"
-	@echo "  make restart-coordinator - Restart agent coordinator"
-	@echo "  make restart-doc    - Restart context store"
+	@echo "Individual Docker services:"
+	@echo "  make start-coordinator    - Start only agent-coordinator"
+	@echo "  make stop-coordinator     - Stop agent-coordinator"
+	@echo "  make start-dashboard      - Start only dashboard"
+	@echo "  make stop-dashboard       - Stop dashboard"
+	@echo "  make start-context-store  - Start only context-store"
+	@echo "  make stop-context-store   - Stop context-store"
+	@echo "  make start-elasticsearch  - Start only elasticsearch"
+	@echo "  make stop-elasticsearch   - Stop elasticsearch"
+	@echo "  make start-neo4j          - Start only neo4j"
+	@echo "  make stop-neo4j           - Stop neo4j"
+	@echo ""
+	@echo "Service profiles:"
+	@echo "  make start-core     - Start coordinator + dashboard only (fast startup)"
+	@echo "  make stop-core      - Stop coordinator + dashboard"
+	@echo ""
+	@echo "Restart individual services:"
+	@echo "  make restart-dashboard    - Restart dashboard"
+	@echo "  make restart-coordinator  - Restart agent coordinator"
+	@echo "  make restart-doc          - Restart context store"
+	@echo ""
+	@echo "Agent Runner (local process):"
+	@echo "  make start-agent-runner   - Start in background (logs to .agent-runner.log)"
+	@echo "  make stop-agent-runner    - Stop agent runner"
+	@echo "  make run-agent-runner     - Run in foreground (Ctrl+C to stop)"
+	@echo "  make run-agent-runner-v   - Run in foreground with verbose/debug output"
+	@echo "  make logs-agent-runner    - Tail logs (Ctrl+C to stop watching)"
 	@echo ""
 	@echo "MCP servers (mcps/):"
 	@echo "  make start-mcp-agent-orchestrator - Start Agent Orchestrator MCP"
@@ -69,10 +92,8 @@ help:
 	@echo "  make stop-all       - Stop everything"
 	@echo ""
 	@echo "Applications (interfaces/):"
-	@echo "  make start-chat-ui         - Start Chat UI (npm/vite preview)"
-	@echo "  make stop-chat-ui          - Stop Chat UI (npm)"
-	@echo "  make start-chat-ui-docker  - Start Chat UI (Docker/nginx)"
-	@echo "  make stop-chat-ui-docker   - Stop Chat UI (Docker)"
+	@echo "  make start-chat-ui         - Start Chat UI (Docker)"
+	@echo "  make stop-chat-ui          - Stop Chat UI (Docker)"
 
 # Build all images
 build:
@@ -237,6 +258,166 @@ restart-coordinator:
 
 restart-doc:
 	docker-compose restart context-store
+
+# ============================================================================
+# INDIVIDUAL DOCKER SERVICES (granular control)
+# ============================================================================
+# Use these when you only need specific services.
+# Note: --no-deps means dependencies won't be started automatically.
+#       Use start-core for common coordinator+dashboard combo.
+
+start-coordinator:
+	@echo "Starting Agent Coordinator..."
+	docker-compose up -d --no-deps agent-coordinator
+	@echo "Agent Coordinator started: http://localhost:8765"
+
+stop-coordinator:
+	@echo "Stopping Agent Coordinator..."
+	docker-compose stop agent-coordinator
+
+start-dashboard:
+	@echo "Starting Dashboard..."
+	@echo "(Note: Requires agent-coordinator to be running)"
+	docker-compose up -d --no-deps dashboard
+	@echo "Dashboard started: http://localhost:3000"
+
+stop-dashboard:
+	@echo "Stopping Dashboard..."
+	docker-compose stop dashboard
+
+start-context-store:
+	@echo "Starting Context Store..."
+	@echo "(Note: Semantic search requires elasticsearch)"
+	docker-compose up -d --no-deps context-store
+	@echo "Context Store started: http://localhost:8766"
+
+stop-context-store:
+	@echo "Stopping Context Store..."
+	docker-compose stop context-store
+
+start-elasticsearch:
+	@echo "Starting Elasticsearch..."
+	docker-compose up -d --no-deps elasticsearch
+	@echo "Elasticsearch started: http://localhost:9200"
+
+stop-elasticsearch:
+	@echo "Stopping Elasticsearch..."
+	docker-compose stop elasticsearch
+
+start-neo4j:
+	@echo "Starting Neo4j..."
+	docker-compose up -d --no-deps neo4j
+	@echo "Neo4j started: http://localhost:7475 (bolt: 7688)"
+
+stop-neo4j:
+	@echo "Stopping Neo4j..."
+	docker-compose stop neo4j
+
+# ============================================================================
+# SERVICE PROFILES (common combinations)
+# ============================================================================
+
+# Core services only: coordinator + dashboard (no elasticsearch, no neo4j)
+# Use this for UI development or when you don't need document storage
+start-core:
+	@echo "Starting core services (coordinator + dashboard)..."
+	docker-compose up -d --no-deps agent-coordinator dashboard
+	@echo ""
+	@echo "Core services started:"
+	@echo "  Dashboard:    http://localhost:3000"
+	@echo "  Coordinator:  http://localhost:8765"
+	@echo ""
+	@echo "Note: Context Store not started. Run 'make start-context-store' if needed."
+
+stop-core:
+	@echo "Stopping core services..."
+	docker-compose stop agent-coordinator dashboard
+
+# ============================================================================
+# AGENT RUNNER (local process, not Docker)
+# ============================================================================
+# Runs agents in a specific project directory.
+# Uses PROJECT_DIR from .env or AGENT_ORCHESTRATOR_PROJECT_DIR as fallback.
+
+AGENT_RUNNER_SCRIPT := servers/agent-runner/agent-runner
+AGENT_RUNNER_PID_FILE := .agent-runner.pid
+AGENT_RUNNER_LOG_FILE := .agent-runner.log
+
+start-agent-runner:
+	@echo "Starting Agent Runner..."
+	@if [ -f $(AGENT_RUNNER_PID_FILE) ] && kill -0 $$(cat $(AGENT_RUNNER_PID_FILE)) 2>/dev/null; then \
+		echo "Agent Runner already running (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \
+		echo "Use 'make logs-agent-runner' to view logs"; \
+		exit 1; \
+	fi
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a; \
+	fi; \
+	PROJ_DIR="$${PROJECT_DIR:-$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.}}"; \
+	if [ "$$PROJ_DIR" = "." ]; then \
+		echo "Warning: No PROJECT_DIR set. Using current directory."; \
+		echo "Set PROJECT_DIR in .env or use: make start-agent-runner PROJECT_DIR=/path/to/project"; \
+	fi; \
+	echo "Configuration:"; \
+	echo "  Project Dir: $$PROJ_DIR"; \
+	echo "  Coordinator: $${AGENT_ORCHESTRATOR_API_URL:-http://localhost:8765}"; \
+	echo "  Log file:    $(AGENT_RUNNER_LOG_FILE)"; \
+	echo ""; \
+	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
+	echo $$! > $(AGENT_RUNNER_PID_FILE); \
+	sleep 2; \
+	echo "Agent Runner started (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \
+	echo ""; \
+	echo "View logs:  make logs-agent-runner"
+
+stop-agent-runner:
+	@echo "Stopping Agent Runner..."
+	@if [ -f $(AGENT_RUNNER_PID_FILE) ]; then \
+		PID=$$(cat $(AGENT_RUNNER_PID_FILE)); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID; \
+			echo "Agent Runner stopped (PID: $$PID)"; \
+		else \
+			echo "Agent Runner not running (stale PID file)"; \
+		fi; \
+		rm -f $(AGENT_RUNNER_PID_FILE); \
+	else \
+		echo "No PID file found. Trying to find and kill process..."; \
+		pkill -f "agent-runner/agent-runner" 2>/dev/null && echo "Agent Runner stopped" || echo "No Agent Runner process found"; \
+	fi
+
+# Run agent runner in foreground (direct output, Ctrl+C to stop)
+run-agent-runner:
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a; \
+	fi; \
+	PROJ_DIR="$${PROJECT_DIR:-$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.}}"; \
+	if [ "$$PROJ_DIR" = "." ]; then \
+		echo "Warning: No PROJECT_DIR set. Using current directory."; \
+	fi; \
+	VERBOSE_FLAG=""; \
+	if [ "$${VERBOSE:-}" = "1" ]; then \
+		VERBOSE_FLAG="--verbose"; \
+	fi; \
+	echo "Starting Agent Runner in foreground (Ctrl+C to stop)..."; \
+	echo "  Project Dir: $$PROJ_DIR"; \
+	if [ -n "$$VERBOSE_FLAG" ]; then echo "  Verbose: enabled"; fi; \
+	echo ""; \
+	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) $$VERBOSE_FLAG
+
+# Run agent runner in foreground with verbose output (shortcut)
+run-agent-runner-v:
+	@$(MAKE) run-agent-runner VERBOSE=1
+
+# Tail agent runner logs
+logs-agent-runner:
+	@if [ -f $(AGENT_RUNNER_LOG_FILE) ]; then \
+		echo "Tailing $(AGENT_RUNNER_LOG_FILE) (Ctrl+C to stop)..."; \
+		echo ""; \
+		tail -f $(AGENT_RUNNER_LOG_FILE); \
+	else \
+		echo "No log file found. Start the agent runner first: make start-agent-runner"; \
+	fi
 
 # External MCP servers (mcps/)
 start-mcp-atlassian:
@@ -415,52 +596,11 @@ stop-all:
 # Applications using Agent Orchestrator Framework (interfaces/)
 # ============================================================================
 
-# Chat UI - npm-based (vite preview)
+# Chat UI (Docker-based)
 CHAT_UI_DIR := interfaces/chat-ui
-CHAT_UI_PID_FILE := .chat-ui.pid
 
 start-chat-ui:
-	@echo "Starting Chat UI (npm/vite preview)..."
-	@if [ -f $(CHAT_UI_PID_FILE) ] && kill -0 $$(cat $(CHAT_UI_PID_FILE)) 2>/dev/null; then \
-		echo "Chat UI already running (PID: $$(cat $(CHAT_UI_PID_FILE)))"; \
-		exit 1; \
-	fi
-	@if [ ! -f $(CHAT_UI_DIR)/.env ]; then \
-		echo "No .env file found. Copying from .env.example..."; \
-		cp $(CHAT_UI_DIR)/.env.example $(CHAT_UI_DIR)/.env; \
-		echo "Created $(CHAT_UI_DIR)/.env - edit if needed"; \
-	fi
-	@echo "Installing dependencies..."
-	@cd $(CHAT_UI_DIR) && npm install
-	@echo "Building application..."
-	@cd $(CHAT_UI_DIR) && npm run build
-	@echo "Starting preview server..."
-	@cd $(CHAT_UI_DIR) && npm run preview & \
-	echo $$! > $(CHAT_UI_PID_FILE)
-	@sleep 2
-	@echo ""
-	@echo "Chat UI started (PID: $$(cat $(CHAT_UI_PID_FILE)))"
-	@echo "URL: http://localhost:3010"
-
-stop-chat-ui:
-	@echo "Stopping Chat UI (npm)..."
-	@if [ -f $(CHAT_UI_PID_FILE) ]; then \
-		PID=$$(cat $(CHAT_UI_PID_FILE)); \
-		if kill -0 $$PID 2>/dev/null; then \
-			kill $$PID; \
-			echo "Chat UI stopped (PID: $$PID)"; \
-		else \
-			echo "Chat UI not running (stale PID file)"; \
-		fi; \
-		rm -f $(CHAT_UI_PID_FILE); \
-	else \
-		echo "No PID file found. Trying to find and kill process..."; \
-		pkill -f "vite preview" 2>/dev/null && echo "Chat UI stopped" || echo "No Chat UI process found"; \
-	fi
-
-# Chat UI - Docker-based (nginx)
-start-chat-ui-docker:
-	@echo "Starting Chat UI (Docker/nginx)..."
+	@echo "Starting Chat UI..."
 	@if [ ! -f $(CHAT_UI_DIR)/.env ]; then \
 		echo "No .env file found. Copying from .env.example..."; \
 		cp $(CHAT_UI_DIR)/.env.example $(CHAT_UI_DIR)/.env; \
@@ -469,10 +609,10 @@ start-chat-ui-docker:
 	@echo "Building and starting Docker container..."
 	@cd $(CHAT_UI_DIR) && docker compose up -d --build
 	@echo ""
-	@echo "Chat UI started (Docker)"
+	@echo "Chat UI started"
 	@echo "URL: http://localhost:3010"
 
-stop-chat-ui-docker:
-	@echo "Stopping Chat UI (Docker)..."
+stop-chat-ui:
+	@echo "Stopping Chat UI..."
 	@cd $(CHAT_UI_DIR) && docker compose down
-	@echo "Chat UI stopped (Docker)"
+	@echo "Chat UI stopped"

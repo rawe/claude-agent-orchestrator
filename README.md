@@ -112,29 +112,25 @@ The `mcps/` directory contains MCP servers that provide capabilities to agents. 
 
 | MCP Server | Port | Purpose | Requires .env |
 |------------|------|---------|---------------|
-| `agent-orchestrator` | 9500 | Agent orchestration tools + framework access | No |
+| `agent-orchestrator` | embedded in agent runner | Agent orchestration tools + framework access | No |
 | `context-store` | 9501 | Document storage and retrieval | No |
 | `neo4j` | 9003 | Neo4j graph database queries | No (has defaults) |
 | `atlassian` | 9000 | Jira + Confluence integration | Yes |
 | `ado` | 9001 | Azure DevOps work items | Yes |
 
-**Start all MCP servers:**
+**Start MCP servers:**
 ```bash
-make start-mcps
-```
-
-**Start individually:**
-```bash
-make start-mcp-agent-orchestrator  # Agent orchestration
+make start-mcps                    # Start all external MCP servers
 make start-mcp-context-store       # Document management
 make start-mcp-neo4j               # Neo4j queries (uses defaults)
 make start-mcp-atlassian           # Requires mcps/atlassian/.env
 make start-mcp-ado                 # Requires mcps/ado/.env
 ```
 
-The **Agent Orchestrator MCP** has a dual purpose:
-1. Provides agent orchestration capabilities to orchestrated agents
-2. Exposes the framework to any MCP-compatible AI client (Claude Desktop, etc.)
+The **Agent Orchestrator MCP** is embedded in the Agent Runner:
+- When running agents via the framework, the MCP server is automatically available
+- Agent configurations use `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder (dynamically replaced)
+- For external clients (Claude Desktop, Claude Code), a standalone server is still available (see `mcps/agent-orchestrator/`)
 
 See `mcps/README.md` for detailed setup.
 
@@ -177,7 +173,7 @@ The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) ar
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
-| Agent Coordinator | http://localhost:8765 | Session management, WebSocket events, Blueprint API |
+| Agent Coordinator | http://localhost:8765 | Session management, SSE events, Blueprint API |
 | Context Store | http://localhost:8766 | Document storage API |
 | Neo4j Browser | http://localhost:7475 | Graph database UI (neo4j/agent-orchestrator) |
 

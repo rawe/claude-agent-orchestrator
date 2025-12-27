@@ -5,6 +5,11 @@ HTTP client for Agent Session Manager API.
 Replaces file-based session operations with API calls.
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
+
+Authentication Note:
+    This client is used by executors which communicate via the Agent Coordinator
+    Proxy. The proxy handles all authentication (Auth0 M2M), so this client
+    does not need to add Authorization headers.
 """
 
 import httpx
@@ -27,6 +32,7 @@ class SessionClient:
     def __init__(self, base_url: str, timeout: float = 5.0):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
+        self._headers = {}
 
     def _request(
         self,
@@ -41,6 +47,7 @@ class SessionClient:
                 method=method,
                 url=url,
                 json=json_data,
+                headers=self._headers,
                 timeout=self.timeout
             )
             if response.status_code == 404:

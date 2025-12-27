@@ -264,7 +264,7 @@ MCP Config (retrieved from agent-coordinator endpoints):
      "mcpServers": {
        "agent-orchestrator": {
          "type": "http",
-         "url": "http://localhost:9500/mcp",
+         "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
          "headers": {
            "X-Agent-Session-Name": "${AGENT_SESSION_NAME}"
          }
@@ -321,7 +321,7 @@ export interface MCPServerHttp {
 ```typescript
 'agent-orchestrator-http': {
   type: 'http',
-  url: 'http://localhost:9500/mcp',
+  url: '${AGENT_ORCHESTRATOR_MCP_URL}',
   headers: {
     'X-Agent-Session-Name': '${AGENT_SESSION_NAME}'
   }
@@ -860,8 +860,8 @@ This section documents where callback notifications to parent agents are trigger
 1. **Update Chat tab**
    - Change from Agent Control API to new `/runs` endpoint
    - Create run via `POST /runs`
-   - Rely on existing WebSocket connection for session updates (no run status polling)
-   - IMPORTANT: Also liststen for session start events for the current sessean name in the websocket, as now the resume can autoamatically start the session again.
+   - Rely on existing SSE connection for session updates (no run status polling)
+   - IMPORTANT: Also listen for session start events for the current session name via SSE, as now the resume can automatically start the session again.
 
 2. **Remove Agent Control API dependency**
    - Remove `VITE_AGENT_CONTROL_API_URL` usage
@@ -1027,7 +1027,7 @@ The following are explicitly **out of scope** for the POC:
 
 1. **Error handling** - No retry logic for failed callbacks, no handling of deleted parent sessions, no recovery from Runner crashes mid-run
 
-2. **Run failure notification to Dashboard** - If a run fails (e.g., `ao-start` errors), the Dashboard has no way to know. It creates a run and relies on WebSocket for session updates; if the session never starts, the Dashboard sees nothing. Future: broadcast run failures via WebSocket or have Dashboard poll run status briefly after creation.
+2. **Run failure notification to Dashboard** - If a run fails (e.g., `ao-start` errors), the Dashboard has no way to know. It creates a run and relies on SSE for session updates; if the session never starts, the Dashboard sees nothing. Future: broadcast run failures via SSE or have Dashboard poll run status briefly after creation.
 
 3. **Callback strategies** - Only "immediate with aggregation" is implemented. No configurable strategies like "wait for all children" or "batch with delay".
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { chatService } from '@/services/chatService';
 import type { Agent, Session } from '@/types';
-import { useNotification, useWebSocket, useChat, useSessions } from '@/contexts';
+import { useNotification, useSSE, useChat, useSessions } from '@/contexts';
 import { Button, Spinner, Dropdown } from '@/components/common';
 import type { DropdownOption } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
@@ -202,7 +202,7 @@ function ToolCallBadge({ tool }: { tool: ToolCall }) {
 
 export function Chat() {
   const { showError } = useNotification();
-  const { connected } = useWebSocket();
+  const { connected } = useSSE();
   const {
     state,
     setMessages,
@@ -279,7 +279,7 @@ export function Chat() {
     };
     setMessages((prev) => [...prev, assistantMessage]);
 
-    // Store the pending message ID for the WebSocket callback
+    // Store the pending message ID for the SSE callback
     setPendingMessageId(assistantMessageId);
 
     try {
@@ -305,7 +305,7 @@ export function Chat() {
         });
       }
 
-      // Set status to running - WebSocket will provide the response
+      // Set status to running - SSE will provide the response
       setAgentStatus('starting');
 
     } catch (err) {
@@ -349,7 +349,7 @@ export function Chat() {
       if (!result.success) {
         showError(result.message);
       }
-      // Note: UI state updates will come via WebSocket when session status changes
+      // Note: UI state updates will come via SSE when session status changes
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to stop session';
       showError(errorMessage);

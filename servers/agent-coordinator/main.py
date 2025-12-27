@@ -1,13 +1,14 @@
 from typing import Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import uvicorn
 import json
 import os
 import asyncio
+import uuid as uuid_module
 
 from database import (
     init_db, insert_session, insert_event, get_sessions, get_events,
@@ -15,10 +16,11 @@ from database import (
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity
 )
+from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
-    ExecutionMode
+    ExecutionMode, StreamEventType, SessionEventType
 )
 import agent_storage
 from validation import validate_agent_name
@@ -28,6 +30,7 @@ from datetime import datetime, timezone
 from services.run_queue import run_queue, RunCreate, Run, RunStatus, RunType
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError
 from services.stop_command_queue import stop_command_queue
+from services.sse_manager import sse_manager, SSEConnection
 from services import callback_processor
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
@@ -43,12 +46,8 @@ RUNNER_LIFECYCLE_INTERVAL = int(os.getenv("RUNNER_LIFECYCLE_INTERVAL", "30"))  #
 # Run demand timeout (ADR-011)
 RUN_NO_MATCH_TIMEOUT = int(os.getenv("RUN_NO_MATCH_TIMEOUT", "300"))  # 5 minutes
 
-# WebSocket connections (in-memory set)
-connections: set[WebSocket] = set()
-
-
 async def update_session_status_and_broadcast(session_id: str, status: str) -> dict | None:
-    """Update session status in DB and broadcast to WebSocket clients.
+    """Update session status in DB and broadcast to SSE clients.
 
     Args:
         session_id: The session ID to update
@@ -62,12 +61,8 @@ async def update_session_status_and_broadcast(session_id: str, status: str) -> d
     if not updated_session:
         return None
 
-    message = json.dumps({"type": "session_updated", "session": updated_session})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    # Broadcast to SSE clients
+    await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
 
     if DEBUG:
         print(f"[DEBUG] Session {session_id} status updated to '{status}', broadcasted to clients", flush=True)
@@ -112,18 +107,15 @@ async def run_timeout_task():
             for run in failed_runs:
                 if DEBUG:
                     print(f"[DEBUG] Run {run.run_id} timed out waiting for matching runner", flush=True)
-                # Broadcast run failure to WebSocket clients
-                message = json.dumps({
-                    "type": "run_failed",
+
+                run_failed_data = {
                     "run_id": run.run_id,
                     "error": run.error,
                     "session_id": run.session_id,
-                })
-                for ws in connections.copy():
-                    try:
-                        await ws.send_text(message)
-                    except:
-                        connections.discard(ws)
+                }
+
+                # Broadcast to SSE clients
+                await sse_manager.broadcast(StreamEventType.RUN_FAILED, run_failed_data, session_id=run.session_id)
         except Exception as e:
             print(f"[ERROR] Run timeout task error: {e}", flush=True)
 
@@ -131,6 +123,16 @@ async def run_timeout_task():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager"""
+    # Validate auth configuration before starting
+    try:
+        validate_startup_config()
+    except AuthConfigError as e:
+        print(f"[FATAL] {e}", flush=True)
+        raise SystemExit(1)
+
+    if not AUTH_ENABLED:
+        print("[WARNING] Authentication is DISABLED. Do not use in production!", flush=True)
+
     init_db()
 
     # Start runner lifecycle background task
@@ -152,23 +154,23 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-    # Close all WebSocket connections
-    for ws in connections.copy():
-        try:
-            await ws.close()
-        except:
-            pass
+    # Clear all SSE connections (they will close on their own when clients disconnect)
+    sse_manager.clear_all()
+
 
 app = FastAPI(
     title="Agent Coordinator",
     description="Unified service for agent session management and agent blueprint registry",
-    version="0.3.0",  # Bumped for ADR-010
-    lifespan=lifespan
+    version="0.4.0",  # Bumped for auth support
+    lifespan=lifespan,
+    dependencies=[Depends(verify_api_key)],
 )
 
 # Enable CORS for frontend
-# Allow multiple origins: old frontend (5173), new unified frontend (3000), and custom via env
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# CORS_ORIGINS must be set via environment variable
+# Use "*" to allow all origins (default for local development)
+# Use comma-separated list for production: "https://app.example.com,https://admin.example.com"
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -195,11 +197,11 @@ async def receive_event(event: Event):
 
     try:
         # Update database
-        if event.event_type == "session_start":
+        if event.event_type == SessionEventType.SESSION_START.value:
             insert_session(event.session_id, event.timestamp)
             if DEBUG:
                 print(f"[DEBUG] Inserted session: {event.session_id}", flush=True)
-        elif event.event_type == "session_stop":
+        elif event.event_type == SessionEventType.SESSION_STOP.value:
             # Update session status to finished
             update_session_status(event.session_id, "finished")
             if DEBUG:
@@ -209,18 +211,9 @@ async def receive_event(event: Event):
         if DEBUG:
             print(f"[DEBUG] Inserted event successfully", flush=True)
 
-        # Broadcast to all connected clients
-        message = json.dumps({"type": "event", "data": event.model_dump()})
-        broadcast_count = 0
-        for ws in connections.copy():
-            try:
-                await ws.send_text(message)
-                broadcast_count += 1
-            except:
-                connections.discard(ws)
-
-        if DEBUG:
-            print(f"[DEBUG] Broadcasted to {broadcast_count} WebSocket clients", flush=True)
+        # Broadcast to SSE clients
+        event_data = {"data": event.model_dump()}
+        await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=event.session_id)
 
         return {"ok": True}
 
@@ -266,13 +259,8 @@ async def create_session_endpoint(session: SessionCreate):
             raise HTTPException(status_code=409, detail="Session already exists")
         raise
 
-    # Broadcast to WebSocket clients
-    message = json.dumps({"type": "session_created", "session": new_session})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    # Broadcast to SSE clients
+    await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=session.session_id)
 
     return {"ok": True, "session": new_session}
 
@@ -299,13 +287,8 @@ async def bind_session_endpoint(session_id: str, binding: SessionBind):
     if DEBUG:
         print(f"[DEBUG] Session {session_id} bound to executor {binding.executor_session_id}", flush=True)
 
-    # Broadcast to WebSocket clients
-    message = json.dumps({"type": "session_updated", "session": result})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    # Broadcast to SSE clients
+    await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": result}, session_id=session_id)
 
     return {"ok": True, "session": result}
 
@@ -514,17 +497,14 @@ async def add_session_event(session_id: str, event: Event):
     insert_event(event)
 
     # Handle session_stop special case: update status to finished
-    if event.event_type == "session_stop":
+    if event.event_type == SessionEventType.SESSION_STOP.value:
         update_session_status(session_id, "finished")
 
         # Get updated session and broadcast session_updated
         updated_session = get_session_by_id(session_id)
-        session_message = json.dumps({"type": "session_updated", "session": updated_session})
-        for ws in connections.copy():
-            try:
-                await ws.send_text(session_message)
-            except:
-                connections.discard(ws)
+
+        # Broadcast to SSE clients
+        await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
 
         # Callback processing: handle child completion and pending notifications
         # Check execution_mode to determine if callback should be triggered (ADR-003)
@@ -546,24 +526,18 @@ async def add_session_event(session_id: str, event: Event):
 
             callback_processor.on_child_completed(
                 child_session_id=session_id,
-                parent_session_id=parent_session_id,
-                parent_status=parent_status,
+                parent_session=parent_session,
                 child_result=child_result,
             )
 
         # Check if this session has pending child callbacks to flush
-        project_dir = updated_session.get("project_dir")
-        flushed = callback_processor.on_session_stopped(session_id, project_dir)
+        flushed = callback_processor.on_session_stopped(session_id)
         if flushed > 0 and DEBUG:
             print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
 
-    # Broadcast event to WebSocket clients
-    message = json.dumps({"type": "event", "data": event.model_dump()})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    # Broadcast event to SSE clients
+    event_data = {"data": event.model_dump()}
+    await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=session_id)
 
     return {"ok": True}
 
@@ -596,19 +570,11 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
     # Get updated session
     updated_session = get_session_by_id(session_id)
 
-    # Broadcast update to WebSocket clients
-    message = json.dumps({
-        "type": "session_updated",
-        "session": updated_session
-    })
-
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    # Broadcast to SSE clients
+    await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
 
     return {"ok": True, "session": updated_session}
+
 
 @app.delete("/sessions/{session_id}")
 async def delete_session_endpoint(session_id: str):
@@ -620,17 +586,8 @@ async def delete_session_endpoint(session_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Broadcast deletion to WebSocket clients
-    message = json.dumps({
-        "type": "session_deleted",
-        "session_id": session_id
-    })
-
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    # Broadcast to SSE clients
+    await sse_manager.broadcast(StreamEventType.SESSION_DELETED, {"session_id": session_id}, session_id=session_id)
 
     return {
         "ok": True,
@@ -638,25 +595,87 @@ async def delete_session_endpoint(session_id: str):
         "deleted": result
     }
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time updates"""
-    await websocket.accept()
-    connections.add(websocket)
 
-    # Send initial state
-    sessions = get_sessions()
-    await websocket.send_text(json.dumps({
-        "type": "init",
-        "sessions": sessions
-    }))
+# ==============================================================================
+# SSE Endpoint (ADR-013)
+# ==============================================================================
 
-    try:
-        # Keep connection alive
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        connections.discard(websocket)
+@app.get("/sse/sessions")
+async def sse_sessions(
+    request: Request,
+    session_id: Optional[str] = Query(None, description="Filter to single session"),
+    created_by: Optional[str] = Query(None, description="Filter by session creator"),
+    include_init: bool = Query(True, description="Include initial state on connect"),
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+):
+    """SSE endpoint for real-time session updates.
+
+    Provides the same events as WebSocket /ws but using Server-Sent Events.
+    Supports filtering by session_id and automatic reconnection via Last-Event-ID.
+
+    See ADR-013 for design rationale.
+    """
+    connection_id = str(uuid_module.uuid4())
+
+    async def event_generator():
+        """Generate SSE events for this connection."""
+        # Register this connection
+        conn = SSEConnection(
+            connection_id=connection_id,
+            session_id_filter=session_id,
+            created_by_filter=created_by,
+        )
+        sse_manager.register(conn)
+
+        try:
+            # Send initial state unless resuming or explicitly disabled
+            if include_init and not last_event_id:
+                # Get filtered sessions (no auth = admin = all sessions)
+                sessions = get_sessions()
+
+                # Apply session_id filter if provided
+                if session_id:
+                    sessions = [s for s in sessions if s.get("session_id") == session_id]
+
+                event_id = await sse_manager.generate_event_id(StreamEventType.INIT)
+                yield sse_manager.format_event(event_id, StreamEventType.INIT, {"sessions": sessions})
+
+            # Stream events from the queue with heartbeat
+            heartbeat_interval = 30  # seconds
+            while True:
+                try:
+                    # Check for client disconnect
+                    if await request.is_disconnected():
+                        break
+
+                    # Wait for event with timeout (for heartbeat)
+                    event = await asyncio.wait_for(
+                        conn.queue.get(),
+                        timeout=heartbeat_interval
+                    )
+                    yield event
+
+                except asyncio.TimeoutError:
+                    # Send heartbeat comment to keep connection alive
+                    yield ": heartbeat\n\n"
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            # Cleanup connection on disconnect
+            sse_manager.unregister(connection_id)
+            if DEBUG:
+                print(f"[DEBUG] SSE connection {connection_id} closed", flush=True)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 
 # ==============================================================================
@@ -1009,15 +1028,14 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
     # Only trigger callback if execution_mode == ASYNC_CALLBACK
     if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK:
         parent_session = get_session_by_id(run.parent_session_id)
-        parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run failed for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}'", flush=True)
+            parent_status = parent_session["status"] if parent_session else "not_found"
+            print(f"[DEBUG] Run failed for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}' status={parent_status}", flush=True)
 
         callback_processor.on_child_completed(
             child_session_id=run.session_id,
-            parent_session_id=run.parent_session_id,
-            parent_status=parent_status,
+            parent_session=parent_session,
             child_result=None,
             child_failed=True,
             child_error=request.error,
@@ -1048,15 +1066,14 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     # Only trigger callback if execution_mode == ASYNC_CALLBACK
     if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK:
         parent_session = get_session_by_id(run.parent_session_id)
-        parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run stopped for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}'", flush=True)
+            parent_status = parent_session["status"] if parent_session else "not_found"
+            print(f"[DEBUG] Run stopped for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}' status={parent_status}", flush=True)
 
         callback_processor.on_child_completed(
             child_session_id=run.session_id,
-            parent_session_id=run.parent_session_id,
-            parent_status=parent_status,
+            parent_session=parent_session,
             child_result=None,
             child_failed=True,
             child_error="Session was manually stopped",
@@ -1168,10 +1185,13 @@ async def create_run(run_create: RunCreate):
     If session_id is not provided, coordinator generates one (ADR-010).
     Returns both run_id and session_id in the response.
 
+    For resume runs, run_queue.add_run() enriches with agent_name and project_dir
+    from the existing session so the Runner has complete information for blueprint resolution.
+
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
     """
-    # Create the run (session_id generated if not provided)
+    # Create the run (session_id generated if not provided, resume runs enriched automatically)
     run = run_queue.add_run(run_create)
 
     # For start runs, create session record immediately with status=pending (ADR-010)
@@ -1190,13 +1210,8 @@ async def create_run(run_create: RunCreate):
             if DEBUG:
                 print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id} (mode={run.execution_mode.value})", flush=True)
 
-            # Broadcast session_created to WebSocket clients
-            message = json.dumps({"type": "session_created", "session": new_session})
-            for ws in connections.copy():
-                try:
-                    await ws.send_text(message)
-                except:
-                    connections.discard(ws)
+            # Broadcast to SSE clients
+            await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)
 
         except Exception as e:
             if "UNIQUE constraint failed" in str(e):

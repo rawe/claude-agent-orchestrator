@@ -7,7 +7,7 @@ Verify that starting a new session produces the correct sequence of WebSocket ev
 - Database reset: `./tests/scripts/reset-db`
 - Agent Coordinator running
 - Agent Runner running with `-x test-executor`
-- ws-monitor running
+- sse-monitor running
 
 ## Test Steps
 
@@ -40,7 +40,7 @@ The runner should pick up the run within a few seconds. Watch the runner termina
 
 ### Step 3: Observe WebSocket events
 
-Watch the ws-monitor output.
+Watch the sse-monitor output.
 
 ## Expected Events (in order)
 

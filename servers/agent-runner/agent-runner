@@ -4,6 +4,10 @@
 # dependencies = [
 #     "httpx>=0.25.0",
 #     "typer>=0.9.0",
+#     "uvicorn>=0.30.0",
+#     "starlette>=0.38.0",
+#     "mcp>=1.0.0",
+#     "fastmcp>=2.0.0",
 # ]
 # ///
 """
@@ -44,11 +48,15 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from config import RunnerConfig
-from api_client import CoordinatorAPIClient, DuplicateRunnerError
+from api_client import CoordinatorAPIClient, DuplicateRunnerError, AuthenticationError
+from auth0_client import Auth0M2MClient
 from registry import RunningRunsRegistry
 from executor import RunExecutor, list_executors, resolve_executor_name, get_executor_type
 from poller import RunPoller
 from supervisor import RunSupervisor
+from coordinator_proxy import CoordinatorProxy
+from blueprint_resolver import BlueprintResolver
+from agent_orchestrator_mcp import MCPServer
 
 # Configure logging
 logging.basicConfig(
@@ -111,12 +119,55 @@ class Runner:
 
     def __init__(self, config: RunnerConfig):
         self.config = config
+
+        # Create Auth0 client if configured
+        self.auth0_client: Auth0M2MClient | None = None
+        if config.use_oidc:
+            self.auth0_client = Auth0M2MClient(
+                domain=config.auth0_domain,
+                client_id=config.auth0_client_id,
+                client_secret=config.auth0_client_secret,
+                audience=config.auth0_audience,
+            )
+            logger.info("Auth0 M2M authentication enabled")
+
         self.api_client = CoordinatorAPIClient(
             config.agent_coordinator_url,
+            auth0_client=self.auth0_client,
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
+
+        # Create proxy for executor communication
+        # Executors connect to this proxy instead of the coordinator directly
+        # The proxy handles authentication transparently
+        self.proxy = CoordinatorProxy(
+            coordinator_url=config.agent_coordinator_url,
+            auth0_client=self.auth0_client,
+        )
+
+        # Create embedded MCP server - facade to Coordinator
+        # Provides orchestration tools to agents running in executors
+        # IMPORTANT: auth0_client is passed by reference to share token cache
+        # This avoids duplicate M2M token requests - the MCP server reuses our token
+        self.mcp_server = MCPServer(
+            coordinator_url=config.agent_coordinator_url,
+            auth0_client=self.auth0_client,  # Shared instance for token reuse
+        )
+
+        # Create blueprint resolver for Schema 2.0
+        # Fetches and resolves blueprints before passing to executor
+        self.blueprint_resolver = BlueprintResolver(
+            coordinator_url=config.agent_coordinator_url,
+            auth0_client=self.auth0_client,
+        )
+
         self.registry = RunningRunsRegistry()
-        self.executor = RunExecutor(config.project_dir)
+        # Note: mcp_server_url will be set after mcp_server.start() in start()
+        self.executor = RunExecutor(
+            default_project_dir=config.project_dir,
+            blueprint_resolver=self.blueprint_resolver,
+            mcp_server_url=None,
+        )
         self.runner_id: str | None = None
 
         self.poller: RunPoller | None = None
@@ -150,6 +201,9 @@ class Runner:
             logger.info(f"  Project directory: {self.config.project_dir}")
             if self.config.tags:
                 logger.info(f"  Tags: {self.config.tags}")
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise SystemExit(1)
         except Exception as e:
             logger.error(f"Failed to register: {e}")
             raise
@@ -158,6 +212,22 @@ class Runner:
         """Start all background threads."""
         if not self.runner_id:
             raise RuntimeError("Must register before starting")
+
+        # Start the proxy server for executor communication
+        # This must happen before spawning any executors
+        self.proxy.start()
+
+        # Set environment variable so executors use the proxy
+        # This is transparent - executors don't know they're using a proxy
+        os.environ["AGENT_ORCHESTRATOR_API_URL"] = self.proxy.url
+
+        # Start embedded MCP server
+        # Provides orchestration tools to agents running in executors
+        self.mcp_server.start()
+        logger.info(f"Embedded MCP server on port {self.mcp_server.port}")
+
+        # Update executor with MCP server URL for placeholder resolution
+        self.executor.mcp_server_url = self.mcp_server.url
 
         # Create components
         self.poller = RunPoller(
@@ -203,6 +273,12 @@ class Runner:
             self.supervisor.stop()
         if self.heartbeat:
             self.heartbeat.stop()
+
+        # Stop the embedded MCP server
+        self.mcp_server.stop()
+
+        # Stop the proxy server
+        self.proxy.stop()
 
         # Deregister from Agent Coordinator (only if not already deregistered externally)
         if self.runner_id and not self._externally_deregistered:

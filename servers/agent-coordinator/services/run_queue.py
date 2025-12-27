@@ -154,12 +154,25 @@ class RunQueue:
         """Create a new run with pending status.
 
         If session_id is not provided, generates one per ADR-010.
+        For resume runs, enriches with agent_name/project_dir from existing session.
         """
         run_id = f"run_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat()
 
         # Generate session_id if not provided (ADR-010)
         session_id = run_create.session_id or generate_session_id()
+
+        # For resume runs, enrich from existing session so Runner has complete info
+        if run_create.type == RunType.RESUME_SESSION and run_create.session_id:
+            from database import get_session_by_id
+            session = get_session_by_id(run_create.session_id)
+            if session:
+                # Copy agent_name if not provided in request
+                if not run_create.agent_name and session.get("agent_name"):
+                    run_create.agent_name = session["agent_name"]
+                # Copy project_dir if not provided in request
+                if not run_create.project_dir and session.get("project_dir"):
+                    run_create.project_dir = session["project_dir"]
 
         run = Run(
             run_id=run_id,

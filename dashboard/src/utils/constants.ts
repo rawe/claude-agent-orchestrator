@@ -2,7 +2,10 @@
 // Agent Orchestrator API handles sessions, events, agent blueprints, and runs (unified service)
 export const AGENT_ORCHESTRATOR_API_URL = import.meta.env.VITE_AGENT_ORCHESTRATOR_API_URL || 'http://localhost:8765';
 export const DOCUMENT_SERVER_URL = import.meta.env.VITE_DOCUMENT_SERVER_URL || 'http://localhost:8766';
-export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8765/ws';
+
+// SSE endpoint for real-time updates (ADR-013) - derived from API URL
+// Note: Token is added at runtime via auth service (EventSource doesn't support headers)
+export const SSE_BASE_URL = `${AGENT_ORCHESTRATOR_API_URL}/sse/sessions`;
 
 // Status colors
 export const STATUS_COLORS = {
@@ -45,6 +48,3 @@ export const FILE_ICONS: Record<string, string> = {
 
 // Pagination
 export const DEFAULT_PAGE_SIZE = 50;
-
-// WebSocket reconnection
-export const WS_RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];

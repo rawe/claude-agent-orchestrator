@@ -1,11 +1,11 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useReducer, type ReactNode } from 'react';
-import { useWebSocket } from './WebSocketContext';
+import { useSSE } from './SSEContext';
 import { chatService } from '../services/api';
 import type {
   ChatMessage,
   ToolCall,
   AgentStatus,
-  WebSocketMessage,
+  StreamMessage,
   SessionEvent,
   ContentBlock,
 } from '../types';
@@ -232,9 +232,9 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(chatReducer, initialState);
-  const { subscribe } = useWebSocket();
+  const { subscribe } = useSSE();
 
-  // Refs to avoid stale closures in WebSocket handler
+  // Refs to avoid stale closures in SSE handler
   // These are updated SYNCHRONOUSLY to prevent race conditions in StrictMode
   const sessionIdRef = useRef<string | null>(null);
   const pendingMessageIdRef = useRef<string | null>(null);
@@ -293,10 +293,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [addPendingAssistantMessage, setSessionId, completeAssistantMessage]);
 
-  // Handle WebSocket messages
-  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
+  // Handle SSE messages
+  const handleSSEMessage = useCallback((message: StreamMessage) => {
     // Check if message belongs to our session (uses session_id only per ADR-010)
-    const isOurSession = (msg: WebSocketMessage): boolean => {
+    const isOurSession = (msg: StreamMessage): boolean => {
       if (!sessionIdRef.current) return false;
       if ('session' in msg && msg.session) {
         return msg.session.session_id === sessionIdRef.current;
@@ -410,12 +410,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [setSessionId, completeAssistantMessage]);
 
-  // Subscribe to WebSocket - use ref pattern to avoid re-subscription
-  const handlerRef = useRef(handleWebSocketMessage);
-  handlerRef.current = handleWebSocketMessage;
+  // Subscribe to SSE - use ref pattern to avoid re-subscription
+  const handlerRef = useRef(handleSSEMessage);
+  handlerRef.current = handleSSEMessage;
 
   useEffect(() => {
-    const stableHandler = (msg: WebSocketMessage) => handlerRef.current(msg);
+    const stableHandler = (msg: StreamMessage) => handlerRef.current(msg);
     const unsubscribe = subscribe(stableHandler);
     return () => unsubscribe();
   }, [subscribe]);

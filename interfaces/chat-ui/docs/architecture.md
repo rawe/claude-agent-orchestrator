@@ -16,7 +16,7 @@ src/
 
 ```
 App
-└── WebSocketProvider      # WebSocket connection
+└── SSEProvider            # SSE connection
     └── ChatProvider       # Chat state management
         └── Chat           # Main UI
             ├── Header     # Title, status, new chat button
@@ -32,7 +32,7 @@ App
 ```
 User Input → ChatContext.sendMessage() → API (POST /runs)
                                               ↓
-WebSocket ← Agent Coordinator broadcasts events
+SSE ← Agent Coordinator broadcasts events
     ↓
 ChatContext handles event → Updates state → UI re-renders
 ```
@@ -46,7 +46,7 @@ ChatContext handles event → Updates state → UI re-renders
 - `currentToolCalls[]` - Tools in progress
 - `pendingMessageId` - Message awaiting response
 
-**WebSocketContext** manages:
+**SSEContext** manages:
 - Connection state
 - Subscriber pattern for message handling
 - Auto-reconnect with exponential backoff

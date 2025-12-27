@@ -2,6 +2,8 @@
 
 Model Context Protocol (MCP) server for orchestrating specialized Claude Code agents. Provides tools to create, manage, and execute agent sessions programmatically.
 
+> **Note:** For agents running within the framework, the MCP server is **embedded in the Agent Runner** - no external server needed. This documentation covers the standalone server for external clients (Claude Desktop, Claude Code).
+
 ## Quick Start
 
 **Requirements:** Python ≥3.10, [uv](https://docs.astral.sh/uv/getting-started/installation/)

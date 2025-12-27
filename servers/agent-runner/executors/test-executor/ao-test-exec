@@ -72,6 +72,7 @@ def generate_response(prompt: str) -> str:
 
 def run_start(inv: ExecutorInvocation) -> None:
     """Start a new session."""
+    # Auth is handled by Agent Coordinator Proxy
     api_url = get_api_url()
     client = SessionClient(api_url)
 
@@ -169,6 +170,7 @@ def run_start(inv: ExecutorInvocation) -> None:
 
 def run_resume(inv: ExecutorInvocation) -> None:
     """Resume an existing session."""
+    # Auth is handled by Agent Coordinator Proxy
     api_url = get_api_url()
     client = SessionClient(api_url)
 

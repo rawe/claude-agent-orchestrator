@@ -57,4 +57,4 @@ The commands automatically connect to the Agent Coordinator at the default URL.
 **Events not appearing:**
 1. Verify server: `curl http://127.0.0.1:8765/sessions`
 2. Check server logs for errors
-3. Ensure dashboard WebSocket is connected
+3. Ensure dashboard SSE connection is active

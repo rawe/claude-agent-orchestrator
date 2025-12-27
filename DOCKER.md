@@ -28,7 +28,7 @@ The Agent Orchestrator Framework consists of three main Docker services:
 │               │       (Port 8765)             │ │    (Port 8766)    │    │
 │               │  - Session management         │ │                   │    │
 │               │  - Agent blueprint registry   │ │                   │    │
-│               │  - WebSocket events           │ │                   │    │
+│               │  - SSE events                 │ │                   │    │
 │               └───────────────┬───────────────┘ └─────────┬─────────┘    │
 │                               │                           │              │
 │                               ▼                           ▼              │
@@ -174,14 +174,14 @@ Run `make help` to see all available commands:
 - **Code Location:** `./dashboard`
 
 **Features:**
-- Agent Sessions (real-time monitoring via WebSocket)
+- Agent Sessions (real-time monitoring via SSE)
 - Document Management (upload, tag, preview)
 - Agent Manager (create/edit agent blueprints)
 
 ### Agent Coordinator
 
 - **Port:** 8765
-- **Technology:** Python 3.11 + FastAPI + WebSockets
+- **Technology:** Python 3.11 + FastAPI + SSE
 - **Purpose:** Session management, agent blueprint registry, and real-time event capture
 - **Health Check:** http://localhost:8765/health
 - **Code Location:** `./servers/agent-coordinator`
@@ -189,7 +189,7 @@ Run `make help` to see all available commands:
 **API Endpoints:**
 - `/sessions/*` - Session management
 - `/events/*` - Event tracking
-- `/ws` - WebSocket for real-time updates
+- `/sse/sessions` - SSE for real-time updates
 - `/agents/*` - Agent blueprint CRUD operations
 - `/health` - Health check
 
@@ -330,7 +330,7 @@ The build process for each service:
 1. Uses `python:3.11-slim` base image
 2. Installs `uv` package manager
 3. Copies `pyproject.toml` and installs dependencies
-4. Runs FastAPI server with WebSocket support
+4. Runs FastAPI server with SSE support
 
 **Context Store:**
 1. Uses `python:3.11-slim` base image

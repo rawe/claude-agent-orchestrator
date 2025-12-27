@@ -59,8 +59,7 @@ Please continue with the orchestration based on these results."""
 
 def on_child_completed(
     child_session_id: str,
-    parent_session_id: str,
-    parent_status: str,
+    parent_session: Optional[dict],
     child_result: Optional[str] = None,
     child_failed: bool = False,
     child_error: Optional[str] = None,
@@ -69,15 +68,24 @@ def on_child_completed(
 
     Args:
         child_session_id: ID of the completed child session
-        parent_session_id: ID of the parent session to callback
-        parent_status: Current status of parent ("running", "finished", etc.)
+        parent_session: Parent session dict (must contain session_id and status)
         child_result: Result text from the child session
         child_failed: Whether the child failed
         child_error: Error message if child failed
 
     Returns:
         True if callback was delivered immediately, False if queued
+
+    Note: agent_name and project_dir are automatically enriched by run_queue.add_run()
+    from the existing session when creating the resume run.
     """
+    if not parent_session:
+        logger.warning(f"Skipping callback: parent session not found for child {child_session_id}")
+        return False
+
+    parent_session_id = parent_session.get("session_id", "")
+    parent_status = parent_session.get("status", "not_found")
+
     # Prevent self-loop
     if child_session_id == parent_session_id:
         logger.warning(f"Skipping callback: session {child_session_id} is its own parent")
@@ -114,7 +122,7 @@ def on_child_completed(
     return False
 
 
-def on_session_stopped(session_id: str, project_dir: Optional[str] = None) -> int:
+def on_session_stopped(session_id: str) -> int:
     """Handle any session stopping - check for pending callbacks.
 
     Called when ANY session stops. If this session has pending child
@@ -126,10 +134,12 @@ def on_session_stopped(session_id: str, project_dir: Optional[str] = None) -> in
 
     Args:
         session_id: ID of the session that just stopped
-        project_dir: Project directory of the session (for resume run)
 
     Returns:
         Number of pending callbacks that were flushed
+
+    Note: agent_name and project_dir are automatically enriched by run_queue.add_run()
+    from the existing session.
     """
     pending = None
     should_create_run = False
@@ -156,7 +166,7 @@ def on_session_stopped(session_id: str, project_dir: Optional[str] = None) -> in
 
     # Create run outside lock
     if should_create_run and pending:
-        _create_resume_run(session_id, pending, project_dir)
+        _create_resume_run(session_id, pending)
         return len(pending)
 
     return 0
@@ -184,17 +194,18 @@ def _queue_notification(
 def _create_resume_run(
     parent_session_id: str,
     children: List[tuple],  # [(child_id, result, failed, error), ...]
-    project_dir: Optional[str] = None,
 ) -> Optional[str]:
     """Create a resume run for the parent with child results.
 
     Args:
         parent_session_id: Session ID to resume
         children: List of (child_id, result, failed, error) tuples
-        project_dir: Project directory for the resume run
 
     Returns:
         Run ID if created successfully, None on error
+
+    Note: agent_name and project_dir are automatically enriched by run_queue.add_run()
+    from the existing session, so we don't need to pass them here.
     """
     from services.run_queue import run_queue, RunCreate, RunType
 
@@ -233,7 +244,6 @@ def _create_resume_run(
             type=RunType.RESUME_SESSION,
             session_id=parent_session_id,
             prompt=prompt,
-            project_dir=project_dir,
         ))
         logger.info(f"Created callback resume run {run.run_id} for parent '{parent_session_id}' with {len(children)} child result(s)")
         return run.run_id

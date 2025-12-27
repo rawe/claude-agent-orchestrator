@@ -179,7 +179,7 @@ Update stop button visibility:
 
 **File:** `dashboard/src/hooks/useSessions.ts`
 
-Handle `session_updated` WebSocket messages to update status to 'stopping'.
+Handle `session_updated` SSE messages to update status to 'stopping'.
 
 ---
 
@@ -191,7 +191,7 @@ Currently, when `POST /sessions/{session_id}/stop` is called, the session status
 
 In `stop_session()` endpoint, after queueing the stop command:
 1. Update session status to 'stopping' (new status)
-2. Broadcast `session_updated` WebSocket message
+2. Broadcast `session_updated` SSE message
 
 ```python
 @app.post("/sessions/{session_id}/stop")
@@ -201,14 +201,10 @@ async def stop_session(session_id: str):
     # Update session status to stopping
     update_session_status(session_id, "stopping")
 
-    # Broadcast to WebSocket clients
+    # Broadcast to SSE clients
     updated_session = get_session_by_id(session_id)
-    message = json.dumps({"type": "session_updated", "session": updated_session})
-    for ws in connections.copy():
-        try:
-            await ws.send_text(message)
-        except:
-            connections.discard(ws)
+    message = {"type": "session_updated", "session": updated_session}
+    await broadcast_to_sse_clients(message)
 
     return {
         "ok": True,
@@ -232,7 +228,7 @@ When the runner terminates a process and reports `POST /runner/runs/{run_id}/sto
 
 In `report_run_stopped()` endpoint:
 1. Update session status to 'stopped'
-2. Broadcast `session_updated` WebSocket message
+2. Broadcast `session_updated` SSE message
 3. Consider creating a `session_stop` event
 
 ```python
@@ -247,12 +243,8 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
 
         # Broadcast update
         updated_session = get_session_by_id(session["session_id"])
-        message = json.dumps({"type": "session_updated", "session": updated_session})
-        for ws in connections.copy():
-            try:
-                await ws.send_text(message)
-            except:
-                connections.discard(ws)
+        message = {"type": "session_updated", "session": updated_session}
+        await broadcast_to_sse_clients(message)
 
     return {"ok": True}
 ```
@@ -276,7 +268,7 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
 | `dashboard/src/types/session.ts` | Add 'stopping' status type |
 | `dashboard/src/components/features/sessions/SessionCard.tsx` | Status badge, stop button |
 | `dashboard/src/components/features/sessions/SessionList.tsx` | Filter for stopping status |
-| `dashboard/src/hooks/useSessions.ts` | WebSocket handling for status updates |
+| `dashboard/src/hooks/useSessions.ts` | SSE handling for status updates |
 | `dashboard/src/pages/AgentSessions.tsx` | Stop handler, success messages |
 
 ### Documentation
@@ -316,6 +308,6 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
 - [ ] Session status changes to 'stopping' immediately
 - [ ] Status badge shows amber/pulsing for 'stopping'
 - [ ] After process terminates, status changes to 'stopped'
-- [ ] WebSocket broadcasts update dashboard in real-time
+- [ ] SSE broadcasts update dashboard in real-time
 - [ ] Error cases show appropriate messages (session not found, not running, etc.)
 - [ ] Multiple stop requests are deduplicated (backend handles this)

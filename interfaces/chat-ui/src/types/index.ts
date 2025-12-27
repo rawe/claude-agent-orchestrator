@@ -9,7 +9,7 @@ export interface ContentBlock {
   text?: string;
 }
 
-// Event from WebSocket
+// Event from SSE stream
 export interface SessionEvent {
   event_type: 'session_start' | 'session_stop' | 'pre_tool' | 'post_tool' | 'message';
   session_id: string;
@@ -46,8 +46,8 @@ export interface Session {
   parent_session_id?: string;
 }
 
-// WebSocket message types
-export type WebSocketMessage =
+// Stream message types
+export type StreamMessage =
   | { type: 'init'; sessions: Session[] }
   | { type: 'session_created'; session: Session }
   | { type: 'session_updated'; session: Session }

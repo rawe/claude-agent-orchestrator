@@ -37,19 +37,35 @@ chmod +x executors/my-executor/ao-my-executor-exec
 
 ### 3. Implement the invocation schema
 
-The executor receives a JSON payload via stdin:
+The executor receives a JSON payload via stdin (Schema 2.0):
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "mode": "start" | "resume",
-  "session_name": "unique-session-name",
+  "session_id": "ses_abc123",
   "prompt": "User input text",
-  "agent_name": "optional-agent-blueprint",
   "project_dir": "/path/to/project",
+  "agent_blueprint": {
+    "name": "worker-agent",
+    "system_prompt": "You are a worker agent...",
+    "mcp_servers": {
+      "orchestrator": {
+        "type": "http",
+        "url": "http://127.0.0.1:54321",
+        "headers": {
+          "X-Agent-Session-Id": "ses_abc123"
+        }
+      }
+    }
+  },
   "metadata": {}
 }
 ```
+
+**Schema 2.0:**
+- `agent_blueprint`: Fully resolved blueprint with placeholders replaced (Runner handles resolution)
+- Runner fetches blueprint from Coordinator and resolves placeholders before spawning executor
 
 ### 4. Use shared libraries
 

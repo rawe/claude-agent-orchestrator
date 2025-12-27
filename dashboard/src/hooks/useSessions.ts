@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useWebSocket, useNotification } from '@/contexts';
+import { useSSE, useNotification } from '@/contexts';
 import { sessionService } from '@/services';
 import { getEventKey } from '@/utils';
-import type { SessionEvent, WebSocketMessage } from '@/types';
+import type { SessionEvent, StreamMessage } from '@/types';
 
 // Note: useSessions() is now a context - import from '@/contexts' instead
 // This file only exports useSessionEvents which is session-specific
@@ -10,7 +10,7 @@ import type { SessionEvent, WebSocketMessage } from '@/types';
 export function useSessionEvents(sessionId: string | null) {
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [loading, setLoading] = useState(false);
-  const { subscribe } = useWebSocket();
+  const { subscribe } = useSSE();
   const { showError } = useNotification();
 
   // Fetch events when session changes
@@ -40,7 +40,7 @@ export function useSessionEvents(sessionId: string | null) {
   useEffect(() => {
     if (!sessionId) return;
 
-    const handleMessage = (message: WebSocketMessage) => {
+    const handleMessage = (message: StreamMessage) => {
       if (message.type === 'event' && message.data?.session_id === sessionId) {
         const newEvent = message.data!;
         const newEventKey = getEventKey(newEvent);

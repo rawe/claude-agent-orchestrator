@@ -134,13 +134,15 @@ async def run_claude_session(
     This function uses the Claude Agent SDK to create or resume a session,
     with session state managed via the AgentCoordinator API.
 
+    Note: Auth is handled by the Agent Coordinator Proxy - no credentials needed.
+
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
         project_dir: Working directory for Claude (sets cwd)
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_executor_session_id: If provided, resume existing Claude SDK session
-        api_url: Base URL of Agent Orchestrator API
+        api_url: Base URL of Agent Orchestrator API (via proxy)
         agent_name: Agent name (optional, for session metadata)
         executor_type: Executor type for bind call (default: "claude-code")
 
@@ -161,7 +163,7 @@ async def run_claude_session(
         ...     session_id="ses_abc123def456"
         ... )
     """
-    # Create session client for API calls
+    # Create session client for API calls (auth handled by proxy)
     session_client = SessionClient(api_url)
 
     # Get hostname for bind call
@@ -350,13 +352,15 @@ def run_session_sync(
     This allows command scripts to remain synchronous while using
     the SDK's async API internally.
 
+    Note: Auth is handled by the Agent Coordinator Proxy - no credentials needed.
+
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
         project_dir: Working directory for Claude (sets cwd)
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_executor_session_id: If provided, resume existing Claude SDK session
-        api_url: Base URL of Agent Orchestrator API
+        api_url: Base URL of Agent Orchestrator API (via proxy)
         agent_name: Agent name (optional, for session metadata)
         executor_type: Executor type for bind call (default: "claude-code")
 

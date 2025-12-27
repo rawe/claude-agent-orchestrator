@@ -4,6 +4,73 @@ from typing import Optional, Any, List, Literal, Union
 
 
 # ==============================================================================
+# Stream Event Types (SSE broadcasts)
+# ==============================================================================
+
+class StreamEventType(str, Enum):
+    """
+    Event types for real-time streaming via Server-Sent Events (SSE).
+
+    These are the event types sent to connected clients for real-time updates
+    via the /sse/sessions endpoint.
+
+    See ADR-013 for SSE migration details.
+    """
+    INIT = "init"                       # Initial state on connect
+    SESSION_CREATED = "session_created" # New session created
+    SESSION_UPDATED = "session_updated" # Session state changed
+    SESSION_DELETED = "session_deleted" # Session removed
+    EVENT = "event"                     # Session event (tool call, message, etc.)
+    RUN_FAILED = "run_failed"           # Run timeout or failure
+
+    @property
+    def abbrev(self) -> str:
+        """Get 3-letter abbreviation for SSE event IDs."""
+        return _STREAM_EVENT_ABBREV[self]
+
+
+# Abbreviations for SSE event IDs (used in Last-Event-ID for resume)
+_STREAM_EVENT_ABBREV = {
+    StreamEventType.INIT: "ini",
+    StreamEventType.SESSION_CREATED: "scr",
+    StreamEventType.SESSION_UPDATED: "sup",
+    StreamEventType.SESSION_DELETED: "sdl",
+    StreamEventType.EVENT: "evt",
+    StreamEventType.RUN_FAILED: "rfl",
+}
+
+
+# ==============================================================================
+# Session Event Types (events within a session)
+# ==============================================================================
+
+class SessionEventType(str, Enum):
+    """
+    Event types that occur within an agent session.
+
+    These are logged in the events table and represent the lifecycle
+    and activities of an agent session.
+
+    TODO: Rename SESSION_START -> RUN_START and SESSION_STOP -> RUN_STOP
+    These events are part of our Run API and should reflect that naming.
+    This rename requires coordination across:
+    - Agent Runner executors (claude-code/ao-claude-code-exec)
+    - Dashboard and other frontends listening to these events
+    - Any external integrations using the events API
+    Consider a migration period with both old and new names accepted.
+    """
+    # TODO: Rename to RUN_START (see class docstring for migration notes)
+    SESSION_START = "session_start"  # Run/session started
+
+    # TODO: Rename to RUN_STOP (see class docstring for migration notes)
+    SESSION_STOP = "session_stop"    # Run/session stopped/finished
+
+    PRE_TOOL = "pre_tool"            # Before tool execution
+    POST_TOOL = "post_tool"          # After tool execution
+    MESSAGE = "message"              # Assistant or user message
+
+
+# ==============================================================================
 # Agent Models (from agent-registry)
 # ==============================================================================
 

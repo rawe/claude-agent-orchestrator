@@ -8,11 +8,7 @@ Uses `mode=async_callback` for all child agents per ADR-003.
 
 - Agent Coordinator running
 - Agent Runner running with `claude-code` executor
-- ws-monitor running
-- Agent Orchestrator MCP server running on port 9500:
-  ```bash
-  uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
-  ```
+- sse-monitor running
 - `agent-orchestrator` blueprint copied (see `tests/README.md` → "Agent Blueprints")
 
 ## Test Design
@@ -53,7 +49,7 @@ Note the parent `session_id`.
 
 ### Step 3: Wait for all agents to complete
 
-Monitor ws-monitor for completion events. Expected timeline:
+Monitor sse-monitor for completion events. Expected timeline:
 - ~5 seconds: Agents 1, 2, 3 complete (Wave 1)
 - ~10 seconds: Agents 4, 5 complete (Wave 2)
 

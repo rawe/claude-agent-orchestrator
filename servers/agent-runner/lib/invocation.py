@@ -4,7 +4,10 @@ Executor Invocation Payload
 Handles parsing and validation of JSON payloads for the unified ao-*-exec entrypoint.
 Replaces individual CLI arguments with a structured, versioned schema.
 
-Schema version: 1.0
+Schema version: 2.0
+
+Runner resolves blueprint and placeholders before spawning executor.
+Executor receives fully resolved agent_blueprint.
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
 """
@@ -18,23 +21,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Current schema version - used by both runner (to build) and executor (to validate)
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 
-# Supported schema versions for backward compatibility
+# Supported schema versions
 SUPPORTED_VERSIONS = {SCHEMA_VERSION}
 
 # JSON Schema for documentation and --schema flag
 INVOCATION_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "ExecutorInvocation",
-    "description": "Payload schema for ao-*-exec unified executor",
+    "description": "Schema 2.0 - Executor receives resolved agent_blueprint",
     "type": "object",
     "required": ["schema_version", "mode", "session_id", "prompt"],
     "properties": {
         "schema_version": {
             "type": "string",
-            "pattern": "^[0-9]+\\.[0-9]+$",
-            "description": "Schema version (semver major.minor)",
+            "const": "2.0",
+            "description": "Schema version",
         },
         "mode": {
             "type": "string",
@@ -50,13 +53,28 @@ INVOCATION_SCHEMA = {
             "type": "string",
             "description": "User input text (may be long)",
         },
-        "agent_name": {
-            "type": "string",
-            "description": "Agent blueprint name (start mode only)",
-        },
         "project_dir": {
             "type": "string",
             "description": "Working directory path (start mode only)",
+        },
+        "agent_blueprint": {
+            "type": "object",
+            "description": "Fully resolved agent blueprint with placeholders replaced",
+            "properties": {
+                "name": {"type": "string"},
+                "system_prompt": {"type": "string"},
+                "mcp_servers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string"},
+                            "url": {"type": "string"},
+                            "headers": {"type": "object"},
+                        },
+                    },
+                },
+            },
         },
         "metadata": {
             "type": "object",
@@ -72,13 +90,16 @@ class ExecutorInvocation:
     """
     Structured payload for ao-*-exec unified executor.
 
+    The agent_blueprint contains the fully resolved blueprint
+    (with placeholders like ${AGENT_ORCHESTRATOR_MCP_URL} replaced).
+
     Attributes:
         schema_version: Schema version for forward compatibility
         mode: Execution mode ('start' or 'resume')
         session_id: Coordinator-generated session identifier (ADR-010)
         prompt: User input text
-        agent_name: Agent blueprint name (start mode only)
         project_dir: Working directory path (start mode only)
+        agent_blueprint: Fully resolved agent blueprint
         metadata: Extensible key-value map for future use
     """
 
@@ -86,8 +107,8 @@ class ExecutorInvocation:
     mode: Literal["start", "resume"]
     session_id: str
     prompt: str
-    agent_name: Optional[str] = None
     project_dir: Optional[str] = None
+    agent_blueprint: Optional[dict[str, Any]] = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -151,9 +172,8 @@ class ExecutorInvocation:
 
         # Warn about ignored fields in resume mode
         if data["mode"] == "resume":
-            for ignored in ("agent_name", "project_dir"):
-                if data.get(ignored):
-                    logger.warning(f"Field '{ignored}' ignored in resume mode")
+            if data.get("project_dir"):
+                logger.warning("Field 'project_dir' ignored in resume mode")
 
         # Warn about unknown fields (forward compatibility)
         known_fields = {
@@ -161,8 +181,8 @@ class ExecutorInvocation:
             "mode",
             "session_id",
             "prompt",
-            "agent_name",
             "project_dir",
+            "agent_blueprint",
             "metadata",
         }
         for key in data.keys():
@@ -174,8 +194,8 @@ class ExecutorInvocation:
             mode=data["mode"],
             session_id=data["session_id"],
             prompt=data["prompt"],
-            agent_name=data.get("agent_name"),
             project_dir=data.get("project_dir"),
+            agent_blueprint=data.get("agent_blueprint"),
             metadata=data.get("metadata", {}),
         )
 
@@ -187,8 +207,8 @@ class ExecutorInvocation:
             "session_id": self.session_id,
             "prompt": self.prompt,
         }
-        if self.agent_name:
-            d["agent_name"] = self.agent_name
+        if self.agent_blueprint:
+            d["agent_blueprint"] = self.agent_blueprint
         if self.project_dir:
             d["project_dir"] = self.project_dir
         if self.metadata:
@@ -206,7 +226,12 @@ class ExecutorInvocation:
         Logs schema version, mode, session ID, and prompt length
         (not the actual prompt content for security).
         """
+        if self.agent_blueprint:
+            agent_info = f"blueprint={self.agent_blueprint.get('name', 'unnamed')}"
+        else:
+            agent_info = "no_agent"
+
         logger.info(
             f"Invocation: version={self.schema_version} mode={self.mode} "
-            f"session={self.session_id} prompt_len={len(self.prompt)}"
+            f"session={self.session_id} {agent_info} prompt_len={len(self.prompt)}"
         )

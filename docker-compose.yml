@@ -8,14 +8,16 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
+      # Vite env vars must be passed as build args (baked at build time)
+      args:
+        - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
+        - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
+        # Auth0 OIDC (optional - see docs/setup/auth0-setup.md)
+        - VITE_AUTH0_DOMAIN=${AUTH0_DOMAIN}
+        - VITE_AUTH0_CLIENT_ID=${AUTH0_DASHBOARD_CLIENT_ID}
+        - VITE_AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
     ports:
       - "3000:80"
-    environment:
-      # These are baked in at build time via Vite
-      - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
-      - VITE_AGENT_CONTROL_API_URL=http://localhost:9500
-      - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-      - VITE_WEBSOCKET_URL=ws://localhost:8765/ws
     networks:
       - agent-orchestrator-network
     restart: unless-stopped
@@ -39,6 +41,13 @@ services:
       - ${AGENT_DIR:-./config/agents}:/data/agents
     environment:
       - PYTHONUNBUFFERED=1
+      # Authentication (see docs/architecture/auth-coordinator.md)
+      # Default false: docker-compose is for local development only
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      # Auth0 OIDC - required when AUTH_ENABLED=true
+      # See docs/setup/auth0-setup.md for setup guide
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
       # Enable verbose debug logging for troubleshooting (set to true to enable)
       - DEBUG_LOGGING=false
       - CORS_ORIGINS=*

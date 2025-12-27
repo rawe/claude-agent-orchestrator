@@ -34,15 +34,15 @@ Valid executors:
    ```
    Use `test-executor` if no executor was specified, otherwise use the provided executor.
 
-4. **Start WebSocket Monitor** in background:
+4. **Start SSE Monitor** in background:
    ```bash
-   ./tests/tools/ws-monitor
+   ./tests/tools/sse-monitor
    ```
 
 5. **Verify services** are running:
    - Health check: `curl -s http://localhost:8765/health`
    - Confirm runner registered (check runner logs)
-   - Confirm ws-monitor connected
+   - Confirm sse-monitor connected
 
 6. **Report status** - Tell me which services are running and ready
 

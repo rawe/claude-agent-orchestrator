@@ -5,6 +5,12 @@ The agent registry is now merged into the agent-coordinator service.
 
 Environment variables:
     AGENT_ORCHESTRATOR_API_URL: API base URL (default: http://localhost:8765)
+
+Authentication Note:
+    This client is used by executors which communicate via the Agent Coordinator
+    Proxy. The proxy handles all authentication (Auth0 M2M or API key), so this
+    client does not add Authorization headers. Requests are forwarded through
+    the proxy which injects the appropriate authentication.
 """
 
 import urllib.request

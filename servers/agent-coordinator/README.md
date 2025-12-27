@@ -68,7 +68,7 @@ DEBUG_LOGGING=true uv run python -m main
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEBUG_LOGGING` | `false` | Enable verbose debug logging |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
+| `CORS_ORIGINS` | `*` | Allowed CORS origins (comma-separated for production) |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `{cwd}/.agent-orchestrator/agents` | Agents storage directory |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `{cwd}` | Project directory (fallback for agents dir) |
 

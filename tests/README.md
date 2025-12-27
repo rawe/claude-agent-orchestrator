@@ -23,9 +23,12 @@ tests/
 │   └── 02-session-resume.md
 │   └── ... (more test cases)
 ├── tools/
-│   └── ws-monitor         # WebSocket event monitor
+│   └── sse-monitor         # SSE event monitor
 ├── scripts/
-│   └── reset-db           # Database reset script
+│   ├── reset-db            # Database reset script
+│   ├── start-coordinator   # Start Agent Coordinator with .env
+│   ├── start-runner        # Start Agent Runner with .env
+│   └── start-sse-monitor   # Start SSE monitor with .env
 └── README.md              # This file
 ```
 
@@ -49,9 +52,16 @@ For tests that require agent blueprints (test cases 03-07), copy them **before**
 
 ### 3. Start Agent Coordinator
 
-In a terminal (or background process). **Must run from `servers/agent-coordinator/`** (the coordinator uses relative paths for database and agent storage):
+In a terminal (or background process). Use the helper script which handles `.env` sourcing and port checks:
 
 ```bash
+./tests/scripts/start-coordinator
+```
+
+Or manually (must run from `servers/agent-coordinator/` directory):
+
+```bash
+set -a; source .env; set +a  # Export all .env variables
 cd servers/agent-coordinator
 uv run python -m main
 ```
@@ -64,25 +74,39 @@ curl http://localhost:8765/health
 
 ### 4. Start Agent Runner
 
-In another terminal (or background process):
+In another terminal (or background process). Use the helper script:
 
 ```bash
 # With test-executor (fast, deterministic)
-./servers/agent-runner/agent-runner -x test-executor
+./tests/scripts/start-runner test-executor
 
 # Or with claude-code (real AI)
-./servers/agent-runner/agent-runner -x claude-code
+./tests/scripts/start-runner claude-code
 ```
 
-### 5. Start WebSocket Monitor
-
-In another terminal (or background process):
+Or manually:
 
 ```bash
-./tests/tools/ws-monitor
+set -a; source .env; set +a
+./servers/agent-runner/agent-runner -x test-executor
 ```
 
-This prints all WebSocket events as JSON lines to stdout.
+### 5. Start SSE Monitor
+
+In another terminal (or background process). Use the helper script:
+
+```bash
+./tests/scripts/start-sse-monitor
+```
+
+Or manually:
+
+```bash
+set -a; source .env; set +a
+./tests/tools/sse-monitor
+```
+
+This prints all SSE events as JSON lines to stdout.
 
 ## Running Tests
 
@@ -94,7 +118,7 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 
 | Command | Description |
 |---------|-------------|
-| `/tests:setup [executor]` | Start core services (Coordinator, Runner, ws-monitor). Optional executor: `test-executor` (default) or `claude-code` |
+| `/tests:setup [executor]` | Start core services (Coordinator, Runner, sse-monitor). Optional executor: `test-executor` (default) or `claude-code` |
 | `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct executor, handles test-specific setup |
 | `/tests:run` | Run all tests sequentially with automatic setup and teardown |
 | `/tests:teardown` | Stop all services and cleanup |
@@ -115,12 +139,12 @@ To avoid redundancy and maintain clarity, documentation is organized by scope:
 
 | Scope | Location | Contains |
 |-------|----------|----------|
-| **README** | `tests/README.md` | Common setup procedures, shared prerequisites (agent blueprints, MCP server), tool references |
+| **README** | `tests/README.md` | Common setup procedures, shared prerequisites (agent blueprints), tool references |
 | **Slash Commands** | `.claude/commands/tests/*.md` | Execution flow, which services to start, how to invoke other commands |
 | **Test Cases** | `tests/integration/*.md` | Test-specific prerequisites, test steps, expected behavior, verification checklist |
 
 **Principles:**
-- **README**: "How to do X" (e.g., how to copy blueprints, how to start MCP server)
+- **README**: "How to do X" (e.g., how to copy blueprints)
 - **Commands**: "What to do and in which order" (orchestration logic)
 - **Test Cases**: "What this test needs and verifies" (references README for how-to)
 
@@ -160,31 +184,13 @@ The Agent Coordinator discovers blueprints in `.agent-orchestrator/agents/` (rel
 curl -s http://localhost:8765/agents | grep agent-orchestrator
 ```
 
-## Agent Orchestrator MCP Server
-
-Test cases 04-07 require the Agent Orchestrator MCP server for spawning child agents.
-
-**Starting the MCP server:**
-
-```bash
-uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
-```
-
-**Verify it's running:**
-
-```bash
-curl -s http://localhost:9500/mcp
-```
-
-The MCP server must be started **before** running test cases that use the `agent-orchestrator` blueprint.
-
-## Test Case
+## Test Cases
 
 ### Category 1: Basic Session Lifecycle
 - `01-basic-session-start.md` - Start a new session, verify events
 - `02-session-resume.md` - Resume an existing session
 - `03-session-with-agent.md` - Start a session with an agent blueprint
-- `04-child-agent-sync.md` - Child agent in sync mode (requires MCP server)
+- `04-child-agent-sync.md` - Child agent in sync mode
 
 ### Category 2: Callback Feature
 - `05-child-agent-callback.md` - Child agent with callback (parent-child relationship)
@@ -200,12 +206,12 @@ The MCP server must be started **before** running test cases that use the `agent
 
 ## Tools Reference
 
-### ws-monitor
+### sse-monitor
 
-Connects to `ws://localhost:8765/ws` and prints events as raw JSON lines.
+Connects to `http://localhost:8765/sse/sessions` and prints events as raw JSON lines.
 
 ```bash
-./tests/tools/ws-monitor
+./tests/tools/sse-monitor
 ```
 
 Outputs raw JSON lines - one event per line.
@@ -222,7 +228,13 @@ Removes the SQLite database and test-executor session data:
 
 - **Agent Coordinator**: `Ctrl+C` in terminal or kill process
 - **Agent Runner**: `Ctrl+C` in terminal or kill process
-- **ws-monitor**: `Ctrl+C` in terminal
+- **sse-monitor**: `Ctrl+C` in terminal
+
+## Authentication
+
+Authentication is **disabled** for all integration tests. The helper scripts explicitly set `AUTH_ENABLED=false` when starting the Agent Coordinator.
+
+If you need to test authentication behavior, do so in a separate environment with `AUTH_ENABLED=true` and Auth0 configured.
 
 ## Troubleshooting
 
@@ -234,6 +246,6 @@ Removes the SQLite database and test-executor session data:
 - Verify Agent Runner is registered (check runner logs)
 - Ensure using `-x test-executor` flag
 
-### No WebSocket events
-- Verify ws-monitor connected successfully
+### No SSE events
+- Verify sse-monitor connected successfully
 - Check Agent Coordinator logs for errors

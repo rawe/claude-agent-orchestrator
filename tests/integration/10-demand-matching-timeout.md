@@ -96,5 +96,5 @@ curl -X DELETE http://localhost:8765/agents/special-agent
 - [ ] Agent blueprint created with unsatisfiable demands
 - [ ] Run stayed in pending status (not claimed)
 - [ ] Run eventually failed with "No matching runner" error
-- [ ] ws-monitor shows `run_failed` event with timeout error
+- [ ] sse-monitor shows `run_failed` event with timeout error
 - [ ] `session_id` in response follows format `ses_...`

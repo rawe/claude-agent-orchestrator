@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { config } from '../config';
+import { fetchAccessToken, isOidcConfigured } from './auth';
 import type { RunRequest, RunResponse } from '../types';
 
 // Create axios instance
@@ -10,10 +11,34 @@ const api = axios.create({
   },
 });
 
-// Error handler
+// Request interceptor to add auth token
+api.interceptors.request.use(async (requestConfig) => {
+  // Add OIDC token if configured and available
+  if (isOidcConfigured()) {
+    const token = await fetchAccessToken();
+    if (token) {
+      requestConfig.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  // When OIDC is not configured, requests go without auth
+  // (for local development with AUTH_ENABLED=false on coordinator)
+  return requestConfig;
+});
+
+// Error handler with auth-specific messages
 function handleError(error: unknown): never {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<{ detail?: string; message?: string }>;
+    const status = axiosError.response?.status;
+
+    // Auth-specific error messages
+    if (status === 401) {
+      throw new Error('Authentication required. Please log in.');
+    }
+    if (status === 403) {
+      throw new Error('Access denied. Invalid or expired token.');
+    }
+
     const message = axiosError.response?.data?.detail
       || axiosError.response?.data?.message
       || axiosError.message

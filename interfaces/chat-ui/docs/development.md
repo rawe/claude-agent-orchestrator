@@ -5,7 +5,7 @@
 | File | Purpose |
 |------|---------|
 | `contexts/ChatContext.tsx` | Chat state, message handling |
-| `contexts/WebSocketContext.tsx` | WS connection management |
+| `contexts/SSEContext.tsx` | SSE connection management |
 | `services/api.ts` | REST API client |
 | `components/Chat.tsx` | Main UI layout |
 | `components/ToolCallBadge.tsx` | Tool status display |
@@ -14,7 +14,7 @@
 
 ### New Message Type
 1. Add type to `types/index.ts`
-2. Handle in `ChatContext.tsx` → `handleWebSocketMessage()`
+2. Handle in `ChatContext.tsx` → `handleSSEMessage()`
 3. Render in `ChatMessage.tsx`
 
 ### New Tool Status
@@ -23,9 +23,9 @@
 
 ## Important Patterns
 
-### Avoiding Stale Closures in WebSocket
+### Avoiding Stale Closures in SSE Callbacks
 ```typescript
-// Store state in refs for WS callbacks
+// Store state in refs for SSE callbacks
 const sessionNameRef = useRef(sessionName);
 useEffect(() => { sessionNameRef.current = sessionName; }, [sessionName]);
 
@@ -35,7 +35,7 @@ const handler = useCallback((msg) => {
 }, []);
 ```
 
-### Stable WebSocket Subscription
+### Stable SSE Subscription
 ```typescript
 const handlerRef = useRef(handleMessage);
 handlerRef.current = handleMessage;

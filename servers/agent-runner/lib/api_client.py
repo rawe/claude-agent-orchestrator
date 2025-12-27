@@ -2,16 +2,28 @@
 HTTP client for communicating with Agent Coordinator.
 
 Wraps the Runner API endpoints with typed methods.
+Supports Auth0 M2M authentication when coordinator has AUTH_ENABLED=true.
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
 """
 
 import httpx
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import logging
 
+if TYPE_CHECKING:
+    from .auth0_client import Auth0M2MClient
+
 logger = logging.getLogger(__name__)
+
+
+class AuthenticationError(Exception):
+    """Raised when API key is missing or invalid."""
+
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        super().__init__(message)
 
 
 class DuplicateRunnerError(Exception):
@@ -62,22 +74,47 @@ class PollResult:
 
 
 class CoordinatorAPIClient:
-    """HTTP client for Agent Coordinator Runner API."""
+    """HTTP client for Agent Coordinator Runner API.
 
-    def __init__(self, base_url: str, timeout: float = 35.0):
-        """Initialize client with base URL.
+    Supports Auth0 M2M authentication when coordinator has AUTH_ENABLED=true.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        auth0_client: Optional["Auth0M2MClient"] = None,
+        timeout: float = 35.0,
+    ):
+        """Initialize client with base URL and authentication.
 
         Args:
             base_url: Agent Coordinator URL (e.g., http://localhost:8765)
+            auth0_client: Auth0 M2M client for OIDC authentication
             timeout: Request timeout in seconds (slightly longer than poll timeout)
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.auth0_client = auth0_client
+
         self._client = httpx.Client(timeout=timeout)
+
+    def _get_auth_headers(self) -> dict:
+        """Get authorization headers from Auth0 M2M client."""
+        if self.auth0_client and self.auth0_client.is_configured:
+            token = self.auth0_client.get_access_token()
+            if token:
+                return {"Authorization": f"Bearer {token}"}
+            logger.warning("Auth0 configured but failed to get token")
+
+        # No auth headers when Auth0 is not configured
+        # (works with coordinator when AUTH_ENABLED=false)
+        return {}
 
     def close(self):
         """Close the HTTP client."""
         self._client.close()
+        if self.auth0_client:
+            self.auth0_client.close()
 
     def register(
         self,
@@ -111,7 +148,14 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/register",
             json=payload,
+            headers=self._get_auth_headers(),
         )
+
+        # Handle authentication errors
+        if response.status_code == 401:
+            raise AuthenticationError(401, "Missing or invalid credentials. Configure Auth0 M2M or disable auth on coordinator.")
+        if response.status_code == 403:
+            raise AuthenticationError(403, "Credentials rejected. Check Auth0 M2M configuration.")
 
         # Handle duplicate runner error (409 Conflict)
         if response.status_code == 409:
@@ -147,6 +191,7 @@ class CoordinatorAPIClient:
             response = self._client.get(
                 f"{self.base_url}/runner/runs",
                 params={"runner_id": runner_id},
+                headers=self._get_auth_headers(),
             )
 
             if response.status_code == 204:
@@ -186,6 +231,7 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/runs/{run_id}/started",
             json={"runner_id": runner_id},
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
 
@@ -194,6 +240,7 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/runs/{run_id}/completed",
             json={"runner_id": runner_id, "status": "success"},
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
 
@@ -202,6 +249,7 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/runs/{run_id}/failed",
             json={"runner_id": runner_id, "error": error},
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
 
@@ -210,6 +258,7 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/runs/{run_id}/stopped",
             json={"runner_id": runner_id, "signal": signal},
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
 
@@ -218,6 +267,7 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/heartbeat",
             json={"runner_id": runner_id},
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
 
@@ -231,6 +281,7 @@ class CoordinatorAPIClient:
             response = self._client.delete(
                 f"{self.base_url}/runners/{runner_id}",
                 params={"self": "true"},
+                headers=self._get_auth_headers(),
             )
             response.raise_for_status()
             logger.info(f"Deregistered runner {runner_id}")
@@ -246,6 +297,7 @@ class CoordinatorAPIClient:
         try:
             response = self._client.get(
                 f"{self.base_url}/sessions/{session_id}",
+                headers=self._get_auth_headers(),
             )
             if response.status_code == 404:
                 return None
@@ -265,6 +317,7 @@ class CoordinatorAPIClient:
         try:
             response = self._client.get(
                 f"{self.base_url}/sessions/{session_id}/affinity",
+                headers=self._get_auth_headers(),
             )
             if response.status_code == 404:
                 return None
@@ -283,6 +336,7 @@ class CoordinatorAPIClient:
         try:
             response = self._client.get(
                 f"{self.base_url}/sessions/{session_id}/result",
+                headers=self._get_auth_headers(),
             )
             if response.status_code != 200:
                 return None
@@ -314,6 +368,7 @@ class CoordinatorAPIClient:
             response = self._client.post(
                 f"{self.base_url}/runs",
                 json=run_request,
+                headers=self._get_auth_headers(),
             )
             response.raise_for_status()
             data = response.json()

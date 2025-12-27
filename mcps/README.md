@@ -10,11 +10,13 @@ MCP (Model Context Protocol) servers that provide capabilities to agents. These 
 
 | Server | Port | Description | Type | Requires .env |
 |--------|------|-------------|------|---------------|
-| [Agent Orchestrator](./agent-orchestrator/) | 9500 | Agent orchestration + framework access | Internal (Python) | No |
+| [Agent Orchestrator](./agent-orchestrator/) | embedded* | Agent orchestration + framework access | Embedded in Agent Runner | No |
 | [Context Store](./context-store/) | 9501 | Document storage and retrieval | Internal (Python) | No |
 | [Neo4j](./neo4j/) | 9003 | Graph database queries (Cypher) | External (Docker) | No (has defaults) |
 | [Atlassian](./atlassian/) | 9000 | Confluence and Jira integration | External (Docker) | Yes |
 | [Azure DevOps](./ado/) | 9001 | Work Items access | External (Docker) | Yes |
+
+*\* The Agent Orchestrator MCP is embedded in the Agent Runner for framework use. A standalone server (port 9500) is available for external clients.*
 
 **Internal servers** are Python-based and run via `uv run`.
 **External servers** are Docker-based. Neo4j works out-of-the-box with the local Neo4j container; Atlassian and ADO require credentials.
@@ -42,15 +44,26 @@ make stop-mcps
 
 ---
 
-## Agent Orchestrator MCP (Dual Purpose)
+## Agent Orchestrator MCP
 
-The Agent Orchestrator MCP server has a **dual purpose**:
+The Agent Orchestrator MCP provides tools for spawning sub-agents, managing sessions, and accessing the framework.
 
-1. **Capabilities for orchestrated agents** - Provides tools that agents can use to spawn sub-agents, manage sessions, etc.
+### Embedded Mode (Primary)
 
-2. **Framework access for any MCP client** - Exposes the Agent Orchestrator Framework to any MCP-compatible AI (Claude Desktop, other AI tools) allowing them to orchestrate agents.
+For agents running within the framework, the MCP server is **embedded in the Agent Runner**:
+- No external server needed
+- Agent configurations use `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder
+- The placeholder is dynamically replaced at runtime
 
-This means you can use Claude Desktop or any MCP-capable AI to orchestrate Claude Code agents without needing the plugin.
+### Standalone Mode (External Clients)
+
+For external clients (Claude Desktop, Claude Code), a standalone server is available:
+
+```bash
+make start-mcp-agent-orchestrator  # Starts on port 9500
+```
+
+This exposes the framework to any MCP-compatible AI, allowing orchestration without the plugin.
 
 ---
 

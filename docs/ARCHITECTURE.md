@@ -13,7 +13,8 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 | **Agent Run** | Single execution of a session (start, resume, or stop). Transient work unit queued in the Agent Runs API. |
 | **Agent Coordinator** | Backend server (port 8765) managing sessions, agent runs, runners, blueprints, and callbacks. |
 | **Agent Runner** | Standalone process that polls for agent runs, processes them via executors, and reports status. |
-| **Executor** | Framework-specific code that spawns the actual agent process (e.g., Claude Code via Agent SDK). |
+| **Agent Coordinator Proxy** | Local HTTP proxy started by Agent Runner that forwards executor requests to Agent Coordinator with authentication. |
+| **Executor** | Framework-specific code that spawns the actual agent process (e.g., Claude Code via Agent SDK). Communicates with Agent Coordinator via the proxy. |
 | **Context Store** | Backend server (port 8766) for document storage and sharing context between agents. |
 
 ### Conceptual Hierarchy
@@ -55,7 +56,7 @@ Claude Code / AI Framework
 ### Servers
 
 **Agent Coordinator** (`servers/agent-coordinator/`) - Port 8765
-- FastAPI + WebSocket server
+- FastAPI server with SSE
 - Persists sessions and events in SQLite
 - Broadcasts real-time updates to dashboard
 - Agent blueprint registry (CRUD API for agent definitions)
@@ -63,15 +64,24 @@ Claude Code / AI Framework
 - Runner registry with health monitoring
 - Callback processor for parent-child session coordination
 - Stop command queue for immediate session termination
+- OIDC authentication with Auth0 (see [auth-oidc.md](architecture/auth-oidc.md))
 
 **Agent Runner** (`servers/agent-runner/`)
 - Polls Agent Coordinator for pending agent runs and stop commands
+- Starts Agent Coordinator Proxy for executor communication (see below)
 - Processes agent runs via framework-specific executors
 - Supports concurrent agent run processing
 - Reports agent run status (started, completed, failed, stopped)
 - Handles stop commands by terminating running processes
 - Maintains heartbeat for health monitoring
 - Auto-exits after repeated connection failures
+
+**Agent Coordinator Proxy** (`servers/agent-runner/lib/coordinator_proxy.py`)
+- Local HTTP proxy started by Agent Runner on a dynamic port
+- Forwards all executor HTTP requests to Agent Coordinator
+- Handles authentication transparently (Auth0 M2M tokens)
+- Executors don't need authentication credentials
+- Supports multiple runners on the same machine (each gets own port)
 
 **Claude Code Executors** (`servers/agent-runner/claude-code/`)
 - `ao-claude-code-exec` - Start new Claude Code sessions or resumes existing ones
@@ -96,7 +106,7 @@ Claude Code / AI Framework
 - `doc-read`, `doc-query`, `doc-info`, `doc-delete` - Document operations
 
 ### Dashboard (`dashboard/`)
-- Real-time session monitoring via WebSocket
+- Real-time session monitoring via SSE
 - Event timeline and tool call visualization
 
 ## Component Interactions
@@ -122,8 +132,8 @@ Claude Code / AI Framework
 │  - Runner registry                  │   │   - Semantic search             │
 │  - Callback processor               │   └─────────────────┬───────────────┘
 │  - SQLite persistence               │                     │
-│  - WebSocket broadcast              │◄──────────────┐     │ HTTP
-│  - Agent blueprint registry         │          WS   │     │
+│  - SSE broadcast                    │◄──────────────┐     │ HTTP
+│  - Agent blueprint registry         │          SSE  │     │
 └──────────┬──────────────────────────┘               │     │
            │                                          │     │
            │ Long-poll (Agent Runs)             ┌─────┴─────┴─────┐
@@ -161,11 +171,13 @@ Claude Code / AI Framework
 | doc-* commands | Context Store | HTTP | Document operations |
 | Dashboard | Agent Coordinator | HTTP | Agent Runs API, Sessions API, Blueprints API |
 | Dashboard | Agent Coordinator | HTTP | Runner management |
-| Dashboard | Agent Coordinator | WebSocket | Real-time session updates |
+| Dashboard | Agent Coordinator | SSE | Real-time session updates |
 | Dashboard | Context Store | HTTP | Document listing/viewing |
 | Agent Runner | Agent Coordinator | HTTP | Long-poll for agent runs, report status |
 | Agent Runner | Agent Coordinator | HTTP | Registration, heartbeat |
-| Agent Runner | Claude Code Executors | Subprocess | Execute ao-start, ao-resume |
+| Agent Runner | Executors | Subprocess | Spawn executor with proxy URL |
+| Executors | Agent Coordinator Proxy | HTTP | Sessions API, Agent Blueprints API (no auth) |
+| Agent Coordinator Proxy | Agent Coordinator | HTTP | Forward requests with auth headers |
 | Agent Orchestrator MCP | Agent Coordinator | HTTP | Agent Runs API (start/resume sessions) |
 | Context Store MCP | doc-* commands | Subprocess | Expose as MCP tools |
 
@@ -177,6 +189,10 @@ Claude Code / AI Framework
 | `VITE_AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Dashboard |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | cwd | ao-* CLI commands, MCP Server |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `.agent-orchestrator/agents` | Agent Coordinator |
+| `AUTH_ENABLED` | `false` | Agent Coordinator (set `true` to enable Auth0 OIDC) |
+| `AUTH0_DOMAIN` | (none) | Agent Coordinator, Dashboard (Auth0 tenant domain) |
+| `AUTH0_AUDIENCE` | (none) | Agent Coordinator, Dashboard (API identifier) |
+| `AUTH0_DASHBOARD_CLIENT_ID` | (none) | Dashboard (SPA client ID) |
 | `DEBUG_LOGGING` | `false` | Agent Coordinator |
 | `POLL_TIMEOUT` | `30` | Agent Runner |
 | `HEARTBEAT_INTERVAL` | `60` | Agent Runner |
@@ -199,24 +215,43 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
 │  - Agent Runs API (queue & dispatch)│
 │  - Runner registry                  │
 │  - Callback processor               │
+│  - Sessions API                     │
+│  - Agent blueprints API             │
 └──────────────┬──────────────────────┘
-               │ Long-poll for agent runs
-               ▼
-┌─────────────────────────────────────┐
+               │
+               │ HTTP (authenticated)
+               │
+     ┌─────────┴─────────┐
+     │                   │
+     │ Long-poll         │ Proxy forwards
+     │ (Runner)          │ (Executor requests)
+     │                   │
+     ▼                   │
+┌────────────────────────┴────────────┐
 │         Agent Runner                │
 │  - Polls for pending agent runs     │
 │  - Concurrent processing            │
 │  - Status reporting                 │
 │  - Health monitoring                │
-└──────────────┬──────────────────────┘
-               │ Subprocess
-               ▼
+│  ┌────────────────────────────────┐ │
+│  │  Agent Coordinator Proxy       │ │
+│  │  - Local HTTP (127.0.0.1:port) │ │
+│  │  - Adds auth headers           │ │
+│  │  - Forwards to Coordinator     │ │
+│  └───────────────┬────────────────┘ │
+└──────────────────┼──────────────────┘
+                   │
+                   │ Subprocess + HTTP via proxy
+                   ▼
 ┌─────────────────────────────────────┐
 │  Framework-Specific Executors       │
 │  ┌───────────────────────────────┐  │
 │  │ claude-code/                  │  │
 │  │  - ao-claude-code-exec        │  │
 │  │  - Uses Claude Agent SDK      │  │
+│  │  - Calls Sessions API         │  │
+│  │  - Calls Agent Blueprints API │  │
+│  │  (via proxy, no auth needed)  │  │
 │  └───────────────────────────────┘  │
 │  ┌───────────────────────────────┐  │
 │  │ (future: other frameworks)    │  │
@@ -227,12 +262,47 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
 ### Runner Lifecycle
 
 1. **Registration**: Runner calls `POST /runner/register` on startup
-2. **Polling**: Long-polls `GET /runner/runs` for pending agent runs or stop commands
-3. **Execution**: Spawns executor subprocess (e.g., `claude-code/ao-start`)
-4. **Reporting**: Reports agent run status (started, completed, failed, stopped)
-5. **Stop Handling**: Receives stop commands and terminates running processes
-6. **Heartbeat**: Sends periodic heartbeat for health monitoring
-7. **Deregistration**: Graceful shutdown or auto-exit after connection failures
+2. **Proxy Start**: Starts Agent Coordinator Proxy on dynamic port
+3. **Polling**: Long-polls `GET /runner/runs` for pending agent runs or stop commands
+4. **Execution**: Spawns executor subprocess with `AGENT_ORCHESTRATOR_API_URL` pointing to proxy
+5. **Reporting**: Reports agent run status (started, completed, failed, stopped)
+6. **Stop Handling**: Receives stop commands and terminates running processes
+7. **Heartbeat**: Sends periodic heartbeat for health monitoring
+8. **Deregistration**: Graceful shutdown or auto-exit after connection failures
+
+### Agent Coordinator Proxy
+
+The Agent Coordinator Proxy provides a security boundary between executors and the Agent Coordinator.
+
+**Why a Proxy?**
+
+Executors are spawned as subprocesses and need to call Agent Coordinator APIs (Sessions API, Agent Blueprints API). Without a proxy, executors would need direct access to authentication credentials. The proxy:
+
+- Keeps authentication credentials in the Runner process only
+- Forwards executor requests with proper auth headers (Auth0 M2M or API key)
+- Makes authentication transparent to executors
+- Supports multiple runners on the same machine (each gets a unique port)
+
+**How It Works**
+
+```
+Executor                    Agent Runner                 Agent Coordinator
+   │                             │                              │
+   │ GET /agents/my-agent        │                              │
+   │ (no auth header)            │                              │
+   │────────────────────────────►│                              │
+   │                             │ GET /agents/my-agent         │
+   │                             │ Authorization: Bearer <token>│
+   │                             │─────────────────────────────►│
+   │                             │                              │
+   │                             │◄─────────────────────────────│
+   │◄────────────────────────────│                              │
+   │                             │                              │
+```
+
+**Configuration**
+
+The proxy is transparent to executors. The Runner sets `AGENT_ORCHESTRATOR_API_URL` to the proxy URL before spawning executors. Executors use this URL without knowing they're communicating via a proxy.
 
 ### Callback Architecture
 

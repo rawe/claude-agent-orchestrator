@@ -8,7 +8,7 @@ Verify that resuming an existing session produces the correct sequence of WebSoc
 - OR create a session using Step 0 below
 - Agent Coordinator running
 - Agent Runner running with `-x test-executor`
-- ws-monitor running
+- sse-monitor running
 
 ## Test Steps
 
@@ -59,7 +59,7 @@ Watch the runner terminal for:
 
 ### Step 3: Observe WebSocket events
 
-Watch the ws-monitor output.
+Watch the sse-monitor output.
 
 ## Expected Events (in order)
 

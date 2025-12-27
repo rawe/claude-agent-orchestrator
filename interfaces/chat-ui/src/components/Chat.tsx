@@ -1,14 +1,14 @@
 import { useRef, useEffect } from 'react';
 import { MessageSquare, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
-import { useWebSocket } from '../contexts/WebSocketContext';
+import { useSSE } from '../contexts/SSEContext';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { config } from '../config';
 
 export function Chat() {
   const { state, sendMessage, stopAgent, resetChat, initializeChat } = useChat();
-  const { connected } = useWebSocket();
+  const { connected } = useSSE();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive

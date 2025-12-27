@@ -13,7 +13,23 @@ RUN npm ci
 # Copy source code and environment file
 COPY . .
 
-# Build the application (VITE_* vars are injected at build time from .env)
+# Vite env vars must be available at build time
+ARG VITE_API_URL
+# Auth0 OIDC (optional - enables login UI)
+ARG VITE_AUTH0_DOMAIN
+ARG VITE_AUTH0_CLIENT_ID
+ARG VITE_AUTH0_AUDIENCE
+# App configuration
+ARG VITE_AGENT_BLUEPRINT
+ARG VITE_APP_TITLE
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN
+ENV VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID
+ENV VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE
+ENV VITE_AGENT_BLUEPRINT=$VITE_AGENT_BLUEPRINT
+ENV VITE_APP_TITLE=$VITE_APP_TITLE
+
+# Build the application
 RUN npm run build
 
 # Stage 2: Serve with nginx
