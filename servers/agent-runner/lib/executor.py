@@ -216,7 +216,8 @@ class RunExecutor:
                 )
                 payload["agent_blueprint"] = agent_blueprint
                 logger.debug(
-                    f"Resolved blueprint '{run.agent_name}' for session {run.session_id}"
+                    f"Resolved blueprint '{run.agent_name}' for session {run.session_id}:\n"
+                    f"{json.dumps(agent_blueprint, indent=2)}"
                 )
             except Exception as e:
                 logger.error(f"Failed to resolve blueprint '{run.agent_name}': {e}")

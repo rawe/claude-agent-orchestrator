@@ -524,14 +524,12 @@ async def add_session_event(session_id: str, event: Event):
 
             callback_processor.on_child_completed(
                 child_session_id=session_id,
-                parent_session_id=parent_session_id,
-                parent_status=parent_status,
+                parent_session=parent_session,
                 child_result=child_result,
             )
 
         # Check if this session has pending child callbacks to flush
-        project_dir = updated_session.get("project_dir")
-        flushed = callback_processor.on_session_stopped(session_id, project_dir)
+        flushed = callback_processor.on_session_stopped(session_id)
         if flushed > 0 and DEBUG:
             print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
 
@@ -1028,15 +1026,14 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
     # Only trigger callback if execution_mode == ASYNC_CALLBACK
     if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK:
         parent_session = get_session_by_id(run.parent_session_id)
-        parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run failed for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}'", flush=True)
+            parent_status = parent_session["status"] if parent_session else "not_found"
+            print(f"[DEBUG] Run failed for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}' status={parent_status}", flush=True)
 
         callback_processor.on_child_completed(
             child_session_id=run.session_id,
-            parent_session_id=run.parent_session_id,
-            parent_status=parent_status,
+            parent_session=parent_session,
             child_result=None,
             child_failed=True,
             child_error=request.error,
@@ -1067,15 +1064,14 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     # Only trigger callback if execution_mode == ASYNC_CALLBACK
     if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK:
         parent_session = get_session_by_id(run.parent_session_id)
-        parent_status = parent_session["status"] if parent_session else "not_found"
 
         if DEBUG:
-            print(f"[DEBUG] Run stopped for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}'", flush=True)
+            parent_status = parent_session["status"] if parent_session else "not_found"
+            print(f"[DEBUG] Run stopped for child '{run.session_id}' (mode=async_callback), notifying parent '{run.parent_session_id}' status={parent_status}", flush=True)
 
         callback_processor.on_child_completed(
             child_session_id=run.session_id,
-            parent_session_id=run.parent_session_id,
-            parent_status=parent_status,
+            parent_session=parent_session,
             child_result=None,
             child_failed=True,
             child_error="Session was manually stopped",
@@ -1187,28 +1183,13 @@ async def create_run(run_create: RunCreate):
     If session_id is not provided, coordinator generates one (ADR-010).
     Returns both run_id and session_id in the response.
 
-    For resume runs, enriches the run with agent_name and project_dir from the
-    existing session so the Runner has complete information for blueprint resolution.
+    For resume runs, run_queue.add_run() enriches with agent_name and project_dir
+    from the existing session so the Runner has complete information for blueprint resolution.
 
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
     """
-    # For resume runs, enrich from existing session so Runner has complete info
-    if run_create.type == RunType.RESUME_SESSION and run_create.session_id:
-        session = get_session_by_id(run_create.session_id)
-        if session:
-            # Copy agent_name if not provided in request
-            if not run_create.agent_name and session.get("agent_name"):
-                run_create.agent_name = session["agent_name"]
-            # Copy project_dir if not provided in request
-            if not run_create.project_dir and session.get("project_dir"):
-                run_create.project_dir = session["project_dir"]
-            if DEBUG:
-                print(f"[DEBUG] Enriched resume run: agent_name={run_create.agent_name}, project_dir={run_create.project_dir}", flush=True)
-        elif DEBUG:
-            print(f"[DEBUG] Warning: resume run for non-existent session {run_create.session_id}", flush=True)
-
-    # Create the run (session_id generated if not provided)
+    # Create the run (session_id generated if not provided, resume runs enriched automatically)
     run = run_queue.add_run(run_create)
 
     # For start runs, create session record immediately with status=pending (ADR-010)
