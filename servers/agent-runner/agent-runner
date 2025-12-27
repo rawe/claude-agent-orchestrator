@@ -4,6 +4,10 @@
 # dependencies = [
 #     "httpx>=0.25.0",
 #     "typer>=0.9.0",
+#     "uvicorn>=0.30.0",
+#     "starlette>=0.38.0",
+#     "mcp>=1.0.0",
+#     "fastmcp>=2.0.0",
 # ]
 # ///
 """
@@ -52,6 +56,7 @@ from poller import RunPoller
 from supervisor import RunSupervisor
 from coordinator_proxy import CoordinatorProxy
 from blueprint_resolver import BlueprintResolver
+from agent_orchestrator_mcp import MCPServer
 
 # Configure logging
 logging.basicConfig(
@@ -140,6 +145,15 @@ class Runner:
             auth0_client=self.auth0_client,
         )
 
+        # Create embedded MCP server - facade to Coordinator
+        # Provides orchestration tools to agents running in executors
+        # IMPORTANT: auth0_client is passed by reference to share token cache
+        # This avoids duplicate M2M token requests - the MCP server reuses our token
+        self.mcp_server = MCPServer(
+            coordinator_url=config.agent_coordinator_url,
+            auth0_client=self.auth0_client,  # Shared instance for token reuse
+        )
+
         # Create blueprint resolver for Schema 2.0
         # Fetches and resolves blueprints before passing to executor
         self.blueprint_resolver = BlueprintResolver(
@@ -148,10 +162,11 @@ class Runner:
         )
 
         self.registry = RunningRunsRegistry()
+        # Note: mcp_server_url will be set after mcp_server.start() in start()
         self.executor = RunExecutor(
             default_project_dir=config.project_dir,
             blueprint_resolver=self.blueprint_resolver,
-            mcp_server_url=None,  # Will be set when embedded MCP server is implemented
+            mcp_server_url=None,
         )
         self.runner_id: str | None = None
 
@@ -206,6 +221,14 @@ class Runner:
         # This is transparent - executors don't know they're using a proxy
         os.environ["AGENT_ORCHESTRATOR_API_URL"] = self.proxy.url
 
+        # Start embedded MCP server
+        # Provides orchestration tools to agents running in executors
+        self.mcp_server.start()
+        logger.info(f"Embedded MCP server on port {self.mcp_server.port}")
+
+        # Update executor with MCP server URL for placeholder resolution
+        self.executor.mcp_server_url = self.mcp_server.url
+
         # Create components
         self.poller = RunPoller(
             self.api_client,
@@ -250,6 +273,9 @@ class Runner:
             self.supervisor.stop()
         if self.heartbeat:
             self.heartbeat.stop()
+
+        # Stop the embedded MCP server
+        self.mcp_server.stop()
 
         # Stop the proxy server
         self.proxy.stop()

@@ -1,24 +1,157 @@
 """
 Blueprint Resolver - fetches and resolves agent blueprints.
 
-Fetches agent blueprints from Agent Coordinator and resolves placeholders
-in the mcp_servers configuration before passing to executors.
+Uses Pydantic models for type-safe MCP server configuration handling.
+This ensures HTTP servers never get stdio-specific fields (like args) and vice versa.
 
-This is part of Schema 2.0 which moves blueprint resolution from the
-executor to the Agent Runner.
+Part of Schema 2.0: Runner resolves blueprints before passing to executors.
 """
 
 import copy
 import logging
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Optional, Literal, Union, TYPE_CHECKING
 
 import httpx
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from auth0_client import Auth0M2MClient
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# Placeholder Resolution
+# =============================================================================
+
+def _resolve_string(
+    value: str,
+    session_id: str,
+    mcp_server_url: Optional[str],
+) -> str:
+    """Resolve placeholders in a string value.
+
+    Supported placeholders:
+    - ${AGENT_SESSION_ID}: Current session identifier
+    - ${AGENT_ORCHESTRATOR_MCP_URL}: Runner's embedded MCP server URL
+    """
+    result = value.replace("${AGENT_SESSION_ID}", session_id)
+    if mcp_server_url:
+        result = result.replace("${AGENT_ORCHESTRATOR_MCP_URL}", mcp_server_url)
+    return result
+
+
+# =============================================================================
+# MCP Server Models (Runner's view of the API contract)
+# =============================================================================
+
+class MCPServerHttp(BaseModel):
+    """HTTP transport MCP server configuration.
+
+    Fields: type, url, headers (optional)
+    Note: No args/command/env - those are stdio-specific.
+    """
+
+    model_config = ConfigDict(extra="ignore")  # Forward-compatible with new fields
+
+    type: Literal["http"]
+    url: str
+    headers: Optional[dict[str, str]] = None
+
+    def with_resolved_placeholders(
+        self,
+        session_id: str,
+        mcp_server_url: Optional[str] = None,
+    ) -> "MCPServerHttp":
+        """Create new instance with placeholders resolved."""
+        resolved_url = _resolve_string(self.url, session_id, mcp_server_url)
+
+        resolved_headers = None
+        if self.headers:
+            resolved_headers = {
+                key: _resolve_string(value, session_id, mcp_server_url)
+                for key, value in self.headers.items()
+            }
+
+        return MCPServerHttp(
+            type=self.type,
+            url=resolved_url,
+            headers=resolved_headers,
+        )
+
+
+class MCPServerStdio(BaseModel):
+    """Stdio transport MCP server configuration.
+
+    Fields: type, command, args, env (optional)
+    Note: No url/headers - those are HTTP-specific.
+    """
+
+    model_config = ConfigDict(extra="ignore")  # Forward-compatible with new fields
+
+    type: Literal["stdio"]
+    command: str
+    args: list[str] = []
+    env: Optional[dict[str, str]] = None
+
+    def with_resolved_placeholders(
+        self,
+        session_id: str,
+        mcp_server_url: Optional[str] = None,
+    ) -> "MCPServerStdio":
+        """Create new instance with placeholders resolved."""
+        resolved_command = _resolve_string(self.command, session_id, mcp_server_url)
+
+        resolved_args = [
+            _resolve_string(arg, session_id, mcp_server_url)
+            for arg in self.args
+        ]
+
+        resolved_env = None
+        if self.env:
+            resolved_env = {
+                key: _resolve_string(value, session_id, mcp_server_url)
+                for key, value in self.env.items()
+            }
+
+        return MCPServerStdio(
+            type=self.type,
+            command=resolved_command,
+            args=resolved_args,
+            env=resolved_env,
+        )
+
+
+# Union type for type-safe handling
+MCPServerConfig = Union[MCPServerHttp, MCPServerStdio]
+
+
+def parse_mcp_server(name: str, config: dict) -> MCPServerConfig:
+    """Parse MCP server config dict into appropriate typed model.
+
+    Args:
+        name: Server name (for error messages)
+        config: Raw config dict from API
+
+    Returns:
+        Typed MCP server model (MCPServerHttp or MCPServerStdio)
+
+    Raises:
+        ValueError: If server type is unknown or invalid
+    """
+    server_type = config.get("type")
+
+    if server_type == "http":
+        return MCPServerHttp.model_validate(config)
+    elif server_type == "stdio":
+        return MCPServerStdio.model_validate(config)
+    else:
+        raise ValueError(f"Unknown MCP server type '{server_type}' for '{name}'")
+
+
+# =============================================================================
+# Blueprint Resolver
+# =============================================================================
 
 class BlueprintNotFoundError(Exception):
     """Raised when a blueprint cannot be found."""
@@ -29,9 +162,12 @@ class BlueprintResolver:
     """
     Fetches agent blueprints from Coordinator and resolves placeholders.
 
-    Supports the following placeholders in mcp_servers configuration:
-    - ${AGENT_ORCHESTRATOR_MCP_URL}: Replaced with the MCP server URL
-    - ${AGENT_SESSION_ID}: Replaced with the current session ID
+    Uses typed Pydantic models to ensure type-safe placeholder resolution.
+    HTTP servers only get HTTP fields, stdio servers only get stdio fields.
+
+    Supported placeholders in mcp_servers configuration:
+    - ${AGENT_ORCHESTRATOR_MCP_URL}: Runner's embedded MCP server URL
+    - ${AGENT_SESSION_ID}: Current session identifier
     """
 
     def __init__(
@@ -77,15 +213,8 @@ class BlueprintResolver:
         Raises:
             BlueprintNotFoundError: If blueprint doesn't exist
         """
-        # Fetch blueprint from Coordinator
         blueprint = self._fetch_blueprint(agent_name)
-
-        # Resolve placeholders
-        return self.resolve_placeholders(
-            blueprint=blueprint,
-            session_id=session_id,
-            mcp_server_url=mcp_server_url,
-        )
+        return self._resolve_blueprint(blueprint, session_id, mcp_server_url)
 
     def _fetch_blueprint(self, agent_name: str) -> dict:
         """Fetch blueprint from Coordinator API.
@@ -126,105 +255,63 @@ class BlueprintResolver:
             logger.error(f"Request error fetching blueprint {agent_name}: {e}")
             raise BlueprintNotFoundError(f"Request error: {e}")
 
-    def resolve_placeholders(
+    def _resolve_blueprint(
         self,
         blueprint: dict,
         session_id: str,
-        mcp_server_url: Optional[str] = None,
+        mcp_server_url: Optional[str],
     ) -> dict:
         """
-        Resolve placeholders in blueprint's mcp_servers config.
+        Resolve placeholders in blueprint using typed models.
 
-        Recursively walks mcp_servers and replaces:
-        - ${AGENT_ORCHESTRATOR_MCP_URL} -> mcp_server_url
-        - ${AGENT_SESSION_ID} -> session_id
-
-        Placeholders without matching values pass through unchanged.
+        Process:
+        1. Parse each MCP server config into typed model (validates structure)
+        2. Call with_resolved_placeholders() to create resolved instance
+        3. Serialize back to dict with exclude_none=True (clean output)
 
         Args:
-            blueprint: Blueprint dict to resolve
+            blueprint: Raw blueprint dict from API
             session_id: Session ID for placeholder replacement
             mcp_server_url: MCP server URL for placeholder replacement
 
         Returns:
-            New blueprint dict with resolved placeholders
+            New blueprint dict with resolved MCP servers
         """
         result = copy.deepcopy(blueprint)
-        mcp_servers = result.get("mcp_servers", {})
+        raw_mcp_servers = result.get("mcp_servers", {})
 
-        if not mcp_servers:
+        if not raw_mcp_servers:
             return result
 
-        for server_name, config in mcp_servers.items():
+        resolved_servers = {}
+        for name, config in raw_mcp_servers.items():
             if not isinstance(config, dict):
+                logger.warning(f"Skipping invalid MCP server config '{name}': not a dict")
                 continue
 
-            # Resolve URL placeholder
-            if "url" in config and isinstance(config["url"], str):
-                config["url"] = self._resolve_string(
-                    config["url"],
-                    session_id=session_id,
-                    mcp_server_url=mcp_server_url,
+            try:
+                # Parse into typed model (validates structure)
+                server = parse_mcp_server(name, config)
+
+                # Resolve placeholders (returns new immutable instance)
+                resolved = server.with_resolved_placeholders(session_id, mcp_server_url)
+
+                # Serialize to dict (exclude_none ensures clean output)
+                resolved_servers[name] = resolved.model_dump(
+                    mode="json",
+                    exclude_none=True,
                 )
 
-            # Resolve headers placeholders
-            headers = config.get("headers", {})
-            if isinstance(headers, dict):
-                for key, value in headers.items():
-                    if isinstance(value, str):
-                        headers[key] = self._resolve_string(
-                            value,
-                            session_id=session_id,
-                            mcp_server_url=mcp_server_url,
-                        )
+            except ValueError as e:
+                # Unknown server type - pass through unmodified
+                logger.warning(f"Skipping MCP server '{name}': {e}")
+                resolved_servers[name] = config
+            except Exception as e:
+                # Validation error - pass through unmodified
+                logger.warning(f"Failed to parse MCP server '{name}': {e}")
+                resolved_servers[name] = config
 
-            # Resolve args list (for command-based MCP servers)
-            args = config.get("args", [])
-            if isinstance(args, list):
-                config["args"] = [
-                    self._resolve_string(arg, session_id=session_id, mcp_server_url=mcp_server_url)
-                    if isinstance(arg, str) else arg
-                    for arg in args
-                ]
-
-            # Resolve env dict (for command-based MCP servers)
-            env = config.get("env", {})
-            if isinstance(env, dict):
-                for key, value in env.items():
-                    if isinstance(value, str):
-                        env[key] = self._resolve_string(
-                            value,
-                            session_id=session_id,
-                            mcp_server_url=mcp_server_url,
-                        )
-
-        return result
-
-    def _resolve_string(
-        self,
-        value: str,
-        session_id: str,
-        mcp_server_url: Optional[str],
-    ) -> str:
-        """Resolve placeholders in a string value.
-
-        Args:
-            value: String that may contain placeholders
-            session_id: Session ID replacement value
-            mcp_server_url: MCP server URL replacement value
-
-        Returns:
-            String with placeholders resolved
-        """
-        result = value
-
-        # Replace session ID placeholder
-        result = result.replace("${AGENT_SESSION_ID}", session_id)
-
-        # Replace MCP URL placeholder only if we have a URL
-        if mcp_server_url:
-            result = result.replace("${AGENT_ORCHESTRATOR_MCP_URL}", mcp_server_url)
-
+        result["mcp_servers"] = resolved_servers
         return result
 
     def close(self):
