@@ -1187,9 +1187,27 @@ async def create_run(run_create: RunCreate):
     If session_id is not provided, coordinator generates one (ADR-010).
     Returns both run_id and session_id in the response.
 
+    For resume runs, enriches the run with agent_name and project_dir from the
+    existing session so the Runner has complete information for blueprint resolution.
+
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
     """
+    # For resume runs, enrich from existing session so Runner has complete info
+    if run_create.type == RunType.RESUME_SESSION and run_create.session_id:
+        session = get_session_by_id(run_create.session_id)
+        if session:
+            # Copy agent_name if not provided in request
+            if not run_create.agent_name and session.get("agent_name"):
+                run_create.agent_name = session["agent_name"]
+            # Copy project_dir if not provided in request
+            if not run_create.project_dir and session.get("project_dir"):
+                run_create.project_dir = session["project_dir"]
+            if DEBUG:
+                print(f"[DEBUG] Enriched resume run: agent_name={run_create.agent_name}, project_dir={run_create.project_dir}", flush=True)
+        elif DEBUG:
+            print(f"[DEBUG] Warning: resume run for non-existent session {run_create.session_id}", flush=True)
+
     # Create the run (session_id generated if not provided)
     run = run_queue.add_run(run_create)
 
