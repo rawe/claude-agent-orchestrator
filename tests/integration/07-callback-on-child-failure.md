@@ -9,10 +9,6 @@ Uses `mode=async_callback` for the child agent per ADR-003.
 - Agent Coordinator running
 - Agent Runner running with `claude-code` executor
 - sse-monitor running
-- Agent Orchestrator MCP server running on port 9500:
-  ```bash
-  uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
-  ```
 - `agent-orchestrator` blueprint copied (see `tests/README.md` → "Agent Blueprints")
 
 ## Test Steps

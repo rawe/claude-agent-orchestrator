@@ -139,12 +139,12 @@ To avoid redundancy and maintain clarity, documentation is organized by scope:
 
 | Scope | Location | Contains |
 |-------|----------|----------|
-| **README** | `tests/README.md` | Common setup procedures, shared prerequisites (agent blueprints, MCP server), tool references |
+| **README** | `tests/README.md` | Common setup procedures, shared prerequisites (agent blueprints), tool references |
 | **Slash Commands** | `.claude/commands/tests/*.md` | Execution flow, which services to start, how to invoke other commands |
 | **Test Cases** | `tests/integration/*.md` | Test-specific prerequisites, test steps, expected behavior, verification checklist |
 
 **Principles:**
-- **README**: "How to do X" (e.g., how to copy blueprints, how to start MCP server)
+- **README**: "How to do X" (e.g., how to copy blueprints)
 - **Commands**: "What to do and in which order" (orchestration logic)
 - **Test Cases**: "What this test needs and verifies" (references README for how-to)
 
@@ -184,31 +184,13 @@ The Agent Coordinator discovers blueprints in `.agent-orchestrator/agents/` (rel
 curl -s http://localhost:8765/agents | grep agent-orchestrator
 ```
 
-## Agent Orchestrator MCP Server
-
-Test cases 04-07 require the Agent Orchestrator MCP server for spawning child agents.
-
-**Starting the MCP server:**
-
-```bash
-uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode --port 9500
-```
-
-**Verify it's running:**
-
-```bash
-curl -s http://localhost:9500/mcp
-```
-
-The MCP server must be started **before** running test cases that use the `agent-orchestrator` blueprint.
-
 ## Test Cases
 
 ### Category 1: Basic Session Lifecycle
 - `01-basic-session-start.md` - Start a new session, verify events
 - `02-session-resume.md` - Resume an existing session
 - `03-session-with-agent.md` - Start a session with an agent blueprint
-- `04-child-agent-sync.md` - Child agent in sync mode (requires MCP server)
+- `04-child-agent-sync.md` - Child agent in sync mode
 
 ### Category 2: Callback Feature
 - `05-child-agent-callback.md` - Child agent with callback (parent-child relationship)

@@ -17,11 +17,10 @@ See `tests/README.md` for full documentation.
      - Agent Coordinator (`uv run python -m main`)
      - Agent Runner (`agent-runner`)
      - SSE Monitor (`sse-monitor`)
-     - MCP Server (`agent-orchestrator-mcp`) if started for testing
 
 2. **Cleanup any remaining processes** (only if background tasks didn't cover them):
    - Check: `lsof -i :8765` - kill any remaining processes on that port
-   - Check: `pgrep -af "python -m main|agent-runner|sse-monitor|agent-orchestrator-mcp"`
+   - Check: `pgrep -af "python -m main|agent-runner|sse-monitor"`
 
 3. **Reset database**: `./tests/scripts/reset-db`
 
