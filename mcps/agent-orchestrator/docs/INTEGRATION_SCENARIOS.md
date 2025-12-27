@@ -98,7 +98,11 @@ Claude Desktop requires `AGENT_ORCHESTRATOR_PROJECT_DIR` and `PATH`:
 
 ## HTTP Mode Headers
 
-When using the MCP server in HTTP mode, these headers control agent behavior:
+When configuring agents to use the Agent Orchestrator MCP, use the `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder. This is dynamically replaced by the Agent Runner at runtime.
+
+> **Note:** For external clients (Claude Desktop, Claude Code), use the actual URL `http://localhost:9500/mcp` when running the standalone server.
+
+These headers control agent behavior:
 
 | Header | Purpose | Example |
 |--------|---------|---------|
@@ -114,7 +118,7 @@ Required for the callback feature. When an orchestrator spawns child agents with
   "mcpServers": {
     "agent-orchestrator-http": {
       "type": "http",
-      "url": "http://localhost:9500/mcp",
+      "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
       "headers": {
         "X-Agent-Session-Name": "${AGENT_SESSION_NAME}"
       }
@@ -123,7 +127,9 @@ Required for the callback feature. When an orchestrator spawns child agents with
 }
 ```
 
-The `${AGENT_SESSION_NAME}` placeholder is replaced at runtime by the runner with the current session's name.
+The placeholders are replaced at runtime by the Agent Runner:
+- `${AGENT_ORCHESTRATOR_MCP_URL}` - URL to the embedded MCP server
+- `${AGENT_SESSION_NAME}` - Current session's name
 
 ### X-Agent-Tags (Blueprint Filtering)
 
@@ -134,7 +140,7 @@ Restricts which agent blueprints are returned by `list_agent_blueprints`. Uses A
   "mcpServers": {
     "agent-orchestrator-http": {
       "type": "http",
-      "url": "http://localhost:9500/mcp",
+      "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
       "headers": {
         "X-Agent-Session-Name": "${AGENT_SESSION_NAME}",
         "X-Agent-Tags": "internal,atlassian"

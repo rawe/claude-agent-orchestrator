@@ -167,8 +167,10 @@ app = FastAPI(
 )
 
 # Enable CORS for frontend
-# Allow multiple origins: old frontend (5173), new unified frontend (3000), and custom via env
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# CORS_ORIGINS must be set via environment variable
+# Use "*" to allow all origins (default for local development)
+# Use comma-separated list for production: "https://app.example.com,https://admin.example.com"
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,

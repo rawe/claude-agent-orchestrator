@@ -23,7 +23,7 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
   },
   'agent-orchestrator-http': {
     type: 'http',
-    url: 'http://localhost:9500/mcp',
+    url: '${AGENT_ORCHESTRATOR_MCP_URL}',
     headers: {
       'X-Agent-Session-Id': '${AGENT_SESSION_ID}',
       'X-Agent-Tags': '<your-tags>',

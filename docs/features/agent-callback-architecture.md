@@ -264,7 +264,7 @@ MCP Config (retrieved from agent-coordinator endpoints):
      "mcpServers": {
        "agent-orchestrator": {
          "type": "http",
-         "url": "http://localhost:9500/mcp",
+         "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
          "headers": {
            "X-Agent-Session-Name": "${AGENT_SESSION_NAME}"
          }
@@ -321,7 +321,7 @@ export interface MCPServerHttp {
 ```typescript
 'agent-orchestrator-http': {
   type: 'http',
-  url: 'http://localhost:9500/mcp',
+  url: '${AGENT_ORCHESTRATOR_MCP_URL}',
   headers: {
     'X-Agent-Session-Name': '${AGENT_SESSION_NAME}'
   }

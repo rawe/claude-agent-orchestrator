@@ -103,9 +103,11 @@ Claude Code will use the orchestrator skill to create a new agent session.
 
 ---
 
-## Use Case 2: MCP Server (HTTP Mode)
+## Use Case 2: MCP Server (External Clients)
 
-Use the orchestrator with Claude Desktop or other MCP-compatible clients via HTTP.
+Use the orchestrator with Claude Desktop or other MCP-compatible clients via the standalone HTTP server.
+
+> **Note:** For agents running within the framework, the MCP server is embedded in the Agent Runner (no external server needed). This use case is for external clients like Claude Desktop.
 
 ### Setup
 

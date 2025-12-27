@@ -2,6 +2,8 @@
 
 The Agent Orchestrator MCP Server can run in API mode, exposing both the MCP protocol and a REST API with OpenAPI documentation.
 
+> **Note:** This documentation covers the **standalone server** for external clients (Claude Desktop, Claude Code, custom applications). For agents running within the framework, the MCP server is embedded in the Agent Runner.
+
 ## Quick Start
 
 ### Using Make (Recommended)
