@@ -70,6 +70,7 @@ help:
 	@echo "  make start-agent-runner   - Start in background (logs to .agent-runner.log)"
 	@echo "  make stop-agent-runner    - Stop agent runner"
 	@echo "  make run-agent-runner     - Run in foreground (Ctrl+C to stop)"
+	@echo "  make run-agent-runner-v   - Run in foreground with verbose/debug output"
 	@echo "  make logs-agent-runner    - Tail logs (Ctrl+C to stop watching)"
 	@echo ""
 	@echo "MCP servers (mcps/):"
@@ -394,10 +395,19 @@ run-agent-runner:
 	if [ "$$PROJ_DIR" = "." ]; then \
 		echo "Warning: No PROJECT_DIR set. Using current directory."; \
 	fi; \
+	VERBOSE_FLAG=""; \
+	if [ "$${VERBOSE:-}" = "1" ]; then \
+		VERBOSE_FLAG="--verbose"; \
+	fi; \
 	echo "Starting Agent Runner in foreground (Ctrl+C to stop)..."; \
 	echo "  Project Dir: $$PROJ_DIR"; \
+	if [ -n "$$VERBOSE_FLAG" ]; then echo "  Verbose: enabled"; fi; \
 	echo ""; \
-	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT)
+	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) $$VERBOSE_FLAG
+
+# Run agent runner in foreground with verbose output (shortcut)
+run-agent-runner-v:
+	@$(MAKE) run-agent-runner VERBOSE=1
 
 # Tail agent runner logs
 logs-agent-runner:
