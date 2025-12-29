@@ -15,16 +15,18 @@ import {
   RotateCcw,
   Users,
   Zap,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import { useUnifiedView, useUnifiedSessionEvents } from '@/hooks';
 import {
-  MockSession,
-  MockRun,
-  mockSessions,
-  mockRuns,
-  formatRelativeTime,
-  formatDuration,
-  getEventTypeStyles,
-} from './';
+  type UnifiedSession,
+  type UnifiedRun,
+  RunTypeValues,
+  SessionStatusValues,
+  isRunActive,
+} from '@/services';
+import { formatRelativeTime, formatDuration, getEventTypeStyles } from './utils';
 
 // ============================================================================
 // TYPES
@@ -35,8 +37,9 @@ type SortField = 'lastActivity' | 'runCount' | 'name' | 'status';
 type StatusFilter = 'all' | 'running' | 'finished' | 'failed';
 type DetailTab = 'overview' | 'runs' | 'events';
 
-interface SessionWithRuns extends MockSession {
-  runs: MockRun[];
+interface SessionWithRuns {
+  session: UnifiedSession;
+  runs: UnifiedRun[];
   activeRunCount: number;
   lastRunAt: string | null;
   childSessionIds: string[];
@@ -54,7 +57,7 @@ interface SessionRunStats {
 interface SparklineDataPoint {
   timestamp: number;
   value: number;
-  status: 'pending' | 'claimed' | 'running' | 'stopping' | 'completed' | 'failed' | 'stopped';
+  status: string;
   runId: string;
 }
 
@@ -62,62 +65,54 @@ interface SparklineDataPoint {
 // DATA HELPERS
 // ============================================================================
 
-function buildSessionsWithRuns(): SessionWithRuns[] {
-  // Create runs lookup by session_id
-  const runsBySession = new Map<string, MockRun[]>();
-  mockRuns.forEach((run) => {
-    const list = runsBySession.get(run.session_id) || [];
-    list.push(run);
-    runsBySession.set(run.session_id, list);
-  });
-  // Sort runs by created_at
-  runsBySession.forEach((list) => {
-    list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  });
-
+function buildSessionsWithRuns(
+  sessions: UnifiedSession[],
+  runsBySession: Map<string, UnifiedRun[]>
+): SessionWithRuns[] {
   // Build child session lookup
   const childSessionsByParent = new Map<string, string[]>();
-  mockSessions.forEach((s) => {
-    if (s.parent_session_id) {
-      const list = childSessionsByParent.get(s.parent_session_id) || [];
-      list.push(s.session_id);
-      childSessionsByParent.set(s.parent_session_id, list);
+  sessions.forEach((s) => {
+    if (s.parentSessionId) {
+      const list = childSessionsByParent.get(s.parentSessionId) || [];
+      list.push(s.sessionId);
+      childSessionsByParent.set(s.parentSessionId, list);
     }
   });
 
   // Merge sessions with runs
-  return mockSessions.map((session) => {
-    const sessionRuns = runsBySession.get(session.session_id) || [];
-    const activeRuns = sessionRuns.filter((r) =>
-      ['pending', 'claimed', 'running', 'stopping'].includes(r.status)
-    );
+  return sessions.map((session) => {
+    const sessionRuns = (runsBySession.get(session.sessionId) || [])
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const activeRuns = sessionRuns.filter((r) => isRunActive(r.status));
     const lastRun = sessionRuns[sessionRuns.length - 1];
 
     return {
-      ...session,
+      session,
       runs: sessionRuns,
       activeRunCount: activeRuns.length,
-      lastRunAt: lastRun?.created_at || null,
-      childSessionIds: childSessionsByParent.get(session.session_id) || [],
+      lastRunAt: lastRun?.createdAt || null,
+      childSessionIds: childSessionsByParent.get(session.sessionId) || [],
     };
   });
 }
 
-function getSessionStats(session: SessionWithRuns): SessionRunStats | null {
-  if (session.runs.length === 0) return null;
+function getSessionStats(sessionWithRuns: SessionWithRuns): SessionRunStats | null {
+  const { runs } = sessionWithRuns;
+  if (runs.length === 0) return null;
 
-  const completed = session.runs.filter((r) => r.status === 'completed');
-  const failed = session.runs.filter((r) => r.status === 'failed');
-  const running = session.runs.filter((r) => r.status === 'running');
+  const completed = runs.filter((r) => r.status === 'completed');
+  const failed = runs.filter((r) => r.status === 'failed');
+  const running = runs.filter((r) => r.status === 'running');
 
-  const durations = session.runs
-    .filter((r) => r.started_at && r.completed_at)
-    .map((r) => new Date(r.completed_at!).getTime() - new Date(r.started_at!).getTime());
+  const durations = runs
+    .filter((r) => r.startedAt && r.completedAt)
+    .map((r) => new Date(r.completedAt!).getTime() - new Date(r.startedAt!).getTime());
 
   const totalDuration = durations.reduce((a, b) => a + b, 0);
 
   return {
-    totalRuns: session.runs.length,
+    totalRuns: runs.length,
     completedRuns: completed.length,
     failedRuns: failed.length,
     runningRuns: running.length,
@@ -126,23 +121,22 @@ function getSessionStats(session: SessionWithRuns): SessionRunStats | null {
   };
 }
 
-function getSparklineData(session: SessionWithRuns): SparklineDataPoint[] {
-  if (session.runs.length === 0) return [];
+function getSparklineData(sessionWithRuns: SessionWithRuns): SparklineDataPoint[] {
+  const { runs } = sessionWithRuns;
+  if (runs.length === 0) return [];
 
-  return session.runs.map((run) => ({
-    timestamp: new Date(run.created_at).getTime(),
+  return runs.map((run) => ({
+    timestamp: new Date(run.createdAt).getTime(),
     value:
-      run.completed_at && run.started_at
-        ? new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()
-        : run.started_at
-          ? Date.now() - new Date(run.started_at).getTime()
+      run.completedAt && run.startedAt
+        ? new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()
+        : run.startedAt
+          ? Date.now() - new Date(run.startedAt).getTime()
           : 30000, // Default 30s for pending
     status: run.status,
-    runId: run.run_id,
+    runId: run.runId,
   }));
 }
-
-const sessionsWithRuns = buildSessionsWithRuns();
 
 // ============================================================================
 // ACTIVITY SPARKLINE COMPONENT
@@ -248,36 +242,39 @@ function ActivitySparkline({ data, height = 32 }: ActivitySparklineProps) {
 // ============================================================================
 
 interface SessionCardProps {
-  session: SessionWithRuns;
+  sessionWithRuns: SessionWithRuns;
   isSelected: boolean;
   onClick: () => void;
   sparklineData: SparklineDataPoint[];
   variant?: 'grid' | 'list';
+  sessionsById: Map<string, UnifiedSession>;
 }
 
 function SessionCard({
-  session,
+  sessionWithRuns,
   isSelected,
   onClick,
   sparklineData,
   variant = 'grid',
+  sessionsById,
 }: SessionCardProps) {
-  const hasActiveRuns = session.activeRunCount > 0;
-  const hasFailed = session.runs.some((r) => r.status === 'failed');
+  const { session, runs, activeRunCount, lastRunAt, childSessionIds } = sessionWithRuns;
+  const hasActiveRuns = activeRunCount > 0;
+  const hasFailed = runs.some((r) => r.status === 'failed');
 
   const runSummary = useMemo(() => {
     if (session.runCount === 0) return 'No runs';
-    if (hasActiveRuns) return `${session.runCount} runs (${session.activeRunCount} active)`;
+    if (hasActiveRuns) return `${session.runCount} runs (${activeRunCount} active)`;
     return `${session.runCount} runs`;
-  }, [session.runCount, session.activeRunCount, hasActiveRuns]);
+  }, [session.runCount, activeRunCount, hasActiveRuns]);
 
-  const getStatusBadgeVariant = (status: MockSession['status']) => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'running':
+      case SessionStatusValues.RUNNING:
         return 'success';
-      case 'finished':
+      case SessionStatusValues.FINISHED:
         return 'default';
-      case 'stopped':
+      case SessionStatusValues.STOPPED:
         return 'warning';
       default:
         return 'default';
@@ -296,7 +293,7 @@ function SessionCard({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900 truncate">{session.name}</span>
+            <span className="font-medium text-gray-900 truncate">{session.displayName}</span>
             <Badge variant={getStatusBadgeVariant(session.status)} size="sm">
               {session.status}
             </Badge>
@@ -307,8 +304,8 @@ function SessionCard({
               </span>
             )}
           </div>
-          {session.agent_name && (
-            <span className="text-sm text-gray-500">{session.agent_name}</span>
+          {session.agentName && (
+            <span className="text-sm text-gray-500">{session.agentName}</span>
           )}
         </div>
 
@@ -319,7 +316,7 @@ function SessionCard({
         </div>
 
         <div className="text-sm text-gray-500 w-24 text-right">
-          {session.lastRunAt ? formatRelativeTime(session.lastRunAt) : 'Never'}
+          {lastRunAt ? formatRelativeTime(lastRunAt) : 'Never'}
         </div>
       </div>
     );
@@ -338,9 +335,9 @@ function SessionCard({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-gray-900 truncate">{session.name}</h3>
-          {session.agent_name && (
-            <p className="text-sm text-gray-500 truncate">{session.agent_name}</p>
+          <h3 className="font-medium text-gray-900 truncate">{session.displayName}</h3>
+          {session.agentName && (
+            <p className="text-sm text-gray-500 truncate">{session.agentName}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -364,18 +361,18 @@ function SessionCard({
             {runSummary}
           </span>
         </div>
-        {session.childSessionIds.length > 0 && (
+        {childSessionIds.length > 0 && (
           <div className="flex justify-between">
             <span className="text-gray-500">Children:</span>
-            <span className="font-medium text-gray-900">{session.childSessionIds.length}</span>
+            <span className="font-medium text-gray-900">{childSessionIds.length}</span>
           </div>
         )}
-        {session.parent_session_id && (
+        {session.parentSessionId && (
           <div className="flex justify-between">
             <span className="text-gray-500">Parent:</span>
             <span className="font-medium text-gray-900 truncate max-w-[120px]">
-              {mockSessions.find((s) => s.session_id === session.parent_session_id)?.name ||
-                session.parent_session_id.slice(0, 12) + '...'}
+              {sessionsById.get(session.parentSessionId)?.displayName ||
+                session.parentSessionId.slice(0, 12) + '...'}
             </span>
           </div>
         )}
@@ -388,7 +385,7 @@ function SessionCard({
 
       {/* Footer */}
       <div className="text-xs text-gray-500 text-right">
-        {session.lastRunAt ? `Last: ${formatRelativeTime(session.lastRunAt)}` : 'No activity'}
+        {lastRunAt ? `Last: ${formatRelativeTime(lastRunAt)}` : 'No activity'}
       </div>
     </div>
   );
@@ -408,6 +405,7 @@ interface TabHeaderProps {
   layout: LayoutMode;
   onLayoutChange: (value: LayoutMode) => void;
   onRefresh: () => void;
+  loading: boolean;
   sessionCount: number;
 }
 
@@ -421,6 +419,7 @@ function TabHeader({
   layout,
   onLayoutChange,
   onRefresh,
+  loading,
   sessionCount,
 }: TabHeaderProps) {
   return (
@@ -489,10 +488,11 @@ function TabHeader({
 
           <button
             onClick={onRefresh}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={loading}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -505,14 +505,19 @@ function TabHeader({
 // ============================================================================
 
 interface SessionDetailPanelProps {
-  session: SessionWithRuns;
+  sessionWithRuns: SessionWithRuns;
   stats: SessionRunStats | null;
+  sessionsById: Map<string, UnifiedSession>;
   onClose: () => void;
 }
 
-function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps) {
+function SessionDetailPanel({ sessionWithRuns, stats, sessionsById, onClose }: SessionDetailPanelProps) {
+  const { session, runs, childSessionIds } = sessionWithRuns;
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
   const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set());
+
+  // Fetch events for this session
+  const { events, loading: eventsLoading } = useUnifiedSessionEvents(session.sessionId);
 
   const toggleRunExpanded = (runId: string) => {
     setExpandedRunIds((prev) => {
@@ -526,13 +531,13 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
     });
   };
 
-  const getStatusBadgeVariant = (status: MockSession['status']) => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'running':
+      case SessionStatusValues.RUNNING:
         return 'success';
-      case 'finished':
+      case SessionStatusValues.FINISHED:
         return 'default';
-      case 'stopped':
+      case SessionStatusValues.STOPPED:
         return 'warning';
       default:
         return 'default';
@@ -544,13 +549,13 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">{session.name}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{session.displayName}</h2>
           <div className="flex items-center gap-2 mt-1">
             <Badge variant={getStatusBadgeVariant(session.status)} size="sm">
               {session.status}
             </Badge>
-            {session.agent_name && (
-              <span className="text-sm text-gray-500">{session.agent_name}</span>
+            {session.agentName && (
+              <span className="text-sm text-gray-500">{session.agentName}</span>
             )}
           </div>
         </div>
@@ -597,33 +602,33 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-gray-500">ID</dt>
-                  <dd className="font-mono text-gray-900 text-xs">{session.session_id}</dd>
+                  <dd className="font-mono text-gray-900 text-xs">{session.sessionId}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Created</dt>
-                  <dd className="text-gray-900">{formatRelativeTime(session.created_at)}</dd>
+                  <dd className="text-gray-900">{formatRelativeTime(session.createdAt)}</dd>
                 </div>
-                {session.project_dir && (
+                {session.projectDir && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Project</dt>
                     <dd className="font-mono text-gray-900 text-xs truncate max-w-[200px]">
-                      {session.project_dir}
+                      {session.projectDir}
                     </dd>
                   </div>
                 )}
-                {session.parent_session_id && (
+                {session.parentSessionId && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Parent</dt>
                     <dd className="font-mono text-gray-900 text-xs truncate max-w-[200px]">
-                      {mockSessions.find((s) => s.session_id === session.parent_session_id)?.name ||
-                        session.parent_session_id}
+                      {sessionsById.get(session.parentSessionId)?.displayName ||
+                        session.parentSessionId}
                     </dd>
                   </div>
                 )}
-                {session.childSessionIds.length > 0 && (
+                {childSessionIds.length > 0 && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Children</dt>
-                    <dd className="text-gray-900">{session.childSessionIds.length} sessions</dd>
+                    <dd className="text-gray-900">{childSessionIds.length} sessions</dd>
                   </div>
                 )}
               </dl>
@@ -660,7 +665,7 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
             <section>
               <h3 className="text-sm font-medium text-gray-900 mb-3">Activity Timeline</h3>
               <div className="bg-gray-50 rounded-lg p-3">
-                <ActivitySparkline data={getSparklineData(session)} height={48} />
+                <ActivitySparkline data={getSparklineData(sessionWithRuns)} height={48} />
               </div>
             </section>
           </div>
@@ -668,34 +673,35 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
 
         {activeTab === 'runs' && (
           <div className="space-y-3">
-            {session.runs.length === 0 ? (
+            {runs.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Zap className="w-12 h-12 mx-auto text-gray-300 mb-3" />
                 <p>No runs yet</p>
               </div>
             ) : (
-              session.runs.map((run) => {
-                const isExpanded = expandedRunIds.has(run.run_id);
+              runs.map((run) => {
+                const isExpanded = expandedRunIds.has(run.runId);
+                const isStartRun = run.type === RunTypeValues.START_SESSION;
                 const duration =
-                  run.started_at && run.completed_at
+                  run.startedAt && run.completedAt
                     ? formatDuration(
-                        new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()
+                        new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()
                       )
-                    : run.started_at
+                    : run.startedAt
                       ? 'Running...'
                       : 'Pending';
 
                 return (
                   <div
-                    key={run.run_id}
+                    key={run.runId}
                     className="border border-gray-200 rounded-lg bg-white overflow-hidden"
                   >
                     <button
-                      onClick={() => toggleRunExpanded(run.run_id)}
+                      onClick={() => toggleRunExpanded(run.runId)}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex-shrink-0">
-                        {run.type === 'start_session' ? (
+                        {isStartRun ? (
                           <Play className="w-4 h-4 text-blue-500" />
                         ) : (
                           <RotateCcw className="w-4 h-4 text-purple-500" />
@@ -707,7 +713,7 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
                           <RunStatusBadge status={run.status} />
                         </div>
                         <div className="text-xs text-gray-500 mt-0.5">
-                          {formatRelativeTime(run.created_at)} | {duration}
+                          {formatRelativeTime(run.createdAt)} | {duration}
                         </div>
                       </div>
                       {isExpanded ? (
@@ -741,8 +747,8 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
                               <span className="font-medium">{run.type}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500">Events:</span>{' '}
-                              <span className="font-medium">{run.events.length}</span>
+                              <span className="text-gray-500">ID:</span>{' '}
+                              <span className="font-medium font-mono">{run.runId.slice(0, 12)}...</span>
                             </div>
                           </div>
                         </div>
@@ -757,32 +763,34 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
 
         {activeTab === 'events' && (
           <div className="space-y-2">
-            {session.runs.length === 0 ? (
+            {eventsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              </div>
+            ) : events.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Clock className="w-12 h-12 mx-auto text-gray-300 mb-3" />
                 <p>No events yet</p>
               </div>
             ) : (
-              session.runs.flatMap((run) =>
-                run.events.map((event, idx) => (
+              events.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg"
+                >
                   <div
-                    key={`${run.run_id}-event-${idx}`}
-                    className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg"
+                    className={`px-2 py-1 text-xs rounded border ${getEventTypeStyles(event.eventType)}`}
                   >
-                    <div
-                      className={`px-2 py-1 text-xs rounded border ${getEventTypeStyles(event.type)}`}
-                    >
-                      {event.type}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900">{event.summary}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Run #{run.runNumber} at {event.timestamp}
-                      </p>
-                    </div>
+                    {event.eventType}
                   </div>
-                ))
-              )
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900">{event.summary}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(event.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         )}
@@ -796,11 +804,18 @@ function SessionDetailPanel({ session, stats, onClose }: SessionDetailPanelProps
 // ============================================================================
 
 export function DashboardCardsTab() {
+  const { sessions, runsBySession, sessionsById, loading, error, refresh } = useUnifiedView();
+
   const [layout, setLayout] = useState<LayoutMode>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortField, setSortField] = useState<SortField>('lastActivity');
-  const [selectedSession, setSelectedSession] = useState<SessionWithRuns | null>(null);
+  const [selectedSessionWithRuns, setSelectedSessionWithRuns] = useState<SessionWithRuns | null>(null);
+
+  // Build sessions with runs
+  const sessionsWithRuns = useMemo(() => {
+    return buildSessionsWithRuns(sessions, runsBySession);
+  }, [sessions, runsBySession]);
 
   // Filter and sort sessions
   const filteredSessions = useMemo(() => {
@@ -811,17 +826,17 @@ export function DashboardCardsTab() {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (s) =>
-          s.session_id.toLowerCase().includes(query) ||
-          s.name.toLowerCase().includes(query) ||
-          s.agent_name?.toLowerCase().includes(query)
+          s.session.sessionId.toLowerCase().includes(query) ||
+          s.session.displayName.toLowerCase().includes(query) ||
+          s.session.agentName?.toLowerCase().includes(query)
       );
     }
 
     // Status filter
     if (statusFilter !== 'all') {
       result = result.filter((s) => {
-        if (statusFilter === 'running') return s.activeRunCount > 0 || s.status === 'running';
-        if (statusFilter === 'finished') return s.status === 'finished';
+        if (statusFilter === 'running') return s.activeRunCount > 0 || s.session.status === SessionStatusValues.RUNNING;
+        if (statusFilter === 'finished') return s.session.status === SessionStatusValues.FINISHED;
         if (statusFilter === 'failed') return s.runs.some((r) => r.status === 'failed');
         return true;
       });
@@ -835,23 +850,50 @@ export function DashboardCardsTab() {
             new Date(b.lastRunAt || 0).getTime() - new Date(a.lastRunAt || 0).getTime()
           );
         case 'runCount':
-          return b.runCount - a.runCount;
+          return b.session.runCount - a.session.runCount;
         case 'name':
-          return a.name.localeCompare(b.name);
+          return a.session.displayName.localeCompare(b.session.displayName);
         case 'status':
-          return a.status.localeCompare(b.status);
+          return a.session.status.localeCompare(b.session.status);
         default:
           return 0;
       }
     });
 
     return result;
-  }, [searchQuery, statusFilter, sortField]);
+  }, [sessionsWithRuns, searchQuery, statusFilter, sortField]);
 
-  const handleRefresh = () => {
-    // In a real implementation, this would refetch data
-    console.log('Refreshing dashboard cards...');
-  };
+  // Loading state
+  if (loading && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-gray-700 font-medium mb-1">Failed to load data</p>
+          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <button
+            onClick={refresh}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-gray-50">
@@ -864,7 +906,8 @@ export function DashboardCardsTab() {
         onSortChange={setSortField}
         layout={layout}
         onLayoutChange={setLayout}
-        onRefresh={handleRefresh}
+        onRefresh={refresh}
+        loading={loading}
         sessionCount={filteredSessions.length}
       />
 
@@ -872,45 +915,52 @@ export function DashboardCardsTab() {
         {filteredSessions.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">No sessions found</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              {sessions.length === 0 ? 'No sessions yet' : 'No sessions found'}
+            </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Try adjusting your search or filters
+              {sessions.length === 0
+                ? 'Sessions will appear here when agents start executing.'
+                : 'Try adjusting your search or filters'}
             </p>
           </div>
         ) : layout === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredSessions.map((session) => (
+            {filteredSessions.map((sessionWithRuns) => (
               <SessionCard
-                key={session.session_id}
-                session={session}
-                isSelected={selectedSession?.session_id === session.session_id}
-                onClick={() => setSelectedSession(session)}
-                sparklineData={getSparklineData(session)}
+                key={sessionWithRuns.session.sessionId}
+                sessionWithRuns={sessionWithRuns}
+                isSelected={selectedSessionWithRuns?.session.sessionId === sessionWithRuns.session.sessionId}
+                onClick={() => setSelectedSessionWithRuns(sessionWithRuns)}
+                sparklineData={getSparklineData(sessionWithRuns)}
                 variant="grid"
+                sessionsById={sessionsById}
               />
             ))}
           </div>
         ) : (
           <div className="space-y-3 max-w-4xl">
-            {filteredSessions.map((session) => (
+            {filteredSessions.map((sessionWithRuns) => (
               <SessionCard
-                key={session.session_id}
-                session={session}
-                isSelected={selectedSession?.session_id === session.session_id}
-                onClick={() => setSelectedSession(session)}
-                sparklineData={getSparklineData(session)}
+                key={sessionWithRuns.session.sessionId}
+                sessionWithRuns={sessionWithRuns}
+                isSelected={selectedSessionWithRuns?.session.sessionId === sessionWithRuns.session.sessionId}
+                onClick={() => setSelectedSessionWithRuns(sessionWithRuns)}
+                sparklineData={getSparklineData(sessionWithRuns)}
                 variant="list"
+                sessionsById={sessionsById}
               />
             ))}
           </div>
         )}
       </div>
 
-      {selectedSession && (
+      {selectedSessionWithRuns && (
         <SessionDetailPanel
-          session={selectedSession}
-          stats={getSessionStats(selectedSession)}
-          onClose={() => setSelectedSession(null)}
+          sessionWithRuns={selectedSessionWithRuns}
+          stats={getSessionStats(selectedSessionWithRuns)}
+          sessionsById={sessionsById}
+          onClose={() => setSelectedSessionWithRuns(null)}
         />
       )}
     </div>

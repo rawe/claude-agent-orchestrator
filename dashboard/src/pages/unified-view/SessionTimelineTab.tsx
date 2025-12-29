@@ -16,19 +16,22 @@ import {
   Bot,
   Hash,
   Calendar,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
+import { useUnifiedView, useUnifiedSessionEvents } from '@/hooks';
 import {
-  MockSession,
-  MockRun,
-  mockSessions,
-  mockRuns,
-  formatRelativeTime,
-  formatDuration,
-  getEventTypeStyles,
-} from './';
+  type UnifiedSession,
+  type UnifiedRun,
+  type UnifiedEvent,
+  RunTypeValues,
+  isRunActive,
+} from '@/services';
+import { formatRelativeTime, formatDuration, getEventTypeStyles } from './utils';
 
 interface SessionCardWithRunsProps {
-  session: MockSession;
+  session: UnifiedSession;
   isSelected: boolean;
   onSelect: () => void;
 }
@@ -50,19 +53,21 @@ function SessionCardWithRuns({ session, isSelected, onSelect }: SessionCardWithR
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Bot className="w-4 h-4 text-gray-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-gray-900 truncate">{session.name}</span>
+          <span className="text-sm font-medium text-gray-900 truncate">{session.displayName}</span>
         </div>
         <StatusBadge status={session.status} />
       </div>
 
       <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
-        <span className="flex items-center gap-1">
-          <Hash className="w-3 h-3" />
-          {session.agent_name}
-        </span>
+        {session.agentName && (
+          <span className="flex items-center gap-1">
+            <Hash className="w-3 h-3" />
+            {session.agentName}
+          </span>
+        )}
         <span className="flex items-center gap-1">
           <Calendar className="w-3 h-3" />
-          {formatRelativeTime(session.created_at)}
+          {formatRelativeTime(session.createdAt)}
         </span>
       </div>
 
@@ -78,7 +83,7 @@ function SessionCardWithRuns({ session, isSelected, onSelect }: SessionCardWithR
 }
 
 interface RunBlockProps {
-  run: MockRun;
+  run: UnifiedRun;
   defaultExpanded?: boolean;
 }
 
@@ -87,13 +92,20 @@ function RunBlock({ run, defaultExpanded = false }: RunBlockProps) {
   const [eventsExpanded, setEventsExpanded] = useState(true);
   const [showPrompt, setShowPrompt] = useState(false);
 
-  const isActive = ['pending', 'claimed', 'running', 'stopping'].includes(run.status);
-  const RunTypeIcon = run.type === 'start_session' ? Play : RotateCcw;
+  // Fetch events for this run's session
+  const { events, loading: eventsLoading } = useUnifiedSessionEvents(expanded ? run.sessionId : null);
+
+  // Filter events for this run's time window
+  const runEvents = filterEventsForRun(events, run);
+
+  const isActive = isRunActive(run.status);
+  const isStartRun = run.type === RunTypeValues.START_SESSION;
+  const RunTypeIcon = isStartRun ? Play : RotateCcw;
 
   const getRunDuration = () => {
-    if (!run.started_at) return '-';
-    const start = new Date(run.started_at).getTime();
-    const end = run.completed_at ? new Date(run.completed_at).getTime() : Date.now();
+    if (!run.startedAt) return '-';
+    const start = new Date(run.startedAt).getTime();
+    const end = run.completedAt ? new Date(run.completedAt).getTime() : Date.now();
     return formatDuration(end - start);
   };
 
@@ -113,19 +125,19 @@ function RunBlock({ run, defaultExpanded = false }: RunBlockProps) {
 
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-            run.type === 'start_session' ? 'bg-blue-100' : 'bg-amber-100'
+            isStartRun ? 'bg-blue-100' : 'bg-amber-100'
           }`}
         >
           <RunTypeIcon
-            className={`w-4 h-4 ${run.type === 'start_session' ? 'text-blue-600' : 'text-amber-600'}`}
+            className={`w-4 h-4 ${isStartRun ? 'text-blue-600' : 'text-amber-600'}`}
           />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-gray-900">Run #{run.runNumber}</span>
-            <Badge variant={run.type === 'start_session' ? 'info' : 'default'} size="sm">
-              {run.type === 'start_session' ? 'start' : 'resume'}
+            <Badge variant={isStartRun ? 'info' : 'default'} size="sm">
+              {isStartRun ? 'start' : 'resume'}
             </Badge>
             <RunStatusBadge status={run.status} />
           </div>
@@ -134,19 +146,19 @@ function RunBlock({ run, defaultExpanded = false }: RunBlockProps) {
               <Clock className="w-3 h-3" />
               {getRunDuration()}
             </span>
-            {run.runner_id && (
+            {run.runnerId && (
               <span className="flex items-center gap-1">
                 <Server className="w-3 h-3" />
-                {run.runner_id.slice(0, 12)}...
+                {run.runnerId.slice(0, 12)}...
               </span>
             )}
-            <span>{formatRelativeTime(run.created_at)}</span>
+            <span>{formatRelativeTime(run.createdAt)}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
           <MessageSquare className="w-3.5 h-3.5" />
-          {run.events.length} events
+          {eventsLoading ? '...' : runEvents.length} events
         </div>
       </button>
 
@@ -179,27 +191,39 @@ function RunBlock({ run, defaultExpanded = false }: RunBlockProps) {
             </button>
 
             {eventsExpanded && (
-              <div className="space-y-2 pl-4 border-l-2 border-gray-200">
-                {run.events.map((event, index) => (
-                  <div key={index} className="flex items-start gap-3 py-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 -ml-[0.45rem]" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-xs px-2 py-0.5 rounded border ${getEventTypeStyles(event.type)}`}>
-                          {event.type}
-                        </span>
-                        <span className="text-xs text-gray-400 font-mono">{event.timestamp}</span>
-                      </div>
-                      <p className="text-sm text-gray-700">{event.summary}</p>
-                    </div>
+              <>
+                {eventsLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                   </div>
-                ))}
-              </div>
+                ) : runEvents.length === 0 ? (
+                  <div className="text-sm text-gray-500 py-2">No events recorded</div>
+                ) : (
+                  <div className="space-y-2 pl-4 border-l-2 border-gray-200">
+                    {runEvents.map((event) => (
+                      <div key={event.id} className="flex items-start gap-3 py-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 -ml-[0.45rem]" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs px-2 py-0.5 rounded border ${getEventTypeStyles(event.eventType)}`}>
+                              {event.eventType}
+                            </span>
+                            <span className="text-xs text-gray-400 font-mono">
+                              {new Date(event.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700">{event.summary}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
-            <span className="font-mono">{run.run_id}</span>
+            <span className="font-mono">{run.runId}</span>
           </div>
         </div>
       )}
@@ -207,29 +231,112 @@ function RunBlock({ run, defaultExpanded = false }: RunBlockProps) {
   );
 }
 
+/**
+ * Filter events that occurred during a run's execution window
+ */
+function filterEventsForRun(events: UnifiedEvent[], run: UnifiedRun): UnifiedEvent[] {
+  const runStart = run.startedAt ? new Date(run.startedAt).getTime() : null;
+  const runEnd = run.completedAt ? new Date(run.completedAt).getTime() : null;
+
+  if (!runStart) {
+    return [];
+  }
+
+  return events.filter((event) => {
+    const eventTime = new Date(event.timestamp).getTime();
+    if (eventTime < runStart) return false;
+    if (runEnd && eventTime > runEnd) return false;
+    return true;
+  });
+}
+
 export function SessionTimelineTab() {
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(mockSessions[0].session_id);
+  const { sessions, runsBySession, loading, error, refresh, stats } = useUnifiedView();
+
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
-  const selectedSession = mockSessions.find((s) => s.session_id === selectedSessionId);
-  const sessionRuns = mockRuns.filter((r) => r.session_id === selectedSessionId);
+  // Auto-select first session when data loads
+  if (!selectedSessionId && sessions.length > 0) {
+    setSelectedSessionId(sessions[0].sessionId);
+  }
+
+  const selectedSession = sessions.find((s) => s.sessionId === selectedSessionId) ?? null;
+  const sessionRuns = selectedSessionId
+    ? (runsBySession.get(selectedSessionId) ?? [])
+        .slice()
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    : [];
+
+  // Loading state
+  if (loading && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500">Loading sessions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-gray-700 font-medium mb-1">Failed to load data</p>
+          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <button
+            onClick={refresh}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-700 font-medium mb-1">No sessions yet</p>
+          <p className="text-gray-500 text-sm">Sessions and runs will appear here when agents start executing.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex min-h-0">
       {sidebarVisible && (
         <div className="w-80 border-r border-gray-200 bg-white flex-shrink-0 flex flex-col">
-          <div className="p-3 border-b border-gray-200">
+          <div className="p-3 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Sessions ({mockSessions.length})
+              Sessions ({stats.totalSessions})
             </h3>
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {mockSessions.map((session) => (
+            {sessions.map((session) => (
               <SessionCardWithRuns
-                key={session.session_id}
+                key={session.sessionId}
                 session={session}
-                isSelected={selectedSessionId === session.session_id}
-                onSelect={() => setSelectedSessionId(session.session_id)}
+                isSelected={selectedSessionId === session.sessionId}
+                onSelect={() => setSelectedSessionId(session.sessionId)}
               />
             ))}
           </div>
@@ -264,11 +371,15 @@ export function SessionTimelineTab() {
                   <Bot className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-gray-900">{selectedSession.name}</h2>
+                  <h2 className="text-base font-semibold text-gray-900">{selectedSession.displayName}</h2>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>Agent: {selectedSession.agent_name}</span>
-                    <span>-</span>
-                    <span>Created {formatRelativeTime(selectedSession.created_at)}</span>
+                    {selectedSession.agentName && (
+                      <>
+                        <span>Agent: {selectedSession.agentName}</span>
+                        <span>-</span>
+                      </>
+                    )}
+                    <span>Created {formatRelativeTime(selectedSession.createdAt)}</span>
                   </div>
                 </div>
               </div>
@@ -280,9 +391,16 @@ export function SessionTimelineTab() {
         <div className="flex-1 min-h-0 overflow-y-auto">
           {selectedSessionId ? (
             <div className="p-4 space-y-4">
-              {sessionRuns.map((run, index) => (
-                <RunBlock key={run.run_id} run={run} defaultExpanded={index === 0} />
-              ))}
+              {sessionRuns.length === 0 ? (
+                <div className="text-center py-12">
+                  <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No runs for this session yet</p>
+                </div>
+              ) : (
+                sessionRuns.map((run, index) => (
+                  <RunBlock key={run.runId} run={run} defaultExpanded={index === 0} />
+                ))
+              )}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">

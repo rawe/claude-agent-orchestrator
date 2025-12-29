@@ -7,11 +7,19 @@ import {
   Maximize2,
   SkipForward,
   RefreshCw,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Badge, StatusBadge } from '@/components/common';
 import { RunStatusBadge } from '@/components/features/runs';
-import { MockSession, MockRun } from './types';
-import { mockSessions, mockRuns } from './mock-data';
+import { useUnifiedView, useUnifiedSessionEvents } from '@/hooks';
+import {
+  type UnifiedSession,
+  type UnifiedRun,
+  type UnifiedEvent,
+  RunTypeValues,
+  isRunActive,
+} from '@/services';
 import { formatRelativeTime, formatDuration, getEventTypeStyles } from './utils';
 
 // ============================================================================
@@ -50,14 +58,14 @@ function timeToPixel(time: Date, viewport: TimelineViewport): number {
 }
 
 function calculateRunBlockPosition(
-  run: MockRun,
+  run: UnifiedRun,
   viewport: TimelineViewport,
   config: TimelineConfig
 ): { left: number; width: number } {
-  const startTime = new Date(run.started_at || run.created_at);
-  const endTime = run.completed_at
-    ? new Date(run.completed_at)
-    : ['pending', 'claimed', 'running', 'stopping'].includes(run.status)
+  const startTime = new Date(run.startedAt || run.createdAt);
+  const endTime = run.completedAt
+    ? new Date(run.completedAt)
+    : isRunActive(run.status)
       ? new Date()
       : startTime;
 
@@ -97,17 +105,17 @@ function generateTimeMarkers(
 }
 
 function calculateFitAllViewport(
-  runs: MockRun[],
+  runs: UnifiedRun[],
   containerWidth: number,
   padding: number = 50
 ): TimelineViewport | null {
   if (runs.length === 0) return null;
 
   const timeRanges = runs.map((run) => {
-    const start = new Date(run.started_at || run.created_at);
-    const end = run.completed_at
-      ? new Date(run.completed_at)
-      : ['pending', 'claimed', 'running', 'stopping'].includes(run.status)
+    const start = new Date(run.startedAt || run.createdAt);
+    const end = run.completedAt
+      ? new Date(run.completedAt)
+      : isRunActive(run.status)
         ? new Date()
         : start;
     return { start, end };
@@ -219,8 +227,7 @@ function TimelineHeader({ viewport, config, timelineWidth }: TimelineHeaderProps
 }
 
 interface SwimlaneRunBlockProps {
-  run: MockRun;
-  runNumber: number;
+  run: UnifiedRun;
   viewport: TimelineViewport;
   config: TimelineConfig;
   isSelected: boolean;
@@ -242,7 +249,6 @@ const runStatusColors: Record<string, string> = {
 
 function SwimlaneRunBlock({
   run,
-  runNumber,
   viewport,
   config,
   isSelected,
@@ -252,7 +258,7 @@ function SwimlaneRunBlock({
   onMouseLeave,
 }: SwimlaneRunBlockProps) {
   const { left, width } = calculateRunBlockPosition(run, viewport, config);
-  const isRunning = run.status === 'running';
+  const isRunning = isRunActive(run.status);
 
   return (
     <div
@@ -266,11 +272,11 @@ function SwimlaneRunBlock({
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      title={`Run #${runNumber} (${run.type}) - ${run.status}`}
+      title={`Run #${run.runNumber} (${run.type}) - ${run.status}`}
     >
       {width > 30 && (
         <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow">
-          #{runNumber}
+          #{run.runNumber}
         </span>
       )}
     </div>
@@ -278,8 +284,8 @@ function SwimlaneRunBlock({
 }
 
 interface SwimlaneProps {
-  session: MockSession;
-  runs: MockRun[];
+  session: UnifiedSession;
+  runs: UnifiedRun[];
   viewport: TimelineViewport;
   config: TimelineConfig;
   timelineWidth: number;
@@ -315,11 +321,11 @@ function Swimlane({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-900 truncate">{session.name}</span>
+            <span className="text-sm font-medium text-gray-900 truncate">{session.displayName}</span>
             <StatusBadge status={session.status} />
           </div>
-          {session.agent_name && (
-            <span className="text-xs text-gray-500 truncate block">{session.agent_name}</span>
+          {session.agentName && (
+            <span className="text-xs text-gray-500 truncate block">{session.agentName}</span>
           )}
         </div>
       </div>
@@ -329,17 +335,16 @@ function Swimlane({
           <div className="h-1 w-full bg-gray-100 rounded" />
         </div>
 
-        {runs.map((run, index) => (
+        {runs.map((run) => (
           <SwimlaneRunBlock
-            key={run.run_id}
+            key={run.runId}
             run={run}
-            runNumber={index + 1}
             viewport={viewport}
             config={config}
-            isSelected={selectedRunId === run.run_id}
-            isHovered={hoveredRunId === run.run_id}
-            onClick={() => onSelectRun(run.run_id)}
-            onMouseEnter={() => onHoverRun(run.run_id)}
+            isSelected={selectedRunId === run.runId}
+            isHovered={hoveredRunId === run.runId}
+            onClick={() => onSelectRun(run.runId)}
+            onMouseEnter={() => onHoverRun(run.runId)}
             onMouseLeave={() => onHoverRun(null)}
           />
         ))}
@@ -349,15 +354,40 @@ function Swimlane({
 }
 
 interface RunDetailPanelProps {
-  run: MockRun;
+  run: UnifiedRun;
   onClose: () => void;
 }
 
+/**
+ * Filter events that occurred during a run's execution window
+ */
+function filterEventsForRun(events: UnifiedEvent[], run: UnifiedRun): UnifiedEvent[] {
+  const runStart = run.startedAt ? new Date(run.startedAt).getTime() : null;
+  const runEnd = run.completedAt ? new Date(run.completedAt).getTime() : null;
+
+  if (!runStart) {
+    return [];
+  }
+
+  return events.filter((event) => {
+    const eventTime = new Date(event.timestamp).getTime();
+    if (eventTime < runStart) return false;
+    if (runEnd && eventTime > runEnd) return false;
+    return true;
+  });
+}
+
 function RunDetailPanel({ run, onClose }: RunDetailPanelProps) {
+  // Fetch events for this run's session
+  const { events, loading: eventsLoading } = useUnifiedSessionEvents(run.sessionId);
+
+  // Filter events for this run's time window
+  const runEvents = filterEventsForRun(events, run);
+
   const getDuration = () => {
-    if (!run.started_at) return '-';
-    const start = new Date(run.started_at).getTime();
-    const end = run.completed_at ? new Date(run.completed_at).getTime() : Date.now();
+    if (!run.startedAt) return '-';
+    const start = new Date(run.startedAt).getTime();
+    const end = run.completedAt ? new Date(run.completedAt).getTime() : Date.now();
     return formatDuration(end - start);
   };
 
@@ -375,19 +405,24 @@ function RunDetailPanel({ run, onClose }: RunDetailPanelProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant={run.type === 'start_session' ? 'info' : 'default'} size="sm">
-              {run.type === 'start_session' ? 'start' : 'resume'}
+            <Badge variant={run.type === RunTypeValues.START_SESSION ? 'info' : 'default'} size="sm">
+              {run.type === RunTypeValues.START_SESSION ? 'start' : 'resume'}
             </Badge>
-            <span className="text-sm text-gray-600">{run.agent_name}</span>
+            {run.agentName && <span className="text-sm text-gray-600">{run.agentName}</span>}
           </div>
-          <div className="text-xs text-gray-500 font-mono mb-3">{run.run_id}</div>
+          <div className="text-xs text-gray-500 font-mono mb-3">{run.runId}</div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex items-center gap-1 text-gray-500">
               <Clock className="w-3 h-3" />
               {getDuration()}
             </div>
-            <div className="text-gray-500">{formatRelativeTime(run.created_at)}</div>
+            <div className="text-gray-500">{formatRelativeTime(run.createdAt)}</div>
           </div>
+          {run.error && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+              {run.error}
+            </div>
+          )}
         </div>
 
         <div>
@@ -398,20 +433,32 @@ function RunDetailPanel({ run, onClose }: RunDetailPanelProps) {
         </div>
 
         <div>
-          <h5 className="text-sm font-medium text-gray-700 mb-2">Events ({run.events.length})</h5>
-          <div className="space-y-2 pl-3 border-l-2 border-gray-200 max-h-64 overflow-y-auto">
-            {run.events.map((event, index) => (
-              <div key={index} className="py-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className={`text-xs px-1.5 py-0.5 rounded border ${getEventTypeStyles(event.type)}`}>
-                    {event.type}
-                  </span>
-                  <span className="text-xs text-gray-400 font-mono">{event.timestamp}</span>
+          <h5 className="text-sm font-medium text-gray-700 mb-2">
+            Events ({eventsLoading ? '...' : runEvents.length})
+          </h5>
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+            </div>
+          ) : runEvents.length === 0 ? (
+            <div className="text-sm text-gray-500 py-2">No events recorded</div>
+          ) : (
+            <div className="space-y-2 pl-3 border-l-2 border-gray-200 max-h-64 overflow-y-auto">
+              {runEvents.map((event) => (
+                <div key={event.id} className="py-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={`text-xs px-1.5 py-0.5 rounded border ${getEventTypeStyles(event.eventType)}`}>
+                      {event.eventType}
+                    </span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">{event.summary}</p>
                 </div>
-                <p className="text-sm text-gray-600">{event.summary}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -419,28 +466,37 @@ function RunDetailPanel({ run, onClose }: RunDetailPanelProps) {
 }
 
 export function SwimlaneTab() {
+  const { sessions, runs, runsBySession, loading, error, refresh, stats } = useUnifiedView();
+
   const [viewport, setViewport] = useState<TimelineViewport | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [hoveredRunId, setHoveredRunId] = useState<string | null>(null);
+  const [viewportInitialized, setViewportInitialized] = useState(false);
 
   const config = DEFAULT_TIMELINE_CONFIG;
   const containerWidth = 1000;
   const timelineWidth = containerWidth - config.sessionLabelWidth;
 
-  const sessionsWithRuns = mockSessions.map((session) => ({
+  // Build sessions with their runs
+  const sessionsWithRuns = sessions.map((session) => ({
     session,
-    runs: mockRuns
-      .filter((r) => r.session_id === session.session_id)
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    runs: (runsBySession.get(session.sessionId) ?? [])
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
   }));
 
+  // Initialize viewport when runs are loaded
   const initViewport = () => {
-    const allRuns = mockRuns;
-    const initial = calculateFitAllViewport(allRuns, timelineWidth, 50);
-    if (initial) setViewport(initial);
+    if (runs.length === 0) return;
+    const initial = calculateFitAllViewport(runs, timelineWidth, 50);
+    if (initial) {
+      setViewport(initial);
+      setViewportInitialized(true);
+    }
   };
 
-  if (!viewport) {
+  // Auto-initialize viewport when data loads
+  if (!viewportInitialized && runs.length > 0 && !viewport) {
     initViewport();
   }
 
@@ -464,8 +520,8 @@ export function SwimlaneTab() {
   };
 
   const handleFitAll = () => {
-    const allRuns = mockRuns;
-    const newViewport = calculateFitAllViewport(allRuns, timelineWidth, 50);
+    if (runs.length === 0) return;
+    const newViewport = calculateFitAllViewport(runs, timelineWidth, 50);
     if (newViewport) setViewport(newViewport);
   };
 
@@ -481,13 +537,58 @@ export function SwimlaneTab() {
   };
 
   const handleRefresh = () => {
-    initViewport();
+    refresh();
+    // Reset viewport to recalculate after refresh
+    setViewportInitialized(false);
+    setViewport(null);
   };
 
-  const selectedRun = mockRuns.find((r) => r.run_id === selectedRunId);
+  const selectedRun = runs.find((r) => r.runId === selectedRunId);
 
-  const activeSessions = mockSessions.filter((s) => s.status === 'running').length;
-  const activeRuns = mockRuns.filter((r) => ['running', 'pending', 'claimed'].includes(r.status)).length;
+  // Loading state
+  if (loading && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500">Loading sessions and runs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-gray-700 font-medium mb-1">Failed to load data</p>
+          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <button
+            onClick={refresh}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-700 font-medium mb-1">No sessions yet</p>
+          <p className="text-gray-500 text-sm">Sessions and runs will appear here when agents start executing.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -500,19 +601,25 @@ export function SwimlaneTab() {
       />
 
       <div className="flex-shrink-0 flex items-center gap-4 px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm text-gray-600">
-        <span>{mockSessions.length} sessions</span>
+        <span>{stats.totalSessions} sessions</span>
         <span>•</span>
-        <span>{mockRuns.length} runs</span>
-        {activeSessions > 0 && (
+        <span>{stats.totalRuns} runs</span>
+        {stats.activeSessions > 0 && (
           <>
             <span>•</span>
-            <span className="text-emerald-600">{activeSessions} active sessions</span>
+            <span className="text-emerald-600">{stats.activeSessions} active sessions</span>
           </>
         )}
-        {activeRuns > 0 && (
+        {stats.activeRuns > 0 && (
           <>
             <span>•</span>
-            <span className="text-blue-600">{activeRuns} running</span>
+            <span className="text-blue-600">{stats.activeRuns} running</span>
+          </>
+        )}
+        {loading && (
+          <>
+            <span>•</span>
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
           </>
         )}
       </div>
@@ -523,11 +630,11 @@ export function SwimlaneTab() {
             <>
               <TimelineHeader viewport={viewport} config={config} timelineWidth={timelineWidth} />
               <div className="flex-1 overflow-y-auto bg-white">
-                {sessionsWithRuns.map(({ session, runs }) => (
+                {sessionsWithRuns.map(({ session, runs: sessionRuns }) => (
                   <Swimlane
-                    key={session.session_id}
+                    key={session.sessionId}
                     session={session}
-                    runs={runs}
+                    runs={sessionRuns}
                     viewport={viewport}
                     config={config}
                     timelineWidth={timelineWidth}

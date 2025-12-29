@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge, StatusBadge } from '@/components/common';
 import { RunStatusBadge } from '@/components/features/runs';
 import {
@@ -9,29 +9,34 @@ import {
   Bot,
   Folder,
   Zap,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
+import { useUnifiedView, useUnifiedSessionEvents } from '@/hooks';
 import {
-  MockRun,
-  mockSessions,
-  mockRuns,
-  formatRelativeTime,
-  formatDuration,
-  getEventTypeStyles,
-} from './';
+  type UnifiedRun,
+  type UnifiedEvent,
+  RunTypeValues,
+  RunStatusValues,
+  isRunActive,
+} from '@/services';
+import { formatRelativeTime, formatDuration, getEventTypeStyles } from './utils';
 
 interface RunListItemProps {
-  run: MockRun;
+  run: UnifiedRun;
   isSelected: boolean;
   onSelect: () => void;
 }
 
 function RunListItem({ run, isSelected, onSelect }: RunListItemProps) {
-  const isActive = ['pending', 'claimed', 'running', 'stopping'].includes(run.status);
+  const isActive = isRunActive(run.status);
+  const isStartRun = run.type === RunTypeValues.START_SESSION;
 
   const getRunDuration = () => {
-    if (!run.started_at) return 'queued';
-    const start = new Date(run.started_at).getTime();
-    const end = run.completed_at ? new Date(run.completed_at).getTime() : Date.now();
+    if (!run.startedAt) return 'queued';
+    const start = new Date(run.startedAt).getTime();
+    const end = run.completedAt ? new Date(run.completedAt).getTime() : Date.now();
     return formatDuration(end - start);
   };
 
@@ -46,13 +51,13 @@ function RunListItem({ run, isSelected, onSelect }: RunListItemProps) {
     >
       <div className="flex items-center justify-between mb-2">
         <RunStatusBadge status={run.status} />
-        <span className="font-mono text-xs text-gray-500">{run.run_id.slice(0, 8)}</span>
+        <span className="font-mono text-xs text-gray-500">{run.runId.slice(0, 8)}</span>
       </div>
 
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm font-medium text-gray-900 truncate">{run.agent_name}</span>
-        <Badge variant={run.type === 'start_session' ? 'info' : 'default'} size="sm">
-          {run.type === 'start_session' ? 'start' : 'resume'}
+        <span className="text-sm font-medium text-gray-900 truncate">{run.agentName ?? 'Unknown Agent'}</span>
+        <Badge variant={isStartRun ? 'info' : 'default'} size="sm">
+          {isStartRun ? 'start' : 'resume'}
         </Badge>
       </div>
 
@@ -69,24 +74,27 @@ function RunListItem({ run, isSelected, onSelect }: RunListItemProps) {
             )}
           </span>
         </div>
-        <span>{formatRelativeTime(run.created_at)}</span>
+        <span>{formatRelativeTime(run.createdAt)}</span>
       </div>
     </button>
   );
 }
 
 interface RunHistoryChipProps {
-  run: MockRun;
+  run: UnifiedRun;
   index: number;
   isSelected: boolean;
   onClick: () => void;
 }
 
 function RunHistoryChip({ run, index, isSelected, onClick }: RunHistoryChipProps) {
+  const isStartRun = run.type === RunTypeValues.START_SESSION;
+
   const statusColors: Record<string, string> = {
     pending: 'bg-gray-100 text-gray-700',
     claimed: 'bg-blue-100 text-blue-700',
     running: 'bg-emerald-100 text-emerald-700',
+    stopping: 'bg-amber-100 text-amber-700',
     completed: 'bg-green-100 text-green-700',
     failed: 'bg-red-100 text-red-700',
     stopped: 'bg-gray-100 text-gray-600',
@@ -100,33 +108,115 @@ function RunHistoryChip({ run, index, isSelected, onClick }: RunHistoryChipProps
       } ${statusColors[run.status] || statusColors.pending}`}
     >
       #{index}
-      <span className="text-[10px] opacity-75">{run.type === 'start_session' ? 'start' : 'resume'}</span>
+      <span className="text-[10px] opacity-75">{isStartRun ? 'start' : 'resume'}</span>
     </button>
   );
 }
 
+/**
+ * Filter events that occurred during a run's execution window
+ */
+function filterEventsForRun(events: UnifiedEvent[], run: UnifiedRun): UnifiedEvent[] {
+  const runStart = run.startedAt ? new Date(run.startedAt).getTime() : null;
+  const runEnd = run.completedAt ? new Date(run.completedAt).getTime() : null;
+
+  if (!runStart) {
+    return [];
+  }
+
+  return events.filter((event) => {
+    const eventTime = new Date(event.timestamp).getTime();
+    if (eventTime < runStart) return false;
+    if (runEnd && eventTime > runEnd) return false;
+    return true;
+  });
+}
+
 export function RunCentricTab() {
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(mockRuns[0].run_id);
+  const { sessions, runs, runsBySession, sessionsById, loading, error, refresh, stats } = useUnifiedView();
+
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  const selectedRun = mockRuns.find((r) => r.run_id === selectedRunId);
+  // Auto-select first run when data loads
+  if (!selectedRunId && runs.length > 0) {
+    setSelectedRunId(runs[0].runId);
+  }
+
+  const selectedRun = runs.find((r) => r.runId === selectedRunId) ?? null;
   const selectedSession = selectedRun
-    ? mockSessions.find((s) => s.session_id === selectedRun.session_id)
+    ? sessionsById.get(selectedRun.sessionId) ?? null
     : null;
   const sessionRuns = selectedRun
-    ? mockRuns.filter((r) => r.session_id === selectedRun.session_id)
+    ? (runsBySession.get(selectedRun.sessionId) ?? [])
+        .slice()
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     : [];
 
-  const filteredRuns = mockRuns
-    .filter((r) => statusFilter === 'all' || r.status === statusFilter)
-    .filter(
-      (r) =>
-        !search ||
-        r.run_id.toLowerCase().includes(search.toLowerCase()) ||
-        r.agent_name.toLowerCase().includes(search.toLowerCase())
-    )
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  // Fetch events for the selected run's session
+  const { events, loading: eventsLoading } = useUnifiedSessionEvents(selectedRun?.sessionId ?? null);
+
+  // Filter events for this run's time window
+  const runEvents = selectedRun ? filterEventsForRun(events, selectedRun) : [];
+
+  const filteredRuns = useMemo(() => {
+    return runs
+      .filter((r) => statusFilter === 'all' || r.status === statusFilter)
+      .filter(
+        (r) =>
+          !search ||
+          r.runId.toLowerCase().includes(search.toLowerCase()) ||
+          (r.agentName?.toLowerCase().includes(search.toLowerCase()) ?? false)
+      )
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [runs, statusFilter, search]);
+
+  // Loading state
+  if (loading && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500">Loading runs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && sessions.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-gray-700 font-medium mb-1">Failed to load data</p>
+          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <button
+            onClick={refresh}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (runs.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-700 font-medium mb-1">No runs yet</p>
+          <p className="text-gray-500 text-sm">Runs will appear here when agents start executing.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex min-h-0">
@@ -151,27 +241,41 @@ export function RunCentricTab() {
               className="flex-1 text-sm border border-gray-300 rounded-md px-2 py-1.5"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="running">Running</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
+              <option value={RunStatusValues.PENDING}>Pending</option>
+              <option value={RunStatusValues.RUNNING}>Running</option>
+              <option value={RunStatusValues.COMPLETED}>Completed</option>
+              <option value={RunStatusValues.FAILED}>Failed</option>
+              <option value={RunStatusValues.STOPPED}>Stopped</option>
             </select>
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {filteredRuns.map((run) => (
             <RunListItem
-              key={run.run_id}
+              key={run.runId}
               run={run}
-              isSelected={selectedRunId === run.run_id}
-              onSelect={() => setSelectedRunId(run.run_id)}
+              isSelected={selectedRunId === run.runId}
+              onSelect={() => setSelectedRunId(run.runId)}
             />
           ))}
+          {filteredRuns.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-sm">No runs match your filters</p>
+            </div>
+          )}
         </div>
 
         <div className="px-3 py-2 border-t border-gray-200 text-xs text-gray-500">
-          {filteredRuns.length} of {mockRuns.length} runs
+          {filteredRuns.length} of {stats.totalRuns} runs
         </div>
       </div>
 
@@ -184,31 +288,33 @@ export function RunCentricTab() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-gray-900">{selectedSession.name}</h3>
+                    <h3 className="text-base font-semibold text-gray-900">{selectedSession.displayName}</h3>
                     <StatusBadge status={selectedSession.status} />
                   </div>
                   <div className="flex items-center gap-1 text-xs text-gray-500">
-                    <span className="font-mono">{selectedSession.session_id.slice(0, 12)}...</span>
+                    <span className="font-mono">{selectedSession.sessionId.slice(0, 12)}...</span>
                     <ExternalLink className="w-3 h-3 ml-1 text-primary-600" />
                   </div>
                 </div>
                 <div className="text-right text-sm text-gray-500">
                   <div className="flex items-center gap-1.5 justify-end">
                     <Clock className="w-4 h-4" />
-                    {formatRelativeTime(selectedSession.created_at)}
+                    {formatRelativeTime(selectedSession.createdAt)}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5 text-gray-600">
-                  <Bot className="w-4 h-4 text-gray-400" />
-                  {selectedSession.agent_name}
-                </div>
-                {selectedSession.project_dir && (
+                {selectedSession.agentName && (
+                  <div className="flex items-center gap-1.5 text-gray-600">
+                    <Bot className="w-4 h-4 text-gray-400" />
+                    {selectedSession.agentName}
+                  </div>
+                )}
+                {selectedSession.projectDir && (
                   <div className="flex items-center gap-1.5 text-gray-500">
                     <Folder className="w-4 h-4 text-gray-400" />
-                    <span className="truncate max-w-[180px]">{selectedSession.project_dir.split('/').pop()}</span>
+                    <span className="truncate max-w-[180px]">{selectedSession.projectDir.split('/').pop()}</span>
                   </div>
                 )}
               </div>
@@ -221,11 +327,11 @@ export function RunCentricTab() {
                 <div className="flex flex-wrap gap-1.5">
                   {sessionRuns.map((run, index) => (
                     <RunHistoryChip
-                      key={run.run_id}
+                      key={run.runId}
                       run={run}
                       index={index + 1}
-                      isSelected={run.run_id === selectedRunId}
-                      onClick={() => setSelectedRunId(run.run_id)}
+                      isSelected={run.runId === selectedRunId}
+                      onClick={() => setSelectedRunId(run.runId)}
                     />
                   ))}
                 </div>
@@ -240,31 +346,45 @@ export function RunCentricTab() {
                     <Zap className="w-4 h-4 text-gray-400" />
                     <span className="text-sm font-medium text-gray-900">Run Events</span>
                   </div>
-                  <Badge variant={selectedRun.type === 'start_session' ? 'info' : 'default'} size="sm">
-                    {selectedRun.type === 'start_session' ? 'start' : 'resume'}
+                  <Badge variant={selectedRun.type === RunTypeValues.START_SESSION ? 'info' : 'default'} size="sm">
+                    {selectedRun.type === RunTypeValues.START_SESSION ? 'start' : 'resume'}
                   </Badge>
                   <RunStatusBadge status={selectedRun.status} />
                 </div>
-                <span className="text-sm text-gray-500">{selectedRun.events.length} events</span>
+                <span className="text-sm text-gray-500">
+                  {eventsLoading ? '...' : runEvents.length} events
+                </span>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-2 pl-4 border-l-2 border-gray-200">
-                  {selectedRun.events.map((event, index) => (
-                    <div key={index} className="flex items-start gap-3 py-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 -ml-[0.45rem]" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs px-2 py-0.5 rounded border ${getEventTypeStyles(event.type)}`}>
-                            {event.type}
-                          </span>
-                          <span className="text-xs text-gray-400 font-mono">{event.timestamp}</span>
+                {eventsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  </div>
+                ) : runEvents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">No events recorded for this run</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 pl-4 border-l-2 border-gray-200">
+                    {runEvents.map((event) => (
+                      <div key={event.id} className="flex items-start gap-3 py-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-2 -ml-[0.45rem]" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs px-2 py-0.5 rounded border ${getEventTypeStyles(event.eventType)}`}>
+                              {event.eventType}
+                            </span>
+                            <span className="text-xs text-gray-400 font-mono">
+                              {new Date(event.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700">{event.summary}</p>
                         </div>
-                        <p className="text-sm text-gray-700">{event.summary}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </>
