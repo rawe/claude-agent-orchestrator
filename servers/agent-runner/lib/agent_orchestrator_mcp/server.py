@@ -51,15 +51,18 @@ class MCPServer:
         self,
         coordinator_url: str,
         auth0_client: Optional["Auth0M2MClient"] = None,
+        port: Optional[int] = None,
     ):
         """Initialize MCPServer.
 
         Args:
             coordinator_url: Agent Coordinator API URL
             auth0_client: Auth0 client for authenticated API calls
+            port: Optional fixed port. If None, a random available port is used.
         """
         self._coordinator_url = coordinator_url
         self._auth0_client = auth0_client
+        self._specified_port: Optional[int] = port  # None = random, int = fixed
         self._port: int = 0
         self._host: str = DEFAULT_HOST
         self._server_thread: Optional[threading.Thread] = None
@@ -253,13 +256,29 @@ Returns:
             port = s.getsockname()[1]
         return port
 
+    def _check_port_available(self, port: int) -> bool:
+        """Check if a specific port is available."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((self._host, port))
+                return True
+        except OSError:
+            return False
+
     def start(self) -> int:
-        """Start server on dynamic port. Returns assigned port."""
+        """Start server on specified or dynamic port. Returns assigned port."""
         if self._server_thread is not None:
             raise RuntimeError("Server already started")
 
-        # Find available port
-        self._port = self._find_available_port()
+        # Determine port: use specified port or find available one
+        if self._specified_port is not None:
+            if not self._check_port_available(self._specified_port):
+                raise RuntimeError(
+                    f"MCP server port {self._specified_port} is already in use"
+                )
+            self._port = self._specified_port
+        else:
+            self._port = self._find_available_port()
 
         # Create FastMCP server with the assigned port
         self._mcp = FastMCP(

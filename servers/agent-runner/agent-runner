@@ -152,6 +152,7 @@ class Runner:
         self.mcp_server = MCPServer(
             coordinator_url=config.agent_coordinator_url,
             auth0_client=self.auth0_client,  # Shared instance for token reuse
+            port=config.mcp_port,  # Optional fixed port from CLI
         )
 
         # Create blueprint resolver for Schema 2.0
@@ -340,6 +341,12 @@ def main(
         "-v",
         help="Enable verbose logging",
     ),
+    mcp_port: int = typer.Option(
+        None,
+        "--mcp-port",
+        "-m",
+        help="Port for embedded MCP server (default: random available port)",
+    ),
 ):
     """
     Agent Runner - Execute agent runs from Agent Coordinator.
@@ -373,6 +380,8 @@ def main(
         config.project_dir = project_dir
     if tags:
         config.tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    if mcp_port:
+        config.mcp_port = mcp_port
 
     # Set executor path via env var (executor.py reads from env)
     if executor:
