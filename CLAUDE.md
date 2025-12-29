@@ -33,8 +33,25 @@
 
 ## Testing
 
-Integration tests for Agent Coordinator and Agent Runner without UI. 
+Integration tests for Agent Coordinator and Agent Runner without UI.
 
-Use SlashCommands `/tests/setup`, `/tests/case`, `/tests/run`, `/tests/teardown`. 
+Use SlashCommands `/tests/setup`, `/tests/case`, `/tests/run`, `/tests/teardown`.
 
 See `tests/README.md`.
+
+## Running Services (No Auth)
+
+**Agent Coordinator** (port 8765):
+```bash
+cd servers/agent-coordinator && AUTH_ENABLED=false AGENT_ORCHESTRATOR_AGENTS_DIR=$(pwd)/../../config/agents uv run python -m main
+```
+
+**Dashboard** (port 3000):
+```bash
+cd dashboard && VITE_AUTH0_DOMAIN= VITE_AUTH0_CLIENT_ID= VITE_AUTH0_AUDIENCE= npm run dev
+```
+
+**Agent Runner**:
+```bash
+mkdir -p .agent-orchestrator/runner-project && PROJECT_DIR=.agent-orchestrator/runner-project ./servers/agent-runner/agent-runner
+```
