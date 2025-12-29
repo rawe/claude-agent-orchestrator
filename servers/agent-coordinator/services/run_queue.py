@@ -1,5 +1,11 @@
 """
-Thread-safe in-memory run queue for Agent Runner.
+Thread-safe run queue with write-through cache to SQLite.
+
+Architecture:
+- All writes go to database first, then update in-memory cache
+- Reads come from cache for fast polling performance
+- Active runs loaded from database on startup
+- Terminal runs removed from cache (but remain in database)
 
 Runs are created via POST /runs and claimed by the Runner via GET /runner/runs.
 Supports demand-based matching per ADR-011.
@@ -7,6 +13,7 @@ Session ID is coordinator-generated at run creation per ADR-010.
 Execution mode controls callback behavior per ADR-003.
 """
 
+import json
 import threading
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -20,6 +27,22 @@ if TYPE_CHECKING:
 
 # Import ExecutionMode for runtime use
 from models import ExecutionMode
+
+# Import database functions for persistence
+from database import (
+    create_run as db_create_run,
+    get_run_by_id as db_get_run,
+    get_run_by_session_id as db_get_run_by_session,
+    get_all_runs as db_get_all_runs,
+    get_active_runs as db_get_active_runs,
+    update_run_status as db_update_run_status,
+    claim_run as db_claim_run,
+    update_run_demands as db_update_run_demands,
+    fail_timed_out_runs as db_fail_timed_out_runs,
+    get_session_by_id,
+    recover_stale_runs as db_recover_stale_runs,
+    recover_all_active_runs as db_recover_all_active_runs,
+)
 
 
 class RunType(str, Enum):
@@ -144,59 +167,141 @@ def capabilities_satisfy_demands(
 
 
 class RunQueue:
-    """Thread-safe in-memory run queue."""
+    """
+    Thread-safe run queue with write-through cache to SQLite.
 
-    def __init__(self):
-        self._runs: dict[str, Run] = {}
+    Architecture:
+    - All writes go to database first, then update in-memory cache
+    - Reads come from cache for fast polling performance
+    - All runs loaded from database on startup
+    """
+
+    def __init__(self, recovery_mode: str = "stale"):
+        """
+        Initialize RunQueue with optional recovery.
+
+        Args:
+            recovery_mode: How to handle non-terminal runs from previous session
+                - "none": Load as-is (may have stale claimed/running runs)
+                - "stale": Recover runs older than 5 minutes (default)
+                - "all": Aggressively recover all non-terminal runs
+        """
+        self._runs: dict[str, Run] = {}  # Cache for all runs
         self._lock = threading.Lock()
 
+        # Run recovery before loading
+        self._run_recovery(recovery_mode)
+
+        # Load all runs from database
+        self._load_runs()
+
+    def _run_recovery(self, mode: str) -> None:
+        """Handle recovery of stale runs from previous coordinator session."""
+        if mode == "none":
+            print("[RunQueue] Recovery disabled (mode=none)", flush=True)
+            return
+
+        if mode == "all":
+            results = db_recover_all_active_runs()
+            if any(results.values()):
+                print(f"[RunQueue] Recovery (all): {results}", flush=True)
+            else:
+                print("[RunQueue] Recovery (all): No runs to recover", flush=True)
+            return
+
+        # Default: stale recovery
+        results = db_recover_stale_runs(stale_threshold_seconds=300)
+        if any(results.values()):
+            print(f"[RunQueue] Recovery (stale): {results}", flush=True)
+        else:
+            print("[RunQueue] Recovery (stale): No stale runs to recover", flush=True)
+
+    def _load_runs(self) -> None:
+        """Load all runs from database into cache on startup."""
+        all_runs = db_get_all_runs()
+        for run_dict in all_runs:
+            run = self._dict_to_run(run_dict)
+            self._runs[run.run_id] = run
+
+    def _dict_to_run(self, d: dict) -> Run:
+        """Convert database dict to Run model."""
+        return Run(
+            run_id=d["run_id"],
+            session_id=d["session_id"],
+            type=RunType(d["type"]),
+            agent_name=d.get("agent_name"),
+            prompt=d["prompt"],
+            project_dir=d.get("project_dir"),
+            parent_session_id=d.get("parent_session_id"),
+            execution_mode=ExecutionMode(d.get("execution_mode", "sync")),
+            demands=json.loads(d["demands"]) if d.get("demands") else None,
+            status=RunStatus(d["status"]),
+            runner_id=d.get("runner_id"),
+            error=d.get("error"),
+            created_at=d["created_at"],
+            claimed_at=d.get("claimed_at"),
+            started_at=d.get("started_at"),
+            completed_at=d.get("completed_at"),
+            timeout_at=d.get("timeout_at"),
+        )
+
     def add_run(self, run_create: RunCreate) -> Run:
-        """Create a new run with pending status.
+        """Create a new run. Persists to database, then updates cache.
 
         If session_id is not provided, generates one per ADR-010.
         For resume runs, enriches with agent_name/project_dir from existing session.
         """
-        run_id = f"run_{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat()
-
-        # Generate session_id if not provided (ADR-010)
-        session_id = run_create.session_id or generate_session_id()
-
-        # For resume runs, enrich from existing session so Runner has complete info
-        if run_create.type == RunType.RESUME_SESSION and run_create.session_id:
-            from database import get_session_by_id
-            session = get_session_by_id(run_create.session_id)
-            if session:
-                # Copy agent_name if not provided in request
-                if not run_create.agent_name and session.get("agent_name"):
-                    run_create.agent_name = session["agent_name"]
-                # Copy project_dir if not provided in request
-                if not run_create.project_dir and session.get("project_dir"):
-                    run_create.project_dir = session["project_dir"]
-
-        run = Run(
-            run_id=run_id,
-            type=run_create.type,
-            session_id=session_id,
-            agent_name=run_create.agent_name,
-            prompt=run_create.prompt,
-            project_dir=run_create.project_dir,
-            parent_session_id=run_create.parent_session_id,
-            execution_mode=run_create.execution_mode,
-            status=RunStatus.PENDING,
-            created_at=now,
-        )
-
         with self._lock:
-            self._runs[run_id] = run
+            # Generate IDs
+            run_id = f"run_{uuid.uuid4().hex[:12]}"
+            session_id = run_create.session_id or generate_session_id()
+            created_at = datetime.now(timezone.utc).isoformat()
 
-        return run
+            # For RESUME_SESSION, enrich from existing session
+            agent_name = run_create.agent_name
+            project_dir = run_create.project_dir
+            if run_create.type == RunType.RESUME_SESSION and session_id:
+                existing_session = get_session_by_id(session_id)
+                if existing_session:
+                    agent_name = agent_name or existing_session.get("agent_name")
+                    project_dir = project_dir or existing_session.get("project_dir")
+
+            # Write to database first
+            db_create_run(
+                run_id=run_id,
+                session_id=session_id,
+                run_type=run_create.type.value,
+                prompt=run_create.prompt,
+                created_at=created_at,
+                agent_name=agent_name,
+                project_dir=project_dir,
+                parent_session_id=run_create.parent_session_id,
+                execution_mode=run_create.execution_mode.value,
+                status=RunStatus.PENDING.value,
+            )
+
+            # Create Run model for cache
+            run = Run(
+                run_id=run_id,
+                session_id=session_id,
+                type=run_create.type,
+                agent_name=agent_name,
+                prompt=run_create.prompt,
+                project_dir=project_dir,
+                parent_session_id=run_create.parent_session_id,
+                execution_mode=run_create.execution_mode,
+                status=RunStatus.PENDING,
+                created_at=created_at,
+            )
+
+            # Update cache
+            self._runs[run_id] = run
+            return run
 
     def claim_run(self, runner: "RunnerInfo") -> Optional[Run]:
-        """Atomically claim a pending run for a runner.
-
-        Only runs whose demands are satisfied by the runner's capabilities
-        can be claimed. See ADR-011 for matching logic.
+        """
+        Claim the first pending run matching runner's capabilities.
+        Uses database for atomic claim to prevent race conditions.
 
         Args:
             runner: The runner attempting to claim a run
@@ -204,24 +309,32 @@ class RunQueue:
         Returns:
             The claimed run or None if no matching pending runs.
         """
-        now = datetime.now(timezone.utc).isoformat()
-
         with self._lock:
-            # Find first pending run that matches runner capabilities
-            for run in self._runs.values():
-                if run.status == RunStatus.PENDING:
-                    # Check if runner satisfies run demands
-                    if capabilities_satisfy_demands(runner, run.demands):
-                        # Claim it
-                        run.status = RunStatus.CLAIMED
-                        run.runner_id = runner.runner_id
-                        run.claimed_at = now
-                        return run
+            claimed_at = datetime.now(timezone.utc).isoformat()
 
-        return None
+            # Find first pending run in cache that matches demands
+            for run in self._runs.values():
+                if run.status != RunStatus.PENDING:
+                    continue
+                if not capabilities_satisfy_demands(runner, run.demands):
+                    continue
+
+                # Try to claim in database (atomic)
+                if db_claim_run(run.run_id, runner.runner_id, claimed_at):
+                    # Success - update cache
+                    run.status = RunStatus.CLAIMED
+                    run.runner_id = runner.runner_id
+                    run.claimed_at = claimed_at
+                    return run
+                else:
+                    # Someone else claimed it - remove from cache (stale)
+                    # This shouldn't happen with single coordinator, but be safe
+                    del self._runs[run.run_id]
+
+            return None
 
     def get_run(self, run_id: str) -> Optional[Run]:
-        """Get run by ID."""
+        """Get a run by ID. Reads from cache for speed."""
         with self._lock:
             return self._runs.get(run_id)
 
@@ -231,73 +344,82 @@ class RunQueue:
         status: RunStatus,
         error: Optional[str] = None,
     ) -> Optional[Run]:
-        """Update run status and optionally set error message.
-
-        Returns updated run or None if run not found.
-        """
-        now = datetime.now(timezone.utc).isoformat()
-
+        """Update run status. Persists to database, then updates cache."""
         with self._lock:
             run = self._runs.get(run_id)
             if not run:
                 return None
 
-            run.status = status
+            # Determine timestamps based on status transition
+            started_at = None
+            completed_at = None
+            now = datetime.now(timezone.utc).isoformat()
 
             if status == RunStatus.RUNNING:
-                run.started_at = now
+                started_at = now
             elif status in (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.STOPPED):
-                run.completed_at = now
-                if error:
-                    run.error = error
+                completed_at = now
+
+            # Write to database first
+            success = db_update_run_status(
+                run_id=run_id,
+                status=status.value,
+                error=error,
+                started_at=started_at,
+                completed_at=completed_at,
+            )
+
+            if not success:
+                return None
+
+            # Update cache
+            run.status = status
+            if error:
+                run.error = error
+            if started_at:
+                run.started_at = started_at
+            if completed_at:
+                run.completed_at = completed_at
 
             return run
 
     def get_pending_runs(self) -> list[Run]:
-        """Get all pending runs (for debugging)."""
+        """Get all pending runs. Reads from cache."""
         with self._lock:
             return [r for r in self._runs.values() if r.status == RunStatus.PENDING]
 
     def get_all_runs(self) -> list[Run]:
-        """Get all runs (for debugging)."""
+        """Get all runs in cache (active runs only)."""
         with self._lock:
             return list(self._runs.values())
 
     def get_run_by_session_id(self, session_id: str) -> Optional[Run]:
-        """Find an active run by session_id.
-
-        Used to link run's parent_session_id to newly created sessions,
-        and to find runs for stop commands.
-        """
+        """Find active run by session ID. Reads from cache."""
         with self._lock:
             for run in self._runs.values():
-                if run.session_id == session_id and run.status in (
-                    RunStatus.PENDING, RunStatus.CLAIMED, RunStatus.RUNNING, RunStatus.STOPPING
-                ):
+                if run.session_id == session_id:
                     return run
-        return None
+            return None
 
     def fail_timed_out_runs(self) -> list[Run]:
-        """Fail pending runs that have exceeded their timeout.
-
-        Returns list of runs that were failed due to timeout.
-        """
-        now = datetime.now(timezone.utc)
-        failed_runs: list[Run] = []
-
+        """Check for and fail any pending runs past their timeout."""
         with self._lock:
-            for run in self._runs.values():
-                if run.status == RunStatus.PENDING and run.timeout_at:
-                    timeout_time = datetime.fromisoformat(
-                        run.timeout_at.replace('Z', '+00:00')
-                    )
-                    if now >= timeout_time:
-                        run.status = RunStatus.FAILED
-                        run.completed_at = now.isoformat()
-                        run.error = "No matching runner available within timeout"
-                        failed_runs.append(run)
+            current_time = datetime.now(timezone.utc).isoformat()
 
-        return failed_runs
+            # Use database to find and fail timed out runs
+            failed_run_ids = db_fail_timed_out_runs(current_time)
+
+            # Update cache for failed runs
+            failed_runs = []
+            for run_id in failed_run_ids:
+                run = self._runs.get(run_id)
+                if run:
+                    run.status = RunStatus.FAILED
+                    run.error = "No matching runner available within timeout"
+                    run.completed_at = current_time
+                    failed_runs.append(run)
+
+            return failed_runs
 
     def set_run_demands(
         self,
@@ -305,31 +427,78 @@ class RunQueue:
         demands: Optional[dict],
         timeout_seconds: int = DEFAULT_NO_MATCH_TIMEOUT_SECONDS,
     ) -> Optional[Run]:
-        """Set demands and timeout on a run after creation.
-
-        This is called by main.py after merging blueprint and additional demands.
-
-        Args:
-            run_id: The run to update
-            demands: Merged demands dict
-            timeout_seconds: Seconds until run fails if not claimed
-
-        Returns:
-            Updated run or None if not found
-        """
+        """Set run demands and timeout. Persists to database, then updates cache."""
         with self._lock:
             run = self._runs.get(run_id)
             if not run:
                 return None
 
-            run.demands = demands
-            # Only set timeout if there are demands (otherwise any runner can claim)
+            # Calculate timeout
+            timeout_at = None
             if demands and not all(v is None or v == [] for v in demands.values()):
-                timeout_at = datetime.now(timezone.utc) + timedelta(seconds=timeout_seconds)
-                run.timeout_at = timeout_at.isoformat()
+                timeout_at = (
+                    datetime.now(timezone.utc) + timedelta(seconds=timeout_seconds)
+                ).isoformat()
+
+            # Write to database first
+            demands_json = json.dumps(demands) if demands else None
+            success = db_update_run_demands(run_id, demands_json, timeout_at)
+
+            if not success:
+                return None
+
+            # Update cache
+            run.demands = demands
+            run.timeout_at = timeout_at
 
             return run
 
+    def get_all_runs_from_db(self, status_filter: Optional[list[str]] = None) -> list[Run]:
+        """Get all runs from database (including completed). For historical queries."""
+        run_dicts = db_get_all_runs(status_filter)
+        return [self._dict_to_run(d) for d in run_dicts]
 
-# Module-level singleton
-run_queue = RunQueue()
+    def get_run_with_fallback(self, run_id: str) -> Optional[Run]:
+        """Get run from cache, falling back to database for completed runs.
+
+        Active runs are served from cache for fast performance.
+        Completed runs (removed from cache) are fetched from database.
+        """
+        with self._lock:
+            run = self._runs.get(run_id)
+            if run:
+                return run
+
+        # Check database for completed runs
+        run_dict = db_get_run(run_id)
+        if run_dict:
+            return self._dict_to_run(run_dict)
+
+        return None
+
+
+# Module-level singleton (initialized lazily via init_run_queue)
+run_queue: RunQueue = None  # type: ignore
+
+
+def init_run_queue(recovery_mode: str = "stale") -> RunQueue:
+    """
+    Initialize the module-level run_queue singleton.
+
+    Must be called once at startup before using run_queue.
+    Should be called after init_db() to ensure database tables exist.
+
+    Args:
+        recovery_mode: How to handle non-terminal runs from previous session
+            - "none": Load as-is (may have stale claimed/running runs)
+            - "stale": Recover runs older than 5 minutes (default)
+            - "all": Aggressively recover all non-terminal runs
+
+    Returns:
+        The initialized RunQueue instance
+    """
+    global run_queue
+    if run_queue is not None:
+        return run_queue  # Idempotent: return existing instance (handles uvicorn reload)
+    run_queue = RunQueue(recovery_mode=recovery_mode)
+    return run_queue

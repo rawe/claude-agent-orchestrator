@@ -26,8 +26,12 @@ import agent_storage
 from validation import validate_agent_name
 from datetime import datetime, timezone
 
-# Import run queue and runner registry services
-from services.run_queue import run_queue, RunCreate, Run, RunStatus, RunType
+# Initialize database BEFORE run_queue (which loads from DB on init)
+init_db()
+
+# Import run queue types and init function
+from services.run_queue import init_run_queue, RunCreate, Run, RunStatus, RunType
+# Import runner registry and other services
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError
 from services.stop_command_queue import stop_command_queue
 from services.sse_manager import sse_manager, SSEConnection
@@ -45,6 +49,16 @@ RUNNER_REMOVE_THRESHOLD = int(os.getenv("RUNNER_REMOVE_THRESHOLD", "600"))  # 10
 RUNNER_LIFECYCLE_INTERVAL = int(os.getenv("RUNNER_LIFECYCLE_INTERVAL", "30"))  # Check every 30s
 # Run demand timeout (ADR-011)
 RUN_NO_MATCH_TIMEOUT = int(os.getenv("RUN_NO_MATCH_TIMEOUT", "300"))  # 5 minutes
+
+# Run recovery mode (Phase 5)
+# - "none": Load as-is (may have stale claimed/running runs)
+# - "stale": Recover runs older than 5 minutes (default)
+# - "all": Aggressively recover all non-terminal runs
+RUN_RECOVERY_MODE = os.getenv("RUN_RECOVERY_MODE", "stale")
+
+# Initialize run_queue with recovery mode now that env vars are loaded
+run_queue = init_run_queue(recovery_mode=RUN_RECOVERY_MODE)
+
 
 async def update_session_status_and_broadcast(session_id: str, status: str) -> dict | None:
     """Update session status in DB and broadcast to SSE clients.
@@ -133,7 +147,8 @@ async def lifespan(app: FastAPI):
     if not AUTH_ENABLED:
         print("[WARNING] Authentication is DISABLED. Do not use in production!", flush=True)
 
-    init_db()
+    # Note: init_db() and run_queue initialization happen at module import time
+    # (with recovery based on RUN_RECOVERY_MODE env var)
 
     # Start runner lifecycle background task
     lifecycle_task = asyncio.create_task(runner_lifecycle_task())
@@ -1191,36 +1206,39 @@ async def create_run(run_create: RunCreate):
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
     """
-    # Create the run (session_id generated if not provided, resume runs enriched automatically)
-    run = run_queue.add_run(run_create)
-
-    # For start runs, create session record immediately with status=pending (ADR-010)
+    # For start runs, create session FIRST (runs table has FK to sessions)
     if run_create.type == RunType.START_SESSION:
+        # Generate session_id if not provided
+        from services.run_queue import generate_session_id
+        session_id = run_create.session_id or generate_session_id()
+        run_create.session_id = session_id  # Ensure run uses same session_id
+
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
             new_session = create_session(
-                session_id=run.session_id,
+                session_id=session_id,
                 timestamp=timestamp,
                 status="pending",
                 project_dir=run_create.project_dir,
                 agent_name=run_create.agent_name,
                 parent_session_id=run_create.parent_session_id,
-                execution_mode=run.execution_mode.value,
+                execution_mode=run_create.execution_mode.value,
             )
             if DEBUG:
-                print(f"[DEBUG] Created pending session {run.session_id} for run {run.run_id} (mode={run.execution_mode.value})", flush=True)
-
-            # Broadcast to SSE clients
-            await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)
-
+                print(f"[DEBUG] Created pending session {session_id} (mode={run_create.execution_mode.value})", flush=True)
         except Exception as e:
             if "UNIQUE constraint failed" in str(e):
-                # Session already exists - this shouldn't happen for start runs
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Session '{run.session_id}' already exists"
-                )
+                raise HTTPException(status_code=409, detail=f"Session '{session_id}' already exists")
             raise
+
+    # Create the run (session must exist for FK constraint)
+    run = run_queue.add_run(run_create)
+
+    # Broadcast session creation after run is created (so we have run_id)
+    if run_create.type == RunType.START_SESSION:
+        if DEBUG:
+            print(f"[DEBUG] Created run {run.run_id} for session {run.session_id}", flush=True)
+        await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)
 
     # Merge demands from blueprint and additional_demands (ADR-011)
     merged_demands = None
@@ -1257,20 +1275,28 @@ async def create_run(run_create: RunCreate):
 
 
 @app.get("/runs")
-async def list_runs():
-    """List all runs in the queue.
+async def list_runs(
+    status: Optional[str] = Query(None, description="Filter by status (e.g., 'completed', 'failed', 'pending')"),
+):
+    """List all runs.
 
-    Returns all runs (pending, running, completed, failed, stopped).
-    Runs are stored in-memory and not persisted to database.
+    Returns all runs from cache. Use status parameter to filter.
     """
     runs = run_queue.get_all_runs()
+    if status:
+        runs = [r for r in runs if r.status.value == status]
+
     return {"runs": [run.model_dump() for run in runs]}
 
 
 @app.get("/runs/{run_id}")
 async def get_run(run_id: str):
-    """Get run status and details."""
-    run = run_queue.get_run(run_id)
+    """Get run status and details.
+
+    Checks cache first for active runs (fast), then falls back to database
+    for completed runs that have been removed from cache.
+    """
+    run = run_queue.get_run_with_fallback(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 

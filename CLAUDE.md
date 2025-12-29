@@ -43,7 +43,7 @@ See `tests/README.md`.
 
 **Agent Coordinator** (port 8765):
 ```bash
-cd servers/agent-coordinator && AUTH_ENABLED=false AGENT_ORCHESTRATOR_AGENTS_DIR=$(pwd)/../../config/agents uv run python -m main
+cd servers/agent-coordinator && AUTH_ENABLED=false CORS_ORIGINS=* AGENT_ORCHESTRATOR_AGENTS_DIR=$(pwd)/../../config/agents uv run python -m main
 ```
 
 **Dashboard** (port 3000):

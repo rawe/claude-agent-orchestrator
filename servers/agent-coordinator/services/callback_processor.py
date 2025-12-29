@@ -248,7 +248,10 @@ def _create_resume_run(
         logger.info(f"Created callback resume run {run.run_id} for parent '{parent_session_id}' with {len(children)} child result(s)")
         return run.run_id
     except Exception as e:
-        logger.error(f"Failed to create callback run for '{parent_session_id}': {e}")
+        if "FOREIGN KEY constraint failed" in str(e):
+            logger.warning(f"Cannot create callback run: parent session '{parent_session_id}' no longer exists (deleted during callback)")
+        else:
+            logger.error(f"Failed to create callback run for '{parent_session_id}': {e}")
         return None
 
 

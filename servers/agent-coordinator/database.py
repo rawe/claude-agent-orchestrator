@@ -42,6 +42,51 @@ def init_db():
         ON sessions(hostname)
     """)
 
+    # Runs table - work items for distribution
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS runs (
+            run_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            agent_name TEXT,
+            prompt TEXT NOT NULL,
+            project_dir TEXT,
+            parent_session_id TEXT,
+            execution_mode TEXT NOT NULL DEFAULT 'sync',
+            demands TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            runner_id TEXT,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            claimed_at TEXT,
+            started_at TEXT,
+            completed_at TEXT,
+            timeout_at TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        )
+    """)
+
+    # Indexes for runs table
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_runs_session_id
+        ON runs(session_id)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_runs_status
+        ON runs(status)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_runs_runner_id
+        ON runs(runner_id)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_runs_status_created
+        ON runs(status, created_at)
+    """)
+
     # Events table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS events (
@@ -406,3 +451,433 @@ def get_session_affinity(session_id: str) -> dict | None:
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+# ============================================================================
+# Run CRUD Functions
+# ============================================================================
+
+def _row_to_run_dict(row, description) -> dict:
+    """Convert a database row to a dictionary."""
+    columns = [col[0] for col in description]
+    return dict(zip(columns, row))
+
+
+def create_run(
+    run_id: str,
+    session_id: str,
+    run_type: str,
+    prompt: str,
+    created_at: str,
+    agent_name: str = None,
+    project_dir: str = None,
+    parent_session_id: str = None,
+    execution_mode: str = "sync",
+    demands: str = None,  # JSON string
+    status: str = "pending",
+    timeout_at: str = None,
+) -> None:
+    """Create a new run in the database."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO runs (
+            run_id, session_id, type, prompt, created_at,
+            agent_name, project_dir, parent_session_id,
+            execution_mode, demands, status, timeout_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id, session_id, run_type, prompt, created_at,
+            agent_name, project_dir, parent_session_id,
+            execution_mode, demands, status, timeout_at
+        )
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_run_by_id(run_id: str) -> dict | None:
+    """Get a run by its ID."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,))
+    row = cursor.fetchone()
+    if row:
+        result = _row_to_run_dict(row, cursor.description)
+        conn.close()
+        return result
+    conn.close()
+    return None
+
+
+def get_run_by_session_id(session_id: str, active_only: bool = True) -> dict | None:
+    """Get run by session ID. If active_only, only returns non-terminal runs."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    if active_only:
+        cursor.execute(
+            """
+            SELECT * FROM runs
+            WHERE session_id = ?
+            AND status IN ('pending', 'claimed', 'running', 'stopping')
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (session_id,)
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT * FROM runs
+            WHERE session_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (session_id,)
+        )
+
+    row = cursor.fetchone()
+    if row:
+        result = _row_to_run_dict(row, cursor.description)
+        conn.close()
+        return result
+    conn.close()
+    return None
+
+
+def get_all_runs(status_filter: list[str] = None) -> list[dict]:
+    """Get all runs, optionally filtered by status."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    if status_filter:
+        placeholders = ",".join("?" * len(status_filter))
+        cursor.execute(
+            f"SELECT * FROM runs WHERE status IN ({placeholders}) ORDER BY created_at DESC",
+            status_filter
+        )
+    else:
+        cursor.execute("SELECT * FROM runs ORDER BY created_at DESC")
+
+    rows = cursor.fetchall()
+    result = [_row_to_run_dict(row, cursor.description) for row in rows]
+    conn.close()
+    return result
+
+
+def get_pending_runs() -> list[dict]:
+    """Get all pending runs ordered by creation time."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM runs WHERE status = 'pending' ORDER BY created_at ASC"
+    )
+    rows = cursor.fetchall()
+    result = [_row_to_run_dict(row, cursor.description) for row in rows]
+    conn.close()
+    return result
+
+
+def get_active_runs() -> list[dict]:
+    """Get all active (non-terminal) runs for cache loading on startup."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM runs
+        WHERE status IN ('pending', 'claimed', 'running', 'stopping')
+        ORDER BY created_at ASC
+        """
+    )
+    rows = cursor.fetchall()
+    result = [_row_to_run_dict(row, cursor.description) for row in rows]
+    conn.close()
+    return result
+
+
+def update_run_status(
+    run_id: str,
+    status: str,
+    error: str = None,
+    started_at: str = None,
+    completed_at: str = None,
+) -> bool:
+    """Update run status and related timestamps. Returns True if updated."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Build dynamic update
+    updates = ["status = ?"]
+    params = [status]
+
+    if error is not None:
+        updates.append("error = ?")
+        params.append(error)
+
+    if started_at is not None:
+        updates.append("started_at = ?")
+        params.append(started_at)
+
+    if completed_at is not None:
+        updates.append("completed_at = ?")
+        params.append(completed_at)
+
+    params.append(run_id)
+
+    cursor.execute(
+        f"UPDATE runs SET {', '.join(updates)} WHERE run_id = ?",
+        params
+    )
+    conn.commit()
+    updated = cursor.rowcount > 0
+    conn.close()
+    return updated
+
+
+def claim_run(run_id: str, runner_id: str, claimed_at: str) -> bool:
+    """
+    Atomically claim a pending run.
+    Returns True if successfully claimed, False if already claimed or not pending.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'claimed', runner_id = ?, claimed_at = ?
+        WHERE run_id = ? AND status = 'pending'
+        """,
+        (runner_id, claimed_at, run_id)
+    )
+    conn.commit()
+    claimed = cursor.rowcount > 0
+    conn.close()
+    return claimed
+
+
+def update_run_demands(
+    run_id: str,
+    demands: str,  # JSON string
+    timeout_at: str,
+) -> bool:
+    """Update run demands and timeout. Returns True if updated."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE runs SET demands = ?, timeout_at = ? WHERE run_id = ?",
+        (demands, timeout_at, run_id)
+    )
+    conn.commit()
+    updated = cursor.rowcount > 0
+    conn.close()
+    return updated
+
+
+def fail_timed_out_runs(current_time: str) -> list[str]:
+    """
+    Mark pending runs past their timeout as failed.
+    Returns list of run_ids that were failed.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # First, get the runs that will be failed
+    cursor.execute(
+        """
+        SELECT run_id FROM runs
+        WHERE status = 'pending'
+        AND timeout_at IS NOT NULL
+        AND timeout_at < ?
+        """,
+        (current_time,)
+    )
+    run_ids = [row[0] for row in cursor.fetchall()]
+
+    if run_ids:
+        # Update them all
+        cursor.execute(
+            """
+            UPDATE runs
+            SET status = 'failed',
+                error = 'No matching runner available within timeout',
+                completed_at = ?
+            WHERE status = 'pending'
+            AND timeout_at IS NOT NULL
+            AND timeout_at < ?
+            """,
+            (current_time, current_time)
+        )
+        conn.commit()
+
+    conn.close()
+    return run_ids
+
+
+def delete_old_runs(older_than: str) -> int:
+    """
+    Delete completed/failed/stopped runs older than the given timestamp.
+    Returns count of deleted runs.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        DELETE FROM runs
+        WHERE status IN ('completed', 'failed', 'stopped')
+        AND completed_at < ?
+        """,
+        (older_than,)
+    )
+    conn.commit()
+    deleted_count = cursor.rowcount
+    conn.close()
+    return deleted_count
+
+
+# ============================================================================
+# Recovery Functions (Phase 5)
+# ============================================================================
+
+def recover_stale_runs(stale_threshold_seconds: int = 300) -> dict:
+    """
+    Recover runs that were in non-terminal states when coordinator restarted.
+
+    This handles:
+    - CLAIMED runs: Reset to PENDING (runner may have died)
+    - RUNNING runs: Mark as FAILED (execution crashed)
+    - STOPPING runs: Mark as STOPPED (stop never completed)
+
+    Args:
+        stale_threshold_seconds: Consider runs stale if claimed/started more than
+                                 this many seconds ago (default 5 minutes)
+
+    Returns:
+        dict with counts: {"reset_to_pending": N, "marked_failed": N, "marked_stopped": N}
+    """
+    from datetime import datetime, timedelta, timezone
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Calculate threshold time
+    threshold = (
+        datetime.now(timezone.utc) - timedelta(seconds=stale_threshold_seconds)
+    ).isoformat()
+
+    results = {"reset_to_pending": 0, "marked_failed": 0, "marked_stopped": 0}
+
+    # Reset CLAIMED runs to PENDING
+    # These were claimed but never started - runner likely died
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'pending',
+            runner_id = NULL,
+            claimed_at = NULL
+        WHERE status = 'claimed'
+        AND (claimed_at IS NULL OR claimed_at < ?)
+        """,
+        (threshold,)
+    )
+    results["reset_to_pending"] = cursor.rowcount
+
+    # Mark RUNNING runs as FAILED
+    # These were executing but coordinator restarted - execution state is unknown
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'failed',
+            error = 'Coordinator restarted during execution',
+            completed_at = ?
+        WHERE status = 'running'
+        AND (started_at IS NULL OR started_at < ?)
+        """,
+        (now, threshold)
+    )
+    results["marked_failed"] = cursor.rowcount
+
+    # Mark STOPPING runs as STOPPED
+    # Stop command was issued but never completed - consider it stopped
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'stopped',
+            completed_at = ?
+        WHERE status = 'stopping'
+        """,
+        (now,)
+    )
+    results["marked_stopped"] = cursor.rowcount
+
+    conn.commit()
+    conn.close()
+    return results
+
+
+def recover_all_active_runs() -> dict:
+    """
+    Aggressively recover all non-terminal runs.
+
+    Use this when:
+    - Coordinator was down for a long time
+    - You want to clean slate all active runs
+
+    Returns:
+        dict with counts of recovered runs by original status
+    """
+    from datetime import datetime, timezone
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+
+    results = {"claimed": 0, "running": 0, "stopping": 0}
+
+    # Count runs in each state before recovery
+    for status in ['claimed', 'running', 'stopping']:
+        cursor.execute(
+            "SELECT COUNT(*) FROM runs WHERE status = ?",
+            (status,)
+        )
+        results[status] = cursor.fetchone()[0]
+
+    # Reset all CLAIMED to PENDING
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'pending', runner_id = NULL, claimed_at = NULL
+        WHERE status = 'claimed'
+        """
+    )
+
+    # Mark all RUNNING as FAILED
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'failed',
+            error = 'Coordinator restarted - execution state unknown',
+            completed_at = ?
+        WHERE status = 'running'
+        """,
+        (now,)
+    )
+
+    # Mark all STOPPING as STOPPED
+    cursor.execute(
+        """
+        UPDATE runs
+        SET status = 'stopped', completed_at = ?
+        WHERE status = 'stopping'
+        """,
+        (now,)
+    )
+
+    conn.commit()
+    conn.close()
+    return results

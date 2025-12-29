@@ -71,6 +71,29 @@ DEBUG_LOGGING=true uv run python -m main
 | `CORS_ORIGINS` | `*` | Allowed CORS origins (comma-separated for production) |
 | `AGENT_ORCHESTRATOR_AGENTS_DIR` | `{cwd}/.agent-orchestrator/agents` | Agents storage directory |
 | `AGENT_ORCHESTRATOR_PROJECT_DIR` | `{cwd}` | Project directory (fallback for agents dir) |
+| `RUN_RECOVERY_MODE` | `stale` | Run recovery on startup (see below) |
+
+## Run Recovery
+
+Runs are persisted to SQLite and survive coordinator restarts. However, runs in active states (claimed, running, stopping) when the coordinator crashes become orphaned—their runners are gone.
+
+On startup, the coordinator recovers these orphaned runs:
+
+| Mode | Behavior |
+|------|----------|
+| `stale` | Recover runs older than 5 minutes (default, safe) |
+| `all` | Recover all non-terminal runs immediately |
+| `none` | Skip recovery (not recommended) |
+
+**Recovery actions:**
+- `claimed` → reset to `pending` (runner died before starting)
+- `running` → mark `failed` (execution state unknown)
+- `stopping` → mark `stopped` (stop intent was clear)
+
+```bash
+# Use aggressive recovery after long downtime
+RUN_RECOVERY_MODE=all uv run python -m main
+```
 
 ## Agent File Structure
 
@@ -86,9 +109,9 @@ Agents are stored as directories:
 
 ## Database
 
-Session and event data is stored in SQLite:
+Session, event, and run data is stored in SQLite:
 - Location: `.agent-orchestrator/observability.db`
-- Tables: `sessions`, `events`
+- Tables: `sessions`, `events`, `runs`
 
 ## Docker
 
