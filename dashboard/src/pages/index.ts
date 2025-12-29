@@ -5,3 +5,4 @@ export { AgentManager } from './AgentManager';
 export { Chat } from './Chat';
 export { Runners } from './Runners';
 export { Runs } from './Runs';
+export { UnifiedView } from './UnifiedView';
