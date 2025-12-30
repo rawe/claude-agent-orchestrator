@@ -112,6 +112,7 @@ class AgentCreate(AgentBase):
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
     tags: Optional[list[str]] = None
+    capabilities: Optional[list[str]] = None
     demands: Optional["RunnerDemands"] = None
 
 
@@ -123,6 +124,7 @@ class AgentUpdate(BaseModel):
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
     tags: Optional[list[str]] = None
+    capabilities: Optional[list[str]] = None
     demands: Optional["RunnerDemands"] = None
 
 
@@ -133,6 +135,7 @@ class Agent(AgentBase):
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
     tags: list[str] = []
+    capabilities: list[str] = []
     demands: Optional["RunnerDemands"] = None
     status: Literal["active", "inactive"] = "active"
     created_at: str
@@ -143,6 +146,51 @@ class AgentStatusUpdate(BaseModel):
     """Request body for status update."""
 
     status: Literal["active", "inactive"]
+
+
+# ==============================================================================
+# Capability Models (Capabilities System)
+# ==============================================================================
+
+class CapabilityBase(BaseModel):
+    """Base capability fields."""
+
+    name: str
+    description: str
+
+
+class CapabilityCreate(CapabilityBase):
+    """Request body for creating a capability."""
+
+    text: Optional[str] = None
+    mcp_servers: Optional[dict[str, MCPServerConfig]] = None
+
+
+class CapabilityUpdate(BaseModel):
+    """Request body for updating a capability (partial)."""
+
+    description: Optional[str] = None
+    text: Optional[str] = None
+    mcp_servers: Optional[dict[str, MCPServerConfig]] = None
+
+
+class Capability(CapabilityBase):
+    """Full capability representation."""
+
+    text: Optional[str] = None
+    mcp_servers: Optional[dict[str, MCPServerConfig]] = None
+    created_at: str
+    modified_at: str
+
+
+class CapabilitySummary(CapabilityBase):
+    """Summary capability for list endpoint (without full text content)."""
+
+    has_text: bool
+    has_mcp: bool
+    mcp_server_names: list[str]
+    created_at: str
+    modified_at: str
 
 
 # ==============================================================================

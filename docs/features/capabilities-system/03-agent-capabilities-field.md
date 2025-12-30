@@ -1,5 +1,6 @@
 # Work Package 3: Agent Capabilities Field
 
+**Status:** Complete
 **Parent Feature:** [Capabilities System](../capabilities-system.md)
 **Depends On:** [01-capability-storage](./01-capability-storage.md)
 

@@ -49,6 +49,8 @@ export function AgentManager() {
           mcp_servers: data.mcp_servers,
           skills: data.skills,
           tags: data.tags,
+          capabilities: data.capabilities,
+          demands: data.demands,
         });
         showSuccess('Agent updated successfully');
       } else {

@@ -17,10 +17,19 @@ export const agentService = {
   },
 
   /**
-   * Get a single agent by name
+   * Get a single agent by name (with capabilities resolved)
    */
   async getAgent(name: string): Promise<Agent> {
     const response = await agentOrchestratorApi.get<Agent>(`/agents/${name}`);
+    return response.data;
+  },
+
+  /**
+   * Get a single agent by name without capability resolution.
+   * Use this for editing to get the raw agent data (unmerged system_prompt and mcp_servers).
+   */
+  async getAgentRaw(name: string): Promise<Agent> {
+    const response = await agentOrchestratorApi.get<Agent>(`/agents/${name}?raw=true`);
     return response.data;
   },
 

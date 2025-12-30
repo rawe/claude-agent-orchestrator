@@ -689,25 +689,25 @@ When the schema changes, update the capability once - all agents get the change 
 
 ### Backend (Agent Coordinator)
 
-- [ ] Capability storage module (`capability_storage.py`)
-- [ ] Capability models and validation
-- [ ] Capability CRUD API endpoints
-- [ ] Agent model update (add `capabilities` field)
-- [ ] Capability resolution and merging logic
-- [ ] Conflict detection (MCP server name collisions)
-- [ ] Error handling for missing capabilities
+- [x] Capability storage module (`capability_storage.py`)
+- [x] Capability models and validation
+- [x] Capability CRUD API endpoints
+- [x] Agent model update (add `capabilities` field)
+- [x] Capability resolution and merging logic
+- [x] Conflict detection (MCP server name collisions)
+- [x] Error handling for missing capabilities
 
 ### Dashboard
 
-- [ ] Capabilities service (`capabilityService.ts`)
-- [ ] Capability TypeScript types
-- [ ] Capabilities list page
-- [ ] Capability create/edit form
-- [ ] Agent edit form: capabilities multi-select
-- [ ] Preview panel for merged result
+- [x] Capabilities service (`capabilityService.ts`)
+- [x] Capability TypeScript types
+- [x] Capabilities list page
+- [x] Capability create/edit form
+- [x] Agent edit form: capabilities multi-select
+- [ ] Preview panel for merged result (optional enhancement)
 
 ### Documentation
 
 - [ ] Update ARCHITECTURE.md with capabilities concept
-- [ ] API documentation for /capabilities endpoints
+- [x] API documentation for /capabilities endpoints
 - [ ] Migration guide for existing agents

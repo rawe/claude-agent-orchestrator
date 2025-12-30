@@ -2,6 +2,7 @@ export { Home } from './Home';
 export { AgentSessions } from './AgentSessions';
 export { Documents } from './Documents';
 export { AgentManager } from './AgentManager';
+export { Capabilities } from './Capabilities';
 export { Chat } from './Chat';
 export { Runners } from './Runners';
 export { Runs } from './Runs';

@@ -31,6 +31,7 @@ export interface Agent {
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[] | null;
   tags: string[];
+  capabilities: string[];
   demands: AgentDemands | null;
   status: AgentStatus;
   created_at: string;
@@ -44,6 +45,7 @@ export interface AgentCreate {
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
   tags?: string[];
+  capabilities?: string[];
   demands?: AgentDemands | null;
 }
 
@@ -53,6 +55,7 @@ export interface AgentUpdate {
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
   tags?: string[];
+  capabilities?: string[];
   demands?: AgentDemands | null;
 }
 

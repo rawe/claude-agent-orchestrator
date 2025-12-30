@@ -4,5 +4,8 @@
   "tags": [
     "internal",
     "graph"
+  ],
+  "capabilities": [
+    "project-knowledge"
   ]
 }

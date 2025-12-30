@@ -7,6 +7,12 @@ Agents are stored as directories with the following structure:
         agent.system-prompt.md  # Optional: system prompt
         agent.mcp.json          # Optional: {"mcpServers": {...}}
         .disabled               # Optional: presence indicates inactive
+
+Capability Resolution:
+    When an agent references capabilities, the system resolves and merges:
+    - System prompts: agent prompt + capability texts (separator: \\n\\n---\\n\\n)
+    - MCP servers: capabilities MCP + agent-level MCP
+    See docs/features/capabilities-system.md for details.
 """
 
 import json
@@ -15,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, RunnerDemands
+from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, MCPServerConfig, RunnerDemands
 
 # Debug logging toggle - matches main.py
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
@@ -95,6 +101,9 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         # Read tags from agent.json (default: empty list)
         tags = data.get("tags", [])
 
+        # Read capabilities from agent.json (default: empty list)
+        capabilities = data.get("capabilities", [])
+
         # Read demands from agent.json (ADR-011)
         demands = None
         demands_data = data.get("demands")
@@ -114,6 +123,7 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
             mcp_servers=mcp_servers,
             skills=skills,
             tags=tags,
+            capabilities=capabilities,
             demands=demands,
             status=status,
             created_at=created_at,
@@ -121,6 +131,136 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         )
     except (json.JSONDecodeError, IOError, TypeError):
         return None
+
+
+# ==============================================================================
+# Capability Resolution
+# ==============================================================================
+
+# Separator between system prompt sections when merging capabilities
+CAPABILITY_SEPARATOR = "\n\n---\n\n"
+
+
+class CapabilityResolutionError(Exception):
+    """Base exception for capability resolution errors."""
+    pass
+
+
+class MissingCapabilityError(CapabilityResolutionError):
+    """Raised when a referenced capability doesn't exist."""
+    def __init__(self, agent_name: str, capability_name: str):
+        self.agent_name = agent_name
+        self.capability_name = capability_name
+        super().__init__(
+            f"Agent '{agent_name}' references missing capability: '{capability_name}'"
+        )
+
+
+class MCPServerConflictError(CapabilityResolutionError):
+    """Raised when multiple sources define the same MCP server name."""
+    def __init__(self, agent_name: str, server_name: str, sources: list[str]):
+        self.agent_name = agent_name
+        self.server_name = server_name
+        self.sources = sources
+        super().__init__(
+            f"Agent '{agent_name}' has MCP server name conflict: '{server_name}' "
+            f"defined in: {', '.join(sources)}"
+        )
+
+
+def _resolve_agent_capabilities(agent: Agent) -> Agent:
+    """
+    Resolve and merge capabilities into agent.
+
+    This function:
+    1. Loads each referenced capability
+    2. Merges system prompts (agent + capabilities in declaration order)
+    3. Merges MCP servers (capabilities + agent-level)
+    4. Raises errors for missing capabilities or MCP server conflicts
+
+    Args:
+        agent: Raw agent with unresolved capabilities
+
+    Returns:
+        Agent with merged system_prompt and mcp_servers
+
+    Raises:
+        MissingCapabilityError: If a referenced capability doesn't exist
+        MCPServerConflictError: If same MCP server name appears in multiple sources
+    """
+    # Import here to avoid circular imports
+    from capability_storage import get_capability
+
+    # No capabilities? Return as-is
+    if not agent.capabilities:
+        return agent
+
+    # Collect parts for merging
+    system_prompt_parts: list[str] = []
+    merged_mcp_servers: dict[str, MCPServerConfig] = {}
+    mcp_server_sources: dict[str, str] = {}  # Track where each server came from
+
+    # Start with agent's own system prompt if present
+    if agent.system_prompt:
+        system_prompt_parts.append(agent.system_prompt)
+
+    # Process each capability in declaration order
+    for cap_name in agent.capabilities:
+        capability = get_capability(cap_name)
+
+        # Error if capability doesn't exist
+        if capability is None:
+            raise MissingCapabilityError(agent.name, cap_name)
+
+        # Merge capability text into system prompt
+        if capability.text:
+            system_prompt_parts.append(capability.text)
+
+        # Merge capability MCP servers
+        if capability.mcp_servers:
+            for server_name, server_config in capability.mcp_servers.items():
+                # Check for conflict
+                if server_name in merged_mcp_servers:
+                    existing_source = mcp_server_sources[server_name]
+                    raise MCPServerConflictError(
+                        agent.name,
+                        server_name,
+                        [existing_source, f"capability:{cap_name}"]
+                    )
+                merged_mcp_servers[server_name] = server_config
+                mcp_server_sources[server_name] = f"capability:{cap_name}"
+
+    # Add agent-level MCP servers last
+    if agent.mcp_servers:
+        for server_name, server_config in agent.mcp_servers.items():
+            # Check for conflict with capability servers
+            if server_name in merged_mcp_servers:
+                existing_source = mcp_server_sources[server_name]
+                raise MCPServerConflictError(
+                    agent.name,
+                    server_name,
+                    [existing_source, "agent"]
+                )
+            merged_mcp_servers[server_name] = server_config
+            mcp_server_sources[server_name] = "agent"
+
+    # Build merged system prompt
+    merged_system_prompt = CAPABILITY_SEPARATOR.join(system_prompt_parts) if system_prompt_parts else None
+
+    # Return new Agent with merged values
+    return Agent(
+        name=agent.name,
+        description=agent.description,
+        system_prompt=merged_system_prompt,
+        mcp_servers=merged_mcp_servers if merged_mcp_servers else None,
+        skills=agent.skills,
+        tags=agent.tags,
+        capabilities=agent.capabilities,  # Keep original list for reference
+        demands=agent.demands,
+        status=agent.status,
+        created_at=agent.created_at,
+        modified_at=agent.modified_at,
+    )
 
 
 def list_agents() -> list[Agent]:
@@ -141,12 +281,33 @@ def list_agents() -> list[Agent]:
     return agents
 
 
-def get_agent(name: str) -> Optional[Agent]:
-    """Get agent by name. Returns None if not found."""
+def get_agent(name: str, resolve: bool = True) -> Optional[Agent]:
+    """
+    Get agent by name.
+
+    Args:
+        name: Agent name
+        resolve: If True (default), resolve and merge capabilities.
+                 If False, return raw agent with unresolved capabilities.
+
+    Returns:
+        Agent or None if not found
+
+    Raises:
+        MissingCapabilityError: If resolve=True and a capability doesn't exist
+        MCPServerConflictError: If resolve=True and MCP server names conflict
+    """
     agent_dir = get_agents_dir() / name
     if not agent_dir.is_dir():
         return None
-    return _read_agent_from_dir(agent_dir)
+
+    agent = _read_agent_from_dir(agent_dir)
+    if agent is None:
+        return None
+
+    if resolve:
+        return _resolve_agent_capabilities(agent)
+    return agent
 
 
 def create_agent(data: AgentCreate) -> Agent:
@@ -172,6 +333,8 @@ def create_agent(data: AgentCreate) -> Agent:
         agent_data["skills"] = data.skills
     if data.tags:
         agent_data["tags"] = data.tags
+    if data.capabilities:
+        agent_data["capabilities"] = data.capabilities
     if data.demands:
         agent_data["demands"] = data.demands.model_dump(exclude_none=True)
 
@@ -194,7 +357,8 @@ def create_agent(data: AgentCreate) -> Agent:
             json.dump(mcp_data, f, indent=2)
             f.write("\n")
 
-    return get_agent(data.name)
+    # Return raw agent (without capability resolution) for management UI
+    return get_agent(data.name, resolve=False)
 
 
 def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
@@ -227,6 +391,12 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
             agent_data["tags"] = updates.tags
         else:
             agent_data.pop("tags", None)
+
+    if updates.capabilities is not None:
+        if updates.capabilities:
+            agent_data["capabilities"] = updates.capabilities
+        else:
+            agent_data.pop("capabilities", None)
 
     if updates.demands is not None:
         if not updates.demands.is_empty():
@@ -262,7 +432,8 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
             # Empty dict {} means delete the file
             mcp_file.unlink()
 
-    return get_agent(name)
+    # Return raw agent (without capability resolution) for management UI
+    return get_agent(name, resolve=False)
 
 
 def delete_agent(name: str) -> bool:
@@ -294,4 +465,5 @@ def set_agent_status(name: str, status: str) -> Optional[Agent]:
     elif status == "active" and disabled_file.exists():
         disabled_file.unlink()
 
-    return get_agent(name)
+    # Return raw agent (without capability resolution) for management UI
+    return get_agent(name, resolve=False)

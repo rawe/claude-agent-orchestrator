@@ -34,14 +34,14 @@
 
 ## Work Packages
 
-| # | Package | Description |
-|---|---------|-------------|
-| 1 | [capability-storage](./01-capability-storage.md) | File storage, models, validation |
-| 2 | [capability-api](./02-capability-api.md) | REST CRUD endpoints |
-| 3 | [agent-capabilities-field](./03-agent-capabilities-field.md) | Add capabilities to agent model |
-| 4 | [capability-resolution](./04-capability-resolution.md) | Merging logic (core feature) |
-| 5 | [dashboard-capability-management](./05-dashboard-capability-management.md) | UI for managing capabilities |
-| 6 | [dashboard-agent-capabilities](./06-dashboard-agent-capabilities.md) | Agent form capability selection |
+| # | Package | Status | Description |
+|---|---------|--------|-------------|
+| 1 | [capability-storage](./01-capability-storage.md) | **Complete** | File storage, models, validation |
+| 2 | [capability-api](./02-capability-api.md) | **Complete** | REST CRUD endpoints |
+| 3 | [agent-capabilities-field](./03-agent-capabilities-field.md) | **Complete** | Add capabilities to agent model |
+| 4 | [capability-resolution](./04-capability-resolution.md) | **Complete** | Merging logic (core feature) |
+| 5 | [dashboard-capability-management](./05-dashboard-capability-management.md) | **Complete** | UI for managing capabilities |
+| 6 | [dashboard-agent-capabilities](./06-dashboard-agent-capabilities.md) | **Complete** | Agent form capability selection |
 
 ## Parallel Work
 

@@ -4,7 +4,8 @@ import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common'
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { Agent, AgentCreate, AgentDemands, MCPServerConfig, SKILLS } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
-import { Eye, Code, X, AlertCircle, Info } from 'lucide-react';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { Eye, Code, X, AlertCircle, Info, Package } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -23,6 +24,7 @@ interface FormData {
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
   tags: string[];
+  capabilities: string[];
   demands: AgentDemands | null;
 }
 
@@ -37,6 +39,9 @@ export function AgentEditor({
   const [saving, setSaving] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
   const [checkingName, setCheckingName] = useState(false);
+
+  // Load available capabilities for the multi-select
+  const { capabilities: availableCapabilities, loading: capabilitiesLoading } = useCapabilities();
 
   const isEditing = !!agent;
 
@@ -56,6 +61,7 @@ export function AgentEditor({
       mcp_servers: null,
       skills: [],
       tags: [],
+      capabilities: [],
       demands: null,
     },
   });
@@ -64,6 +70,7 @@ export function AgentEditor({
   const watchedPrompt = watch('system_prompt');
   const watchedMcpServers = watch('mcp_servers');
   const watchedSkills = watch('skills');
+  const watchedCapabilities = watch('capabilities');
 
   // Load agent data when editing
   useEffect(() => {
@@ -75,6 +82,7 @@ export function AgentEditor({
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
         tags: agent.tags || [],
+        capabilities: agent.capabilities || [],
         demands: agent.demands,
       });
     } else {
@@ -85,6 +93,7 @@ export function AgentEditor({
         mcp_servers: null,
         skills: [],
         tags: [],
+        capabilities: [],
         demands: null,
       });
     }
@@ -158,6 +167,7 @@ export function AgentEditor({
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
         tags: data.tags,                       // empty array clears tags
+        capabilities: data.capabilities,       // capability references
         demands: cleanDemands ?? null,         // null clears demands
       };
       await onSave(createData);
@@ -171,6 +181,17 @@ export function AgentEditor({
 
   const hasMcpServers = watchedMcpServers && Object.keys(watchedMcpServers).length > 0;
   const hasSkills = watchedSkills && watchedSkills.length > 0;
+  const hasCapabilities = watchedCapabilities && watchedCapabilities.length > 0;
+
+  // Toggle capability selection
+  const toggleCapability = (name: string) => {
+    const current = watchedCapabilities || [];
+    if (current.includes(name)) {
+      setValue('capabilities', current.filter((c) => c !== name));
+    } else {
+      setValue('capabilities', [...current, name]);
+    }
+  };
 
   return (
     <Modal
@@ -396,7 +417,66 @@ export function AgentEditor({
               )}
             </div>
 
-            {!hasMcpServers && !hasSkills && (
+            {/* Capabilities */}
+            <div>
+              <label className="label">
+                <span className="flex items-center gap-1.5">
+                  <Package className="w-4 h-4" />
+                  Capabilities
+                </span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Reusable configurations that provide MCP servers and system prompt extensions.
+              </p>
+              {capabilitiesLoading ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+                  <Spinner size="sm" />
+                  <span>Loading capabilities...</span>
+                </div>
+              ) : availableCapabilities.length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-2">
+                  No capabilities defined. Create capabilities in the Capabilities page first.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {availableCapabilities.map((cap) => (
+                    <button
+                      key={cap.name}
+                      type="button"
+                      onClick={() => toggleCapability(cap.name)}
+                      title={cap.description}
+                      className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                        watchedCapabilities?.includes(cap.name)
+                          ? 'bg-purple-50 border-purple-300 text-purple-700'
+                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {cap.name}
+                      {cap.has_mcp && <span className="ml-1 text-xs opacity-60">⚙</span>}
+                      {cap.has_text && <span className="ml-0.5 text-xs opacity-60">📝</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {hasCapabilities && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {watchedCapabilities.map((name) => (
+                    <Badge key={name} size="sm" variant="default" className="bg-purple-100 text-purple-700">
+                      {name}
+                      <button
+                        type="button"
+                        onClick={() => toggleCapability(name)}
+                        className="ml-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!hasMcpServers && !hasSkills && !hasCapabilities && (
               <div className="flex items-center gap-2 text-yellow-600 text-sm">
                 <AlertCircle className="w-4 h-4" />
                 <span>Consider adding at least one capability for the agent</span>

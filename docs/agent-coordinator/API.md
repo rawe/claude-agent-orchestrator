@@ -368,6 +368,8 @@ See [Event model](DATA_MODELS.md#event)
 
 Manage agent blueprints (templates for creating agents).
 
+**Capability Resolution:** Agents can reference capabilities (reusable configurations). When fetching an agent, capabilities are resolved and merged into `system_prompt` and `mcp_servers`. Use `?raw=true` to get unresolved data for editing. See [Capabilities System](../features/capabilities-system.md).
+
 #### GET /agents
 
 List all agent blueprints.
@@ -392,6 +394,7 @@ List all agent blueprints.
     },
     "skills": ["research", "web-search"],
     "tags": ["research"],
+    "capabilities": ["neo4j-knowledge-graph"],
     "demands": {
       "hostname": null,
       "project_dir": null,
@@ -406,27 +409,51 @@ List all agent blueprints.
 ```
 
 **Notes:**
+- List returns raw agents (capabilities not resolved)
 - `demands` are blueprint demands that are merged with run's `additional_demands`
 
 #### GET /agents/{name}
 
 Get a specific agent blueprint.
 
-**Response:**
+**Query Parameters:**
+- `raw` (optional, default: `false`) - If `true`, return raw agent without capability resolution
+
+**Response (default - resolved):**
 ```json
 {
   "name": "researcher",
   "description": "Research agent",
-  "system_prompt": "You are...",
-  "mcp_servers": {},
+  "system_prompt": "You are...\n\n---\n\n## Capability Instructions...",
+  "mcp_servers": { ... },
   "skills": [],
+  "tags": [],
+  "capabilities": ["neo4j-knowledge-graph"],
   "status": "active",
   "created_at": "2025-12-10T10:00:00Z",
   "modified_at": "2025-12-10T10:00:00Z"
 }
 ```
 
-**Error:** `404 Not Found` if agent doesn't exist.
+**Response (`?raw=true` - unresolved):**
+```json
+{
+  "name": "researcher",
+  "description": "Research agent",
+  "system_prompt": "You are...",
+  "mcp_servers": null,
+  "skills": [],
+  "tags": [],
+  "capabilities": ["neo4j-knowledge-graph"],
+  "status": "active",
+  "created_at": "2025-12-10T10:00:00Z",
+  "modified_at": "2025-12-10T10:00:00Z"
+}
+```
+
+**Errors:**
+- `404 Not Found` - Agent doesn't exist
+- `422 Unprocessable Entity` - Capability resolution failed (missing capability or MCP server conflict)
 
 #### POST /agents
 
@@ -441,6 +468,7 @@ Create a new agent blueprint.
   "mcp_servers": {},              // optional
   "skills": [],                   // optional
   "tags": [],                     // optional
+  "capabilities": [],             // optional - capability names to include
   "demands": {                    // optional
     "hostname": null,
     "project_dir": null,
@@ -455,6 +483,7 @@ Create a new agent blueprint.
 **Error:** `409 Conflict` if agent name already exists.
 
 **Notes:**
+- `capabilities` array references capability names; resolved at read time
 - `demands` specify blueprint demands for runner matching
 - These demands are merged with `additional_demands` when a run is created
 
@@ -470,6 +499,7 @@ Update an existing agent blueprint (partial update).
   "mcp_servers": {},                     // optional
   "skills": [],                          // optional
   "tags": [],                            // optional
+  "capabilities": [],                    // optional
   "demands": {}                          // optional
 }
 ```
@@ -512,6 +542,101 @@ Update agent status (active/inactive).
   ...
 }
 ```
+
+---
+
+### Capabilities API
+
+Manage reusable capability configurations that can be shared across agents.
+
+#### GET /capabilities
+
+List all capabilities with summary metadata.
+
+**Response:**
+```json
+[
+  {
+    "name": "neo4j-knowledge-graph",
+    "description": "Company knowledge graph",
+    "has_text": true,
+    "has_mcp": true,
+    "mcp_server_names": ["neo4j"],
+    "created_at": "2025-12-10T10:00:00Z",
+    "modified_at": "2025-12-10T10:00:00Z"
+  }
+]
+```
+
+#### GET /capabilities/{name}
+
+Get a specific capability with full content.
+
+**Response:**
+```json
+{
+  "name": "neo4j-knowledge-graph",
+  "description": "Company knowledge graph",
+  "text": "## Knowledge Graph Ontology\n\n...",
+  "mcp_servers": {
+    "neo4j": {
+      "type": "http",
+      "url": "http://localhost:9003/mcp/"
+    }
+  },
+  "created_at": "2025-12-10T10:00:00Z",
+  "modified_at": "2025-12-10T10:00:00Z"
+}
+```
+
+**Error:** `404 Not Found` if capability doesn't exist.
+
+#### POST /capabilities
+
+Create a new capability.
+
+**Request Body:**
+```json
+{
+  "name": "neo4j-knowledge-graph",
+  "description": "Company knowledge graph",
+  "text": "## Knowledge Graph Ontology\n\n...",  // optional
+  "mcp_servers": {}                              // optional
+}
+```
+
+**Response:** `201 Created` with Capability object.
+
+**Errors:**
+- `400 Bad Request` - Invalid capability name
+- `409 Conflict` - Capability already exists
+
+#### PATCH /capabilities/{name}
+
+Update an existing capability (partial update).
+
+**Request Body:**
+```json
+{
+  "description": "Updated description",  // optional
+  "text": "...",                         // optional
+  "mcp_servers": {}                      // optional
+}
+```
+
+**Response:** Capability object.
+
+**Error:** `404 Not Found` if capability doesn't exist.
+
+#### DELETE /capabilities/{name}
+
+Delete a capability.
+
+**Response:** `204 No Content`
+
+**Errors:**
+- `404 Not Found` - Capability doesn't exist
+- `409 Conflict` - Capability is referenced by agents
 
 ---
 

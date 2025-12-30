@@ -20,10 +20,13 @@ from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConf
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
-    ExecutionMode, StreamEventType, SessionEventType
+    ExecutionMode, StreamEventType, SessionEventType,
+    Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary
 )
 import agent_storage
-from validation import validate_agent_name
+from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError
+import capability_storage
+from validation import validate_agent_name, validate_capability_name
 from datetime import datetime, timezone
 
 # Initialize database BEFORE run_queue (which loads from DB on init)
@@ -730,9 +733,26 @@ def list_agents(
 
 
 @app.get("/agents/{name}", response_model=Agent, response_model_exclude_none=True)
-def get_agent(name: str):
-    """Get agent by name."""
-    agent = agent_storage.get_agent(name)
+def get_agent(name: str, raw: bool = Query(False, description="Return raw agent without capability resolution")):
+    """
+    Get agent by name.
+
+    By default, capabilities are resolved and merged into system_prompt and mcp_servers.
+    Use `?raw=true` to get the unresolved agent configuration (for editing).
+    """
+    try:
+        agent = agent_storage.get_agent(name, resolve=not raw)
+    except MissingCapabilityError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Capability resolution failed: {e.capability_name} not found"
+        )
+    except MCPServerConflictError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"MCP server name conflict: '{e.server_name}' defined in {', '.join(e.sources)}"
+        )
+
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
     return agent
@@ -756,7 +776,18 @@ def create_agent(data: AgentCreate):
 @app.patch("/agents/{name}", response_model=Agent, response_model_exclude_none=True)
 def update_agent(name: str, updates: AgentUpdate):
     """Update an existing agent (partial update)."""
-    agent = agent_storage.update_agent(name, updates)
+    try:
+        agent = agent_storage.update_agent(name, updates)
+    except MissingCapabilityError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Capability resolution failed: {e.capability_name} not found"
+        )
+    except MCPServerConflictError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"MCP server name conflict: '{e.server_name}' defined in {', '.join(e.sources)}"
+        )
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
     return agent
@@ -777,6 +808,82 @@ def update_agent_status(name: str, data: AgentStatusUpdate):
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
     return agent
+
+
+# ==============================================================================
+# Capability Registry Routes (Capabilities System)
+# ==============================================================================
+
+@app.get("/capabilities", response_model=list[CapabilitySummary])
+def list_capabilities():
+    """
+    List all capabilities.
+
+    Returns summary view with metadata (has_text, has_mcp, mcp_server_names).
+    """
+    return capability_storage.list_capabilities()
+
+
+@app.get("/capabilities/{name}", response_model=Capability, response_model_exclude_none=True)
+def get_capability(name: str):
+    """Get capability by name with full content."""
+    capability = capability_storage.get_capability(name)
+    if not capability:
+        raise HTTPException(status_code=404, detail=f"Capability not found: {name}")
+    return capability
+
+
+@app.post("/capabilities", response_model=Capability, status_code=201, response_model_exclude_none=True)
+def create_capability(data: CapabilityCreate):
+    """Create a new capability."""
+    try:
+        validate_capability_name(data.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        capability = capability_storage.create_capability(data)
+        return capability
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.patch("/capabilities/{name}", response_model=Capability, response_model_exclude_none=True)
+def update_capability(name: str, updates: CapabilityUpdate):
+    """Update an existing capability (partial update)."""
+    capability = capability_storage.update_capability(name, updates)
+    if not capability:
+        raise HTTPException(status_code=404, detail=f"Capability not found: {name}")
+    return capability
+
+
+def _get_agents_using_capability(capability_name: str) -> list[str]:
+    """Get list of agent names that reference a capability."""
+    agents = agent_storage.list_agents()
+    return [a.name for a in agents if capability_name in a.capabilities]
+
+
+@app.delete("/capabilities/{name}", status_code=204)
+def delete_capability(name: str):
+    """
+    Delete a capability.
+
+    Fails with 409 Conflict if capability is referenced by any agents.
+    """
+    # Check if capability exists
+    if not capability_storage.get_capability(name):
+        raise HTTPException(status_code=404, detail=f"Capability not found: {name}")
+
+    # Check for agent references
+    agents_using = _get_agents_using_capability(name)
+    if agents_using:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Capability is referenced by agents: {', '.join(agents_using)}"
+        )
+
+    capability_storage.delete_capability(name)
+    return None
 
 
 # ==============================================================================
