@@ -337,7 +337,8 @@ stop-core:
 # AGENT RUNNER (local process, not Docker)
 # ============================================================================
 # Runs agents in a specific project directory.
-# Uses PROJECT_DIR from .env or AGENT_ORCHESTRATOR_PROJECT_DIR as fallback.
+# Uses PROJECT_DIR or AGENT_ORCHESTRATOR_PROJECT_DIR from .env if set.
+# Default: .agent-orchestrator/runner-project (git-ignored, auto-created)
 
 AGENT_RUNNER_SCRIPT := servers/agent-runner/agent-runner
 AGENT_RUNNER_PID_FILE := .agent-runner.pid
@@ -353,17 +354,18 @@ start-agent-runner:
 	@if [ -f .env ]; then \
 		set -a && . ./.env && set +a; \
 	fi; \
-	PROJ_DIR="$${PROJECT_DIR:-$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.}}"; \
-	if [ "$$PROJ_DIR" = "." ]; then \
-		echo "Warning: No PROJECT_DIR set. Using current directory."; \
-		echo "Set PROJECT_DIR in .env or use: make start-agent-runner PROJECT_DIR=/path/to/project"; \
+	PROJ_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.agent-orchestrator/runner-project}"; \
+	mkdir -p "$$PROJ_DIR"; \
+	if [ "$$PROJ_DIR" = ".agent-orchestrator/runner-project" ]; then \
+		echo "Notice: Using default project directory (git-ignored)."; \
+		echo "Set AGENT_ORCHESTRATOR_PROJECT_DIR in .env to use a different directory."; \
 	fi; \
 	echo "Configuration:"; \
 	echo "  Project Dir: $$PROJ_DIR"; \
 	echo "  Coordinator: $${AGENT_ORCHESTRATOR_API_URL:-http://localhost:8765}"; \
 	echo "  Log file:    $(AGENT_RUNNER_LOG_FILE)"; \
 	echo ""; \
-	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
+	$(AGENT_RUNNER_SCRIPT) --project-dir "$$PROJ_DIR" > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
 	echo $$! > $(AGENT_RUNNER_PID_FILE); \
 	sleep 2; \
 	echo "Agent Runner started (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \
@@ -391,9 +393,11 @@ run-agent-runner:
 	@if [ -f .env ]; then \
 		set -a && . ./.env && set +a; \
 	fi; \
-	PROJ_DIR="$${PROJECT_DIR:-$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.}}"; \
-	if [ "$$PROJ_DIR" = "." ]; then \
-		echo "Warning: No PROJECT_DIR set. Using current directory."; \
+	PROJ_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.agent-orchestrator/runner-project}"; \
+	mkdir -p "$$PROJ_DIR"; \
+	if [ "$$PROJ_DIR" = ".agent-orchestrator/runner-project" ]; then \
+		echo "Notice: Using default project directory (git-ignored)."; \
+		echo "Set AGENT_ORCHESTRATOR_PROJECT_DIR in .env to use a different directory."; \
 	fi; \
 	VERBOSE_FLAG=""; \
 	if [ "$${VERBOSE:-}" = "1" ]; then \
@@ -403,7 +407,7 @@ run-agent-runner:
 	echo "  Project Dir: $$PROJ_DIR"; \
 	if [ -n "$$VERBOSE_FLAG" ]; then echo "  Verbose: enabled"; fi; \
 	echo ""; \
-	PROJECT_DIR="$$PROJ_DIR" $(AGENT_RUNNER_SCRIPT) $$VERBOSE_FLAG
+	$(AGENT_RUNNER_SCRIPT) --project-dir "$$PROJ_DIR" $$VERBOSE_FLAG
 
 # Run agent runner in foreground with verbose output (shortcut)
 run-agent-runner-v:
