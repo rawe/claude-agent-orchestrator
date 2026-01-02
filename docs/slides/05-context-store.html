@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Store - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-context: #8b5cf6;
+      --color-session: #a78bfa;
+      --color-success: #10b981;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-context);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-context);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Main layout */
+    .content-layout {
+      display: flex;
+      gap: var(--space-xl);
+      max-width: 1100px;
+      width: 100%;
+      align-items: center;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      animation: fadeIn 0.5s ease forwards;
+      opacity: 0;
+    }
+
+    .flow-row:nth-child(1) { animation-delay: 0.1s; }
+    .flow-row:nth-child(2) { animation-delay: 0.3s; }
+    .flow-row:nth-child(3) { animation-delay: 0.5s; }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .agent-box {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-session);
+      border-radius: var(--radius-lg);
+      min-width: 140px;
+    }
+
+    .agent-icon { font-size: 1.25rem; }
+    .agent-label { font-size: 0.875rem; color: var(--color-text); font-weight: 500; }
+
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .arrow-line {
+      width: 60px;
+      height: 2px;
+      background: var(--color-context);
+      position: relative;
+    }
+
+    .arrow-line::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: -4px;
+      border: 5px solid transparent;
+      border-left-color: var(--color-context);
+    }
+
+    .arrow-label {
+      font-size: 0.625rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Context Store Box */
+    .store-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--color-bg-card);
+      border: 3px solid var(--color-context);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
+      min-width: 180px;
+    }
+
+    .store-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .store-label { font-size: 1rem; font-weight: 600; color: var(--color-context); }
+
+    .store-docs {
+      display: flex;
+      gap: var(--space-sm);
+      margin-top: var(--space-md);
+    }
+
+    .doc-item {
+      padding: 0.25rem 0.5rem;
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid var(--color-context);
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      color: var(--color-context);
+    }
+
+    /* Data bubbles */
+    .data-bubble {
+      padding: 0.375rem 0.75rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .data-bubble.small {
+      border-color: var(--color-success);
+      color: var(--color-success);
+    }
+
+    /* Benefits panel */
+    .benefits-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      max-width: 320px;
+    }
+
+    .benefit-card {
+      padding: var(--space-md);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      animation: fadeIn 0.5s ease forwards;
+      opacity: 0;
+    }
+
+    .benefit-card:nth-child(1) { animation-delay: 0.2s; }
+    .benefit-card:nth-child(2) { animation-delay: 0.4s; }
+    .benefit-card:nth-child(3) { animation-delay: 0.6s; }
+
+    .benefit-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: 0.5rem;
+    }
+
+    .benefit-icon { font-size: 1.25rem; }
+
+    .benefit-title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .benefit-desc {
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+
+    .highlight { color: var(--color-context); font-weight: 500; }
+
+    /* Comparison */
+    .comparison {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .comparison-item {
+      flex: 1;
+      text-align: center;
+    }
+
+    .comparison-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .comparison-value {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .comparison-value.bad { color: #ef4444; }
+    .comparison-value.good { color: var(--color-success); }
+
+    .comparison-vs {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Context Store</h1>
+      <p class="subtitle">Shared document storage for efficient agent handover</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="content-layout">
+
+        <div class="flow-diagram">
+          <!-- Row 1: Research Agent stores document -->
+          <div class="flow-row">
+            <div class="agent-box">
+              <span class="agent-icon">🔍</span>
+              <span class="agent-label">Research Agent</span>
+            </div>
+            <div class="flow-arrow">
+              <span class="arrow-label">stores</span>
+              <div class="arrow-line"></div>
+            </div>
+            <div class="store-box">
+              <div class="store-icon">📄</div>
+              <div class="store-label">Context Store</div>
+              <div class="store-docs">
+                <span class="doc-item">doc_a1b2</span>
+                <span class="doc-item">doc_c3d4</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2: Returns doc_id to orchestrator -->
+          <div class="flow-row">
+            <div class="agent-box">
+              <span class="agent-icon">🧠</span>
+              <span class="agent-label">Orchestrator</span>
+            </div>
+            <div class="flow-arrow" style="transform: scaleX(-1);">
+              <div class="arrow-line"></div>
+            </div>
+            <div class="data-bubble small">
+              "Found 3 docs: doc_a1b2, doc_c3d4, doc_e5f6"
+            </div>
+          </div>
+
+          <!-- Row 3: Worker retrieves -->
+          <div class="flow-row">
+            <div class="agent-box">
+              <span class="agent-icon">💻</span>
+              <span class="agent-label">Worker Agent</span>
+            </div>
+            <div class="flow-arrow">
+              <span class="arrow-label">retrieves</span>
+              <div class="arrow-line"></div>
+            </div>
+            <div class="store-box" style="padding: var(--space-md);">
+              <div class="store-icon">📄</div>
+              <div class="store-label">Context Store</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="benefits-panel">
+          <div class="benefit-card">
+            <div class="benefit-header">
+              <span class="benefit-icon">🎯</span>
+              <span class="benefit-title">Pass References, Not Content</span>
+            </div>
+            <div class="benefit-desc">
+              Agents exchange <span class="highlight">document IDs</span> instead of full text. Orchestrator stays lightweight.
+            </div>
+          </div>
+
+          <div class="benefit-card">
+            <div class="benefit-header">
+              <span class="benefit-icon">💾</span>
+              <span class="benefit-title">Save Context Window</span>
+            </div>
+            <div class="benefit-desc">
+              Only the agent that <span class="highlight">needs</span> the content loads it. No duplication across agents.
+            </div>
+            <div class="comparison">
+              <div class="comparison-item">
+                <div class="comparison-label">Before</div>
+                <div class="comparison-value bad">150K tokens</div>
+              </div>
+              <span class="comparison-vs">vs</span>
+              <div class="comparison-item">
+                <div class="comparison-label">After</div>
+                <div class="comparison-value good">~500 tokens</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="benefit-card">
+            <div class="benefit-header">
+              <span class="benefit-icon">🔎</span>
+              <span class="benefit-title">Semantic Search</span>
+            </div>
+            <div class="benefit-desc">
+              Agents can <span class="highlight">search</span> stored documents by meaning, not just retrieve by ID.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="04-runner.html" class="nav-prev">←</a>
+      <a href="index.html" class="nav-home">⌂</a>
+      <span class="slide-number">5 / 21</span>
+      <a href="06-dashboard.html" class="nav-next">→</a>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
+      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
+      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
+    });
+  </script>
+</body>
+</html>

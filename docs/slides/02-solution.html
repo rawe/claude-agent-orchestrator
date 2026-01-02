@@ -11,16 +11,23 @@
       --color-bg-card: #141b2d;
       --color-coordinator: #3b82f6;
       --color-runner: #10b981;
+      --color-context: #8b5cf6;
       --color-dashboard: #f59e0b;
+      --color-problem-coord: #ef4444;
+      --color-problem-context: #f59e0b;
+      --color-problem-provider: #3b82f6;
       --color-text: #f1f5f9;
       --color-text-muted: #64748b;
       --color-text-bright: #ffffff;
       --color-border: #1e293b;
       --color-border-light: #334155;
       --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
       --radius-lg: 12px;
       --radius-xl: 16px;
       --radius-full: 9999px;
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
       --space-md: 1rem;
       --space-lg: 1.5rem;
       --space-xl: 2rem;
@@ -52,15 +59,15 @@
       pointer-events: none;
     }
     .slide > * { position: relative; z-index: 1; }
-    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header { text-align: center; margin-bottom: var(--space-md); }
     .slide-header h1 {
-      font-size: clamp(2rem, 5vw, 3rem);
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
       font-weight: 700;
       color: var(--color-text-bright);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
     }
     .slide-header .subtitle {
-      font-size: clamp(1rem, 2vw, 1.25rem);
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
       color: var(--color-text-muted);
     }
     .slide-content {
@@ -98,12 +105,12 @@
     .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
     .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
 
-    /* Solution Grid */
+    /* Solution Grid - 4 columns */
     .solution-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-xl);
-      max-width: 1100px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-lg);
+      max-width: 1200px;
       width: 100%;
     }
 
@@ -111,97 +118,190 @@
       background: var(--color-bg-card);
       border: 2px solid var(--color-border);
       border-radius: var(--radius-xl);
-      padding: var(--space-xl);
-      text-align: center;
-      transition: all 0.4s ease;
+      padding: var(--space-lg);
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s ease;
       opacity: 0;
-      transform: translateY(30px);
-      animation: cardAppear 0.6s ease forwards;
+      transform: translateY(20px);
+      animation: cardAppear 0.5s ease forwards;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
     }
 
-    .solution-card:nth-child(1) { animation-delay: 0.2s; }
-    .solution-card:nth-child(2) { animation-delay: 0.4s; }
-    .solution-card:nth-child(3) { animation-delay: 0.6s; }
+    .solution-card:nth-child(1) { animation-delay: 0.1s; }
+    .solution-card:nth-child(2) { animation-delay: 0.2s; }
+    .solution-card:nth-child(3) { animation-delay: 0.3s; }
+    .solution-card:nth-child(4) { animation-delay: 0.4s; }
+
+    .solution-card:hover {
+      transform: translateY(-4px);
+    }
 
     .solution-card.coordinator {
       border-color: var(--color-coordinator);
-      box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.15);
+    }
+    .solution-card.coordinator:hover {
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
     }
 
     .solution-card.runner {
       border-color: var(--color-runner);
-      box-shadow: 0 0 40px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
+    }
+    .solution-card.runner:hover {
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.3);
+    }
+
+    .solution-card.context {
+      border-color: var(--color-context);
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
+    }
+    .solution-card.context:hover {
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
     }
 
     .solution-card.dashboard {
       border-color: var(--color-dashboard);
-      box-shadow: 0 0 40px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.15);
+    }
+    .solution-card.dashboard:hover {
+      box-shadow: 0 0 40px rgba(245, 158, 11, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
     }
 
     .card-icon {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto var(--space-lg);
-      border-radius: var(--radius-lg);
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2.5rem;
+      font-size: 1.5rem;
+      flex-shrink: 0;
     }
 
     .coordinator .card-icon { background: linear-gradient(135deg, var(--color-coordinator), #1d4ed8); }
     .runner .card-icon { background: linear-gradient(135deg, var(--color-runner), #059669); }
+    .context .card-icon { background: linear-gradient(135deg, var(--color-context), #6d28d9); }
     .dashboard .card-icon { background: linear-gradient(135deg, var(--color-dashboard), #d97706); }
 
     .card-title {
-      font-size: 1.5rem;
+      font-size: 1.125rem;
       font-weight: 700;
-      color: var(--color-text-bright);
-      margin-bottom: 0.5rem;
     }
 
     .coordinator .card-title { color: var(--color-coordinator); }
     .runner .card-title { color: var(--color-runner); }
+    .context .card-title { color: var(--color-context); }
     .dashboard .card-title { color: var(--color-dashboard); }
 
-    .card-role {
-      font-size: 1rem;
+    .card-desc {
+      font-size: 0.8125rem;
       color: var(--color-text-muted);
-      margin-bottom: var(--space-lg);
+      margin-bottom: var(--space-md);
+      line-height: 1.4;
+      flex: 1;
     }
 
-    .card-features {
-      list-style: none;
-      text-align: left;
+    /* Problem tags - what this component solves */
+    .solves-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-xs);
     }
 
-    .card-features li {
-      padding: 0.5rem 0;
+    .problem-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .problem-tag {
+      font-size: 0.6875rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-full);
+      font-weight: 500;
+    }
+
+    .problem-tag.coordination {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--color-problem-coord);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .problem-tag.context-sharing {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--color-problem-context);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .problem-tag.provider {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--color-problem-provider);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .problem-tag.observability {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--color-context);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    /* Click hint */
+    .card-footer {
+      margin-top: var(--space-sm);
+      padding-top: var(--space-sm);
       border-top: 1px solid var(--color-border);
-      font-size: 0.9375rem;
-      color: var(--color-text);
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: space-between;
     }
 
-    .card-features li::before {
-      content: '✓';
-      font-weight: bold;
+    .click-hint {
+      font-size: 0.6875rem;
+      color: var(--color-text-muted);
     }
 
-    .coordinator .card-features li::before { color: var(--color-coordinator); }
-    .runner .card-features li::before { color: var(--color-runner); }
-    .dashboard .card-features li::before { color: var(--color-dashboard); }
+    .click-arrow {
+      font-size: 1rem;
+      transition: transform var(--transition-normal);
+    }
+
+    .coordinator .click-arrow { color: var(--color-coordinator); }
+    .runner .click-arrow { color: var(--color-runner); }
+    .context .click-arrow { color: var(--color-context); }
+    .dashboard .click-arrow { color: var(--color-dashboard); }
+
+    .solution-card:hover .click-arrow {
+      transform: translateX(4px);
+    }
 
     @keyframes cardAppear {
       to { opacity: 1; transform: translateY(0); }
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1000px) {
+      .solution-grid {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 700px;
+      }
+    }
+
+    @media (max-width: 600px) {
       .solution-grid {
         grid-template-columns: 1fr;
-        max-width: 400px;
+        max-width: 350px;
       }
     }
   </style>
@@ -209,51 +309,93 @@
 <body>
   <div class="slide">
     <header class="slide-header">
-      <h1>The Three-Part Solution</h1>
-      <p class="subtitle">Coordinate, Execute, Observe</p>
+      <h1>The Solution Architecture</h1>
+      <p class="subtitle">Four components solving three challenges</p>
     </header>
 
     <main class="slide-content">
       <div class="solution-grid">
-        <div class="solution-card coordinator">
-          <div class="card-icon">🧠</div>
-          <h2 class="card-title">Coordinator</h2>
-          <p class="card-role">The Brain</p>
-          <ul class="card-features">
-            <li>Manages all sessions</li>
-            <li>Queues agent runs</li>
-            <li>Stores history</li>
-          </ul>
-        </div>
 
-        <div class="solution-card runner">
-          <div class="card-icon">⚡</div>
-          <h2 class="card-title">Runner</h2>
-          <p class="card-role">The Executor</p>
-          <ul class="card-features">
-            <li>Runs AI agents</li>
-            <li>Reports status</li>
-            <li>Handles scaling</li>
-          </ul>
-        </div>
+        <a href="03-coordinator.html" class="solution-card coordinator">
+          <div class="card-header">
+            <div class="card-icon">🧠</div>
+            <h2 class="card-title">Coordinator</h2>
+          </div>
+          <p class="card-desc">
+            Central brain that manages sessions, orchestrates agent lifecycles, and handles execution modes (sync, async, callback).
+          </p>
+          <div class="solves-label">Solves</div>
+          <div class="problem-tags">
+            <span class="problem-tag coordination">Multi-Agent</span>
+          </div>
+          <div class="card-footer">
+            <span class="click-hint">Details</span>
+            <span class="click-arrow">→</span>
+          </div>
+        </a>
 
-        <div class="solution-card dashboard">
-          <div class="card-icon">📊</div>
-          <h2 class="card-title">Dashboard</h2>
-          <p class="card-role">The Window</p>
-          <ul class="card-features">
-            <li>Real-time monitoring</li>
-            <li>Event timeline</li>
-            <li>Agent control</li>
-          </ul>
-        </div>
+        <a href="04-runner.html" class="solution-card runner">
+          <div class="card-header">
+            <div class="card-icon">⚡</div>
+            <h2 class="card-title">Runner</h2>
+          </div>
+          <p class="card-desc">
+            Executes agents via pluggable executors. Abstracts the AI provider, enabling Claude, OpenAI, or local LLMs.
+          </p>
+          <div class="solves-label">Solves</div>
+          <div class="problem-tags">
+            <span class="problem-tag coordination">Multi-Agent</span>
+            <span class="problem-tag provider">Provider Lock-in</span>
+          </div>
+          <div class="card-footer">
+            <span class="click-hint">Details</span>
+            <span class="click-arrow">→</span>
+          </div>
+        </a>
+
+        <a href="05-context-store.html" class="solution-card context">
+          <div class="card-header">
+            <div class="card-icon">📄</div>
+            <h2 class="card-title">Context Store</h2>
+          </div>
+          <p class="card-desc">
+            Shared document storage with IDs. Agents pass references, not full content. Saves context window, enables efficient handover.
+          </p>
+          <div class="solves-label">Solves</div>
+          <div class="problem-tags">
+            <span class="problem-tag context-sharing">Context Sharing</span>
+          </div>
+          <div class="card-footer">
+            <span class="click-hint">Details</span>
+            <span class="click-arrow">→</span>
+          </div>
+        </a>
+
+        <a href="06-dashboard.html" class="solution-card dashboard">
+          <div class="card-header">
+            <div class="card-icon">📊</div>
+            <h2 class="card-title">Dashboard</h2>
+          </div>
+          <p class="card-desc">
+            Real-time visibility into all agents. Monitor progress, view events, and control execution across the system.
+          </p>
+          <div class="solves-label">Provides</div>
+          <div class="problem-tags">
+            <span class="problem-tag observability">Observability</span>
+          </div>
+          <div class="card-footer">
+            <span class="click-hint">Details</span>
+            <span class="click-arrow">→</span>
+          </div>
+        </a>
+
       </div>
     </main>
 
     <nav class="slide-nav">
       <a href="01-problem.html" class="nav-prev">←</a>
       <a href="index.html" class="nav-home">⌂</a>
-      <span class="slide-number">2 / 20</span>
+      <span class="slide-number">2 / 21</span>
       <a href="03-coordinator.html" class="nav-next">→</a>
     </nav>
   </div>

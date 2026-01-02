@@ -191,12 +191,12 @@ To remove: delete the corresponding card.
 | # | File | Section |
 |---|------|---------|
 | 1-2 | 01-problem, 02-solution | Problem & Solution |
-| 3-6 | 03-coordinator through 06-architecture | Core Components |
-| 7-8 | 07-chat-overview, 08-chat-flow | First Chat |
-| 9-10 | 09-orchestration, 10-parent-child | Orchestration |
-| 11-15 | 11-mode-sync through 15-modes-comparison | Execution Modes |
-| 16-19 | 16-blueprints through 19-capabilities-example | Config System |
-| 20 | 20-summary | Summary |
+| 3-7 | 03-coordinator through 07-architecture | Core Components (incl. Context Store) |
+| 8-9 | 08-chat-overview, 09-chat-flow | First Chat |
+| 10-11 | 10-orchestration, 11-parent-child | Orchestration |
+| 12-16 | 12-mode-sync through 16-modes-comparison | Execution Modes |
+| 17-20 | 17-blueprints through 20-capabilities-example | Config System |
+| 21 | 21-summary | Summary |
 
 ### Deep Dives (Out of Main Flow)
 
@@ -209,11 +209,11 @@ To remove: delete the corresponding card.
 ## Visual Patterns Reference
 
 For complex diagrams, look at these files as examples:
-- **SVG architecture diagram:** `06-architecture.html`
-- **Sequence diagram:** `08-chat-flow.html`
-- **Timeline diagrams:** `11-mode-sync.html` through `14-mode-callback.html`
-- **Comparison grid:** `15-modes-comparison.html`
-- **Card layouts:** `02-solution.html`, `16-blueprints.html`
+- **SVG architecture diagram:** `07-architecture.html`
+- **Sequence diagram:** `09-chat-flow.html`
+- **Timeline diagrams:** `12-mode-sync.html` through `15-mode-callback.html`
+- **Comparison grid:** `16-modes-comparison.html`
+- **Card layouts:** `02-solution.html`, `17-blueprints.html`
 
 ## Key CSS Patterns
 
