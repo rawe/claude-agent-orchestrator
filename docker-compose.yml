@@ -38,7 +38,7 @@ services:
     volumes:
       - ./servers/agent-coordinator:/app
       - coordinator-data:/app/.agent-orchestrator
-      - ${AGENT_DIR:-./config/agents}:/data/agents
+      - ${CONFIG_DIR:-./config}:/data/config
     environment:
       - PYTHONUNBUFFERED=1
       # Authentication (see docs/architecture/auth-coordinator.md)
@@ -52,7 +52,7 @@ services:
       - DEBUG_LOGGING=false
       - CORS_ORIGINS=*
       # Agent registry configuration (merged into coordinator)
-      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
+      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/config/agents
     networks:
       - agent-orchestrator-network
     restart: unless-stopped

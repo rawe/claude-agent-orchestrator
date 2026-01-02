@@ -9,26 +9,27 @@
 #   3. Run: make start (the override file is automatically loaded by Docker Compose)
 #
 # COMMON USE CASES:
-#   - Point agent-coordinator to a different agent blueprints directory
+#   - Point agent-coordinator to a different config directory (agents + capabilities)
 #   - Change port mappings
 #   - Add environment variables for debugging
 #
-# For simple cases (just changing AGENT_DIR), you can also use a .env file:
-#   echo "AGENT_DIR=/path/to/your/agents" >> .env
+# For simple cases (just changing CONFIG_DIR), you can also use a .env file:
+#   echo "CONFIG_DIR=/path/to/your/config" >> .env
 
 services:
-  # Override agent-coordinator to use a custom agents directory
+  # Override agent-coordinator to use a custom config directory
   agent-coordinator:
     volumes:
-      # Mount your local agents directory to the container
-      # Replace /path/to/your/agents with your actual path
-      - /path/to/your/agents:/data/agents
+      # Mount your local config directory to the container
+      # The config directory should contain agents/ and capabilities/ subdirectories
+      # Replace /path/to/your/config with your actual path
+      - /path/to/your/config:/data/config
 
 # Example: Override with additional environment variables
 #  agent-coordinator:
 #    environment:
 #      - PYTHONUNBUFFERED=1
-#      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/agents
+#      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/config/agents
 #      - DEBUG_LOGGING=true
 
 # Example: Change port mappings

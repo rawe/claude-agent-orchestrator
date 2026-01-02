@@ -34,7 +34,7 @@ The Agent Orchestrator Framework consists of three main Docker services:
 │                               ▼                           ▼              │
 │               ┌───────────────────┐           ┌───────────────────┐     │
 │               │   Volume Mount    │           │   Named Volume    │     │
-│               │   (agents dir)    │           │   (persistent)    │     │
+│               │   (config dir)    │           │   (persistent)    │     │
 │               └───────────────────┘           └───────────────────┘     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -71,17 +71,17 @@ docker-compose up --build -d
 docker-compose logs -f
 ```
 
-## Custom Agent Directory Configuration
+## Custom Configuration Directory
 
-By default, the Agent Coordinator service looks for agent blueprints in `./.agent-orchestrator/agents`. You can customize this to point to a different directory on your machine.
+By default, the Agent Coordinator service uses the `./config` directory for all configuration files (agents, capabilities, etc.). You can customize this to point to a different config directory on your machine.
 
 ### Option 1: Using a `.env` file (Simplest)
 
 Create a `.env` file in the project root:
 
 ```bash
-# Set your custom agents directory path
-echo "AGENT_DIR=/path/to/your/agents" > .env
+# Set your custom config directory path
+echo "CONFIG_DIR=/path/to/your/config" > .env
 
 # Then start services as usual
 make start-bg
@@ -105,7 +105,7 @@ Edit `docker-compose.override.yml`:
 services:
   agent-coordinator:
     volumes:
-      - /path/to/your/agents:/data/agents
+      - /path/to/your/config:/data/config
 ```
 
 ### Option 3: Inline Environment Variable (One-off)
@@ -113,13 +113,13 @@ services:
 For quick testing without modifying any files:
 
 ```bash
-AGENT_DIR=/path/to/your/agents make start-bg
+CONFIG_DIR=/path/to/your/config make start-bg
 ```
 
 Or with docker-compose directly:
 
 ```bash
-AGENT_DIR=/path/to/your/agents docker-compose up --build -d
+CONFIG_DIR=/path/to/your/config docker-compose up --build -d
 ```
 
 ## Available Commands
@@ -198,7 +198,7 @@ Run `make help` to see all available commands:
 |----------|---------|-------------|
 | `DEBUG_LOGGING` | `false` | Enable verbose debug logging |
 | `CORS_ORIGINS` | `*` | Allowed CORS origins |
-| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `/data/agents` | Agents storage directory (in container) |
+| `AGENT_ORCHESTRATOR_AGENTS_DIR` | `/data/config/agents` | Agents storage directory (in container) |
 
 **Development Mode:**
 - Source code is mounted as a volume
@@ -478,8 +478,8 @@ The dashboard provides a single interface for all agent orchestration tasks:
 Create a `.env` file in the project root:
 
 ```env
-# Agent directory
-AGENT_DIR=/path/to/your/agents
+# Config directory
+CONFIG_DIR=/path/to/your/config
 
 # Debug logging
 DEBUG_LOGGING=true
@@ -541,7 +541,7 @@ The centralized Docker setup provides:
 
 - **Simple:** Single command to start everything
 - **Minimal Redundancy:** Reuses existing Dockerfiles
-- **Flexible:** Custom agent directory via `.env` or `docker-compose.override.yml`
+- **Flexible:** Custom config directory via `.env` or `docker-compose.override.yml`
 - **Development-Friendly:** Hot reloading for code changes
 - **Production-Ready:** Health checks and proper networking
 - **Well-Documented:** Clear commands and troubleshooting steps
