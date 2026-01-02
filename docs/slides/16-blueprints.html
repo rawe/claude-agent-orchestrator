@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Blueprints - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-dashboard: #f59e0b;
+      --color-session: #8b5cf6;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-dashboard);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Blueprint Card */
+    .blueprint-card {
+      width: 400px;
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-dashboard);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 0 50px rgba(245, 158, 11, 0.2);
+      animation: cardFloat 3s ease-in-out infinite;
+    }
+
+    @keyframes cardFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .blueprint-header {
+      background: linear-gradient(135deg, var(--color-dashboard), #d97706);
+      padding: var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .blueprint-icon {
+      font-size: 2.5rem;
+    }
+
+    .blueprint-info h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-bg);
+    }
+
+    .blueprint-info p {
+      font-size: 0.875rem;
+      color: rgba(0, 0, 0, 0.6);
+    }
+
+    .blueprint-body {
+      padding: var(--space-lg);
+    }
+
+    .blueprint-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .blueprint-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .section-content {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-text);
+      line-height: 1.5;
+    }
+
+    .section-content.prompt {
+      font-family: var(--font-sans);
+      font-style: italic;
+    }
+
+    .mcp-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .mcp-tag {
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid var(--color-session);
+      border-radius: var(--radius-full);
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: var(--color-session);
+    }
+
+    /* Explanation Panel */
+    .explanation {
+      max-width: 350px;
+    }
+
+    .explanation h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .explanation-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .explanation-item {
+      display: flex;
+      gap: var(--space-md);
+    }
+
+    .exp-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .exp-content h4 {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 4px;
+    }
+
+    .exp-content p {
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Agent Blueprints</h1>
+      <p class="subtitle">Templates that define what an agent can do</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="blueprint-card">
+        <div class="blueprint-header">
+          <div class="blueprint-icon">📋</div>
+          <div class="blueprint-info">
+            <h3>code-reviewer</h3>
+            <p>Reviews code for quality and issues</p>
+          </div>
+        </div>
+        <div class="blueprint-body">
+          <div class="blueprint-section">
+            <div class="section-label">📝 System Prompt</div>
+            <div class="section-content prompt">
+              "You are an expert code reviewer. Analyze code for bugs, security issues, and best practices..."
+            </div>
+          </div>
+          <div class="blueprint-section">
+            <div class="section-label">🔌 MCP Servers</div>
+            <div class="mcp-list">
+              <span class="mcp-tag">filesystem</span>
+              <span class="mcp-tag">git</span>
+              <span class="mcp-tag">github</span>
+            </div>
+          </div>
+          <div class="blueprint-section">
+            <div class="section-label">📊 Metadata</div>
+            <div class="section-content">
+              version: 1.0<br>
+              category: development<br>
+              timeout: 300s
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="explanation">
+        <h3>💡 Why Blueprints?</h3>
+        <ul class="explanation-list">
+          <li class="explanation-item">
+            <div class="exp-icon">♻️</div>
+            <div class="exp-content">
+              <h4>Reusable</h4>
+              <p>Define once, use across many sessions</p>
+            </div>
+          </li>
+          <li class="explanation-item">
+            <div class="exp-icon">📍</div>
+            <div class="exp-content">
+              <h4>Single Source of Truth</h4>
+              <p>All agents of a type share the same config</p>
+            </div>
+          </li>
+          <li class="explanation-item">
+            <div class="exp-icon">🔄</div>
+            <div class="exp-content">
+              <h4>Version Controlled</h4>
+              <p>Track changes, rollback when needed</p>
+            </div>
+          </li>
+          <li class="explanation-item">
+            <div class="exp-icon">🎯</div>
+            <div class="exp-content">
+              <h4>Specialized</h4>
+              <p>Each agent focused on a specific task</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="15-modes-comparison.html" class="nav-prev">←</a>
+      <a href="index.html" class="nav-home">⌂</a>
+      <span class="slide-number">16 / 20</span>
+      <a href="17-capabilities-problem.html" class="nav-next">→</a>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
+      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
+      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
+    });
+  </script>
+</body>
+</html>

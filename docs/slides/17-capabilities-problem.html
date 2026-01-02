@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Config Problem - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-dashboard: #f59e0b;
+      --color-error: #ef4444;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-error);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-error);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Blueprints with duplicate config */
+    .blueprints-grid {
+      display: flex;
+      gap: var(--space-lg);
+    }
+
+    .mini-blueprint {
+      width: 220px;
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      opacity: 0;
+      animation: slideIn 0.4s ease forwards;
+    }
+
+    .mini-blueprint:nth-child(1) { animation-delay: 0.1s; }
+    .mini-blueprint:nth-child(2) { animation-delay: 0.2s; }
+    .mini-blueprint:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .mini-header {
+      background: var(--color-dashboard);
+      padding: var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .mini-icon {
+      font-size: 1.25rem;
+    }
+
+    .mini-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-bg);
+    }
+
+    .mini-body {
+      padding: var(--space-md);
+    }
+
+    .config-section {
+      margin-bottom: var(--space-sm);
+    }
+
+    .config-label {
+      font-size: 0.625rem;
+      color: var(--color-text-muted);
+      margin-bottom: 4px;
+    }
+
+    .config-block {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm);
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      line-height: 1.4;
+    }
+
+    .config-duplicate {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--color-error);
+      position: relative;
+    }
+
+    .config-duplicate::after {
+      content: '⚠️ Duplicate';
+      position: absolute;
+      top: -8px;
+      right: 4px;
+      font-size: 0.5rem;
+      color: var(--color-error);
+      font-family: var(--font-sans);
+    }
+
+    /* Problem callouts */
+    .problems {
+      max-width: 320px;
+    }
+
+    .problems h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-error);
+      margin-bottom: var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .problem-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .problem-item {
+      display: flex;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: var(--radius-md);
+    }
+
+    .problem-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .problem-content h4 {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 4px;
+    }
+
+    .problem-content p {
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>The Configuration Problem</h1>
+      <p class="subtitle">Copy-pasting leads to inconsistency</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="blueprints-grid">
+        <div class="mini-blueprint">
+          <div class="mini-header">
+            <span class="mini-icon">🔍</span>
+            <span class="mini-name">code-reviewer</span>
+          </div>
+          <div class="mini-body">
+            <div class="config-section">
+              <div class="config-label">MCP Config</div>
+              <div class="config-block config-duplicate">
+                neo4j-server:<br>
+                &nbsp;&nbsp;url: bolt://...<br>
+                &nbsp;&nbsp;user: neo4j<br>
+                &nbsp;&nbsp;pass: ****
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-blueprint">
+          <div class="mini-header">
+            <span class="mini-icon">📝</span>
+            <span class="mini-name">doc-writer</span>
+          </div>
+          <div class="mini-body">
+            <div class="config-section">
+              <div class="config-label">MCP Config</div>
+              <div class="config-block config-duplicate">
+                neo4j-server:<br>
+                &nbsp;&nbsp;url: bolt://...<br>
+                &nbsp;&nbsp;user: neo4j<br>
+                &nbsp;&nbsp;pass: ****
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-blueprint">
+          <div class="mini-header">
+            <span class="mini-icon">🧪</span>
+            <span class="mini-name">test-writer</span>
+          </div>
+          <div class="mini-body">
+            <div class="config-section">
+              <div class="config-label">MCP Config</div>
+              <div class="config-block config-duplicate">
+                neo4j-server:<br>
+                &nbsp;&nbsp;url: bolt://...<br>
+                &nbsp;&nbsp;user: neo4j<br>
+                &nbsp;&nbsp;pass: ****
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="problems">
+        <h3>❌ Problems</h3>
+        <ul class="problem-list">
+          <li class="problem-item">
+            <span class="problem-icon">📋</span>
+            <div class="problem-content">
+              <h4>Duplication</h4>
+              <p>Same config copied across many blueprints</p>
+            </div>
+          </li>
+          <li class="problem-item">
+            <span class="problem-icon">🔄</span>
+            <div class="problem-content">
+              <h4>Update Nightmare</h4>
+              <p>Change password? Update every blueprint manually</p>
+            </div>
+          </li>
+          <li class="problem-item">
+            <span class="problem-icon">⚠️</span>
+            <div class="problem-content">
+              <h4>Drift Risk</h4>
+              <p>Configs diverge over time, causing bugs</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="16-blueprints.html" class="nav-prev">←</a>
+      <a href="index.html" class="nav-home">⌂</a>
+      <span class="slide-number">17 / 20</span>
+      <a href="18-capabilities-solution.html" class="nav-next">→</a>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
+      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
+      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
+    });
+  </script>
+</body>
+</html>

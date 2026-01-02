@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Overview - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-dashboard: #f59e0b;
+      --color-session: #8b5cf6;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-session);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Chat Flow Visualization */
+    .chat-flow {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xl);
+    }
+
+    .flow-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-md);
+      opacity: 0;
+      animation: fadeInUp 0.5s ease forwards;
+    }
+
+    .flow-step:nth-child(1) { animation-delay: 0.1s; }
+    .flow-step:nth-child(2) { animation-delay: 0.3s; }
+    .flow-step:nth-child(3) { animation-delay: 0.5s; }
+    .flow-step:nth-child(4) { animation-delay: 0.7s; }
+    .flow-step:nth-child(5) { animation-delay: 0.9s; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-icon-container {
+      position: relative;
+    }
+
+    .step-icon {
+      width: 100px;
+      height: 100px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-border-light);
+      transition: all 0.3s ease;
+    }
+
+    .step-icon.user { border-color: var(--color-session); box-shadow: 0 0 30px rgba(139, 92, 246, 0.3); }
+    .step-icon.dashboard { border-color: var(--color-dashboard); box-shadow: 0 0 30px rgba(245, 158, 11, 0.3); }
+    .step-icon.coordinator { border-color: var(--color-coordinator); box-shadow: 0 0 30px rgba(59, 130, 246, 0.3); }
+    .step-icon.runner { border-color: var(--color-runner); box-shadow: 0 0 30px rgba(16, 185, 129, 0.3); }
+
+    .step-number {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--color-session);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: white;
+    }
+
+    .step-label {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      text-align: center;
+    }
+
+    .step-desc {
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      max-width: 120px;
+    }
+
+    /* Arrows between steps */
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      color: var(--color-text-muted);
+      font-size: 1.5rem;
+      opacity: 0;
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    .flow-arrow:nth-of-type(2) { animation-delay: 0.2s; }
+    .flow-arrow:nth-of-type(4) { animation-delay: 0.4s; }
+    .flow-arrow:nth-of-type(6) { animation-delay: 0.6s; }
+    .flow-arrow:nth-of-type(8) { animation-delay: 0.8s; }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .arrow-svg {
+      width: 60px;
+      height: 30px;
+    }
+
+    .arrow-path {
+      stroke: var(--color-text-muted);
+      stroke-width: 2;
+      fill: none;
+      stroke-dasharray: 6 4;
+      animation: flowArrow 0.8s linear infinite;
+    }
+
+    @keyframes flowArrow {
+      to { stroke-dashoffset: -10; }
+    }
+
+    /* Message bubble */
+    .message-bubble {
+      position: absolute;
+      bottom: -45px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-session);
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-lg);
+      font-size: 0.75rem;
+      color: white;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+    }
+
+    .message-bubble::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 6px solid var(--color-session);
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Your First Chat</h1>
+      <p class="subtitle">From message to AI response in 4 simple steps</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="chat-flow">
+        <div class="flow-step">
+          <div class="step-icon-container">
+            <div class="step-icon user">👤</div>
+            <div class="step-number">1</div>
+            <div class="message-bubble">"Help me review code"</div>
+          </div>
+          <div class="step-label">You</div>
+          <div class="step-desc">Type a message</div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg class="arrow-svg" viewBox="0 0 60 30">
+            <defs>
+              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+              </marker>
+            </defs>
+            <path d="M 0 15 L 50 15" class="arrow-path" marker-end="url(#arrowhead)"/>
+          </svg>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-icon-container">
+            <div class="step-icon dashboard">📊</div>
+            <div class="step-number">2</div>
+          </div>
+          <div class="step-label">Dashboard</div>
+          <div class="step-desc">Sends to Coordinator</div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg class="arrow-svg" viewBox="0 0 60 30">
+            <path d="M 0 15 L 50 15" class="arrow-path" marker-end="url(#arrowhead)"/>
+          </svg>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-icon-container">
+            <div class="step-icon coordinator">🧠</div>
+            <div class="step-number">3</div>
+          </div>
+          <div class="step-label">Coordinator</div>
+          <div class="step-desc">Queues agent run</div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg class="arrow-svg" viewBox="0 0 60 30">
+            <path d="M 0 15 L 50 15" class="arrow-path" marker-end="url(#arrowhead)"/>
+          </svg>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-icon-container">
+            <div class="step-icon runner">⚡</div>
+            <div class="step-number">4</div>
+          </div>
+          <div class="step-label">Runner</div>
+          <div class="step-desc">Executes AI agent</div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="06-architecture.html" class="nav-prev">←</a>
+      <a href="index.html" class="nav-home">⌂</a>
+      <span class="slide-number">7 / 20</span>
+      <a href="08-chat-flow.html" class="nav-next">→</a>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
+      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
+      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
+    });
+  </script>
+</body>
+</html>

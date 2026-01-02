@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Orchestrator - Introduction</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-bg-card-hover: #1e2844;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-dashboard: #f59e0b;
+      --color-session: #8b5cf6;
+      --color-executor: #ec4899;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+      --transition-normal: 250ms ease;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      min-height: 100vh;
+      padding: var(--space-xl);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: var(--space-2xl);
+      padding: var(--space-2xl) 0;
+    }
+
+    .logo {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto var(--space-lg);
+      background: linear-gradient(135deg, var(--color-coordinator), var(--color-session));
+      border-radius: var(--radius-xl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      box-shadow: 0 10px 40px rgba(59, 130, 246, 0.3);
+    }
+
+    .header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: var(--space-sm);
+      letter-spacing: -0.02em;
+    }
+
+    .header p {
+      font-size: 1.125rem;
+      color: var(--color-text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Sections */
+    .section {
+      margin-bottom: var(--space-2xl);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .section-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    /* Color coding for sections */
+    .section-intro .section-number { background: var(--color-text-muted); color: var(--color-bg); }
+    .section-components .section-number { background: var(--color-coordinator); }
+    .section-chat .section-number { background: var(--color-runner); }
+    .section-orchestration .section-number { background: var(--color-session); }
+    .section-modes .section-number { background: var(--color-executor); }
+    .section-config .section-number { background: var(--color-dashboard); }
+    .section-summary .section-number { background: linear-gradient(135deg, var(--color-coordinator), var(--color-runner)); }
+
+    /* Slide Cards */
+    .slides-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-md);
+    }
+
+    .slide-card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      text-decoration: none;
+      color: var(--color-text);
+      transition: all var(--transition-normal);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .slide-card:hover {
+      background: var(--color-bg-card-hover);
+      border-color: var(--color-border-light);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .slide-card-number {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .slide-card-title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--color-text-bright);
+      line-height: 1.3;
+    }
+
+    .slide-card-icon {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-sm);
+    }
+
+    /* Color accents on hover */
+    .section-intro .slide-card:hover { border-color: var(--color-text-muted); }
+    .section-components .slide-card:hover { border-color: var(--color-coordinator); box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2); }
+    .section-chat .slide-card:hover { border-color: var(--color-runner); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2); }
+    .section-orchestration .slide-card:hover { border-color: var(--color-session); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.2); }
+    .section-modes .slide-card:hover { border-color: var(--color-executor); box-shadow: 0 10px 30px rgba(236, 72, 153, 0.2); }
+    .section-config .slide-card:hover { border-color: var(--color-dashboard); box-shadow: 0 10px 30px rgba(245, 158, 11, 0.2); }
+    .section-summary .slide-card:hover { border-color: var(--color-coordinator); }
+
+    /* Start button */
+    .start-section {
+      text-align: center;
+      padding: var(--space-2xl) 0;
+    }
+
+    .start-button {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-lg) var(--space-2xl);
+      background: linear-gradient(135deg, var(--color-coordinator), var(--color-session));
+      border: none;
+      border-radius: var(--radius-xl);
+      color: var(--color-text-bright);
+      font-size: 1.25rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all var(--transition-normal);
+      box-shadow: 0 10px 40px rgba(59, 130, 246, 0.3);
+    }
+
+    .start-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 50px rgba(59, 130, 246, 0.4);
+    }
+
+    .start-button span {
+      font-size: 1.5rem;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: var(--space-xl) 0;
+      color: var(--color-text-muted);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--color-border);
+      margin-top: var(--space-2xl);
+    }
+
+    /* Keyboard hints */
+    .keyboard-hints {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-lg);
+      margin-top: var(--space-lg);
+      color: var(--color-text-muted);
+      font-size: 0.875rem;
+    }
+
+    .keyboard-hint {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    kbd {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: 0.25rem 0.5rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">🤖</div>
+      <h1>Agent Orchestrator</h1>
+      <p>A step-by-step introduction to managing multiple AI agents with real-time observability</p>
+    </header>
+
+    <div class="start-section">
+      <a href="01-problem.html" class="start-button">
+        Start Presentation <span>→</span>
+      </a>
+      <div class="keyboard-hints">
+        <div class="keyboard-hint"><kbd>←</kbd> <kbd>→</kbd> Navigate slides</div>
+        <div class="keyboard-hint"><kbd>H</kbd> Return home</div>
+      </div>
+    </div>
+
+    <!-- Section 1: Introduction -->
+    <section class="section section-intro">
+      <div class="section-header">
+        <div class="section-number">1</div>
+        <h2 class="section-title">The Problem & Solution</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="01-problem.html" class="slide-card">
+          <div class="slide-card-icon">❓</div>
+          <div class="slide-card-number">Slide 01</div>
+          <div class="slide-card-title">The Single Agent Problem</div>
+        </a>
+        <a href="02-solution.html" class="slide-card">
+          <div class="slide-card-icon">💡</div>
+          <div class="slide-card-number">Slide 02</div>
+          <div class="slide-card-title">The Three-Part Solution</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 2: Core Components -->
+    <section class="section section-components">
+      <div class="section-header">
+        <div class="section-number">2</div>
+        <h2 class="section-title">Core Components</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="03-coordinator.html" class="slide-card">
+          <div class="slide-card-icon">🧠</div>
+          <div class="slide-card-number">Slide 03</div>
+          <div class="slide-card-title">Agent Coordinator</div>
+        </a>
+        <a href="04-runner.html" class="slide-card">
+          <div class="slide-card-icon">⚡</div>
+          <div class="slide-card-number">Slide 04</div>
+          <div class="slide-card-title">Agent Runner</div>
+        </a>
+        <a href="05-dashboard.html" class="slide-card">
+          <div class="slide-card-icon">📊</div>
+          <div class="slide-card-number">Slide 05</div>
+          <div class="slide-card-title">Dashboard</div>
+        </a>
+        <a href="06-architecture.html" class="slide-card">
+          <div class="slide-card-icon">🔗</div>
+          <div class="slide-card-number">Slide 06</div>
+          <div class="slide-card-title">Architecture Overview</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 3: First Chat -->
+    <section class="section section-chat">
+      <div class="section-header">
+        <div class="section-number">3</div>
+        <h2 class="section-title">Your First Chat</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="07-chat-overview.html" class="slide-card">
+          <div class="slide-card-icon">💬</div>
+          <div class="slide-card-number">Slide 07</div>
+          <div class="slide-card-title">Chat Overview</div>
+        </a>
+        <a href="08-chat-flow.html" class="slide-card">
+          <div class="slide-card-icon">🔄</div>
+          <div class="slide-card-number">Slide 08</div>
+          <div class="slide-card-title">Message Flow</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 4: Orchestration -->
+    <section class="section section-orchestration">
+      <div class="section-header">
+        <div class="section-number">4</div>
+        <h2 class="section-title">Multi-Agent Orchestration</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="09-orchestration.html" class="slide-card">
+          <div class="slide-card-icon">🎭</div>
+          <div class="slide-card-number">Slide 09</div>
+          <div class="slide-card-title">Why Orchestration?</div>
+        </a>
+        <a href="10-parent-child.html" class="slide-card">
+          <div class="slide-card-icon">🌳</div>
+          <div class="slide-card-number">Slide 10</div>
+          <div class="slide-card-title">Parent-Child Agents</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 5: Execution Modes -->
+    <section class="section section-modes">
+      <div class="section-header">
+        <div class="section-number">5</div>
+        <h2 class="section-title">Execution Modes</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="11-mode-sync.html" class="slide-card">
+          <div class="slide-card-icon">⏸️</div>
+          <div class="slide-card-number">Slide 11</div>
+          <div class="slide-card-title">Synchronous</div>
+        </a>
+        <a href="12-mode-polling.html" class="slide-card">
+          <div class="slide-card-icon">🔍</div>
+          <div class="slide-card-number">Slide 12</div>
+          <div class="slide-card-title">Async + Polling</div>
+        </a>
+        <a href="13-mode-fire-forget.html" class="slide-card">
+          <div class="slide-card-icon">🚀</div>
+          <div class="slide-card-number">Slide 13</div>
+          <div class="slide-card-title">Fire & Forget</div>
+        </a>
+        <a href="14-mode-callback.html" class="slide-card">
+          <div class="slide-card-icon">📞</div>
+          <div class="slide-card-number">Slide 14</div>
+          <div class="slide-card-title">Callback</div>
+        </a>
+        <a href="15-modes-comparison.html" class="slide-card">
+          <div class="slide-card-icon">⚖️</div>
+          <div class="slide-card-number">Slide 15</div>
+          <div class="slide-card-title">Modes Comparison</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 6: Configuration -->
+    <section class="section section-config">
+      <div class="section-header">
+        <div class="section-number">6</div>
+        <h2 class="section-title">Blueprints & Capabilities</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="16-blueprints.html" class="slide-card">
+          <div class="slide-card-icon">📋</div>
+          <div class="slide-card-number">Slide 16</div>
+          <div class="slide-card-title">Agent Blueprints</div>
+        </a>
+        <a href="17-capabilities-problem.html" class="slide-card">
+          <div class="slide-card-icon">📝</div>
+          <div class="slide-card-number">Slide 17</div>
+          <div class="slide-card-title">The Config Problem</div>
+        </a>
+        <a href="18-capabilities-solution.html" class="slide-card">
+          <div class="slide-card-icon">🧩</div>
+          <div class="slide-card-number">Slide 18</div>
+          <div class="slide-card-title">Capabilities</div>
+        </a>
+        <a href="19-capabilities-example.html" class="slide-card">
+          <div class="slide-card-icon">🔮</div>
+          <div class="slide-card-number">Slide 19</div>
+          <div class="slide-card-title">Neo4j Example</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 7: Summary -->
+    <section class="section section-summary">
+      <div class="section-header">
+        <div class="section-number">✓</div>
+        <h2 class="section-title">Summary</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="20-summary.html" class="slide-card">
+          <div class="slide-card-icon">🎯</div>
+          <div class="slide-card-number">Slide 20</div>
+          <div class="slide-card-title">Putting It All Together</div>
+        </a>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Agent Orchestrator • Framework for Multi-Agent AI Systems</p>
+    </footer>
+  </div>
+</body>
+</html>

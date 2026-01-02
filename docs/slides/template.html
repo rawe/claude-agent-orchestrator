@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slide Title - Agent Orchestrator</title>
+  <style>
+    /* ============================================
+       AGENT ORCHESTRATOR - DESIGN SYSTEM
+       ============================================ */
+
+    :root {
+      /* Background Colors */
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-bg-card-hover: #1e2844;
+
+      /* Primary Component Colors */
+      --color-coordinator: #3b82f6;
+      --color-coordinator-glow: rgba(59, 130, 246, 0.3);
+      --color-runner: #10b981;
+      --color-runner-glow: rgba(16, 185, 129, 0.3);
+      --color-dashboard: #f59e0b;
+      --color-dashboard-glow: rgba(245, 158, 11, 0.3);
+      --color-session: #8b5cf6;
+      --color-session-glow: rgba(139, 92, 246, 0.3);
+      --color-executor: #ec4899;
+      --color-executor-glow: rgba(236, 72, 153, 0.3);
+
+      /* Text Colors */
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+
+      /* Accent Colors */
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-success: #22c55e;
+      --color-warning: #eab308;
+      --color-error: #ef4444;
+
+      /* Typography */
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+      /* Spacing */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+      --space-3xl: 4rem;
+
+      /* Border Radius */
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --radius-full: 9999px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+      --shadow-glow-blue: 0 0 30px rgba(59, 130, 246, 0.3);
+      --shadow-glow-green: 0 0 30px rgba(16, 185, 129, 0.3);
+      --shadow-glow-amber: 0 0 30px rgba(245, 158, 11, 0.3);
+
+      /* Transitions */
+      --transition-fast: 150ms ease;
+      --transition-normal: 250ms ease;
+      --transition-slow: 400ms ease;
+    }
+
+    /* ============================================
+       RESET & BASE
+       ============================================ */
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ============================================
+       SLIDE CONTAINER
+       ============================================ */
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .slide > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ============================================
+       HEADER
+       ============================================ */
+
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+      flex-shrink: 0;
+    }
+
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      letter-spacing: -0.02em;
+      margin-bottom: var(--space-sm);
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+      font-weight: 400;
+    }
+
+    /* ============================================
+       MAIN CONTENT
+       ============================================ */
+
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    /* ============================================
+       NAVIGATION
+       ============================================ */
+
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+      flex-shrink: 0;
+    }
+
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+
+    .slide-nav a:hover {
+      background: var(--color-bg-card-hover);
+      border-color: var(--color-coordinator);
+      box-shadow: var(--shadow-glow-blue);
+      transform: translateY(-2px);
+    }
+
+    .slide-nav a.disabled {
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .slide-number {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      font-variant-numeric: tabular-nums;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .nav-home {
+      font-size: 1rem !important;
+    }
+
+    /* ============================================
+       COMPONENT BOXES
+       ============================================ */
+
+    .box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      transition: all var(--transition-normal);
+    }
+
+    .box-coordinator {
+      border-color: var(--color-coordinator);
+      box-shadow: 0 0 20px var(--color-coordinator-glow);
+    }
+
+    .box-runner {
+      border-color: var(--color-runner);
+      box-shadow: 0 0 20px var(--color-runner-glow);
+    }
+
+    .box-dashboard {
+      border-color: var(--color-dashboard);
+      box-shadow: 0 0 20px var(--color-dashboard-glow);
+    }
+
+    .box-session {
+      border-color: var(--color-session);
+      box-shadow: 0 0 20px var(--color-session-glow);
+    }
+
+    .box-executor {
+      border-color: var(--color-executor);
+      box-shadow: 0 0 20px var(--color-executor-glow);
+    }
+
+    .box-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: var(--space-sm);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .box-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+
+    .box-icon-coordinator { background: var(--color-coordinator); }
+    .box-icon-runner { background: var(--color-runner); }
+    .box-icon-dashboard { background: var(--color-dashboard); }
+    .box-icon-session { background: var(--color-session); }
+
+    /* ============================================
+       SVG DIAGRAMS
+       ============================================ */
+
+    .diagram {
+      width: 100%;
+      max-width: 1000px;
+      height: auto;
+    }
+
+    .diagram-lg {
+      max-width: 1200px;
+    }
+
+    .diagram-sm {
+      max-width: 600px;
+    }
+
+    /* SVG Styles */
+    .svg-box {
+      fill: var(--color-bg-card);
+      stroke-width: 2;
+    }
+
+    .svg-box-coordinator { stroke: var(--color-coordinator); }
+    .svg-box-runner { stroke: var(--color-runner); }
+    .svg-box-dashboard { stroke: var(--color-dashboard); }
+    .svg-box-session { stroke: var(--color-session); }
+    .svg-box-executor { stroke: var(--color-executor); }
+
+    .svg-text {
+      fill: var(--color-text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+    }
+
+    .svg-text-title {
+      fill: var(--color-text-bright);
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .svg-text-muted {
+      fill: var(--color-text-muted);
+      font-size: 12px;
+    }
+
+    .svg-arrow {
+      stroke: var(--color-text-muted);
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrowhead);
+    }
+
+    .svg-arrow-animated {
+      stroke-dasharray: 8 4;
+      animation: flowAnimation 1s linear infinite;
+    }
+
+    @keyframes flowAnimation {
+      to {
+        stroke-dashoffset: -12;
+      }
+    }
+
+    .svg-glow-coordinator { filter: drop-shadow(0 0 10px var(--color-coordinator-glow)); }
+    .svg-glow-runner { filter: drop-shadow(0 0 10px var(--color-runner-glow)); }
+    .svg-glow-dashboard { filter: drop-shadow(0 0 10px var(--color-dashboard-glow)); }
+
+    /* ============================================
+       TIMELINE DIAGRAMS
+       ============================================ */
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+      width: 100%;
+      max-width: 800px;
+    }
+
+    .timeline-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .timeline-label {
+      width: 120px;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .timeline-bar {
+      flex: 1;
+      height: 40px;
+      background: var(--color-bg-card);
+      border-radius: var(--radius-md);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .timeline-segment {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-text-bright);
+    }
+
+    .segment-active { background: var(--color-runner); }
+    .segment-waiting { background: var(--color-text-muted); opacity: 0.3; }
+    .segment-blocked { background: var(--color-error); opacity: 0.5; }
+
+    /* ============================================
+       CARDS & LISTS
+       ============================================ */
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-lg);
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      transition: all var(--transition-normal);
+    }
+
+    .card:hover {
+      border-color: var(--color-border-light);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .card-description {
+      color: var(--color-text-muted);
+      font-size: 0.9375rem;
+      line-height: 1.5;
+    }
+
+    /* ============================================
+       FEATURE LISTS
+       ============================================ */
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      color: var(--color-text);
+      font-size: 0.9375rem;
+    }
+
+    .feature-list li::before {
+      content: '→';
+      color: var(--color-coordinator);
+      font-weight: bold;
+    }
+
+    /* ============================================
+       BADGES & TAGS
+       ============================================ */
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-coordinator {
+      background: var(--color-coordinator-glow);
+      color: var(--color-coordinator);
+      border: 1px solid var(--color-coordinator);
+    }
+
+    .badge-runner {
+      background: var(--color-runner-glow);
+      color: var(--color-runner);
+      border: 1px solid var(--color-runner);
+    }
+
+    .badge-dashboard {
+      background: var(--color-dashboard-glow);
+      color: var(--color-dashboard);
+      border: 1px solid var(--color-dashboard);
+    }
+
+    /* ============================================
+       CODE BLOCKS
+       ============================================ */
+
+    .code-block {
+      background: #0d1117;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      color: var(--color-text);
+    }
+
+    .code-keyword { color: #ff7b72; }
+    .code-string { color: #a5d6ff; }
+    .code-comment { color: #8b949e; }
+
+    /* ============================================
+       ANIMATIONS
+       ============================================ */
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .animate-fade-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+
+    .animate-pulse {
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .animate-scale-in {
+      animation: scaleIn 0.4s ease forwards;
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; }
+
+    /* ============================================
+       UTILITY CLASSES
+       ============================================ */
+
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .text-right { text-align: right; }
+
+    .text-coordinator { color: var(--color-coordinator); }
+    .text-runner { color: var(--color-runner); }
+    .text-dashboard { color: var(--color-dashboard); }
+    .text-session { color: var(--color-session); }
+    .text-muted { color: var(--color-text-muted); }
+
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .gap-sm { gap: var(--space-sm); }
+    .gap-md { gap: var(--space-md); }
+    .gap-lg { gap: var(--space-lg); }
+    .gap-xl { gap: var(--space-xl); }
+
+    .w-full { width: 100%; }
+    .max-w-md { max-width: 600px; }
+    .max-w-lg { max-width: 800px; }
+    .max-w-xl { max-width: 1000px; }
+
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+
+    @media (max-width: 768px) {
+      .slide {
+        padding: var(--space-md);
+      }
+
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-label {
+        width: 80px;
+        font-size: 0.875rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Slide Title</h1>
+      <p class="subtitle">Brief description or context</p>
+    </header>
+
+    <main class="slide-content">
+      <!-- Primary visual content goes here -->
+
+      <!-- Example: SVG with arrow markers -->
+      <svg class="diagram" viewBox="0 0 800 400">
+        <defs>
+          <!-- Arrow marker definition -->
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+          </marker>
+          <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+          </marker>
+        </defs>
+
+        <!-- Example box -->
+        <rect x="100" y="150" width="200" height="100" rx="12"
+              class="svg-box svg-box-coordinator svg-glow-coordinator"/>
+        <text x="200" y="195" text-anchor="middle" class="svg-text-title">Agent Coordinator</text>
+        <text x="200" y="220" text-anchor="middle" class="svg-text-muted">Port 8765</text>
+
+        <!-- Example arrow -->
+        <path d="M 320 200 L 480 200" class="svg-arrow svg-arrow-animated"
+              marker-end="url(#arrowhead)"/>
+
+        <!-- Another box -->
+        <rect x="500" y="150" width="200" height="100" rx="12"
+              class="svg-box svg-box-runner svg-glow-runner"/>
+        <text x="600" y="195" text-anchor="middle" class="svg-text-title">Agent Runner</text>
+        <text x="600" y="220" text-anchor="middle" class="svg-text-muted">Executor</text>
+      </svg>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="#" class="nav-prev disabled" aria-label="Previous slide">←</a>
+      <a href="index.html" class="nav-home" aria-label="Home">⌂</a>
+      <span class="slide-number">1 / 20</span>
+      <a href="#" class="nav-next" aria-label="Next slide">→</a>
+    </nav>
+  </div>
+
+  <script>
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') {
+        const prev = document.querySelector('.nav-prev:not(.disabled)');
+        if (prev) prev.click();
+      }
+      if (e.key === 'ArrowRight') {
+        const next = document.querySelector('.nav-next:not(.disabled)');
+        if (next) next.click();
+      }
+      if (e.key === 'Home' || e.key === 'h') {
+        document.querySelector('.nav-home')?.click();
+      }
+    });
+  </script>
+</body>
+</html>

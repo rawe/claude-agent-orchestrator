@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Problem - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-dashboard: #f59e0b;
+      --color-session: #8b5cf6;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-error: #ef4444;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-coordinator);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* Problem Visual */
+    .problem-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xl);
+    }
+
+    .agent-box {
+      position: relative;
+      width: 280px;
+      height: 160px;
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-error);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 40px rgba(239, 68, 68, 0.2);
+    }
+
+    .agent-icon {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .agent-label {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .limitations {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-md);
+      max-width: 700px;
+    }
+
+    .limitation {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: var(--space-md) var(--space-lg);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      animation: fadeInUp 0.5s ease forwards;
+      opacity: 0;
+    }
+
+    .limitation:nth-child(1) { animation-delay: 0.2s; }
+    .limitation:nth-child(2) { animation-delay: 0.3s; }
+    .limitation:nth-child(3) { animation-delay: 0.4s; }
+    .limitation:nth-child(4) { animation-delay: 0.5s; }
+
+    .limitation-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--color-error);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .limitation-text {
+      font-size: 0.9375rem;
+      color: var(--color-text);
+    }
+
+    .limitation-text strong {
+      color: var(--color-error);
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.2); }
+      50% { box-shadow: 0 0 60px rgba(239, 68, 68, 0.4); }
+    }
+
+    .agent-box {
+      animation: pulse 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>The Single Agent Problem</h1>
+      <p class="subtitle">One AI agent, many limitations</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="problem-container">
+        <div class="agent-box">
+          <div class="agent-icon">🤖</div>
+          <div class="agent-label">Single Agent</div>
+        </div>
+
+        <div class="limitations">
+          <div class="limitation">
+            <div class="limitation-icon">👁️</div>
+            <div class="limitation-text"><strong>No visibility</strong> into what it's doing</div>
+          </div>
+          <div class="limitation">
+            <div class="limitation-icon">🔗</div>
+            <div class="limitation-text"><strong>No coordination</strong> with other agents</div>
+          </div>
+          <div class="limitation">
+            <div class="limitation-icon">📊</div>
+            <div class="limitation-text"><strong>No monitoring</strong> of progress or status</div>
+          </div>
+          <div class="limitation">
+            <div class="limitation-icon">🎮</div>
+            <div class="limitation-text"><strong>No control</strong> to stop or adjust</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="index.html" class="nav-prev disabled">←</a>
+      <a href="index.html" class="nav-home">⌂</a>
+      <span class="slide-number">1 / 20</span>
+      <a href="02-solution.html" class="nav-next">→</a>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
+      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
+      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
+    });
+  </script>
+</body>
+</html>

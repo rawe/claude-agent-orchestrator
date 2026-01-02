@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Async + Polling Mode - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-session: #8b5cf6;
+      --color-polling: #f59e0b;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-muted);
+    }
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-lg);
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--color-polling);
+      border-radius: var(--radius-full);
+      color: var(--color-polling);
+      font-weight: 600;
+      margin-bottom: var(--space-md);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-polling);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Timeline */
+    .timeline-container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+      padding: 0 100px;
+    }
+
+    .time-label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+    }
+
+    .timeline-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: var(--space-lg);
+      position: relative;
+    }
+
+    .row-label {
+      width: 100px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--color-text-bright);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .row-icon {
+      font-size: 1.25rem;
+    }
+
+    .timeline-track {
+      flex: 1;
+      height: 50px;
+      background: var(--color-bg-card);
+      border-radius: var(--radius-md);
+      position: relative;
+      overflow: visible;
+    }
+
+    .segment {
+      position: absolute;
+      top: 5px;
+      bottom: 5px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .segment-active {
+      background: linear-gradient(135deg, var(--color-runner), #059669);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    }
+
+    .segment-working {
+      background: linear-gradient(135deg, var(--color-session), #7c3aed);
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+    }
+
+    /* Polling arrows */
+    .poll-arrows {
+      position: absolute;
+      top: 55px;
+      left: 100px;
+      right: 0;
+      height: 60px;
+    }
+
+    .poll-arrow {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .poll-line {
+      width: 2px;
+      height: 20px;
+      background: var(--color-polling);
+    }
+
+    .poll-icon {
+      font-size: 0.875rem;
+      color: var(--color-polling);
+      animation: bounce 1s ease-in-out infinite;
+    }
+
+    .poll-label {
+      font-size: 0.625rem;
+      color: var(--color-polling);
+      white-space: nowrap;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .poll-arrow:nth-child(1) { left: 25%; animation-delay: 0s; }
+    .poll-arrow:nth-child(2) { left: 40%; animation-delay: 0.2s; }
+    .poll-arrow:nth-child(3) { left: 55%; animation-delay: 0.4s; }
+    .poll-arrow:nth-child(4) { left: 70%; animation-delay: 0.6s; }
+
+    .poll-arrow:nth-child(4) .poll-label {
+      color: var(--color-runner);
+    }
+
+    .poll-arrow:nth-child(4) .poll-icon {
+      color: var(--color-runner);
+    }
+
+    /* Info Panel */
+    .info-panel {
+      width: 280px;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+    }
+
+    .info-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .info-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .info-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+
+    .info-item-icon {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .use-case {
+      margin-top: var(--space-lg);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .use-case-label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .use-case-text {
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <div class="mode-badge">🔍 Mode 2 of 4</div>
+      <h1>Async + Polling</h1>
+      <p class="subtitle">Parent works and checks periodically</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="timeline-container">
+        <div class="timeline-header">
+          <span class="time-label">Start</span>
+          <span class="time-label">Time →</span>
+          <span class="time-label">End</span>
+        </div>
+
+        <!-- Parent Row -->
+        <div class="timeline-row">
+          <div class="row-label">
+            <span class="row-icon">🎭</span>
+            Parent
+          </div>
+          <div class="timeline-track">
+            <div class="segment segment-working" style="left: 0; width: 70%;">Working on other tasks...</div>
+            <div class="segment segment-active" style="left: 70%; width: 30%;">Got result!</div>
+          </div>
+        </div>
+
+        <!-- Child Row -->
+        <div class="timeline-row">
+          <div class="row-label">
+            <span class="row-icon">🔍</span>
+            Child
+          </div>
+          <div class="timeline-track">
+            <div class="segment segment-active" style="left: 5%; width: 60%;">Processing task...</div>
+          </div>
+
+          <!-- Polling Arrows -->
+          <div class="poll-arrows">
+            <div class="poll-arrow">
+              <div class="poll-line"></div>
+              <div class="poll-icon">🔍</div>
+              <div class="poll-label">Not ready</div>
+            </div>
+            <div class="poll-arrow">
+              <div class="poll-line"></div>
+              <div class="poll-icon">🔍</div>
+              <div class="poll-label">Not ready</div>
+            </div>
+            <div class="poll-arrow">
+              <div class="poll-line"></div>
+              <div class="poll-icon">🔍</div>
+              <div class="poll-label">Not ready</div>
+            </div>
+            <div class="poll-arrow">
+              <div class="poll-line"></div>
+              <div class="poll-icon">✓</div>
+              <div class="poll-label">Done!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-panel">
+        <h3 class="info-title">📋 Characteristics</h3>
+        <ul class="info-list">
+          <li class="info-item">
+            <span class="info-item-icon">🔓</span>
+            <span>Parent is <strong>not blocked</strong></span>
+          </li>
+          <li class="info-item">
+            <span class="info-item-icon">🔄</span>
+            <span>Requires <strong>active checking</strong> for completion</span>
+          </li>
+          <li class="info-item">
+            <span class="info-item-icon">⚡</span>
+            <span>Can do other work while waiting</span>
+          </li>
+        </ul>
+
+        <div class="use-case">
+          <div class="use-case-label">Best for</div>
+          <div class="use-case-text">
+            Long-running tasks where parent has other work to do but still needs the result
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="11-mode-sync.html" class="nav-prev">←</a>
+      <a href="index.html" class="nav-home">⌂</a>
+      <span class="slide-number">12 / 20</span>
+      <a href="13-mode-fire-forget.html" class="nav-next">→</a>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
+      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
+      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
+    });
+  </script>
+</body>
+</html>
