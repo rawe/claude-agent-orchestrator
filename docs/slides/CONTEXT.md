@@ -8,8 +8,8 @@ You are editing an HTML slide presentation about the Agent Orchestrator framewor
 docs/slides/
 ├── index.html          # Navigation hub - UPDATE when adding/removing slides
 ├── template.html       # Design system reference - READ for styling patterns
-├── 01-problem.html     # Main flow slides (01 through 20)
-├── 01a-problem-*.html  # Deep dive slides (out of main flow)
+├── 01-orchestration.html  # Main flow slides (01 through 21)
+├── 02a-problem-*.html     # Deep dive slides (out of main flow)
 └── 20-summary.html
 ```
 
@@ -149,7 +149,7 @@ Deep dives are detail slides accessible via click but **not** in the arrow-key n
 
 <!-- Navigation: only back link, no prev/next -->
 <nav class="slide-nav">
-  <a href="01-problem.html" class="nav-back">←</a>
+  <a href="02-problem.html" class="nav-back">←</a>
   <span class="nav-label">Back to Overview</span>
 </nav>
 
@@ -190,10 +190,10 @@ To remove: delete the corresponding card.
 
 | # | File | Section |
 |---|------|---------|
-| 1-2 | 01-problem, 02-solution | Problem & Solution |
-| 3-7 | 03-coordinator through 07-architecture | Core Components (incl. Context Store) |
-| 8-9 | 08-chat-overview, 09-chat-flow | First Chat |
-| 10-11 | 10-orchestration, 11-parent-child | Orchestration |
+| 1-3 | 01-orchestration, 02-problem, 03-solution | Motivation & Problem |
+| 4-8 | 04-coordinator through 08-architecture | Core Components |
+| 9-10 | 09-chat-overview, 10-chat-flow | First Chat |
+| 11 | 11-parent-child | Parent-Child Orchestration |
 | 12-16 | 12-mode-sync through 16-modes-comparison | Execution Modes |
 | 17-20 | 17-blueprints through 20-capabilities-example | Config System |
 | 21 | 21-summary | Summary |
@@ -202,9 +202,9 @@ To remove: delete the corresponding card.
 
 | File | Parent | Topic |
 |------|--------|-------|
-| 01a-problem-multiagent.html | 01-problem | Multi-Agent Coordination |
-| 01b-problem-context.html | 01-problem | Context Sharing |
-| 01c-problem-provider.html | 01-problem | Provider Lock-in |
+| 02a-problem-multiagent.html | 02-problem | Multi-Agent Coordination |
+| 02b-problem-context.html | 02-problem | Context Sharing |
+| 02c-problem-provider.html | 02-problem | Provider Lock-in |
 
 ## Visual Patterns Reference
 

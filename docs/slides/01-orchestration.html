@@ -313,6 +313,73 @@
     @keyframes flowDown {
       to { stroke-dashoffset: -7; }
     }
+
+    /* Benefits Panel */
+    .benefits-panel {
+      position: absolute;
+      right: var(--space-xl);
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      max-width: 280px;
+    }
+
+    .benefits-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-success);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .benefit-card {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--color-success);
+      border-radius: var(--radius-md);
+      opacity: 0;
+      animation: fadeInRight 0.4s ease forwards;
+    }
+
+    .benefit-card:nth-child(2) { animation-delay: 0.2s; }
+    .benefit-card:nth-child(3) { animation-delay: 0.4s; }
+    .benefit-card:nth-child(4) { animation-delay: 0.6s; }
+    .benefit-card:nth-child(5) { animation-delay: 0.8s; }
+
+    @keyframes fadeInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .benefit-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .benefit-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
+
+    .benefit-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .benefit-desc {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -378,13 +445,46 @@
           </div>
         </div>
       </div>
+
+      <!-- Benefits Panel -->
+      <div class="benefits-panel">
+        <div class="benefits-title">Why It Works</div>
+        <div class="benefit-card">
+          <span class="benefit-icon">⚡</span>
+          <div class="benefit-content">
+            <span class="benefit-title">Parallel Execution</span>
+            <span class="benefit-desc">Tasks run simultaneously, not one after another</span>
+          </div>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">🎯</span>
+          <div class="benefit-content">
+            <span class="benefit-title">Specialized Agents</span>
+            <span class="benefit-desc">Each agent focuses on what it does best</span>
+          </div>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">🧠</span>
+          <div class="benefit-content">
+            <span class="benefit-title">Focused Context</span>
+            <span class="benefit-desc">Smaller context windows = better results</span>
+          </div>
+        </div>
+        <div class="benefit-card">
+          <span class="benefit-icon">📈</span>
+          <div class="benefit-content">
+            <span class="benefit-title">Easy to Scale</span>
+            <span class="benefit-desc">Add more agents as your needs grow</span>
+          </div>
+        </div>
+      </div>
     </main>
 
     <nav class="slide-nav">
-      <a href="09-chat-flow.html" class="nav-prev">←</a>
+      <a href="index.html" class="nav-prev disabled">←</a>
       <a href="index.html" class="nav-home">⌂</a>
-      <span class="slide-number">10 / 21</span>
-      <a href="11-parent-child.html" class="nav-next">→</a>
+      <span class="slide-number">1 / 21</span>
+      <a href="02-problem.html" class="nav-next">→</a>
     </nav>
   </div>
 
