@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MessageSquare, Activity, Settings, Server, ArrowDown, Database, Zap, GitBranch } from 'lucide-react';
+import { MessageSquare, Activity, Settings, Server, ArrowDown, Database, Zap, GitBranch, Puzzle } from 'lucide-react';
 
 export function Home() {
   return (
@@ -11,7 +11,7 @@ export function Home() {
             Agent Orchestration Framework
           </h1>
           <p className="text-xl text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-            A powerful framework for orchestrating AI agents with Claude Code.
+            A powerful framework for orchestrating AI agents.
             Create specialized agent teams, coordinate work through callbacks,
             and share context across isolated sessions.
           </p>
@@ -40,8 +40,8 @@ export function Home() {
               <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Settings className="w-6 h-6 text-indigo-600" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Agent Blueprints</h3>
-              <p className="text-sm text-gray-500">Define reusable agent configurations with custom prompts and MCP servers</p>
+              <h3 className="font-semibold text-gray-900 mb-1">Agent Management</h3>
+              <p className="text-sm text-gray-500">Define agent personalities and compose shared capabilities for reusable configurations</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-3">
@@ -201,120 +201,145 @@ export function Home() {
             Navigate the framework using these sections
           </p>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Chat */}
-            <Link
-              to="/chat"
-              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-indigo-100 rounded-xl group-hover:bg-indigo-200 transition-colors">
-                  <MessageSquare className="w-5 h-5 text-indigo-600" />
+          {/* Interaction Section */}
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Interaction</h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Link
+                to="/chat"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-indigo-100 rounded-xl group-hover:bg-indigo-200 transition-colors">
+                    <MessageSquare className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Chat</h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Chat</h3>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Start new agent sessions with prompts. Select an agent blueprint,
-                enter your task, and launch a new Claude Code session.
-              </p>
-            </Link>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Start new agent sessions with prompts. Select an agent blueprint,
+                  enter your task, and launch a new Claude Code session.
+                </p>
+              </Link>
+            </div>
+          </div>
 
-            {/* Agent Sessions */}
-            <Link
-              to="/sessions"
-              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-green-300 hover:-translate-y-1 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
-                  <Activity className="w-5 h-5 text-green-600" />
+          {/* Agent Management Section */}
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Agent Management</h3>
+            <p className="text-xs text-gray-400 mb-4">Define what agents know and how they connect to tools</p>
+            <div className="grid md:grid-cols-2 gap-6">
+              <Link
+                to="/agents"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-indigo-100 rounded-xl group-hover:bg-indigo-200 transition-colors">
+                    <Settings className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Agent Blueprints</h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">Agent Sessions</h3>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Monitor running and completed sessions in real-time. View event
-                timelines, session status, and execution results.
-              </p>
-            </Link>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Create and configure agent blueprints. Define system prompts,
+                  assign capabilities, and customize agent behavior.
+                </p>
+              </Link>
 
-            {/* Agent Runs */}
-            <Link
-              to="/runs"
-              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-orange-300 hover:-translate-y-1 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-orange-100 rounded-xl group-hover:bg-orange-200 transition-colors">
-                  <Zap className="w-5 h-5 text-orange-600" />
+              <Link
+                to="/capabilities"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-cyan-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-cyan-100 rounded-xl group-hover:bg-cyan-200 transition-colors">
+                    <Puzzle className="w-5 h-5 text-cyan-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-cyan-600 transition-colors">Capabilities</h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">Agent Runs</h3>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Track distributed task execution across runners. Monitor run
-                status, execution timelines, and runner assignments in real-time.
-              </p>
-            </Link>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Create reusable knowledge modules with MCP servers and instructions.
+                  Share domain knowledge across multiple agents.
+                </p>
+              </Link>
+            </div>
+          </div>
 
-            {/* Context Store */}
-            <Link
-              to="/context-store"
-              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-purple-300 hover:-translate-y-1 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-purple-100 rounded-xl group-hover:bg-purple-200 transition-colors">
-                  <Database className="w-5 h-5 text-purple-600" />
+          {/* Session Monitoring Section */}
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Session Monitoring</h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <Link
+                to="/sessions"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-green-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
+                    <Activity className="w-5 h-5 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">Agent Sessions</h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">Context Store</h3>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Manage shared documents that agents can access. Push and pull
-                documents to share information across isolated sessions.
-              </p>
-            </Link>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Monitor running and completed sessions in real-time. View event
+                  timelines, session status, and execution results.
+                </p>
+              </Link>
 
-            {/* Agent Blueprints */}
-            <Link
-              to="/agents"
-              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-indigo-100 rounded-xl group-hover:bg-indigo-200 transition-colors">
-                  <Settings className="w-5 h-5 text-indigo-600" />
+              <Link
+                to="/runs"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-orange-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-orange-100 rounded-xl group-hover:bg-orange-200 transition-colors">
+                    <Zap className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">Agent Runs</h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Agent Blueprints</h3>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Create and configure agent blueprints. Define system prompts,
-                assign MCP servers, and set agent capabilities.
-              </p>
-            </Link>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Track distributed task execution across runners. Monitor run
+                  status, execution timelines, and runner assignments in real-time.
+                </p>
+              </Link>
+            </div>
+          </div>
 
-            {/* Agent Runners */}
-            <Link
-              to="/runners"
-              className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-teal-300 hover:-translate-y-1 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-teal-100 rounded-xl group-hover:bg-teal-200 transition-colors">
-                  <Server className="w-5 h-5 text-teal-600" />
+          {/* Infrastructure Section */}
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Infrastructure</h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <Link
+                to="/context-store"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-purple-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-purple-100 rounded-xl group-hover:bg-purple-200 transition-colors">
+                    <Database className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">Context Store</h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">Agent Runners</h3>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                View registered runners and their health status. Runners
-                execute agent sessions as Claude Code subprocesses.
-              </p>
-            </Link>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Manage shared documents that agents can access. Push and pull
+                  documents to share information across isolated sessions.
+                </p>
+              </Link>
+
+              <Link
+                to="/runners"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-teal-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-teal-100 rounded-xl group-hover:bg-teal-200 transition-colors">
+                    <Server className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">Agent Runners</h3>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  View registered runners and their health status. Runners
+                  execute agent sessions as Claude Code subprocesses.
+                </p>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-8 py-8 border-t border-gray-200 bg-white">
-        <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm text-gray-500">
-            Built with Claude Code Agent SDK
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
