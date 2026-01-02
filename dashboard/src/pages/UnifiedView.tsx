@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Badge } from '@/components/common';
 import {
   Layers,
   Zap,
@@ -75,13 +74,8 @@ export function UnifiedView() {
       <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-gray-900">Unified View</h1>
-              <Badge variant="warning" size="sm">
-                Mock
-              </Badge>
-            </div>
-            <p className="text-sm text-gray-500">Compare different session/run visualization approaches</p>
+            <h1 className="text-lg font-semibold text-gray-900">Sessions & Runs</h1>
+            <p className="text-sm text-gray-500">Unified view combining session and run data</p>
           </div>
         </div>
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />

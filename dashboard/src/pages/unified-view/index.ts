@@ -1,7 +1,6 @@
 // Barrel export for unified-view module
 
 export * from './types';
-export * from './mock-data';
 export * from './utils';
 export * from './SessionTimelineTab';
 export * from './RunCentricTab';
