@@ -125,6 +125,7 @@
     .section-orchestration .section-number { background: var(--color-session); }
     .section-modes .section-number { background: var(--color-executor); }
     .section-config .section-number { background: var(--color-dashboard); }
+    .section-deepdives .section-number { background: var(--color-text-muted); color: var(--color-bg); font-size: 0.75rem; }
     .section-summary .section-number { background: linear-gradient(135deg, var(--color-coordinator), var(--color-runner)); }
 
     /* Slide Cards */
@@ -181,7 +182,24 @@
     .section-orchestration .slide-card:hover { border-color: var(--color-session); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.2); }
     .section-modes .slide-card:hover { border-color: var(--color-executor); box-shadow: 0 10px 30px rgba(236, 72, 153, 0.2); }
     .section-config .slide-card:hover { border-color: var(--color-dashboard); box-shadow: 0 10px 30px rgba(245, 158, 11, 0.2); }
+    .section-deepdives .slide-card:hover { border-color: var(--color-border-light); }
     .section-summary .slide-card:hover { border-color: var(--color-coordinator); }
+
+    /* Deep dive cards - smaller/subtle styling */
+    .section-deepdives .slide-card {
+      padding: var(--space-md);
+      background: rgba(20, 27, 45, 0.5);
+    }
+    .section-deepdives .slide-card-icon {
+      font-size: 1.25rem;
+      margin-bottom: var(--space-sm);
+    }
+    .section-deepdives .slide-card-number {
+      font-size: 0.625rem;
+    }
+    .section-deepdives .slide-card-title {
+      font-size: 0.875rem;
+    }
 
     /* Start button */
     .start-section {
@@ -278,7 +296,7 @@
         <a href="01-problem.html" class="slide-card">
           <div class="slide-card-icon">❓</div>
           <div class="slide-card-number">Slide 01</div>
-          <div class="slide-card-title">The Single Agent Problem</div>
+          <div class="slide-card-title">The Challenges</div>
         </a>
         <a href="02-solution.html" class="slide-card">
           <div class="slide-card-icon">💡</div>
@@ -419,6 +437,31 @@
           <div class="slide-card-icon">🔮</div>
           <div class="slide-card-number">Slide 19</div>
           <div class="slide-card-title">Neo4j Example</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Deep Dives (out of main flow) -->
+    <section class="section section-deepdives">
+      <div class="section-header">
+        <div class="section-number">+</div>
+        <h2 class="section-title">Deep Dives</h2>
+      </div>
+      <div class="slides-grid">
+        <a href="01a-problem-multiagent.html" class="slide-card">
+          <div class="slide-card-icon">🔗</div>
+          <div class="slide-card-number">Slide 01a</div>
+          <div class="slide-card-title">Multi-Agent Coordination</div>
+        </a>
+        <a href="01b-problem-context.html" class="slide-card">
+          <div class="slide-card-icon">📄</div>
+          <div class="slide-card-number">Slide 01b</div>
+          <div class="slide-card-title">Context Sharing</div>
+        </a>
+        <a href="01c-problem-provider.html" class="slide-card">
+          <div class="slide-card-icon">🔌</div>
+          <div class="slide-card-number">Slide 01c</div>
+          <div class="slide-card-title">Provider Lock-in</div>
         </a>
       </div>
     </section>

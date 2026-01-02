@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent Coordination - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-error: #ef4444;
+      --color-session: #8b5cf6;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-header .badge {
+      display: inline-block;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--color-error);
+      color: var(--color-error);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-error);
+      transform: translateY(-2px);
+    }
+    .nav-label {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Diagram */
+    .diagram-container {
+      flex: 1;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .orchestrator-box {
+      width: 200px;
+      padding: var(--space-md);
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-session);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    }
+
+    .orchestrator-icon {
+      font-size: 2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .orchestrator-label {
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .spawn-lines {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+      margin: var(--space-md) 0;
+    }
+
+    .spawn-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .spawn-arrow {
+      width: 2px;
+      height: 40px;
+      background: var(--color-error);
+      position: relative;
+    }
+
+    .spawn-arrow::after {
+      content: '?';
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.25rem;
+      color: var(--color-error);
+      font-weight: bold;
+    }
+
+    .child-agents {
+      display: flex;
+      gap: var(--space-lg);
+    }
+
+    .child-agent {
+      width: 100px;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 2px dashed var(--color-error);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      opacity: 0.7;
+    }
+
+    .child-icon {
+      font-size: 1.5rem;
+    }
+
+    .child-label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .question-bubbles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      justify-content: center;
+      margin-top: var(--space-lg);
+      max-width: 400px;
+    }
+
+    .question-bubble {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--color-error);
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      color: var(--color-error);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .question-bubble:nth-child(2) { animation-delay: 0.3s; }
+    .question-bubble:nth-child(3) { animation-delay: 0.6s; }
+    .question-bubble:nth-child(4) { animation-delay: 0.9s; }
+
+    /* Challenges List */
+    .challenges-container {
+      flex: 1;
+      max-width: 450px;
+    }
+
+    .challenge-category {
+      margin-bottom: var(--space-lg);
+    }
+
+    .category-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-error);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .challenge-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .challenge-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .challenge-item:nth-child(1) { animation-delay: 0.1s; }
+    .challenge-item:nth-child(2) { animation-delay: 0.2s; }
+    .challenge-item:nth-child(3) { animation-delay: 0.3s; }
+
+    .challenge-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .challenge-text {
+      font-size: 0.875rem;
+      color: var(--color-text);
+      line-height: 1.4;
+    }
+
+    .challenge-text strong {
+      color: var(--color-text-bright);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.02); }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <div class="badge">Deep Dive</div>
+      <h1>Multi-Agent Coordination</h1>
+      <p class="subtitle">The challenge of orchestrating multiple AI agents</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="diagram-container">
+        <div class="orchestrator-box">
+          <div class="orchestrator-icon">🧠</div>
+          <div class="orchestrator-label">Orchestrator</div>
+        </div>
+
+        <div class="spawn-lines">
+          <div class="spawn-line"><div class="spawn-arrow"></div></div>
+          <div class="spawn-line"><div class="spawn-arrow"></div></div>
+          <div class="spawn-line"><div class="spawn-arrow"></div></div>
+        </div>
+
+        <div class="child-agents">
+          <div class="child-agent">
+            <div class="child-icon">🔍</div>
+            <div class="child-label">Research</div>
+          </div>
+          <div class="child-agent">
+            <div class="child-icon">💻</div>
+            <div class="child-label">Coder</div>
+          </div>
+          <div class="child-agent">
+            <div class="child-icon">🧪</div>
+            <div class="child-label">Tester</div>
+          </div>
+        </div>
+
+        <div class="question-bubbles">
+          <span class="question-bubble">How to spawn?</span>
+          <span class="question-bubble">How to wait?</span>
+          <span class="question-bubble">How to collect results?</span>
+          <span class="question-bubble">How to cancel?</span>
+        </div>
+      </div>
+
+      <div class="challenges-container">
+        <div class="challenge-category">
+          <div class="category-title">Starting Agents</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>No standard API</strong> to spawn child agents from a parent</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Session management</strong> - tracking parent-child relationships</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="challenge-category">
+          <div class="category-title">Waiting for Results</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Busy-polling</strong> wastes resources and API calls</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Blocking</strong> prevents parallel execution</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Callbacks</strong> need infrastructure to receive and route</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="challenge-category">
+          <div class="category-title">Control & Visibility</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>No dashboard</strong> to see what agents are doing</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>No way to stop</strong> runaway or stuck agents</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="01-problem.html" class="nav-back" title="Back to overview">←</a>
+      <span class="nav-label">Back to Problem Overview</span>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+        document.querySelector('.nav-back')?.click();
+      }
+    });
+  </script>
+</body>
+</html>

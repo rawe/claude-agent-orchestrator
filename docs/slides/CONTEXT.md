@@ -8,8 +8,9 @@ You are editing an HTML slide presentation about the Agent Orchestrator framewor
 docs/slides/
 ├── index.html          # Navigation hub - UPDATE when adding/removing slides
 ├── template.html       # Design system reference - READ for styling patterns
-├── 01-problem.html     # ... through ...
-└── 20-summary.html     # Individual slides
+├── 01-problem.html     # Main flow slides (01 through 20)
+├── 01a-problem-*.html  # Deep dive slides (out of main flow)
+└── 20-summary.html
 ```
 
 ## Design System (from template.html)
@@ -133,6 +134,39 @@ Every slide follows this HTML structure:
 3. **Update index.html** - Remove the slide card
 4. **Delete the file**
 
+### Add a Deep Dive Slide (Out of Main Flow)
+
+Deep dives are detail slides accessible via click but **not** in the arrow-key navigation. Use for optional content the presenter can skip.
+
+**Naming:** `NNx-topic.html` where `NN` is parent slide number, `x` is letter (a, b, c...)
+- Example: `01a-problem-multiagent.html`, `01b-problem-context.html`
+
+**Structure differences from main slides:**
+```html
+<!-- Header with badge -->
+<div class="badge">Deep Dive</div>
+<h1>Detail Topic</h1>
+
+<!-- Navigation: only back link, no prev/next -->
+<nav class="slide-nav">
+  <a href="01-problem.html" class="nav-back">←</a>
+  <span class="nav-label">Back to Overview</span>
+</nav>
+
+<!-- Keyboard: Escape or ← returns to parent -->
+<script>
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+      document.querySelector('.nav-back')?.click();
+    }
+  });
+</script>
+```
+
+**Parent slide:** Add clickable cards that link to deep dives. Arrow keys still go to next main slide.
+
+**index.html:** Add to `section-deepdives` section (uses `+` badge, smaller card styling).
+
 ### Update index.html
 
 The index has sections like:
@@ -163,6 +197,14 @@ To remove: delete the corresponding card.
 | 11-15 | 11-mode-sync through 15-modes-comparison | Execution Modes |
 | 16-19 | 16-blueprints through 19-capabilities-example | Config System |
 | 20 | 20-summary | Summary |
+
+### Deep Dives (Out of Main Flow)
+
+| File | Parent | Topic |
+|------|--------|-------|
+| 01a-problem-multiagent.html | 01-problem | Multi-Agent Coordination |
+| 01b-problem-context.html | 01-problem | Context Sharing |
+| 01c-problem-provider.html | 01-problem | Provider Lock-in |
 
 ## Visual Patterns Reference
 

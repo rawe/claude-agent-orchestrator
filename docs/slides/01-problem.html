@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Problem - Agent Orchestrator</title>
+  <title>The Problems - Agent Orchestrator</title>
   <style>
     :root {
       --color-bg: #0a0f1a;
@@ -19,9 +19,12 @@
       --color-border: #1e293b;
       --color-border-light: #334155;
       --color-error: #ef4444;
+      --color-warning: #f59e0b;
+      --color-info: #3b82f6;
       --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --radius-lg: 12px;
       --radius-full: 9999px;
+      --space-sm: 0.5rem;
       --space-md: 1rem;
       --space-lg: 1.5rem;
       --space-xl: 2rem;
@@ -106,132 +109,192 @@
       text-align: center;
     }
 
-    /* Problem Visual */
-    .problem-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-xl);
-    }
-
-    .agent-box {
-      position: relative;
-      width: 280px;
-      height: 160px;
-      background: var(--color-bg-card);
-      border: 2px solid var(--color-error);
-      border-radius: var(--radius-lg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 40px rgba(239, 68, 68, 0.2);
-    }
-
-    .agent-icon {
-      font-size: 3rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .agent-label {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--color-text-bright);
-    }
-
-    .limitations {
+    /* Problem Cards Grid */
+    .problems-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-md);
-      max-width: 700px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-lg);
+      max-width: 1100px;
+      width: 100%;
     }
 
-    .limitation {
+    .problem-card {
       display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: var(--space-md) var(--space-lg);
+      flex-direction: column;
       background: var(--color-bg-card);
-      border: 1px solid var(--color-border);
+      border: 2px solid var(--color-border);
       border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      text-decoration: none;
+      color: inherit;
+      transition: all var(--transition-normal);
       animation: fadeInUp 0.5s ease forwards;
       opacity: 0;
+      cursor: pointer;
     }
 
-    .limitation:nth-child(1) { animation-delay: 0.2s; }
-    .limitation:nth-child(2) { animation-delay: 0.3s; }
-    .limitation:nth-child(3) { animation-delay: 0.4s; }
-    .limitation:nth-child(4) { animation-delay: 0.5s; }
+    .problem-card:nth-child(1) {
+      animation-delay: 0.1s;
+      --card-color: var(--color-error);
+    }
+    .problem-card:nth-child(2) {
+      animation-delay: 0.2s;
+      --card-color: var(--color-warning);
+    }
+    .problem-card:nth-child(3) {
+      animation-delay: 0.3s;
+      --card-color: var(--color-info);
+    }
 
-    .limitation-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid var(--color-error);
+    .problem-card:hover {
+      border-color: var(--card-color);
+      transform: translateY(-4px);
+      box-shadow: 0 0 30px color-mix(in srgb, var(--card-color) 30%, transparent);
+    }
+
+    .problem-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .problem-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--card-color) 15%, transparent);
+      border: 1px solid var(--card-color);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
+      font-size: 1.75rem;
       flex-shrink: 0;
     }
 
-    .limitation-text {
-      font-size: 0.9375rem;
-      color: var(--color-text);
+    .problem-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      line-height: 1.3;
     }
 
-    .limitation-text strong {
-      color: var(--color-error);
+    .problem-points {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      flex: 1;
+    }
+
+    .problem-points li {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      padding-left: 1.25rem;
+      position: relative;
+    }
+
+    .problem-points li::before {
+      content: '×';
+      position: absolute;
+      left: 0;
+      color: var(--card-color);
+      font-weight: bold;
+    }
+
+    .problem-footer {
+      margin-top: var(--space-md);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .deep-dive-hint {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .deep-dive-arrow {
+      color: var(--card-color);
+      font-size: 1.25rem;
+      transition: transform var(--transition-normal);
+    }
+
+    .problem-card:hover .deep-dive-arrow {
+      transform: translateX(4px);
     }
 
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
-
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.2); }
-      50% { box-shadow: 0 0 60px rgba(239, 68, 68, 0.4); }
-    }
-
-    .agent-box {
-      animation: pulse 3s ease-in-out infinite;
-    }
   </style>
 </head>
 <body>
   <div class="slide">
     <header class="slide-header">
-      <h1>The Single Agent Problem</h1>
-      <p class="subtitle">One AI agent, many limitations</p>
+      <h1>The Challenges</h1>
+      <p class="subtitle">Why building multi-agent systems is hard</p>
     </header>
 
     <main class="slide-content">
-      <div class="problem-container">
-        <div class="agent-box">
-          <div class="agent-icon">🤖</div>
-          <div class="agent-label">Single Agent</div>
-        </div>
+      <div class="problems-grid">
 
-        <div class="limitations">
-          <div class="limitation">
-            <div class="limitation-icon">👁️</div>
-            <div class="limitation-text"><strong>No visibility</strong> into what it's doing</div>
+        <a href="01a-problem-multiagent.html" class="problem-card">
+          <div class="problem-header">
+            <div class="problem-icon">🔗</div>
+            <div class="problem-title">Multi-Agent Coordination</div>
           </div>
-          <div class="limitation">
-            <div class="limitation-icon">🔗</div>
-            <div class="limitation-text"><strong>No coordination</strong> with other agents</div>
+          <ul class="problem-points">
+            <li>How to start multiple agents?</li>
+            <li>How to wait without busy-polling?</li>
+            <li>How to handle proper handover?</li>
+            <li>No visibility or control</li>
+          </ul>
+          <div class="problem-footer">
+            <span class="deep-dive-hint">Deep dive</span>
+            <span class="deep-dive-arrow">→</span>
           </div>
-          <div class="limitation">
-            <div class="limitation-icon">📊</div>
-            <div class="limitation-text"><strong>No monitoring</strong> of progress or status</div>
+        </a>
+
+        <a href="01b-problem-context.html" class="problem-card">
+          <div class="problem-header">
+            <div class="problem-icon">📄</div>
+            <div class="problem-title">Context Sharing</div>
           </div>
-          <div class="limitation">
-            <div class="limitation-icon">🎮</div>
-            <div class="limitation-text"><strong>No control</strong> to stop or adjust</div>
+          <ul class="problem-points">
+            <li>Agents can't share documents</li>
+            <li>Full content wastes context window</li>
+            <li>No efficient handover mechanism</li>
+            <li>Orchestrator becomes bottleneck</li>
+          </ul>
+          <div class="problem-footer">
+            <span class="deep-dive-hint">Deep dive</span>
+            <span class="deep-dive-arrow">→</span>
           </div>
-        </div>
+        </a>
+
+        <a href="01c-problem-provider.html" class="problem-card">
+          <div class="problem-header">
+            <div class="problem-icon">🔌</div>
+            <div class="problem-title">Provider Lock-in</div>
+          </div>
+          <ul class="problem-points">
+            <li>Tightly coupled to one AI provider</li>
+            <li>Can't mix cloud and local LLMs</li>
+            <li>No abstraction layer</li>
+            <li>Hard to switch or compare</li>
+          </ul>
+          <div class="problem-footer">
+            <span class="deep-dive-hint">Deep dive</span>
+            <span class="deep-dive-arrow">→</span>
+          </div>
+        </a>
+
       </div>
     </main>
 

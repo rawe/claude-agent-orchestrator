@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Sharing - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-warning: #f59e0b;
+      --color-session: #8b5cf6;
+      --color-error: #ef4444;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-header .badge {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--color-warning);
+      color: var(--color-warning);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-warning);
+      transform: translateY(-2px);
+    }
+    .nav-label {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Flow Diagram */
+    .flow-container {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+      max-width: 900px;
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .agent-box {
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-session);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .agent-icon {
+      font-size: 1.5rem;
+    }
+
+    .agent-label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--color-warning);
+    }
+
+    .arrow-line {
+      width: 60px;
+      height: 2px;
+      background: var(--color-warning);
+      position: relative;
+    }
+
+    .arrow-line::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: -4px;
+      border: 5px solid transparent;
+      border-left-color: var(--color-warning);
+    }
+
+    .flow-content {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-sm) var(--space-md);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-width: 300px;
+    }
+
+    .flow-content.large {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: var(--color-error);
+    }
+
+    .content-size {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      background: rgba(239, 68, 68, 0.2);
+      border-radius: var(--radius-full);
+      font-size: 0.625rem;
+      color: var(--color-error);
+      margin-left: 0.5rem;
+    }
+
+    .problem-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      max-width: 380px;
+    }
+
+    .problem-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-warning);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .problem-card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .problem-card:nth-child(2) { animation-delay: 0.1s; }
+    .problem-card:nth-child(3) { animation-delay: 0.2s; }
+    .problem-card:nth-child(4) { animation-delay: 0.3s; }
+    .problem-card:nth-child(5) { animation-delay: 0.4s; }
+
+    .problem-card-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .problem-card-text {
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+
+    .highlight {
+      color: var(--color-warning);
+      font-weight: 500;
+    }
+
+    /* Scenario illustration */
+    .scenario {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      max-width: 500px;
+    }
+
+    .scenario-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-md);
+    }
+
+    .scenario-flow {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .scenario-step {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--color-warning);
+      color: var(--color-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .step-content {
+      flex: 1;
+      font-size: 0.875rem;
+    }
+
+    .step-content .agent {
+      color: var(--color-session);
+      font-weight: 500;
+    }
+
+    .step-content .problem {
+      color: var(--color-error);
+    }
+
+    .step-data {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      background: var(--color-bg);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      margin-left: auto;
+    }
+
+    .step-data.bloated {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--color-error);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <div class="badge">Deep Dive</div>
+      <h1>Context Sharing Problem</h1>
+      <p class="subtitle">How agents share knowledge without wasting context windows</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="scenario">
+        <div class="scenario-title">Typical Research Handover</div>
+        <div class="scenario-flow">
+          <div class="scenario-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <span class="agent">Orchestrator</span> starts <span class="agent">Research Agent</span>
+            </div>
+          </div>
+          <div class="scenario-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              Research Agent finds <span class="highlight">5 detailed documents</span>
+            </div>
+            <div class="step-data">~50K tokens</div>
+          </div>
+          <div class="scenario-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <span class="problem">Entire content</span> returned to Orchestrator
+            </div>
+            <div class="step-data bloated">50K tokens!</div>
+          </div>
+          <div class="scenario-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              Orchestrator passes to <span class="agent">Worker Agent</span>
+            </div>
+            <div class="step-data bloated">50K again!</div>
+          </div>
+          <div class="scenario-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <span class="problem">Context window explodes</span>, cost skyrockets
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="problem-section">
+        <div class="problem-title">
+          <span>Core Problems</span>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title">
+            <span>📦</span> Full Content Transfer
+          </div>
+          <div class="problem-card-text">
+            Without shared storage, the <span class="highlight">complete document content</span> must flow through the orchestrator to reach other agents.
+          </div>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title">
+            <span>🧠</span> Context Window Waste
+          </div>
+          <div class="problem-card-text">
+            Orchestrator doesn't need to read 50K tokens of research - it just needs to <span class="highlight">coordinate the handover</span>.
+          </div>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title">
+            <span>💸</span> Cost Multiplication
+          </div>
+          <div class="problem-card-text">
+            Same content processed multiple times: once by researcher, once by orchestrator, once by worker. <span class="highlight">3x the cost</span>.
+          </div>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title">
+            <span>🔀</span> No Selective Sharing
+          </div>
+          <div class="problem-card-text">
+            Can't say "here's a summary, details are in doc_abc123" - it's <span class="highlight">all or nothing</span>.
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="01-problem.html" class="nav-back" title="Back to overview">←</a>
+      <span class="nav-label">Back to Problem Overview</span>
+    </nav>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+        document.querySelector('.nav-back')?.click();
+      }
+    });
+  </script>
+</body>
+</html>
