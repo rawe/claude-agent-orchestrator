@@ -62,4 +62,4 @@ In-memory registry (ephemeral by design).
 ## References
 
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md)
-- [RUNS_API.md](../agent-coordinator/RUNS_API.md)
+- [RUNS_API.md](../components/agent-coordinator/RUNS_API.md)

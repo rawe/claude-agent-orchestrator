@@ -22,7 +22,7 @@ Copy `.env.example` to `.env` and configure:
 
 ## Requirements
 
-Agent Coordinator must be running. See `docs/agent-coordinator/API.md` for API details.
+Agent Coordinator must be running. See `docs/components/agent-coordinator/API.md` for API details.
 
 ## Build
 

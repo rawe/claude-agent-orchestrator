@@ -304,5 +304,5 @@ Without affinity tracking, resume requests could be dispatched to wrong runners.
 
 - [ADR-001](./ADR-001-run-session-separation.md) - Run and Session Separation (partially superseded)
 - [ADR-002](./ADR-002-agent-runner-architecture.md) - Agent Runner Architecture
-- [DATABASE_SCHEMA.md](../agent-coordinator/DATABASE_SCHEMA.md) - Current schema
-- [DATA_MODELS.md](../agent-coordinator/DATA_MODELS.md) - Current data models
+- [DATABASE_SCHEMA.md](../components/agent-coordinator/DATABASE_SCHEMA.md) - Current schema
+- [DATA_MODELS.md](../components/agent-coordinator/DATA_MODELS.md) - Current data models

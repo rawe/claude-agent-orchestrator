@@ -26,8 +26,8 @@ In the previous coding session, the following backend components were implemente
 - `servers/agent-runner/lib/poller.py` - Added `_handle_stop()` with SIGTERM→SIGKILL escalation
 
 ### Updated Documentation
-- `docs/agent-coordinator/API.md` - New endpoints documented
-- `docs/agent-coordinator/DATA_MODELS.md` - Updated run statuses
+- `docs/components/agent-coordinator/API.md` - New endpoints documented
+- `docs/components/agent-coordinator/DATA_MODELS.md` - Updated run statuses
 - `docs/ARCHITECTURE.md` - Updated to reflect stop capability
 
 ### Database Note
@@ -275,8 +275,8 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
 | File | Purpose |
 |------|---------|
 | `docs/features/session-stop-command.md` | Feature specification |
-| `docs/agent-coordinator/API.md` | API documentation (updated) |
-| `docs/agent-coordinator/DATA_MODELS.md` | Data models (updated) |
+| `docs/components/agent-coordinator/API.md` | API documentation (updated) |
+| `docs/components/agent-coordinator/DATA_MODELS.md` | Data models (updated) |
 | `docs/ARCHITECTURE.md` | Architecture overview (updated) |
 
 ---

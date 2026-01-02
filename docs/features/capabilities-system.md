@@ -1,6 +1,6 @@
 # Capabilities System
 
-**Status:** Proposed
+**Status:** Implemented
 **Version:** 1.0
 **Date:** 2025-12-30
 

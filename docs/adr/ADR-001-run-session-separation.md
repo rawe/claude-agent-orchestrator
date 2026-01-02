@@ -167,7 +167,7 @@ This would survive Agent Coordinator restarts without sacrificing polling perfor
 
 ## References
 
-- [RUNS_API.md](../agent-coordinator/RUNS_API.md) - Runs API documentation
-- [RUN_EXECUTION_FLOW.md](../agent-coordinator/RUN_EXECUTION_FLOW.md) - Execution sequence diagrams
+- [RUNS_API.md](../components/agent-coordinator/RUNS_API.md) - Runs API documentation
+- [RUN_EXECUTION_FLOW.md](../components/agent-coordinator/RUN_EXECUTION_FLOW.md) - Execution sequence diagrams
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview
 - Git commit `3b98e8f` - Introduction of Runs API (2025-12-08)

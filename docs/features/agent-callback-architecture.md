@@ -1084,4 +1084,4 @@ delivered successfully?
 ## Related Documents
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - Overall system architecture
-- [DATABASE_SCHEMA.md](../agent-coordinator/DATABASE_SCHEMA.md) - Current database schema
+- [DATABASE_SCHEMA.md](../components/agent-coordinator/DATABASE_SCHEMA.md) - Current database schema

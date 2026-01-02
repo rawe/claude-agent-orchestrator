@@ -497,8 +497,8 @@ class RunStatus(str, Enum):
 | `servers/agent-runner/lib/api_client.py` | Add stop_runs to PollResult, report_stopped() |
 | `servers/agent-runner/lib/poller.py` | Handle stop commands |
 | `servers/agent-runner/lib/supervisor.py` | Add get_running_run() method |
-| `docs/agent-coordinator/API.md` | Document new endpoints |
-| `docs/agent-coordinator/DATA_MODELS.md` | Document new run statuses |
+| `docs/components/agent-coordinator/API.md` | Document new endpoints |
+| `docs/components/agent-coordinator/DATA_MODELS.md` | Document new run statuses |
 
 ## Future Enhancements
 

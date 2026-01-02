@@ -60,4 +60,4 @@ Single-run execution would defeat async patterns.
 ## References
 
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md)
-- [RUN_EXECUTION_FLOW.md](../agent-coordinator/RUN_EXECUTION_FLOW.md)
+- [RUN_EXECUTION_FLOW.md](../components/agent-coordinator/RUN_EXECUTION_FLOW.md)

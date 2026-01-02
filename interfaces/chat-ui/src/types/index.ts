@@ -1,6 +1,6 @@
 /**
  * Types matching Agent Coordinator API models
- * See: docs/agent-coordinator/DATA_MODELS.md
+ * See: docs/components/agent-coordinator/DATA_MODELS.md
  */
 
 // Message content block

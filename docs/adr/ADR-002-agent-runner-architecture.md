@@ -65,4 +65,4 @@ These requirements conflict with containerization goals for the Agent Coordinato
 ## References
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
-- [RUN_EXECUTION_FLOW.md](../agent-coordinator/RUN_EXECUTION_FLOW.md)
+- [RUN_EXECUTION_FLOW.md](../components/agent-coordinator/RUN_EXECUTION_FLOW.md)

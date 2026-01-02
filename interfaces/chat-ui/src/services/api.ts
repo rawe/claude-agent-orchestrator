@@ -50,7 +50,7 @@ function handleError(error: unknown): never {
 
 /**
  * Chat API Service
- * See: docs/agent-coordinator/API.md
+ * See: docs/components/agent-coordinator/API.md
  */
 export const chatService = {
   /**

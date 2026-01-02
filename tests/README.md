@@ -161,7 +161,7 @@ Agent blueprints define specialized agents with system prompts and MCP servers.
 - Local coordinator: `servers/agent-coordinator/.agent-orchestrator/agents/` (relative to Agent Coordinator's working directory)
 
 **For testing:**
-- Simple agents: Create via `POST /agents` API (see `docs/agent-coordinator/API.md` → Agents API)
+- Simple agents: Create via `POST /agents` API (see `docs/components/agent-coordinator/API.md` → Agents API)
 - Complex agents (with MCP servers): **Copy** from `config/agents/` to `servers/agent-coordinator/.agent-orchestrator/agents/`
 
 **Important**: Agent blueprints must be copied **before** starting the Agent Coordinator, as blueprints are only discovered on startup.
