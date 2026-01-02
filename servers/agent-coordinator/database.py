@@ -251,8 +251,8 @@ def get_events(session_id: str, limit: int = 100):
 
 def delete_session(session_id: str) -> dict | None:
     """
-    Delete session and all associated events.
-    Events are deleted automatically via CASCADE.
+    Delete session and all associated events and runs.
+    Events and runs are deleted automatically via CASCADE.
 
     Returns:
         dict with deletion stats if session exists, None if not found
@@ -268,6 +268,13 @@ def delete_session(session_id: str) -> dict | None:
     )
     events_count = cursor.fetchone()[0]
 
+    # Count runs before deleting (for response)
+    cursor.execute(
+        "SELECT COUNT(*) FROM runs WHERE session_id = ?",
+        (session_id,)
+    )
+    runs_count = cursor.fetchone()[0]
+
     # Check if session exists
     cursor.execute(
         "SELECT COUNT(*) FROM sessions WHERE session_id = ?",
@@ -279,7 +286,7 @@ def delete_session(session_id: str) -> dict | None:
         conn.close()
         return None
 
-    # Delete session (events deleted via CASCADE)
+    # Delete session (events and runs deleted via CASCADE)
     cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
 
     conn.commit()
@@ -287,7 +294,8 @@ def delete_session(session_id: str) -> dict | None:
 
     return {
         "session": True,
-        "events_count": events_count
+        "events_count": events_count,
+        "runs_count": runs_count
     }
 
 

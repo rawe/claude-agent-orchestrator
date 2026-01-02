@@ -338,6 +338,23 @@ class RunQueue:
         with self._lock:
             return self._runs.get(run_id)
 
+    def remove_runs_for_session(self, session_id: str) -> int:
+        """Remove all runs for a session from cache.
+
+        Called when session is deleted to keep cache synchronized with DB.
+        Returns count of removed runs.
+        """
+        with self._lock:
+            run_ids_to_remove = [
+                run_id for run_id, run in self._runs.items()
+                if run.session_id == session_id
+            ]
+
+            for run_id in run_ids_to_remove:
+                del self._runs[run_id]
+
+            return len(run_ids_to_remove)
+
     def update_run_status(
         self,
         run_id: str,

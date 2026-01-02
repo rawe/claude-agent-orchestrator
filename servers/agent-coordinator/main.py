@@ -596,21 +596,32 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
 
 @app.delete("/sessions/{session_id}")
 async def delete_session_endpoint(session_id: str):
-    """Delete a session and all its events"""
+    """Delete a session and all its events and runs"""
 
-    # Delete from database
+    # Delete from database (cascade deletes runs and events)
     result = delete_session(session_id)
 
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Clean up in-memory run cache
+    runs_removed_from_cache = run_queue.remove_runs_for_session(session_id)
+
     # Broadcast to SSE clients
-    await sse_manager.broadcast(StreamEventType.SESSION_DELETED, {"session_id": session_id}, session_id=session_id)
+    await sse_manager.broadcast(
+        StreamEventType.SESSION_DELETED,
+        {
+            "session_id": session_id,
+            "runs_deleted": result["runs_count"],
+        },
+        session_id=session_id
+    )
 
     return {
         "ok": True,
         "session_id": session_id,
-        "deleted": result
+        "deleted": result,
+        "runs_removed_from_cache": runs_removed_from_cache
     }
 
 
