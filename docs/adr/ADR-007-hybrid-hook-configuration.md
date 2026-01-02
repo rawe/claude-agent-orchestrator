@@ -59,4 +59,4 @@ All matching hooks execute in parallel. Hooks are merged, not replaced.
 
 ## References
 
-- [ClaudeAgentSDK-Hooks-Research.md](../../ClaudeAgentSDK-Hooks-Research.md)
+- [Claude Agent SDK Hooks Documentation](https://docs.anthropic.com/en/docs/claude-code/hooks)
