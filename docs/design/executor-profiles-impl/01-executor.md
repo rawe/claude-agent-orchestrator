@@ -81,8 +81,8 @@ Verify:
 
 ## Definition of Done
 
-- [ ] Executor reads `executor_config` from invocation payload
-- [ ] Missing `executor_config` = current hardcoded behavior (backward compatible)
-- [ ] Partial config uses defaults for missing keys
-- [ ] Unknown config keys are ignored (forward compatible)
-- [ ] Tested with mock invocation payloads
+- [x] Executor reads `executor_config` from invocation payload
+- [x] Missing `executor_config` = current hardcoded behavior (backward compatible)
+- [x] Partial config uses defaults for missing keys
+- [x] Unknown config keys are ignored (forward compatible)
+- [x] Tested with mock invocation payloads

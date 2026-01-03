@@ -4,8 +4,9 @@ Run Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
 Maps agent run types to execution modes and handles subprocess spawning.
 Uses unified ao-*-exec entrypoint with structured JSON payloads.
 
-Schema 2.0: Runner fetches and resolves blueprints before spawning executor.
-The executor receives a fully resolved agent_blueprint with placeholders replaced.
+Schema 2.1: Runner fetches and resolves blueprints before spawning executor.
+The executor receives a fully resolved agent_blueprint with placeholders replaced,
+and executor_config from the profile (if configured).
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
 """
@@ -13,8 +14,9 @@ Note: Uses session_id (coordinator-generated) per ADR-010.
 import json
 import os
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 import logging
 
 from api_client import Run
@@ -26,9 +28,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Environment variable for executor path (relative to agent-runner dir)
-ENV_EXECUTOR_PATH = "AGENT_EXECUTOR_PATH"
+# Default executor path and type (used when no profile is specified)
 DEFAULT_EXECUTOR_PATH = "executors/claude-code/ao-claude-code-exec"
+DEFAULT_EXECUTOR_TYPE = "claude-code"
 
 
 def get_runner_dir() -> Path:
@@ -36,112 +38,115 @@ def get_runner_dir() -> Path:
     return Path(__file__).parent.parent.resolve()
 
 
-def get_executors_dir() -> Path:
-    """Get the executors directory."""
-    return get_runner_dir() / "executors"
+# =============================================================================
+# Executor Profiles
+# =============================================================================
 
 
-def list_executors() -> list[str]:
-    """List available executor names (folder names in executors/).
+@dataclass
+class ExecutorProfile:
+    """Loaded executor profile.
+
+    A profile bundles an executor type with its configuration.
+    Profiles are stored as JSON files in the profiles/ directory.
+
+    Attributes:
+        name: Profile name (e.g., "coding") - derived from filename
+        type: Executor type (e.g., "claude-code") - for coordinator visibility
+        command: Relative path to executor script from agent-runner dir
+        config: Executor-specific configuration (passed as-is to executor)
+    """
+
+    name: str
+    type: str
+    command: str
+    config: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for registration payload."""
+        return {
+            "type": self.type,
+            "command": self.command,
+            "config": self.config,
+        }
+
+
+def get_profiles_dir() -> Path:
+    """Get the profiles directory."""
+    return get_runner_dir() / "profiles"
+
+
+def list_profiles() -> list[str]:
+    """List available profile names.
+
+    Scans the profiles/ directory for JSON files.
 
     Returns:
-        List of executor folder names sorted alphabetically
+        List of profile names (without .json extension) sorted alphabetically
     """
-    executors_dir = get_executors_dir()
-    if not executors_dir.exists():
+    profiles_dir = get_profiles_dir()
+    if not profiles_dir.exists():
         return []
-
-    return sorted([
-        d.name for d in executors_dir.iterdir()
-        if d.is_dir() and not d.name.startswith(".")
-    ])
+    return sorted([p.stem for p in profiles_dir.glob("*.json")])
 
 
-def resolve_executor_name(name: str) -> str:
-    """Resolve executor name to full relative path.
+def load_profile(name: str) -> ExecutorProfile:
+    """Load executor profile by name.
 
-    Looks for ao-*-exec file inside executors/<name>/ directory.
+    Reads and validates a profile JSON file from the profiles/ directory.
 
     Args:
-        name: Executor folder name (e.g., 'claude-code', 'test-executor')
+        name: Profile name (must match profiles/<name>.json)
 
     Returns:
-        Relative path string (e.g., 'executors/claude-code/ao-claude-code-exec')
+        ExecutorProfile with type, command, and config
 
     Raises:
-        RuntimeError: If executor folder or script not found
+        RuntimeError: If profile file not found, invalid JSON, or missing required fields
     """
-    executor_dir = get_executors_dir() / name
+    profile_path = get_profiles_dir() / f"{name}.json"
 
-    if not executor_dir.exists():
-        available = ", ".join(list_executors()) or "none"
-        raise RuntimeError(
-            f"Executor '{name}' not found. Available: {available}"
-        )
+    if not profile_path.exists():
+        available = ", ".join(list_profiles()) or "none"
+        raise RuntimeError(f"Profile '{name}' not found. Available: {available}")
 
-    # Find ao-*-exec file in the directory
-    exec_files = list(executor_dir.glob("ao-*-exec"))
-    if not exec_files:
-        raise RuntimeError(
-            f"No ao-*-exec script found in executors/{name}/"
-        )
-    if len(exec_files) > 1:
-        raise RuntimeError(
-            f"Multiple ao-*-exec scripts found in executors/{name}/: "
-            f"{[f.name for f in exec_files]}"
-        )
-
-    # Return relative path string
-    return f"executors/{name}/{exec_files[0].name}"
-
-
-def get_executor_path() -> Path:
-    """Get path to executor script.
-
-    Uses AGENT_EXECUTOR_PATH env var (relative to agent-runner dir).
-    Default: executors/claude-code/ao-claude-code-exec
-    """
-    executor_rel_path = os.environ.get(ENV_EXECUTOR_PATH, DEFAULT_EXECUTOR_PATH)
-
-    # Resolve relative to agent-runner dir
-    runner_dir = get_runner_dir()
-    executor_path = runner_dir / executor_rel_path
-
-    if not executor_path.exists():
-        raise RuntimeError(f"Executor not found: {executor_path}")
-
-    return executor_path
-
-
-def get_executor_type() -> str:
-    """Get executor type (folder name) from current executor path.
-
-    Extracts folder name from paths like:
-    - executors/claude-code/ao-claude-code-exec -> claude-code
-    - executors/test-executor/ao-test-exec -> test-executor
-
-    Returns:
-        Executor folder name, or 'unknown' if cannot be determined
-    """
     try:
-        executor_path = get_executor_path()
-        # Path is: .../executors/<name>/ao-*-exec
-        # Parent is the executor folder
-        return executor_path.parent.name
-    except RuntimeError:
-        return "unknown"
+        with open(profile_path) as f:
+            profile = json.load(f)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Profile '{name}' has invalid JSON: {e}")
+
+    # Validate required fields
+    for field in ("type", "command"):
+        if field not in profile:
+            raise RuntimeError(f"Profile '{name}' missing required '{field}' field")
+
+    # Validate command path exists
+    command_path = get_runner_dir() / profile["command"]
+    if not command_path.exists():
+        raise RuntimeError(
+            f"Profile '{name}' command not found: {profile['command']}"
+        )
+
+    return ExecutorProfile(
+        name=name,
+        type=profile["type"],
+        command=profile["command"],
+        config=profile.get("config", {}),
+    )
 
 
 class RunExecutor:
     """Executes agent runs by spawning executor subprocess with JSON payload.
 
-    Schema 2.0: The executor now fetches and resolves blueprints before spawning,
-    passing a fully resolved agent_blueprint to the executor subprocess.
+    Schema 2.1: The executor fetches and resolves blueprints before spawning,
+    passing a fully resolved agent_blueprint and executor_config to the executor subprocess.
     """
 
     def __init__(
         self,
         default_project_dir: str,
+        profile: Optional[ExecutorProfile] = None,
         blueprint_resolver: Optional["BlueprintResolver"] = None,
         mcp_server_url: Optional[str] = None,
     ):
@@ -149,17 +154,27 @@ class RunExecutor:
 
         Args:
             default_project_dir: Default project directory if agent run doesn't specify one
-            blueprint_resolver: Optional resolver for fetching and resolving blueprints (schema 2.0)
-            mcp_server_url: Optional MCP server URL for placeholder resolution (schema 2.0)
+            profile: Optional executor profile with command and config (None = use defaults)
+            blueprint_resolver: Optional resolver for fetching and resolving blueprints
+            mcp_server_url: Optional MCP server URL for placeholder resolution
         """
         self.default_project_dir = default_project_dir
         self.blueprint_resolver = blueprint_resolver
         self.mcp_server_url = mcp_server_url
-        self.executor_path = get_executor_path()
+
+        # Resolve executor path and config from profile or defaults
+        if profile:
+            self.executor_path = get_runner_dir() / profile.command
+            self.executor_config = profile.config
+        else:
+            self.executor_path = get_runner_dir() / DEFAULT_EXECUTOR_PATH
+            self.executor_config = {}
 
         logger.debug(f"Executor path: {self.executor_path}")
+        if self.executor_config:
+            logger.debug(f"Executor config: {self.executor_config}")
         if blueprint_resolver:
-            logger.debug("Blueprint resolver enabled (schema 2.0)")
+            logger.debug("Blueprint resolver enabled")
 
     def execute_run(self, run: Run, parent_session_id: Optional[str] = None) -> subprocess.Popen:
         """Execute an agent run by spawning ao-*-exec with JSON payload via stdin.
@@ -184,8 +199,9 @@ class RunExecutor:
     def _build_payload(self, run: Run, mode: str) -> dict:
         """Build JSON payload for ao-*-exec.
 
-        Schema 2.0: If agent_name is specified and blueprint_resolver is configured,
+        Schema 2.1: If agent_name is specified and blueprint_resolver is configured,
         fetches and resolves the blueprint, including it as agent_blueprint in the payload.
+        Also includes executor_config from the profile if configured.
 
         Args:
             run: The agent run to execute
@@ -206,7 +222,11 @@ class RunExecutor:
             project_dir = run.project_dir or self.default_project_dir
             payload["project_dir"] = project_dir
 
-        # Schema 2.0: Resolve blueprint if resolver is available
+        # Add executor_config from profile if present
+        if self.executor_config:
+            payload["executor_config"] = self.executor_config
+
+        # Resolve blueprint if resolver is available
         if run.agent_name and self.blueprint_resolver:
             try:
                 agent_blueprint = self.blueprint_resolver.resolve(

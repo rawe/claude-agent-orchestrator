@@ -29,11 +29,11 @@ class AuthenticationError(Exception):
 class DuplicateRunnerError(Exception):
     """Raised when trying to register a runner with an identity that's already online."""
 
-    def __init__(self, runner_id: str, hostname: str, project_dir: str, executor_type: str, message: str):
+    def __init__(self, runner_id: str, hostname: str, project_dir: str, executor_profile: str, message: str):
         self.runner_id = runner_id
         self.hostname = hostname
         self.project_dir = project_dir
-        self.executor_type = executor_type
+        self.executor_profile = executor_profile
         super().__init__(message)
 
 
@@ -120,8 +120,10 @@ class CoordinatorAPIClient:
         self,
         hostname: str,
         project_dir: str,
-        executor_type: str,
+        executor_profile: str,
+        executor: dict,
         tags: Optional[list[str]] = None,
+        require_matching_tags: bool = False,
     ) -> RegistrationResponse:
         """Register this runner with Agent Coordinator.
 
@@ -131,8 +133,10 @@ class CoordinatorAPIClient:
         Args:
             hostname: The machine hostname where the runner is running
             project_dir: The default project directory for this runner
-            executor_type: The type of executor (folder name, e.g., 'claude-code')
+            executor_profile: Profile name (e.g., 'coding', 'research', 'claude-code')
+            executor: Executor details dict with type, command, and config
             tags: Optional list of capability tags this runner offers (ADR-011)
+            require_matching_tags: If True, only accept runs with matching tags
 
         Returns:
             Registration info including runner_id derived from properties
@@ -140,10 +144,13 @@ class CoordinatorAPIClient:
         payload = {
             "hostname": hostname,
             "project_dir": project_dir,
-            "executor_type": executor_type,
+            "executor_profile": executor_profile,
+            "executor": executor,
         }
         if tags:
             payload["tags"] = tags
+        if require_matching_tags:
+            payload["require_matching_tags"] = require_matching_tags
 
         response = self._client.post(
             f"{self.base_url}/runner/register",
@@ -165,7 +172,7 @@ class CoordinatorAPIClient:
                 runner_id=detail.get("runner_id", "unknown"),
                 hostname=detail.get("hostname", hostname),
                 project_dir=detail.get("project_dir", project_dir),
-                executor_type=detail.get("executor_type", executor_type),
+                executor_profile=detail.get("executor_profile", executor_profile),
                 message=detail.get("message", "A runner with this identity is already online"),
             )
 
@@ -311,7 +318,7 @@ class CoordinatorAPIClient:
     def get_session_affinity(self, session_id: str) -> Optional[dict]:
         """Get session affinity information for resume routing.
 
-        Returns affinity dict (hostname, project_dir, executor_type, executor_session_id)
+        Returns affinity dict (hostname, project_dir, executor_profile, executor_session_id)
         or None if not found.
         """
         try:

@@ -152,7 +152,7 @@ export function AgentEditor({
         const cleaned: AgentDemands = {};
         if (d.hostname?.trim()) cleaned.hostname = d.hostname.trim();
         if (d.project_dir?.trim()) cleaned.project_dir = d.project_dir.trim();
-        if (d.executor_type?.trim()) cleaned.executor_type = d.executor_type.trim();
+        if (d.executor_profile?.trim()) cleaned.executor_profile = d.executor_profile.trim();
         if (d.tags && d.tags.length > 0) cleaned.tags = d.tags;
         // Only include demands if at least one field is set
         if (Object.keys(cleaned).length > 0) {
@@ -529,17 +529,17 @@ export function AgentEditor({
               />
             </div>
 
-            {/* Executor Type */}
+            {/* Executor Profile */}
             <div>
-              <label className="label">Executor Type</label>
+              <label className="label">Executor Profile</label>
               <Controller
-                name="demands.executor_type"
+                name="demands.executor_profile"
                 control={control}
                 render={({ field }) => (
                   <input
                     {...field}
                     value={field.value || ''}
-                    placeholder="e.g., claude-code (must use this executor)"
+                    placeholder="e.g., coding, research, supervised"
                     className="input"
                   />
                 )}

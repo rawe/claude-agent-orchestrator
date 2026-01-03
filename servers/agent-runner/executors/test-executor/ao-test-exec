@@ -11,6 +11,9 @@ Test Executor - Simple dummy executor for testing.
 Echoes prompts back as responses. Does not use any AI SDK.
 Stores session data in local .test-executor-data/ folder.
 
+Communicates with Agent Coordinator via the Runner Gateway, which
+enriches requests with runner-owned data (hostname, executor_profile).
+
 Uses session_id (coordinator-generated) per ADR-010.
 
 Usage:
@@ -88,14 +91,11 @@ def run_start(inv: ExecutorInvocation) -> None:
     executor_session_id = generate_executor_session_id()
 
     # Bind this executor to the session (per ADR-010)
+    # The Runner Gateway enriches with hostname and executor_profile
     try:
-        import socket
-        hostname = socket.gethostname()
-        client.bind_session_executor(
+        client.bind(
             session_id=session_id,
             executor_session_id=executor_session_id,
-            hostname=hostname,
-            executor_type="test-executor",
         )
     except SessionClientError as e:
         print(f"Warning: Could not bind session executor: {e}", file=sys.stderr)

@@ -1,0 +1,5 @@
+{
+  "type": "test-executor",
+  "command": "executors/test-executor/ao-test-exec",
+  "config": {}
+}

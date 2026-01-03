@@ -8,24 +8,31 @@ Implementation sessions for the Executor Profiles feature.
 
 | Order | Session | Component | Status |
 |-------|---------|-----------|--------|
-| 1 | [Executor](./01-executor.md) | `servers/agent-runner/executors/claude-code/` | Pending |
-| 2 | [Agent Runner](./02-agent-runner.md) | `servers/agent-runner/` | Pending |
-| 3 | [Agent Coordinator](./03-agent-coordinator.md) | `servers/agent-coordinator/` + `config/agents/` | Pending |
-| 4 | [Dashboard](./04-dashboard.md) | `dashboard/src/` | Pending |
+| 1 | [Executor](./01-executor.md) | `servers/agent-runner/executors/claude-code/` | Done |
+| 2 | [Agent Runner](./02-agent-runner.md) | `servers/agent-runner/` | Done |
+| 3 | [Agent Coordinator](./03-agent-coordinator.md) | `servers/agent-coordinator/` + `config/agents/` | Done |
+| 3b | [Runner Client Fixes](./03-agent-coordinator-runner-fixes.md) | `servers/agent-runner/lib/` + executors | Done |
+| 4 | [Executor-Runner Communication](./04-executor-runner-communication-refactor.md) | Runner/executor interface | Done |
+| 5 | [Dashboard](./05-dashboard.md) | `dashboard/src/` | Pending |
 
 ## Dependency Graph
 
 ```
-Session 1: Executor
+Session 1: Executor ✓
      │
      ▼
-Session 2: Agent Runner
+Session 2: Agent Runner ✓
      │
      ▼
-Session 3: Agent Coordinator
+Session 3: Agent Coordinator ✓
+     │
+     ├──► Session 3b: Runner Client Fixes ✓
+     │         │
+     │         ▼
+     │    Session 4: Executor-Runner Communication Refactor ✓
      │
      ▼
-Session 4: Dashboard
+Session 5: Dashboard
 ```
 
 ## How to Use
@@ -66,7 +73,15 @@ Session 4: Dashboard
 - `servers/agent-coordinator/main.py`
 - `config/agents/*/agent.json`
 
-**Session 4:**
+**Session 4 (Executor-Runner Communication):**
+- `servers/agent-runner/agent-runner` (uses RunnerGateway)
+- `servers/agent-runner/lib/runner_gateway.py` (new - replaces coordinator_proxy.py)
+- `servers/agent-runner/lib/session_client.py` (simplified bind API)
+- `servers/agent-runner/executors/claude-code/lib/claude_client.py`
+- `servers/agent-runner/executors/test-executor/ao-test-exec`
+- `servers/agent-runner/docs/runner-gateway-api.md` (new)
+
+**Session 5 (Dashboard):**
 - `dashboard/src/types/*.ts`
 - `dashboard/src/pages/Runners.tsx`
 - `dashboard/src/components/features/agents/AgentEditor.tsx`

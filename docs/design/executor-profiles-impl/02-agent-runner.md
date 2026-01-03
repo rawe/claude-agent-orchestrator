@@ -1,6 +1,7 @@
 # Session 2: Agent Runner
 
 **Component:** `servers/agent-runner/`
+**Status:** Done
 
 ## Objective
 
@@ -145,13 +146,13 @@ Verify:
 
 ## Definition of Done
 
-- [ ] `lib/invocation.py`: Schema 2.1 with `executor_config` field
-- [ ] `lib/executor.py`: `load_profile()`, `list_profiles()`, `ExecutorProfile` dataclass
-- [ ] CLI: `--profile`, `--profile-list`, `--require-matching-tags` flags
-- [ ] CLI: Removed `--executor`, `--executor-path`, `--executor-list`
-- [ ] `profiles/` directory with 3 example profiles
-- [ ] Registration sends `executor_profile` + `executor` object
-- [ ] Backward compatible when no --profile flag
+- [x] `lib/invocation.py`: Schema 2.1 with `executor_config` field
+- [x] `lib/executor.py`: `load_profile()`, `list_profiles()`, `ExecutorProfile` dataclass
+- [x] CLI: `--profile`, `--profile-list`, `--require-matching-tags` flags
+- [x] CLI: Removed `--executor`, `--executor-path`, `--executor-list`
+- [x] `profiles/` directory with 3 example profiles
+- [x] Registration sends `executor_profile` + `executor` object
+- [x] Backward compatible when no --profile flag
 
 ## Note on Integration
 

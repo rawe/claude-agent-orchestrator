@@ -156,7 +156,7 @@ export interface UnifiedSession {
 
   // Executor info (populated after bind)
   executorSessionId: string | null;
-  executorType: string | null;
+  executorProfile: string | null;  // Was executorType
   hostname: string | null;
 
   // ---- COMPUTED FIELDS ----

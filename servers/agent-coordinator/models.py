@@ -209,7 +209,7 @@ class RunnerDemands(BaseModel):
     # Property demands (exact match required if specified)
     hostname: Optional[str] = None
     project_dir: Optional[str] = None
-    executor_type: Optional[str] = None
+    executor_profile: Optional[str] = None
     # Capability demands (must have ALL)
     tags: List[str] = []
 
@@ -218,7 +218,7 @@ class RunnerDemands(BaseModel):
         return (
             self.hostname is None
             and self.project_dir is None
-            and self.executor_type is None
+            and self.executor_profile is None
             and len(self.tags) == 0
         )
 
@@ -238,7 +238,7 @@ class RunnerDemands(BaseModel):
             # Blueprint wins if set, otherwise use additional
             hostname=blueprint.hostname or additional.hostname,
             project_dir=blueprint.project_dir or additional.project_dir,
-            executor_type=blueprint.executor_type or additional.executor_type,
+            executor_profile=blueprint.executor_profile or additional.executor_profile,
             # Tags are always additive (union)
             tags=list(set(blueprint.tags) | set(additional.tags)),
         )
@@ -290,7 +290,7 @@ class SessionBind(BaseModel):
     """
     executor_session_id: str
     hostname: str
-    executor_type: str
+    executor_profile: str
     project_dir: Optional[str] = None
 
 
@@ -300,7 +300,7 @@ class SessionMetadataUpdate(BaseModel):
     agent_name: Optional[str] = None
     last_resumed_at: Optional[str] = None
     executor_session_id: Optional[str] = None
-    executor_type: Optional[str] = None
+    executor_profile: Optional[str] = None
     hostname: Optional[str] = None
 
 

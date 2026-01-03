@@ -295,7 +295,7 @@ async def bind_session_endpoint(session_id: str, binding: SessionBind):
         session_id=session_id,
         executor_session_id=binding.executor_session_id,
         hostname=binding.hostname,
-        executor_type=binding.executor_type,
+        executor_profile=binding.executor_profile,
         project_dir=binding.project_dir,
     )
 
@@ -581,7 +581,7 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
         agent_name=metadata.agent_name,
         last_resumed_at=metadata.last_resumed_at,
         executor_session_id=metadata.executor_session_id,
-        executor_type=metadata.executor_type,
+        executor_profile=metadata.executor_profile,
         hostname=metadata.hostname,
     )
 
@@ -910,9 +910,13 @@ class RunnerRegisterRequest(BaseModel):
     """
     hostname: str
     project_dir: str
-    executor_type: str
+    executor_profile: str
+    # Executor details (type, command, config)
+    executor: Optional[dict] = None
     # Optional capability tags (ADR-011)
     tags: Optional[list[str]] = None
+    # If true, only accept runs with at least one matching tag
+    require_matching_tags: bool = False
 
 
 class RunnerRegisterResponse(BaseModel):
@@ -965,8 +969,10 @@ async def register_runner(request: RunnerRegisterRequest):
         runner = runner_registry.register_runner(
             hostname=request.hostname,
             project_dir=request.project_dir,
-            executor_type=request.executor_type,
+            executor_profile=request.executor_profile,
+            executor=request.executor,
             tags=request.tags,
+            require_matching_tags=request.require_matching_tags,
         )
     except DuplicateRunnerError as e:
         raise HTTPException(
@@ -977,7 +983,7 @@ async def register_runner(request: RunnerRegisterRequest):
                 "runner_id": e.runner_id,
                 "hostname": e.hostname,
                 "project_dir": e.project_dir,
-                "executor_type": e.executor_type,
+                "executor_profile": e.executor_profile,
             }
         )
 
@@ -988,9 +994,13 @@ async def register_runner(request: RunnerRegisterRequest):
         print(f"[DEBUG] Registered runner: {runner.runner_id}", flush=True)
         print(f"[DEBUG]   hostname: {request.hostname}", flush=True)
         print(f"[DEBUG]   project_dir: {request.project_dir}", flush=True)
-        print(f"[DEBUG]   executor_type: {request.executor_type}", flush=True)
+        print(f"[DEBUG]   executor_profile: {request.executor_profile}", flush=True)
+        if request.executor:
+            print(f"[DEBUG]   executor: {request.executor}", flush=True)
         if request.tags:
             print(f"[DEBUG]   tags: {request.tags}", flush=True)
+        if request.require_matching_tags:
+            print(f"[DEBUG]   require_matching_tags: {request.require_matching_tags}", flush=True)
 
     return RunnerRegisterResponse(
         runner_id=runner.runner_id,
@@ -1236,8 +1246,10 @@ class RunnerWithStatus(BaseModel):
     last_heartbeat: str
     hostname: str
     project_dir: str
-    executor_type: str
+    executor_profile: str
+    executor: dict = {}  # Executor details (type, command, config)
     tags: list[str] = []  # Capability tags (ADR-011)
+    require_matching_tags: bool = False  # If true, only accept runs with matching tags
     status: str  # "online" or "stale"
     seconds_since_heartbeat: float
 
@@ -1264,8 +1276,10 @@ async def list_runners():
             last_heartbeat=runner.last_heartbeat,
             hostname=runner.hostname,
             project_dir=runner.project_dir,
-            executor_type=runner.executor_type,
+            executor_profile=runner.executor_profile,
+            executor=runner.executor,
             tags=runner.tags,
+            require_matching_tags=runner.require_matching_tags,
             status=runner.status,
             seconds_since_heartbeat=seconds,
         ))
@@ -1358,10 +1372,25 @@ async def create_run(run_create: RunCreate):
             print(f"[DEBUG] Created run {run.run_id} for session {run.session_id}", flush=True)
         await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)
 
-    # Merge demands from blueprint and additional_demands (ADR-011)
+    # Merge demands from blueprint, affinity, and additional_demands (ADR-011)
     merged_demands = None
+    affinity_demands = RunnerDemands()  # Empty defaults - populated for resume runs
     blueprint_demands = RunnerDemands()  # Empty defaults
     additional_demands = RunnerDemands()  # Empty defaults
+
+    # For RESUME_SESSION, look up session affinity and enforce it (ADR-010)
+    # This ensures resume runs go to the same runner that owns the session
+    if run_create.type == RunType.RESUME_SESSION:
+        affinity = get_session_affinity(run_create.session_id)
+        if affinity:
+            # Create demands from affinity - hostname and executor_profile are required
+            affinity_demands = RunnerDemands(
+                hostname=affinity.get('hostname'),
+                executor_profile=affinity.get('executor_profile'),
+            )
+            if DEBUG:
+                print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
+                      f"hostname={affinity.get('hostname')}, executor_profile={affinity.get('executor_profile')}", flush=True)
 
     # Load blueprint demands if agent_name provided
     if run_create.agent_name:
@@ -1373,8 +1402,12 @@ async def create_run(run_create: RunCreate):
     if run_create.additional_demands:
         additional_demands = RunnerDemands(**run_create.additional_demands)
 
-    # Merge demands (blueprint takes precedence, additional is additive)
-    merged_demands = RunnerDemands.merge(blueprint_demands, additional_demands)
+    # Merge demands: affinity (mandatory for resume) + blueprint + additional
+    # Affinity takes precedence for resume runs
+    merged_demands = RunnerDemands.merge(
+        RunnerDemands.merge(affinity_demands, blueprint_demands),
+        additional_demands
+    )
 
     # Only store and set timeout if there are actual demands
     if not merged_demands.is_empty():

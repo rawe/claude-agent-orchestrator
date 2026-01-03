@@ -16,7 +16,7 @@ export interface Session {
   parent_session_id?: string;
   // Executor affinity data (ADR-010)
   executor_session_id?: string;
-  executor_type?: string;
+  executor_profile?: string;  // Was executor_type
   hostname?: string;
 }
 

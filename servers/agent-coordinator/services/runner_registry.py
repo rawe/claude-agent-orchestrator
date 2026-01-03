@@ -2,7 +2,7 @@
 Runner registry for tracking registered runner instances.
 
 Runners register on startup and send periodic heartbeats to stay alive.
-Runner identity is deterministically derived from (hostname, project_dir, executor_type)
+Runner identity is deterministically derived from (hostname, project_dir, executor_profile)
 to enable automatic reconnection recognition. See ADR-012.
 """
 
@@ -16,18 +16,18 @@ from pydantic import BaseModel
 class DuplicateRunnerError(Exception):
     """Raised when attempting to register a runner with an identity that's already online."""
 
-    def __init__(self, runner_id: str, hostname: str, project_dir: str, executor_type: str):
+    def __init__(self, runner_id: str, hostname: str, project_dir: str, executor_profile: str):
         self.runner_id = runner_id
         self.hostname = hostname
         self.project_dir = project_dir
-        self.executor_type = executor_type
+        self.executor_profile = executor_profile
         super().__init__(
-            f"Runner with identity ({hostname}, {project_dir}, {executor_type}) "
+            f"Runner with identity ({hostname}, {project_dir}, {executor_profile}) "
             f"is already registered and online as {runner_id}"
         )
 
 
-def derive_runner_id(hostname: str, project_dir: str, executor_type: str) -> str:
+def derive_runner_id(hostname: str, project_dir: str, executor_profile: str) -> str:
     """
     Deterministically derive runner_id from identifying properties.
 
@@ -37,13 +37,13 @@ def derive_runner_id(hostname: str, project_dir: str, executor_type: str) -> str
     Args:
         hostname: The machine hostname where the runner is running
         project_dir: The default project directory for this runner
-        executor_type: The type of executor (folder name, e.g., 'claude-code')
+        executor_profile: The executor profile name (e.g., 'coding', 'research')
 
     Returns:
         Runner ID in format: lnch_{sha256_hash[:12]}
     """
     # Normalize inputs
-    key = f"{hostname}:{project_dir}:{executor_type}"
+    key = f"{hostname}:{project_dir}:{executor_profile}"
 
     # Generate deterministic hash
     hash_hex = hashlib.sha256(key.encode()).hexdigest()
@@ -66,9 +66,12 @@ class RunnerInfo(BaseModel):
     # Identifying properties (required for ID derivation)
     hostname: str
     project_dir: str
-    executor_type: str
+    executor_profile: str
+    # Executor details
+    executor: dict = {}  # {type, command, config}
     # Capabilities (features the runner offers)
     tags: list[str] = []
+    require_matching_tags: bool = False  # If true, only accept runs with matching tags
     # Status managed by coordinator
     status: Literal["online", "stale"] = RunnerStatus.ONLINE
 
@@ -86,12 +89,14 @@ class RunnerRegistry:
         self,
         hostname: str,
         project_dir: str,
-        executor_type: str,
+        executor_profile: str,
+        executor: Optional[dict] = None,
         tags: Optional[list[str]] = None,
+        require_matching_tags: bool = False,
     ) -> RunnerInfo:
         """Register a runner and return its info.
 
-        If a runner with the same (hostname, project_dir, executor_type) already exists:
+        If a runner with the same (hostname, project_dir, executor_profile) already exists:
         - If ONLINE: Raises DuplicateRunnerError (cannot have two runners with same identity)
         - If STALE: Treated as reconnection (old runner probably crashed)
 
@@ -100,8 +105,10 @@ class RunnerRegistry:
         Args:
             hostname: The machine hostname where the runner is running
             project_dir: The default project directory for this runner
-            executor_type: The type of executor (folder name, e.g., 'claude-code')
+            executor_profile: The executor profile name (e.g., 'coding', 'research')
+            executor: Executor details dict with {type, command, config}
             tags: Optional list of capability tags this runner offers
+            require_matching_tags: If true, only accept runs with at least one matching tag
 
         Returns:
             RunnerInfo with the runner_id derived from the properties
@@ -110,7 +117,7 @@ class RunnerRegistry:
             DuplicateRunnerError: If an online runner with the same identity already exists
         """
         # Derive deterministic runner_id from properties
-        runner_id = derive_runner_id(hostname, project_dir, executor_type)
+        runner_id = derive_runner_id(hostname, project_dir, executor_profile)
         now = datetime.now(timezone.utc).isoformat()
 
         with self._lock:
@@ -122,15 +129,18 @@ class RunnerRegistry:
                         runner_id=runner_id,
                         hostname=hostname,
                         project_dir=project_dir,
-                        executor_type=executor_type,
+                        executor_profile=executor_profile,
                     )
 
                 # Stale runner: treat as reconnection (old runner probably crashed)
                 existing.last_heartbeat = now
                 existing.status = RunnerStatus.ONLINE
-                # Update tags on reconnection (runner may have new capabilities)
+                # Update fields on reconnection (runner may have new capabilities)
                 if tags is not None:
                     existing.tags = tags
+                if executor is not None:
+                    existing.executor = executor
+                existing.require_matching_tags = require_matching_tags
                 # Remove from deregistered set if it was marked
                 self._deregistered.discard(runner_id)
                 return existing
@@ -142,8 +152,10 @@ class RunnerRegistry:
                 last_heartbeat=now,
                 hostname=hostname,
                 project_dir=project_dir,
-                executor_type=executor_type,
+                executor_profile=executor_profile,
+                executor=executor or {},
                 tags=tags or [],
+                require_matching_tags=require_matching_tags,
                 status=RunnerStatus.ONLINE,
             )
             self._runners[runner_id] = runner

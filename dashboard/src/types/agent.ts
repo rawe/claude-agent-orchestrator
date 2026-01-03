@@ -3,10 +3,10 @@ export type AgentStatus = 'active' | 'inactive';
 // Agent Demands (ADR-011)
 // Requirements the agent demands to be satisfied before a session can run
 export interface AgentDemands {
-  hostname?: string;      // Must run on this specific host
-  project_dir?: string;   // Must run in this directory
-  executor_type?: string; // Must use this executor type
-  tags?: string[];        // Must have ALL these capability tags
+  hostname?: string;          // Must run on this specific host
+  project_dir?: string;       // Must run in this directory
+  executor_profile?: string;  // Must use this executor profile
+  tags?: string[];            // Must have ALL these capability tags
 }
 
 export interface MCPServerStdio {

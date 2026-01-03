@@ -39,7 +39,7 @@ class RequestContext:
     additional_demands: dict = field(default_factory=dict)
     """Additional demands from X-Additional-Demands header (JSON).
 
-    May contain: hostname, project_dir, executor_type, tags
+    May contain: hostname, project_dir, executor_profile, tags
     """
 
     def get_hostname(self) -> Optional[str]:
@@ -50,9 +50,9 @@ class RequestContext:
         """Get project_dir from additional demands."""
         return self.additional_demands.get("project_dir")
 
-    def get_executor_type(self) -> Optional[str]:
-        """Get executor_type from additional demands."""
-        return self.additional_demands.get("executor_type")
+    def get_executor_profile(self) -> Optional[str]:
+        """Get executor_profile from additional demands."""
+        return self.additional_demands.get("executor_profile")
 
     def get_runner_tags(self) -> Optional[list[str]]:
         """Get runner tags from additional demands."""

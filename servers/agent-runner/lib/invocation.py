@@ -4,7 +4,7 @@ Executor Invocation Payload
 Handles parsing and validation of JSON payloads for the unified ao-*-exec entrypoint.
 Replaces individual CLI arguments with a structured, versioned schema.
 
-Schema version: 2.0
+Schema version: 2.1
 
 Runner resolves blueprint and placeholders before spawning executor.
 Executor receives fully resolved agent_blueprint.
@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Current schema version - used by both runner (to build) and executor (to validate)
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 
 # Supported schema versions
 SUPPORTED_VERSIONS = {SCHEMA_VERSION}
@@ -30,13 +30,13 @@ SUPPORTED_VERSIONS = {SCHEMA_VERSION}
 INVOCATION_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "ExecutorInvocation",
-    "description": "Schema 2.0 - Executor receives resolved agent_blueprint",
+    "description": "Schema 2.1 - Executor receives resolved agent_blueprint and executor_config",
     "type": "object",
     "required": ["schema_version", "mode", "session_id", "prompt"],
     "properties": {
         "schema_version": {
             "type": "string",
-            "const": "2.0",
+            "const": "2.1",
             "description": "Schema version",
         },
         "mode": {
@@ -76,6 +76,11 @@ INVOCATION_SCHEMA = {
                 },
             },
         },
+        "executor_config": {
+            "type": "object",
+            "additionalProperties": True,
+            "description": "Executor-specific configuration (schema depends on executor type)",
+        },
         "metadata": {
             "type": "object",
             "additionalProperties": True,
@@ -100,6 +105,7 @@ class ExecutorInvocation:
         prompt: User input text
         project_dir: Working directory path (start mode only)
         agent_blueprint: Fully resolved agent blueprint
+        executor_config: Executor-specific configuration (schema depends on executor type)
         metadata: Extensible key-value map for future use
     """
 
@@ -109,6 +115,7 @@ class ExecutorInvocation:
     prompt: str
     project_dir: Optional[str] = None
     agent_blueprint: Optional[dict[str, Any]] = None
+    executor_config: Optional[dict[str, Any]] = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -183,6 +190,7 @@ class ExecutorInvocation:
             "prompt",
             "project_dir",
             "agent_blueprint",
+            "executor_config",
             "metadata",
         }
         for key in data.keys():
@@ -196,6 +204,7 @@ class ExecutorInvocation:
             prompt=data["prompt"],
             project_dir=data.get("project_dir"),
             agent_blueprint=data.get("agent_blueprint"),
+            executor_config=data.get("executor_config"),
             metadata=data.get("metadata", {}),
         )
 
@@ -211,6 +220,8 @@ class ExecutorInvocation:
             d["agent_blueprint"] = self.agent_blueprint
         if self.project_dir:
             d["project_dir"] = self.project_dir
+        if self.executor_config:
+            d["executor_config"] = self.executor_config
         if self.metadata:
             d["metadata"] = self.metadata
         return d

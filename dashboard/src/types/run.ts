@@ -7,7 +7,7 @@ export type ExecutionMode = 'sync' | 'async_poll' | 'async_callback';
 export interface RunDemands {
   hostname?: string | null;
   project_dir?: string | null;
-  executor_type?: string | null;
+  executor_profile?: string | null;  // Was executor_type
   tags?: string[];
 }
 

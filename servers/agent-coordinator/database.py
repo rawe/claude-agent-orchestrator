@@ -27,7 +27,7 @@ def init_db():
             parent_session_id TEXT REFERENCES sessions(session_id) ON DELETE SET NULL,
             execution_mode TEXT DEFAULT 'sync',
             executor_session_id TEXT,
-            executor_type TEXT,
+            executor_profile TEXT,
             hostname TEXT
         )
     """)
@@ -144,7 +144,7 @@ def update_session_metadata(
     agent_name: str = None,
     last_resumed_at: str = None,
     executor_session_id: str = None,
-    executor_type: str = None,
+    executor_profile: str = None,
     hostname: str = None
 ):
     """Update session metadata fields"""
@@ -169,9 +169,9 @@ def update_session_metadata(
         updates.append("executor_session_id = ?")
         params.append(executor_session_id)
 
-    if executor_type is not None:
-        updates.append("executor_type = ?")
-        params.append(executor_type)
+    if executor_profile is not None:
+        updates.append("executor_profile = ?")
+        params.append(executor_profile)
 
     if hostname is not None:
         updates.append("hostname = ?")
@@ -329,7 +329,7 @@ def bind_session_executor(
     session_id: str,
     executor_session_id: str,
     hostname: str,
-    executor_type: str,
+    executor_profile: str,
     project_dir: str = None
 ) -> dict | None:
     """Bind executor information to a session after framework starts.
@@ -341,7 +341,7 @@ def bind_session_executor(
         session_id: Our coordinator-generated session ID
         executor_session_id: Framework's session ID (e.g., Claude SDK UUID)
         hostname: Machine where session is running
-        executor_type: Type of executor (e.g., "claude-code")
+        executor_profile: Profile used by executor (e.g., "coding")
         project_dir: Optional project directory override
 
     Returns:
@@ -362,10 +362,10 @@ def bind_session_executor(
     updates = [
         "executor_session_id = ?",
         "hostname = ?",
-        "executor_type = ?",
+        "executor_profile = ?",
         "status = 'running'"
     ]
-    params = [executor_session_id, hostname, executor_type]
+    params = [executor_session_id, hostname, executor_profile]
 
     if project_dir is not None:
         updates.append("project_dir = ?")
@@ -447,13 +447,13 @@ def update_session_parent(session_id: str, parent_session_id: str) -> None:
 def get_session_affinity(session_id: str) -> dict | None:
     """Get session affinity information for resume routing.
 
-    Returns hostname, project_dir, executor_type needed to route
+    Returns hostname, project_dir, executor_profile needed to route
     resume requests to the correct runner.
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.execute("""
-        SELECT session_id, executor_session_id, hostname, project_dir, executor_type
+        SELECT session_id, executor_session_id, hostname, project_dir, executor_profile
         FROM sessions WHERE session_id = ?
     """, (session_id,))
     row = cursor.fetchone()

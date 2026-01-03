@@ -185,15 +185,15 @@ curl http://localhost:8765/runners
 
 ## Definition of Done
 
-- [ ] `executor_type` renamed to `executor_profile` everywhere
-- [ ] New `executor` object field stored and returned in API
-- [ ] New `require_matching_tags` field with filtering logic
-- [ ] Database schema updated (column rename)
-- [ ] All SQL queries updated
-- [ ] Demand matching uses `executor_profile`
-- [ ] Agent blueprints updated
-- [ ] API responses include new fields
-- [ ] Integration test with runner + blueprint
+- [x] `executor_type` renamed to `executor_profile` everywhere
+- [x] New `executor` object field stored and returned in API
+- [x] New `require_matching_tags` field with filtering logic
+- [x] Database schema updated (column rename)
+- [x] All SQL queries updated
+- [x] Demand matching uses `executor_profile`
+- [ ] Agent blueprints updated (no blueprints currently use executor_type/executor_profile)
+- [x] API responses include new fields
+- [x] Integration test with runner + blueprint
 
 ## Database Migration Note
 

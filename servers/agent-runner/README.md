@@ -13,20 +13,23 @@ The Agent Runner is a standalone process that polls Agent Coordinator for runs a
 ### Start the Runner
 
 ```bash
-# From project root
+# From project root (uses default executor)
 ./servers/agent-runner/agent-runner
 
-# Or with explicit coordinator URL
-./servers/agent-runner/agent-runner --coordinator-url http://localhost:8765
+# With an executor profile
+./servers/agent-runner/agent-runner --profile coding
+
+# List available profiles
+./servers/agent-runner/agent-runner --profile-list
 
 # Verbose mode for debugging
 ./servers/agent-runner/agent-runner -v
 ```
 
 The runner will:
-1. Register with Agent Coordinator
+1. Register with Agent Coordinator (with profile info)
 2. Start polling for runs
-3. Execute runs via the configured executor (default: `executors/claude-code/ao-claude-code-exec`)
+3. Execute runs via the configured executor
 4. Report run status back to the Agent Coordinator
 
 ### Stop the Runner
@@ -40,57 +43,72 @@ Press `Ctrl+C` for graceful shutdown.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AGENT_ORCHESTRATOR_API_URL` | `http://localhost:8765` | Agent Coordinator URL |
-| `AGENT_EXECUTOR_PATH` | `executors/claude-code/ao-claude-code-exec` | Executor script path (relative to agent-runner dir) |
 | `POLL_TIMEOUT` | `30` | Long-poll timeout in seconds |
 | `HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
 | `PROJECT_DIR` | Current directory | Default project directory |
 
-#### Executor Selection
+### Executor Profiles
 
-Use `--executor` / `-x` to switch between executors by name:
+Profiles define executor configuration (permission mode, model, settings). Located in `profiles/`.
 
-```bash
-# List available executors
-./agent-runner --executor-list
-
-# Use Claude SDK executor (default)
-./agent-runner -x claude-code
-
-# Use test executor
-./agent-runner -x test-executor
-```
-
-Or use environment variable with full path:
+See [Profiles Documentation](profiles/PROFILES.md) for the naming convention and available profiles.
 
 ```bash
-AGENT_EXECUTOR_PATH=executors/test-executor/ao-test-exec ./agent-runner
+# List available profiles
+./agent-runner --profile-list
+
+# Start with a profile
+./agent-runner --profile full-access-project-best
 ```
+
+**Profile format** (`profiles/full-access-project-best.json`):
+```json
+{
+  "type": "claude-code",
+  "command": "executors/claude-code/ao-claude-code-exec",
+  "config": {
+    "permission_mode": "bypassPermissions",
+    "setting_sources": ["project", "local"],
+    "model": "opus"
+  }
+}
+```
+
+Without `--profile`, the runner uses the default executor with no config.
 
 ### CLI Options
 
 ```
---coordinator-url, -c  Agent Coordinator URL (overrides AGENT_ORCHESTRATOR_API_URL)
---executor, -x        Executor name (e.g., 'claude-code', 'test-executor')
---executor-path, -e   Full executor script path (overrides AGENT_EXECUTOR_PATH)
---executor-list, -l   List available executors and exit
---project-dir, -p     Default project directory (overrides PROJECT_DIR)
---verbose, -v         Enable verbose logging
+--coordinator-url, -c      Agent Coordinator URL
+--profile, -x              Executor profile name (loads profiles/<name>.json)
+--profile-list, -l         List available profiles and exit
+--require-matching-tags    Only accept runs with at least one matching tag
+--project-dir, -p          Default project directory
+--tags, -t                 Comma-separated capability tags
+--mcp-port, -m             Port for embedded MCP server
+--verbose, -v              Enable verbose logging
 ```
-
-Note: `--executor` and `--executor-path` are mutually exclusive.
 
 ## Directory Structure
 
 ```
 servers/agent-runner/
 ├── agent-runner             # Main runner script (uv script)
+├── profiles/                # Executor profiles
+│   ├── PROFILES.md          # Profile naming convention
+│   ├── full-access-project-best.json
+│   ├── full-access-isolated-best.json
+│   ├── restricted-project-best.json
+│   └── full-access-project-quick.json
 ├── lib/                     # Shared libraries
 │   ├── config.py            # RunnerConfig
-│   ├── executor_config.py   # Executor Config (for ao-*-exec scripts)
-│   ├── invocation.py        # JSON payload schema
-│   ├── session_client.py    # Session API client
-│   ├── agent_api.py         # Agent blueprints API client
+│   ├── executor.py          # Profile loading, RunExecutor
+│   ├── invocation.py        # JSON payload schema (2.1)
+│   ├── runner_gateway.py    # Gateway for executor communication
+│   ├── session_client.py    # HTTP client for gateway
 │   └── ...
+├── docs/                    # Documentation
+│   └── runner-gateway-api.md
 ├── executors/               # Executor implementations
 │   ├── claude-code/         # Claude SDK executor
 │   │   ├── ao-claude-code-exec
@@ -138,14 +156,14 @@ servers/agent-runner/
 │  └─────────────────────────────────────────────────────────────────────────────┘│
 │                                                                                  │
 │  ┌─────────────────────────────┐  ┌─────────────────────────────────────────┐   │
-│  │ COORDINATOR PROXY           │  │ EMBEDDED MCP SERVER                     │   │
+│  │ RUNNER GATEWAY              │  │ EMBEDDED MCP SERVER                     │   │
 │  │ THREAD                      │  │ THREAD                                  │   │
 │  │ (127.0.0.1:<dynamic>)       │  │ (127.0.0.1:<dynamic>)                   │   │
 │  │                             │  │                                         │   │
-│  │ • HTTP proxy to Coord.      │  │ • FastMCP HTTP server                   │   │
-│  │ • Injects auth headers      │  │ • 7 orchestration tools                 │   │
-│  │ • Used by executor for      │  │ • Facade to Coordinator API             │   │
-│  │   session/agent API calls   │  │ • Used by Claude for child agents       │   │
+│  │ • Enriches executor reqs    │  │ • FastMCP HTTP server                   │   │
+│  │ • Adds hostname, profile    │  │ • 7 orchestration tools                 │   │
+│  │ • Injects auth headers      │  │ • Facade to Coordinator API             │   │
+│  │ • Routes to Coordinator     │  │ • Used by Claude for child agents       │   │
 │  │                             │  │                                         │   │
 │  └──────────────┬──────────────┘  └──────────────────┬──────────────────────┘   │
 │                 │                                     │                          │
@@ -185,7 +203,7 @@ When a run is received, the Runner spawns an executor subprocess:
 │   │  2. Resolve placeholders:                                        │           │
 │   │     • ${AGENT_ORCHESTRATOR_MCP_URL} → http://127.0.0.1:<mcp>    │           │
 │   │     • ${AGENT_SESSION_ID} → ses_abc123                          │           │
-│   │  3. Build Schema 2.0 JSON payload                                │           │
+│   │  3. Build Schema 2.1 JSON payload (with executor_config)          │           │
 │   │  4. Spawn executor subprocess                                    │           │
 │   └─────────────────────────────────────────────────────────────────┘           │
 │         │                                                                        │
@@ -203,21 +221,14 @@ When a run is received, the Runner spawns an executor subprocess:
 │                    (ao-claude-code-exec)                                        │
 │                                                                                  │
 │  ┌───────────────────────────────────────────────────────────────────┐          │
-│  │  Reads JSON from stdin (Schema 2.0):                              │          │
+│  │  Reads JSON from stdin (Schema 2.1):                              │          │
 │  │  {                                                                 │          │
-│  │    "schema_version": "2.0",                                       │          │
+│  │    "schema_version": "2.1",                                       │          │
 │  │    "mode": "start",                                               │          │
 │  │    "session_id": "ses_abc123",                                    │          │
 │  │    "prompt": "...",                                               │          │
-│  │    "agent_blueprint": {                                           │          │
-│  │      "name": "researcher",                                        │          │
-│  │      "system_prompt": "...",                                      │          │
-│  │      "mcp_servers": {                                             │          │
-│  │        "orchestrator": {                                          │          │
-│  │          "url": "http://127.0.0.1:54321"  ◄─ resolved             │          │
-│  │        }                                                          │          │
-│  │      }                                                            │          │
-│  │    }                                                              │          │
+│  │    "executor_config": { ... },      ◄─ from profile               │          │
+│  │    "agent_blueprint": { ... }       ◄─ resolved                   │          │
 │  │  }                                                                │          │
 │  └───────────────────────────────────────────────────────────────────┘          │
 │                                                                                  │
@@ -288,10 +299,10 @@ When a run is received, the Runner spawns an executor subprocess:
 │                                                                                  │
 │  4. EXECUTOR SPAWNING                                                            │
 │     Runner ──[stdin JSON]──► Executor subprocess                                │
-│     Env: AGENT_ORCHESTRATOR_API_URL=<proxy_url>                                 │
+│     Env: AGENT_ORCHESTRATOR_API_URL=<gateway_url>                               │
 │                                                                                  │
-│  5. EXECUTOR → COORDINATOR (via Proxy)                                          │
-│     Executor ──[HTTP]──► Proxy ──[HTTP+Auth]──► Coordinator                     │
+│  5. EXECUTOR → COORDINATOR (via Runner Gateway)                                 │
+│     Executor ──[HTTP]──► Gateway ──[HTTP+Auth]──► Coordinator                   │
 │     (session binding, event reporting, etc.)                                    │
 │                                                                                  │
 │  6. CLAUDE → EMBEDDED MCP → COORDINATOR (for child orchestration)              │
@@ -316,7 +327,7 @@ When a run is received, the Runner spawns an executor subprocess:
 | Heartbeat | Thread | - | Keep registration alive |
 | Poller | Thread | - | Long-poll for runs |
 | Supervisor | Thread | - | Monitor executor completion |
-| Coordinator Proxy | Thread | dynamic | Auth proxy for executors |
+| Runner Gateway | Thread | dynamic | Enriches executor requests, handles auth |
 | Embedded MCP Server | Thread | dynamic | Orchestration tools for Claude |
 | Executor | Subprocess | - | Runs Claude SDK agent |
 
@@ -336,11 +347,11 @@ When a run is received, the Runner spawns an executor subprocess:
            │                           │                           │
            ▼                           ▼                           ▼
     ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-    │ API Client   │          │ Coord Proxy  │          │ MCP Server   │
-    │              │          │              │          │              │
-    │ (polling,    │          │ (forwards    │          │ (orchestr.   │
-    │  heartbeat,  │          │  executor    │          │  tools)      │
-    │  status)     │          │  requests)   │          │              │
+    │ API Client   │          │ Runner       │          │ MCP Server   │
+    │              │          │ Gateway      │          │              │
+    │ (polling,    │          │ (enriches &  │          │ (orchestr.   │
+    │  heartbeat,  │          │  forwards    │          │  tools)      │
+    │  status)     │          │  executor)   │          │              │
     └──────────────┘          └──────────────┘          └──────────────┘
            │                           │                           │
            │                           │                           │
@@ -356,16 +367,17 @@ When a run is received, the Runner spawns an executor subprocess:
 
 ## Run Types
 
-Runs are passed to the executor as JSON via stdin (Schema 2.0):
+Runs are passed to the executor as JSON via stdin (Schema 2.1):
 
 | Type | Mode | Parameters |
 |------|------|------------|
-| `start_session` | `start` | `session_id`, `prompt`, `project_dir`, `agent_blueprint` |
-| `resume_session` | `resume` | `session_id`, `prompt`, `agent_blueprint` |
+| `start_session` | `start` | `session_id`, `prompt`, `project_dir`, `executor_config`, `agent_blueprint` |
+| `resume_session` | `resume` | `session_id`, `prompt`, `executor_config`, `agent_blueprint` |
 
-**Schema 2.0 Notes:**
-- `agent_blueprint`: Fully resolved blueprint with placeholders replaced. The Runner fetches the blueprint from the Coordinator and resolves placeholders like `${AGENT_ORCHESTRATOR_MCP_URL}` and `${AGENT_SESSION_ID}` before spawning the executor.
-- Executor uses `agent_blueprint` directly without making Coordinator API calls.
+**Schema 2.1 Notes:**
+- `executor_config`: Configuration from the profile (permission_mode, model, etc.)
+- `agent_blueprint`: Fully resolved blueprint with placeholders replaced
+- Executor applies `executor_config` to configure itself (e.g., permission mode, model)
 
 ## How It Works
 
@@ -416,11 +428,26 @@ Use `-v` for debug-level logs.
 
 ### Subprocess failures
 
-- Check that the executor script exists at `AGENT_EXECUTOR_PATH`
+- Check that the profile's command path exists
 - Verify `PROJECT_DIR` points to a valid directory
 - Use `-v` flag for detailed subprocess output
 
+## Runner Gateway
+
+Executors communicate with the Agent Coordinator through the **Runner Gateway**, a local HTTP server that enriches requests with runner-owned data (hostname, executor_profile).
+
+**Important:** The gateway exposes endpoints that **do not exist** on the Agent Coordinator:
+
+| Gateway Endpoint | Coordinator Endpoint | Enrichment |
+|------------------|---------------------|------------|
+| `POST /bind` | `POST /sessions/{id}/bind` | Adds `hostname`, `executor_profile` |
+| `POST /events` | `POST /sessions/{id}/events` | Routes by `session_id` |
+| `PATCH /metadata` | `PATCH /sessions/{id}/metadata` | Routes by `session_id` |
+
+See [Runner Gateway API](docs/runner-gateway-api.md) for full specification.
+
 ## Related Documentation
 
+- [Runner Gateway API](docs/runner-gateway-api.md)
 - [Agent Callback Architecture](../../docs/features/agent-callback-architecture.md)
 - [Work Package 2: Agent Runner Process](../../docs/features/02-agent-runner-process.md)

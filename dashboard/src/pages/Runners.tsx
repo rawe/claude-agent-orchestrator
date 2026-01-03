@@ -3,7 +3,7 @@ import { runnerService } from '@/services';
 import { Runner, RunnerStatus } from '@/types';
 import { ConfirmModal } from '@/components/common';
 import { formatRelativeTime, formatAbsoluteTime, getLastPathSegment } from '@/utils/formatters';
-import { RefreshCw, Server, Folder, Clock, Activity, Power, AlertTriangle, Terminal, Tag } from 'lucide-react';
+import { RefreshCw, Server, Folder, Clock, Activity, Power, AlertTriangle, Terminal, Tag, ChevronDown, ChevronUp, Code } from 'lucide-react';
 
 interface RunnerCardProps {
   runner: Runner;
@@ -55,18 +55,20 @@ function getStatusConfig(status: RunnerStatus, isDeregistering: boolean) {
 }
 
 function RunnerCard({ runner, isDeregistering, onDeregister }: RunnerCardProps) {
+  const [showExecutorDetails, setShowExecutorDetails] = useState(false);
   const projectFolder = runner.project_dir ? getLastPathSegment(runner.project_dir) : null;
-  const config = getStatusConfig(runner.status, isDeregistering);
-  const StatusIcon = config.icon;
+  const statusConfig = getStatusConfig(runner.status, isDeregistering);
+  const StatusIcon = statusConfig.icon;
+  const hasExecutorDetails = runner.executor && (runner.executor.command || runner.executor.config);
 
   return (
     <div
       className={`group bg-white rounded-lg border border-gray-200 overflow-hidden transition-all duration-300 ${
         isDeregistering ? 'animate-pulse' : 'hover:shadow-sm'
-      } ${config.cardOpacity}`}
+      } ${statusConfig.cardOpacity}`}
     >
       {/* Status bar */}
-      <div className={`h-1 ${config.barColor} transition-colors duration-300`} />
+      <div className={`h-1 ${statusConfig.barColor} transition-colors duration-300`} />
 
       <div className="p-4">
         {/* Header: Hostname and Status */}
@@ -78,10 +80,10 @@ function RunnerCard({ runner, isDeregistering, onDeregister }: RunnerCardProps) 
             </h3>
           </div>
           <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${config.badgeBg} ${config.badgeText}`}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${statusConfig.badgeBg} ${statusConfig.badgeText}`}
           >
             <StatusIcon className="w-3 h-3" />
-            {config.label}
+            {statusConfig.label}
           </span>
         </div>
 
@@ -100,11 +102,52 @@ function RunnerCard({ runner, isDeregistering, onDeregister }: RunnerCardProps) 
           </div>
         )}
 
-        {/* Executor Type */}
-        {runner.executor_type && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-2">
-            <Terminal className="w-3.5 h-3.5 text-gray-400" />
-            <span className="truncate">{runner.executor_type}</span>
+        {/* Executor Profile and Details */}
+        {runner.executor_profile && (
+          <div className="mb-2">
+            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+              <Terminal className="w-3.5 h-3.5 text-gray-400" />
+              <span className="truncate font-medium">{runner.executor_profile}</span>
+              {runner.executor?.type && (
+                <span className="text-gray-400">({runner.executor.type})</span>
+              )}
+              {hasExecutorDetails && (
+                <button
+                  type="button"
+                  onClick={() => setShowExecutorDetails(!showExecutorDetails)}
+                  className="ml-auto flex items-center gap-0.5 text-blue-600 hover:text-blue-700"
+                >
+                  <Code className="w-3 h-3" />
+                  {showExecutorDetails ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Expandable Executor Details */}
+            {showExecutorDetails && runner.executor && (
+              <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+                {runner.executor.command && (
+                  <div className="mb-2">
+                    <span className="text-gray-500 font-medium">Command:</span>
+                    <code className="ml-1 text-gray-700 bg-gray-100 px-1 py-0.5 rounded break-all">
+                      {runner.executor.command}
+                    </code>
+                  </div>
+                )}
+                {runner.executor.config && Object.keys(runner.executor.config).length > 0 && (
+                  <div>
+                    <span className="text-gray-500 font-medium">Config:</span>
+                    <pre className="mt-1 p-2 bg-gray-900 text-gray-100 rounded overflow-x-auto text-[10px] leading-relaxed">
+                      {JSON.stringify(runner.executor.config, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

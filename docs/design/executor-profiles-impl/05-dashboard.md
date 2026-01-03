@@ -1,4 +1,4 @@
-# Session 4: Dashboard
+# Session 5: Dashboard
 
 **Component:** `dashboard/src/`
 

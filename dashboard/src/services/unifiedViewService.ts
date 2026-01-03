@@ -58,7 +58,7 @@ function adaptSession(
     projectDir: session.project_dir ?? null,
     parentSessionId: session.parent_session_id ?? null,
     executorSessionId: session.executor_session_id ?? null,
-    executorType: session.executor_type ?? null,
+    executorProfile: session.executor_profile ?? null,
     hostname: session.hostname ?? null,
     // Computed fields
     runCount: sortedRuns.length,

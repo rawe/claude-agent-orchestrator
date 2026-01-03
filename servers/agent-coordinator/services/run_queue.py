@@ -118,7 +118,7 @@ class DemandFields:
     """Field names for demands matching."""
     HOSTNAME = "hostname"
     PROJECT_DIR = "project_dir"
-    EXECUTOR_TYPE = "executor_type"
+    EXECUTOR_PROFILE = "executor_profile"
     TAGS = "tags"
 
 
@@ -130,17 +130,22 @@ def capabilities_satisfy_demands(
     Check if runner capabilities satisfy run demands.
 
     All specified demands must be met (hard requirements).
+    Additionally, if runner.require_matching_tags is True, the run must have
+    at least one tag that matches the runner's tags.
     See ADR-011 for details.
 
     Args:
         runner: Runner info with properties and tags
-        demands: Demands dict with hostname, project_dir, executor_type, tags
+        demands: Demands dict with hostname, project_dir, executor_profile, tags
 
     Returns:
         True if runner satisfies all demands, False otherwise
     """
     if demands is None:
-        # No demands = any runner can claim
+        # No demands - check require_matching_tags filter
+        if runner.require_matching_tags:
+            # Runner requires matching tags but run has no demands/tags
+            return False
         return True
 
     # Property demands (exact match required)
@@ -152,8 +157,8 @@ def capabilities_satisfy_demands(
     if demanded_project_dir and runner.project_dir != demanded_project_dir:
         return False
 
-    demanded_executor_type = demands.get(DemandFields.EXECUTOR_TYPE)
-    if demanded_executor_type and runner.executor_type != demanded_executor_type:
+    demanded_executor_profile = demands.get(DemandFields.EXECUTOR_PROFILE)
+    if demanded_executor_profile and runner.executor_profile != demanded_executor_profile:
         return False
 
     # Tag demands - runner must have ALL demanded tags
@@ -161,6 +166,14 @@ def capabilities_satisfy_demands(
     if demanded_tags:
         runner_tags = set(runner.tags or [])
         if not set(demanded_tags).issubset(runner_tags):
+            return False
+
+    # require_matching_tags - runner only accepts runs with matching tags
+    if runner.require_matching_tags:
+        run_tags = set(demands.get(DemandFields.TAGS, []))
+        runner_tags = set(runner.tags or [])
+        # Reject if run has no tags OR no intersection with runner tags
+        if not run_tags or not run_tags.intersection(runner_tags):
             return False
 
     return True

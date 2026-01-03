@@ -1,15 +1,20 @@
 """
 Session Client
 
-HTTP client for Agent Session Manager API.
-Replaces file-based session operations with API calls.
+HTTP client for executor-to-runner communication via the Runner Gateway.
+
+Executors use this client to communicate with the Agent Coordinator through
+the Runner Gateway. The gateway:
+- Handles authentication (Auth0 M2M tokens)
+- Enriches requests with runner-owned data (hostname, executor_profile)
+- Routes requests to the appropriate Coordinator endpoints
+
+Gateway endpoints:
+- POST /bind      - Bind executor to session (gateway adds runner data)
+- POST /events    - Add event to session
+- PATCH /metadata - Update session metadata
 
 Note: Uses session_id (coordinator-generated) per ADR-010.
-
-Authentication Note:
-    This client is used by executors which communicate via the Agent Coordinator
-    Proxy. The proxy handles all authentication (Auth0 M2M), so this client
-    does not need to add Authorization headers.
 """
 
 import httpx
@@ -82,40 +87,36 @@ class SessionClient:
         result = self._request("POST", "/sessions", json_data=data)
         return result.get("session", result)
 
-    def bind_session_executor(
+    def bind(
         self,
         session_id: str,
         executor_session_id: str,
-        hostname: str,
-        executor_type: str,
         project_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Bind executor information to a session after framework starts.
+        Bind executor to a session via the Runner Gateway.
 
         Called by executor after it gets the framework's session ID.
-        Updates session status to 'running'.
-        See ADR-010 for details.
+        The Runner Gateway enriches this request with runner-owned data
+        (hostname, executor_profile) before forwarding to the Coordinator.
 
         Args:
             session_id: Coordinator-generated session ID
             executor_session_id: Framework's session ID (e.g., Claude SDK UUID)
-            hostname: Machine where session is running
-            executor_type: Type of executor (e.g., "claude-code")
-            project_dir: Optional project directory override
+            project_dir: Project directory (executor provides this per-invocation)
 
         Returns:
             Updated session dict
         """
         data = {
+            "session_id": session_id,
             "executor_session_id": executor_session_id,
-            "hostname": hostname,
-            "executor_type": executor_type,
         }
         if project_dir is not None:
             data["project_dir"] = project_dir
 
-        result = self._request("POST", f"/sessions/{session_id}/bind", json_data=data)
+        # Calls the Runner Gateway's /bind endpoint (not coordinator directly)
+        result = self._request("POST", "/bind", json_data=data)
         return result.get("session", result)
 
     def get_session(self, session_id: str) -> Dict[str, Any]:
@@ -136,7 +137,7 @@ class SessionClient:
     def get_affinity(self, session_id: str) -> Dict[str, Any]:
         """Get session affinity information for resume routing.
 
-        Returns hostname, project_dir, executor_type, executor_session_id.
+        Returns hostname, project_dir, executor_profile, executor_session_id.
         """
         result = self._request("GET", f"/sessions/{session_id}/affinity")
         return result.get("affinity", {})
@@ -147,32 +148,36 @@ class SessionClient:
         return result.get("sessions", [])
 
     def add_event(self, session_id: str, event: Dict[str, Any]) -> None:
-        """Add event to session. Handles session_stop specially on server."""
+        """Add event to session via the Runner Gateway.
+
+        The gateway extracts session_id from the body to route to the
+        correct coordinator endpoint: POST /sessions/{session_id}/events
+        """
         # Ensure session_id is set in event
         event_data = dict(event)
         event_data["session_id"] = session_id
-        self._request("POST", f"/sessions/{session_id}/events", json_data=event_data)
+        # Calls the Runner Gateway's /events endpoint
+        self._request("POST", "/events", json_data=event_data)
 
     def update_session(
         self,
         session_id: str,
         last_resumed_at: Optional[str] = None,
         executor_session_id: Optional[str] = None,
-        executor_type: Optional[str] = None,
-        hostname: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update session metadata."""
-        data = {}
+        """Update session metadata via the Runner Gateway.
+
+        The gateway extracts session_id from the body to route to the
+        correct coordinator endpoint: PATCH /sessions/{session_id}/metadata
+        """
+        data = {"session_id": session_id}
         if last_resumed_at is not None:
             data["last_resumed_at"] = last_resumed_at
         if executor_session_id is not None:
             data["executor_session_id"] = executor_session_id
-        if executor_type is not None:
-            data["executor_type"] = executor_type
-        if hostname is not None:
-            data["hostname"] = hostname
 
-        result = self._request("PATCH", f"/sessions/{session_id}/metadata", json_data=data)
+        # Calls the Runner Gateway's /metadata endpoint
+        result = self._request("PATCH", "/metadata", json_data=data)
         return result.get("session", result)
 
     def delete_session(self, session_id: str) -> bool:

@@ -18,11 +18,10 @@ subprocesses to handle them. It supports concurrent agent run execution
 and reports run status back to the coordinator.
 
 Usage:
-    ./servers/agent-runner/agent-runner
+    ./servers/agent-runner/agent-runner --profile coding
 
 Environment Variables:
     AGENT_ORCHESTRATOR_API_URL - Agent Coordinator URL (default: http://localhost:8765)
-    AGENT_EXECUTOR_PATH  - Executor script path (default: executors/claude-code/ao-claude-code-exec)
     POLL_TIMEOUT         - Long-poll timeout in seconds (default: 30)
     HEARTBEAT_INTERVAL   - Heartbeat interval in seconds (default: 60)
     PROJECT_DIR          - Default project directory (default: cwd)
@@ -51,10 +50,17 @@ from config import RunnerConfig
 from api_client import CoordinatorAPIClient, DuplicateRunnerError, AuthenticationError
 from auth0_client import Auth0M2MClient
 from registry import RunningRunsRegistry
-from executor import RunExecutor, list_executors, resolve_executor_name, get_executor_type
+from executor import (
+    RunExecutor,
+    list_profiles,
+    load_profile,
+    ExecutorProfile,
+    DEFAULT_EXECUTOR_PATH,
+    DEFAULT_EXECUTOR_TYPE,
+)
 from poller import RunPoller
 from supervisor import RunSupervisor
-from coordinator_proxy import CoordinatorProxy
+from runner_gateway import RunnerGateway
 from blueprint_resolver import BlueprintResolver
 from agent_orchestrator_mcp import MCPServer
 
@@ -137,12 +143,23 @@ class Runner:
             timeout=config.poll_timeout + 5.0,  # Slightly longer than poll timeout
         )
 
-        # Create proxy for executor communication
-        # Executors connect to this proxy instead of the coordinator directly
-        # The proxy handles authentication transparently
-        self.proxy = CoordinatorProxy(
+        # Runner-owned data (used by gateway to enrich executor requests)
+        self._hostname = socket.gethostname()
+
+        # Determine executor profile name
+        if config.profile:
+            self._executor_profile = config.profile.name
+        else:
+            self._executor_profile = DEFAULT_EXECUTOR_TYPE
+
+        # Create gateway for executor communication
+        # Executors connect to this gateway instead of the coordinator directly
+        # The gateway handles authentication and enriches requests with runner data
+        self.gateway = RunnerGateway(
             coordinator_url=config.agent_coordinator_url,
             auth0_client=self.auth0_client,
+            hostname=self._hostname,
+            executor_profile=self._executor_profile,
         )
 
         # Create embedded MCP server - facade to Coordinator
@@ -166,6 +183,7 @@ class Runner:
         # Note: mcp_server_url will be set after mcp_server.start() in start()
         self.executor = RunExecutor(
             default_project_dir=config.project_dir,
+            profile=config.profile,
             blueprint_resolver=self.blueprint_resolver,
             mcp_server_url=None,
         )
@@ -182,26 +200,38 @@ class Runner:
         """Register with Agent Coordinator."""
         logger.info(f"Connecting to Agent Coordinator at {self.config.agent_coordinator_url}")
 
-        # Get machine hostname and executor type for registration metadata
-        hostname = socket.gethostname()
-        executor_type = get_executor_type()
+        # Determine executor info for registration
+        if self.config.profile:
+            executor = self.config.profile.to_dict()
+        else:
+            # Default: no profile specified
+            executor = {
+                "type": DEFAULT_EXECUTOR_TYPE,
+                "command": DEFAULT_EXECUTOR_PATH,
+                "config": {},
+            }
 
         try:
             response = self.api_client.register(
-                hostname=hostname,
+                hostname=self._hostname,
                 project_dir=self.config.project_dir,
-                executor_type=executor_type,
+                executor_profile=self._executor_profile,
+                executor=executor,
                 tags=self.config.tags if self.config.tags else None,
+                require_matching_tags=self.config.require_matching_tags,
             )
             self.runner_id = response.runner_id
             logger.info(f"Registered as {self.runner_id}")
-            logger.info(f"  Hostname: {hostname}")
-            logger.info(f"  Executor type: {executor_type}")
+            logger.info(f"  Hostname: {self._hostname}")
+            logger.info(f"  Executor profile: {self._executor_profile}")
+            logger.info(f"  Executor type: {executor['type']}")
             logger.info(f"  Poll timeout: {response.poll_timeout_seconds}s")
             logger.info(f"  Heartbeat interval: {response.heartbeat_interval_seconds}s")
             logger.info(f"  Project directory: {self.config.project_dir}")
             if self.config.tags:
                 logger.info(f"  Tags: {self.config.tags}")
+            if self.config.require_matching_tags:
+                logger.info(f"  Require matching tags: {self.config.require_matching_tags}")
         except AuthenticationError as e:
             logger.error(f"Authentication failed: {e}")
             raise SystemExit(1)
@@ -214,13 +244,12 @@ class Runner:
         if not self.runner_id:
             raise RuntimeError("Must register before starting")
 
-        # Start the proxy server for executor communication
+        # Start the gateway server for executor communication
         # This must happen before spawning any executors
-        self.proxy.start()
+        self.gateway.start()
 
-        # Set environment variable so executors use the proxy
-        # This is transparent - executors don't know they're using a proxy
-        os.environ["AGENT_ORCHESTRATOR_API_URL"] = self.proxy.url
+        # Set environment variable so executors use the gateway
+        os.environ["AGENT_ORCHESTRATOR_API_URL"] = self.gateway.url
 
         # Start embedded MCP server
         # Provides orchestration tools to agents running in executors
@@ -278,8 +307,8 @@ class Runner:
         # Stop the embedded MCP server
         self.mcp_server.stop()
 
-        # Stop the proxy server
-        self.proxy.stop()
+        # Stop the gateway server
+        self.gateway.stop()
 
         # Deregister from Agent Coordinator (only if not already deregistered externally)
         if self.runner_id and not self._externally_deregistered:
@@ -305,23 +334,22 @@ def main(
         "-c",
         help="Agent Coordinator URL (env: AGENT_ORCHESTRATOR_API_URL)",
     ),
-    executor: str = typer.Option(
+    profile: str = typer.Option(
         None,
-        "--executor",
+        "--profile",
         "-x",
-        help="Executor name (e.g., 'claude-code', 'test-executor')",
+        help="Executor profile name (loads profiles/<name>.json)",
     ),
-    executor_path: str = typer.Option(
-        None,
-        "--executor-path",
-        "-e",
-        help="Full executor script path (env: AGENT_EXECUTOR_PATH)",
-    ),
-    executor_list: bool = typer.Option(
+    profile_list: bool = typer.Option(
         False,
-        "--executor-list",
+        "--profile-list",
         "-l",
-        help="List available executors and exit",
+        help="List available profiles and exit",
+    ),
+    require_matching_tags: bool = typer.Option(
+        False,
+        "--require-matching-tags",
+        help="Only accept runs with at least one matching tag",
     ),
     project_dir: str = typer.Option(
         None,
@@ -354,21 +382,16 @@ def main(
     Polls Agent Coordinator for agent runs and spawns executor subprocesses to handle them.
     Supports concurrent agent run execution.
     """
-    # Handle --executor-list
-    if executor_list:
-        executors = list_executors()
-        if executors:
-            print("Available executors:")
-            for name in executors:
+    # Handle --profile-list
+    if profile_list:
+        profiles = list_profiles()
+        if profiles:
+            print("Available profiles:")
+            for name in profiles:
                 print(f"  {name}")
         else:
-            print("No executors found in executors/ directory")
+            print("No profiles found in profiles/ directory")
         raise typer.Exit(0)
-
-    # Validate mutual exclusivity of --executor and --executor-path
-    if executor and executor_path:
-        logger.error("Cannot use both --executor and --executor-path")
-        raise typer.Exit(1)
 
     # Load config
     config = RunnerConfig.from_env()
@@ -382,18 +405,17 @@ def main(
         config.tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
     if mcp_port:
         config.mcp_port = mcp_port
+    if require_matching_tags:
+        config.require_matching_tags = require_matching_tags
 
-    # Set executor path via env var (executor.py reads from env)
-    if executor:
-        # Resolve name to full path
+    # Load profile if specified
+    if profile:
         try:
-            resolved_path = resolve_executor_name(executor)
-            os.environ["AGENT_EXECUTOR_PATH"] = resolved_path
+            config.profile = load_profile(profile)
+            logger.info(f"Loaded profile '{profile}' (executor: {config.profile.type})")
         except RuntimeError as e:
             logger.error(str(e))
             raise typer.Exit(1)
-    elif executor_path:
-        os.environ["AGENT_EXECUTOR_PATH"] = executor_path
 
     # Set log level
     if verbose:
@@ -423,12 +445,12 @@ def main(
         logger.error("DUPLICATE RUNNER ERROR")
         logger.error("=" * 60)
         logger.error(f"A runner with this identity is already online:")
-        logger.error(f"  Runner ID:     {e.runner_id}")
-        logger.error(f"  Hostname:      {e.hostname}")
-        logger.error(f"  Project Dir:   {e.project_dir}")
-        logger.error(f"  Executor Type: {e.executor_type}")
+        logger.error(f"  Runner ID:        {e.runner_id}")
+        logger.error(f"  Hostname:         {e.hostname}")
+        logger.error(f"  Project Dir:      {e.project_dir}")
+        logger.error(f"  Executor Profile: {e.executor_profile}")
         logger.error("")
-        logger.error("Each unique combination of (hostname, project_dir, executor_type)")
+        logger.error("Each unique combination of (hostname, project_dir, executor_profile)")
         logger.error("can only have one active runner at a time.")
         logger.error("")
         logger.error("Options:")

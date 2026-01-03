@@ -2,7 +2,15 @@
 Claude SDK Integration
 
 Wrapper around Claude Agent SDK for session creation and resumption.
-Uses SessionClient for API-based session management.
+Uses SessionClient to communicate with the Runner Gateway.
+
+The Runner Gateway enriches requests with runner-owned data:
+- hostname (machine where runner is running)
+- executor_profile (profile name like "coding", "research")
+
+The executor only sends data it owns:
+- executor_session_id (from Claude SDK)
+- project_dir (per-invocation working directory)
 
 NOTE: This module expects the runner lib to already be in sys.path.
       The parent executor (ao-claude-code-exec) is responsible for
@@ -18,10 +26,57 @@ import asyncio
 import copy
 import os
 import re
-import socket
 from datetime import datetime, UTC
 
+from enum import StrEnum
+
 from session_client import SessionClient, SessionClientError
+
+
+# =============================================================================
+# Claude Code Executor Config
+# =============================================================================
+
+class ClaudeConfigKey(StrEnum):
+    """Keys for claude-code executor configuration."""
+    PERMISSION_MODE = "permission_mode"
+    SETTING_SOURCES = "setting_sources"
+    MODEL = "model"
+
+
+# Default values when executor_config is missing or incomplete
+EXECUTOR_CONFIG_DEFAULTS = {
+    ClaudeConfigKey.PERMISSION_MODE: "bypassPermissions",
+    ClaudeConfigKey.SETTING_SOURCES: ["user", "project", "local"],
+    ClaudeConfigKey.MODEL: None,  # None = use SDK default
+}
+
+
+def get_claude_config(executor_config: Optional[dict]) -> dict:
+    """
+    Extract claude-code specific configuration with defaults.
+
+    Args:
+        executor_config: Raw executor_config dict from invocation (may be None)
+
+    Returns:
+        Dict with permission_mode, setting_sources, model (with defaults applied)
+    """
+    config = executor_config or {}
+    return {
+        ClaudeConfigKey.PERMISSION_MODE: config.get(
+            ClaudeConfigKey.PERMISSION_MODE,
+            EXECUTOR_CONFIG_DEFAULTS[ClaudeConfigKey.PERMISSION_MODE]
+        ),
+        ClaudeConfigKey.SETTING_SOURCES: config.get(
+            ClaudeConfigKey.SETTING_SOURCES,
+            EXECUTOR_CONFIG_DEFAULTS[ClaudeConfigKey.SETTING_SOURCES]
+        ),
+        ClaudeConfigKey.MODEL: config.get(
+            ClaudeConfigKey.MODEL,
+            EXECUTOR_CONFIG_DEFAULTS[ClaudeConfigKey.MODEL]
+        ),
+    }
 
 
 # =============================================================================
@@ -126,15 +181,17 @@ async def run_claude_session(
     resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
-    executor_type: str = "claude-code",
+    executor_config: Optional[dict] = None,
 ) -> tuple[str, str]:
     """
     Run Claude session with API-based session management.
 
     This function uses the Claude Agent SDK to create or resume a session,
-    with session state managed via the AgentCoordinator API.
+    with session state managed via the Runner Gateway (which forwards to
+    the Agent Coordinator).
 
-    Note: Auth is handled by the Agent Coordinator Proxy - no credentials needed.
+    Note: Auth and runner-owned data (hostname, executor_profile) are handled
+    by the Runner Gateway - executors only send data they own.
 
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
@@ -142,9 +199,9 @@ async def run_claude_session(
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_executor_session_id: If provided, resume existing Claude SDK session
-        api_url: Base URL of Agent Orchestrator API (via proxy)
+        api_url: Base URL of Runner Gateway
         agent_name: Agent name (optional, for session metadata)
-        executor_type: Executor type for bind call (default: "claude-code")
+        executor_config: Executor-specific config (permission_mode, setting_sources, model)
 
     Returns:
         Tuple of (executor_session_id, result) where executor_session_id is
@@ -163,11 +220,8 @@ async def run_claude_session(
         ...     session_id="ses_abc123def456"
         ... )
     """
-    # Create session client for API calls (auth handled by proxy)
+    # Create session client for API calls (communicates via Runner Gateway)
     session_client = SessionClient(api_url)
-
-    # Get hostname for bind call
-    hostname = socket.gethostname()
 
     # Import SDK here to give better error message if not installed
     try:
@@ -179,12 +233,19 @@ async def run_claude_session(
             "in their uv script header dependencies."
         ) from e
 
+    # Get executor config with defaults
+    claude_config = get_claude_config(executor_config)
+
     # Build ClaudeAgentOptions
     options = ClaudeAgentOptions(
         cwd=str(project_dir.resolve()),
-        permission_mode="bypassPermissions",
-        setting_sources=["user", "project", "local"],
+        permission_mode=claude_config[ClaudeConfigKey.PERMISSION_MODE],
+        setting_sources=claude_config[ClaudeConfigKey.SETTING_SOURCES],
     )
+
+    # Set model if specified (None = use SDK default)
+    if claude_config[ClaudeConfigKey.MODEL]:
+        options.model = claude_config[ClaudeConfigKey.MODEL]
 
     # Add programmatic hooks for post_tool events
     try:
@@ -236,12 +297,11 @@ async def run_claude_session(
                             # Bind session executor (ADR-010)
                             # This stores the Claude SDK's session_id as executor_session_id
                             # and sets session status to 'running'
+                            # The Runner Gateway enriches with hostname and executor_profile
                             try:
-                                session_client.bind_session_executor(
+                                session_client.bind(
                                     session_id=session_id,
                                     executor_session_id=executor_session_id,
-                                    hostname=hostname,
-                                    executor_type=executor_type,
                                     project_dir=str(project_dir),
                                 )
                             except SessionClientError as e:
@@ -344,7 +404,7 @@ def run_session_sync(
     resume_executor_session_id: Optional[str] = None,
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
-    executor_type: str = "claude-code",
+    executor_config: Optional[dict] = None,
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -352,7 +412,7 @@ def run_session_sync(
     This allows command scripts to remain synchronous while using
     the SDK's async API internally.
 
-    Note: Auth is handled by the Agent Coordinator Proxy - no credentials needed.
+    Note: Auth and runner-owned data are handled by the Runner Gateway.
 
     Args:
         prompt: User prompt (may include prepended system prompt from agent)
@@ -360,9 +420,9 @@ def run_session_sync(
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
         resume_executor_session_id: If provided, resume existing Claude SDK session
-        api_url: Base URL of Agent Orchestrator API (via proxy)
+        api_url: Base URL of Runner Gateway
         agent_name: Agent name (optional, for session metadata)
-        executor_type: Executor type for bind call (default: "claude-code")
+        executor_config: Executor-specific config (permission_mode, setting_sources, model)
 
     Returns:
         Tuple of (executor_session_id, result)
@@ -389,6 +449,6 @@ def run_session_sync(
             resume_executor_session_id=resume_executor_session_id,
             api_url=api_url,
             agent_name=agent_name,
-            executor_type=executor_type,
+            executor_config=executor_config,
         )
     )

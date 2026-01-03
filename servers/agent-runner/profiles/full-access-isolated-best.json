@@ -1,0 +1,9 @@
+{
+  "type": "claude-code",
+  "command": "executors/claude-code/ao-claude-code-exec",
+  "config": {
+    "permission_mode": "bypassPermissions",
+    "setting_sources": [],
+    "model": "opus"
+  }
+}

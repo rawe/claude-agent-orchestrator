@@ -75,6 +75,11 @@ JSON PAYLOAD FORMAT (Schema 2.0):
         "system_prompt": "<string>",
         "mcp_servers": { ... }
       },
+      "executor_config": {           // Optional: claude-code specific config
+        "permission_mode": "<string>",   // default: "bypassPermissions"
+        "setting_sources": ["..."],      // default: ["user", "project", "local"]
+        "model": "<string>"              // default: SDK default
+      },
       "metadata": { ... }            // Optional: extensible metadata
     }
 
@@ -223,6 +228,7 @@ def run_start(inv: ExecutorInvocation):
         mcp_servers=mcp_servers,
         api_url=config.api_url,
         agent_name=agent_name,
+        executor_config=inv.executor_config,
     )
 
     # Print result to stdout
@@ -306,6 +312,7 @@ def run_resume(inv: ExecutorInvocation):
         resume_executor_session_id=executor_session_id,
         api_url=api_url,
         agent_name=agent_name,
+        executor_config=inv.executor_config,
     )
 
     # Print result to stdout

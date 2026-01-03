@@ -247,10 +247,10 @@ function TreeDetailPanel({ type, session, run, sessionRuns, onClose }: TreeDetai
                   <span className="ml-2 text-gray-900">{session.hostname}</span>
                 </div>
               )}
-              {session.executorType && (
+              {session.executorProfile && (
                 <div>
-                  <span className="text-gray-500">Executor:</span>
-                  <span className="ml-2 text-gray-900">{session.executorType}</span>
+                  <span className="text-gray-500">Profile:</span>
+                  <span className="ml-2 text-gray-900">{session.executorProfile}</span>
                 </div>
               )}
             </div>

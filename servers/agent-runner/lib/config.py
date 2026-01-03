@@ -7,6 +7,10 @@ Supports Auth0 M2M authentication when coordinator has AUTH_ENABLED=true.
 
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from executor import ExecutorProfile
 
 
 # Environment variable names
@@ -46,6 +50,10 @@ class RunnerConfig:
     tags: list[str]  # Capability tags (ADR-011)
     mcp_port: int | None  # Optional fixed port for embedded MCP server (CLI-only)
 
+    # Executor profile (CLI-only)
+    profile: "ExecutorProfile | None"  # Loaded executor profile
+    require_matching_tags: bool  # Only accept runs with matching tags
+
     # Auth0 M2M configuration
     auth0_domain: str
     auth0_client_id: str
@@ -74,6 +82,8 @@ class RunnerConfig:
             project_dir=os.environ.get(ENV_PROJECT_DIR, os.getcwd()),
             tags=_parse_tags(os.environ.get(ENV_RUNNER_TAGS, "")),
             mcp_port=None,  # CLI-only, no env var
+            profile=None,  # CLI-only, no env var
+            require_matching_tags=False,  # CLI-only, no env var
             # Auth0 M2M
             auth0_domain=os.environ.get(ENV_AUTH0_DOMAIN, ""),
             auth0_client_id=os.environ.get(ENV_AUTH0_CLIENT_ID, ""),
