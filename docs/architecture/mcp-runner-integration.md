@@ -40,7 +40,7 @@ This pattern doesn't scale:
 Executors currently handle:
 - Agent blueprint resolution (API call to get config)
 - MCP server configuration
-- System prompt prepending
+- System prompt configuration
 - Session binding
 
 This makes executors complex and framework-specific logic gets mixed with orchestration logic.
@@ -279,9 +279,8 @@ The executor shouldn't know or care whether the blueprint was resolved by the Ru
    Remove from executor:
    - `get_agent_api()` calls
    - Blueprint validation logic
-   - System prompt prepending logic (Runner does it or passes separately)
 
-   Executor just uses `agent_blueprint.mcp_servers` directly.
+   Executor uses `agent_blueprint` fields directly (mcp_servers, system_prompt).
 
 **Files to modify:**
 - `servers/agent-runner/lib/invocation.py` - New schema version
@@ -568,8 +567,8 @@ async def handle_mcp_request(self, request, session_id: str):
 
 3. **System prompt handling**
    - Runner provides `agent_blueprint` with all fields (including `system_prompt`)
-   - Executor decides what to use based on `mode` (start vs resume)
-   - Future: System prompt will become a dedicated, separate feature
+   - Executor passes `system_prompt` to `ClaudeAgentOptions.system_prompt` (not prepended to user message)
+   - System prompt is only used for new sessions (`mode=start`), not for resume
 
 4. **Scope: Orchestrator MCP native, other MCPs proxied**
    - **Orchestrator MCP**: Implemented directly in Runner (same domain - Runner already uses Sessions/Runs/Agents APIs)

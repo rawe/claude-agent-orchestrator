@@ -190,18 +190,15 @@ def run_start(inv: ExecutorInvocation):
     )
 
     # 2. Get agent config from blueprint (Runner provides resolved blueprint)
-    final_prompt = inv.prompt
     mcp_servers = None
     agent_name = None
+    system_prompt = None
 
     if inv.agent_blueprint:
         # Schema 2.0: Use resolved blueprint directly (no API call needed)
         agent_name = inv.agent_blueprint.get("name")
         system_prompt = inv.agent_blueprint.get("system_prompt")
         mcp_servers = inv.agent_blueprint.get("mcp_servers")
-
-        if system_prompt:
-            final_prompt = f"{system_prompt}\n\n---\n\n{inv.prompt}"
 
         debug_log("ao-claude-code-exec using agent_blueprint", {
             "agent_name": agent_name or "unnamed",
@@ -214,21 +211,23 @@ def run_start(inv: ExecutorInvocation):
         "session_id": inv.session_id,
         "project_dir": str(config.project_dir),
         "agent_name": agent_name or "None",
+        "has_system_prompt": system_prompt is not None,
         "has_mcp_servers": mcp_servers is not None,
-        "final_prompt_length": len(final_prompt),
+        "prompt_length": len(inv.prompt),
         "schema_version": inv.schema_version,
     })
 
     # 3. Run Claude session (binds to coordinator session automatically)
     # Auth is handled by Agent Coordinator Proxy
     executor_session_id, result = run_session_sync(
-        prompt=final_prompt,
+        prompt=inv.prompt,
         project_dir=config.project_dir,
         session_id=inv.session_id,
         mcp_servers=mcp_servers,
         api_url=config.api_url,
         agent_name=agent_name,
         executor_config=inv.executor_config,
+        system_prompt=system_prompt,
     )
 
     # Print result to stdout
@@ -277,7 +276,7 @@ def run_resume(inv: ExecutorInvocation):
         )
 
     # 3. Get MCP servers from blueprint (Runner provides resolved blueprint)
-    # NOTE: Do NOT prepend system prompt for resume (only for new sessions)
+    # NOTE: system_prompt is only passed for new sessions, not resume
     mcp_servers = None
     agent_name = session_agent
 
@@ -304,8 +303,9 @@ def run_resume(inv: ExecutorInvocation):
 
     # 4. Run Claude session with resume (uses executor_session_id for SDK resume)
     # Auth is handled by Agent Coordinator Proxy
+    # NOTE: system_prompt is not passed for resume - only for new sessions
     new_executor_session_id, result = run_session_sync(
-        prompt=inv.prompt,  # No system prompt prepended!
+        prompt=inv.prompt,
         project_dir=session_project_dir,
         session_id=inv.session_id,
         mcp_servers=mcp_servers,

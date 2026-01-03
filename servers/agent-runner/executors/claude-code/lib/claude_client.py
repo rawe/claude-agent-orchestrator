@@ -182,6 +182,7 @@ async def run_claude_session(
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
     executor_config: Optional[dict] = None,
+    system_prompt: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Run Claude session with API-based session management.
@@ -194,7 +195,7 @@ async def run_claude_session(
     by the Runner Gateway - executors only send data they own.
 
     Args:
-        prompt: User prompt (may include prepended system prompt from agent)
+        prompt: User prompt
         project_dir: Working directory for Claude (sets cwd)
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
@@ -202,6 +203,7 @@ async def run_claude_session(
         api_url: Base URL of Runner Gateway
         agent_name: Agent name (optional, for session metadata)
         executor_config: Executor-specific config (permission_mode, setting_sources, model)
+        system_prompt: System prompt for Claude (only used for new sessions, not resume)
 
     Returns:
         Tuple of (executor_session_id, result) where executor_session_id is
@@ -246,6 +248,10 @@ async def run_claude_session(
     # Set model if specified (None = use SDK default)
     if claude_config[ClaudeConfigKey.MODEL]:
         options.model = claude_config[ClaudeConfigKey.MODEL]
+
+    # Set system prompt if provided (only for new sessions, not resume)
+    if system_prompt:
+        options.system_prompt = system_prompt
 
     # Add programmatic hooks for post_tool events
     try:
@@ -405,6 +411,7 @@ def run_session_sync(
     api_url: str = "http://127.0.0.1:8765",
     agent_name: Optional[str] = None,
     executor_config: Optional[dict] = None,
+    system_prompt: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -415,7 +422,7 @@ def run_session_sync(
     Note: Auth and runner-owned data are handled by the Runner Gateway.
 
     Args:
-        prompt: User prompt (may include prepended system prompt from agent)
+        prompt: User prompt
         project_dir: Working directory for Claude (sets cwd)
         session_id: Coordinator-generated session ID (ADR-010)
         mcp_servers: MCP server configuration dict (from agent blueprint)
@@ -423,6 +430,7 @@ def run_session_sync(
         api_url: Base URL of Runner Gateway
         agent_name: Agent name (optional, for session metadata)
         executor_config: Executor-specific config (permission_mode, setting_sources, model)
+        system_prompt: System prompt for Claude (only used for new sessions, not resume)
 
     Returns:
         Tuple of (executor_session_id, result)
@@ -450,5 +458,6 @@ def run_session_sync(
             api_url=api_url,
             agent_name=agent_name,
             executor_config=executor_config,
+            system_prompt=system_prompt,
         )
     )

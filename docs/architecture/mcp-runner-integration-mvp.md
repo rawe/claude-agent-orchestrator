@@ -112,7 +112,7 @@ The MCP server forwards `start_agent_session` calls to the Coordinator. The Coor
 │                                                                              │
 │   Executor:                                                                  │
 │   - Uses agent_blueprint directly (NO Coordinator API call)                 │
-│   - Sets up Claude with system_prompt and mcp_servers                       │
+│   - Passes system_prompt to ClaudeAgentOptions.system_prompt                │
 │   - Claude makes MCP calls to embedded MCP server URL                       │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -589,21 +589,22 @@ class ExecutorInvocation:
 
 invocation = ExecutorInvocation.from_stdin()
 
+# Extract blueprint fields (Runner provides resolved blueprint)
+system_prompt = None
+mcp_servers = {}
+
 if invocation.agent_blueprint:
-    # Schema 2.0: Use provided blueprint directly
     system_prompt = invocation.agent_blueprint.get("system_prompt")
     mcp_servers = invocation.agent_blueprint.get("mcp_servers", {})
-elif invocation.agent_name:
-    # Schema 1.0 backward compat: Fetch from Coordinator (deprecated)
-    blueprint = fetch_blueprint(invocation.agent_name)
-    system_prompt = blueprint.get("system_prompt")
-    mcp_servers = blueprint.get("mcp_servers", {})
-else:
-    # No blueprint
-    system_prompt = None
-    mcp_servers = {}
 
-# Set up Claude with system_prompt and mcp_servers
+# Pass system_prompt to ClaudeAgentOptions (not prepended to user message)
+# System prompt is only used for new sessions (mode=start), not resume
+options = ClaudeAgentOptions(
+    cwd=project_dir,
+    system_prompt=system_prompt,  # Proper SDK system prompt
+    mcp_servers=mcp_servers,
+)
+
 # NO placeholder resolution needed - already done by Runner
 ```
 
