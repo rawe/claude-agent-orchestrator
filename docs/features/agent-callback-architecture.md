@@ -847,7 +847,7 @@ This section documents where callback notifications to parent agents are trigger
    - `start_session` → `ao-start --name X --agent Y --prompt "Z"`
    - `resume_session` → `ao-resume --session X --message "Y"`
    - Use `subprocess.Popen()` for non-blocking execution
-   - **Command Discovery**: Auto-discover `ao-*` commands relative to project root (same pattern as MCP server in `interfaces/agent-orchestrator-mcp-server/agent-orchestrator-mcp.py`). Don't use `AGENT_ORCHESTRATOR_COMMAND_PATH` env var for override.
+   - **Command Discovery**: Auto-discover `ao-*` commands relative to project root. Don't use `AGENT_ORCHESTRATOR_COMMAND_PATH` env var for override.
    - **Logging**: Log run execution to stdout/stderr (concise, not verbose) for visibility during POC
 
 7. **Implement Heartbeat Thread**

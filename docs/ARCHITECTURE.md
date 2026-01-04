@@ -46,9 +46,11 @@ Claude Code / AI Framework
 ├── plugins/
 │   ├── orchestrator/             # Claude Code plugin - orchestrator skill: ao-* CLI commands
 │   └── context-store/            # Claude Code plugin - context-store skill: doc-* commands
-└── interfaces/
-    ├── agent-orchestrator-mcp-server/  # MCP server - calls Agent Runs API
-    └── context-store-mcp-server/       # MCP server for document management
+└── mcps/                         # MCP servers
+    ├── context-store/            # Context Store MCP server
+    ├── neo4j/                    # Neo4j MCP server
+    ├── atlassian/                # Atlassian (Jira + Confluence) MCP
+    └── ado/                      # Azure DevOps MCP
 ```
 
 ## Components
@@ -69,6 +71,7 @@ Claude Code / AI Framework
 **Agent Runner** (`servers/agent-runner/`)
 - Polls Agent Coordinator for pending agent runs and stop commands
 - Starts Agent Coordinator Proxy for executor communication (see below)
+- Hosts embedded Agent Orchestrator MCP server (use `--mcp-port` for external clients)
 - Processes agent runs via framework-specific executors
 - Supports concurrent agent run processing
 - Reports agent run status (started, completed, failed, stopped)
@@ -157,9 +160,9 @@ Claude Code / AI Framework
 └─────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────┐
-│  MCP Servers (interfaces/)                           │
-│  - agent-orchestrator-mcp: calls Agent Runs API      │──► External MCP Clients
-│  - context-store-mcp: runs doc-* as subprocess       │
+│  MCP Servers                                         │
+│  - Agent Orchestrator: embedded in Agent Runner      │──► Agents + External Clients
+│  - Context Store (mcps/context-store/): port 9501    │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -178,8 +181,8 @@ Claude Code / AI Framework
 | Agent Runner | Executors | Subprocess | Spawn executor with proxy URL |
 | Executors | Agent Coordinator Proxy | HTTP | Sessions API, Agent Blueprints API (no auth) |
 | Agent Coordinator Proxy | Agent Coordinator | HTTP | Forward requests with auth headers |
-| Agent Orchestrator MCP | Agent Coordinator | HTTP | Agent Runs API (start/resume sessions) |
-| Context Store MCP | doc-* commands | Subprocess | Expose as MCP tools |
+| Agent Orchestrator MCP (embedded) | Agent Coordinator | HTTP | Agent Runs API (start/resume sessions) |
+| Context Store MCP | Context Store | HTTP | Document operations as MCP tools |
 
 ## Key Environment Variables
 

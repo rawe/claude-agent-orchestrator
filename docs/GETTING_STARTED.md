@@ -105,9 +105,9 @@ Claude Code will use the orchestrator skill to create a new agent session.
 
 ## Use Case 2: MCP Server (External Clients)
 
-Use the orchestrator with Claude Desktop or other MCP-compatible clients via the standalone HTTP server.
+Use the orchestrator with Claude Desktop or other MCP-compatible clients via the Agent Runner's embedded MCP server.
 
-> **Note:** For agents running within the framework, the MCP server is embedded in the Agent Runner (no external server needed). This use case is for external clients like Claude Desktop.
+> **Note:** The MCP server is embedded in the Agent Runner. External clients connect directly to the runner's MCP endpoint.
 
 ### Setup
 
@@ -117,21 +117,7 @@ git clone https://github.com/your-org/claude-agent-orchestrator.git
 cd claude-agent-orchestrator
 ```
 
-**2. Configure environment variables:**
-```bash
-cp .env.template .env
-```
-
-Edit `.env` and set the project directory for your agents:
-```bash
-# Required: Set the default project directory for agent sessions
-AGENT_ORCHESTRATOR_PROJECT_DIR=/path/to/your/project
-
-# Optional: Customize port (default: 9500)
-# AGENT_ORCHESTRATOR_MCP_PORT=9500
-```
-
-**3. Start the backend services:**
+**2. Start the backend services:**
 ```bash
 make start-bg
 ```
@@ -141,29 +127,24 @@ This starts in the background:
 - Context Store (port 8766) - Document storage
 - Dashboard (port 3000) - Web UI
 
-**4. Start the Agent Runner in your project directory:**
+**3. Start the Agent Runner with a fixed MCP port:**
 ```bash
 cd /path/to/your/project
-/path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner
+/path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner --mcp-port 9500
 ```
+
+The `--mcp-port` option exposes the MCP server on a fixed port (default uses a random available port). This is required for external clients that need a stable endpoint.
 
 > **Important:** The Agent Runner must run in the directory where you want agents to execute. Without the runner, agent runs will be queued but not executed.
 
-**5. Open the dashboard:**
+**4. Open the dashboard:**
 ```bash
 make open
 ```
 
 Verify the dashboard is running at http://localhost:3000. You should see the runner registered.
 
-**6. Start the MCP server (HTTP mode):**
-```bash
-make start-mcp-agent-orchestrator
-```
-
-This starts the Agent Orchestrator MCP server at `http://localhost:9500/mcp`
-
-**7. Configure your MCP client:**
+**5. Configure your MCP client:**
 
 **Option A: Claude Desktop**
 
@@ -184,14 +165,9 @@ Add to your Claude Desktop config file:
 
 **Option B: Other MCP clients**
 
-Use the provided config file:
-```
-mcps/agent-orchestrator/.mcp-agent-orchestrator-http.json
-```
+Configure your client to connect to: `http://localhost:9500/mcp`
 
-Or configure your client to connect to: `http://localhost:9500/mcp`
-
-**8. Restart your MCP client** (e.g., Claude Desktop) to pick up the new configuration.
+**6. Restart your MCP client** (e.g., Claude Desktop) to pick up the new configuration.
 
 ### Usage
 
@@ -217,18 +193,10 @@ Start a new agent session called "my-task" to analyze the codebase
 | `get_agent_session_result` | Get result from completed session |
 | `delete_all_agent_sessions` | Clean up all sessions |
 
-### Stopping the Server
-
-```bash
-make stop-mcp-agent-orchestrator
-```
-
 ### Verify
 
 - Dashboard at http://localhost:3000 shows active sessions and registered runner
 - MCP server endpoint: http://localhost:9500/mcp
-
-See [mcps/agent-orchestrator/README.md](../mcps/agent-orchestrator/README.md) for detailed MCP server documentation.
 
 ---
 

@@ -10,13 +10,13 @@ MCP (Model Context Protocol) servers that provide capabilities to agents. These 
 
 | Server | Port | Description | Type | Requires .env |
 |--------|------|-------------|------|---------------|
-| [Agent Orchestrator](./agent-orchestrator/) | embedded* | Agent orchestration + framework access | Embedded in Agent Runner | No |
+| Agent Orchestrator | embedded* | Agent orchestration + framework access | Embedded in Agent Runner | No |
 | [Context Store](./context-store/) | 9501 | Document storage and retrieval | Internal (Python) | No |
 | [Neo4j](./neo4j/) | 9003 | Graph database queries (Cypher) | External (Docker) | No (has defaults) |
 | [Atlassian](./atlassian/) | 9000 | Confluence and Jira integration | External (Docker) | Yes |
 | [Azure DevOps](./ado/) | 9001 | Work Items access | External (Docker) | Yes |
 
-*\* The Agent Orchestrator MCP is embedded in the Agent Runner for framework use. A standalone server (port 9500) is available for external clients.*
+*\* The Agent Orchestrator MCP is embedded in the Agent Runner. For external clients, start the runner with `--mcp-port 9500` to expose a fixed endpoint.*
 
 **Internal servers** are Python-based and run via `uv run`.
 **External servers** are Docker-based. Neo4j works out-of-the-box with the local Neo4j container; Atlassian and ADO require credentials.
@@ -32,7 +32,6 @@ From the project root, use Make commands:
 make start-mcps
 
 # Start individually
-make start-mcp-agent-orchestrator
 make start-mcp-context-store
 make start-mcp-neo4j        # Works with defaults (local Neo4j container)
 make start-mcp-atlassian    # Requires atlassian/.env
@@ -48,22 +47,22 @@ make stop-mcps
 
 The Agent Orchestrator MCP provides tools for spawning sub-agents, managing sessions, and accessing the framework.
 
-### Embedded Mode (Primary)
+### Embedded in Agent Runner
 
-For agents running within the framework, the MCP server is **embedded in the Agent Runner**:
-- No external server needed
+The MCP server is **embedded in the Agent Runner**:
+- No separate server needed
 - Agent configurations use `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder
 - The placeholder is dynamically replaced at runtime
 
-### Standalone Mode (External Clients)
+### External Clients
 
-For external clients (Claude Desktop, Claude Code), a standalone server is available:
+For external clients (Claude Desktop), start the Agent Runner with a fixed MCP port:
 
 ```bash
-make start-mcp-agent-orchestrator  # Starts on port 9500
+./servers/agent-runner/agent-runner --mcp-port 9500
 ```
 
-This exposes the framework to any MCP-compatible AI, allowing orchestration without the plugin.
+This exposes the MCP endpoint at `http://localhost:9500/mcp` for any MCP-compatible client.
 
 ---
 
@@ -122,7 +121,7 @@ docker compose up -d
 
 | Service | Endpoint |
 |---------|----------|
-| Agent Orchestrator MCP | `http://127.0.0.1:9500/mcp` |
+| Agent Orchestrator MCP | Embedded in Agent Runner (use `--mcp-port` for fixed port) |
 | Context Store MCP | `http://127.0.0.1:9501/mcp` |
 | Neo4j MCP | `http://127.0.0.1:9003/mcp/` |
 | Atlassian MCP | `http://127.0.0.1:9000` |
@@ -132,7 +131,7 @@ docker compose up -d
 
 ## Documentation
 
-- **Agent Orchestrator:** `agent-orchestrator/README.md`
+- **Agent Orchestrator:** See `servers/agent-runner/README.md` (embedded in Agent Runner)
 - **Context Store:** `context-store/README.md`
 - **Neo4j:** `neo4j/README.md`
 - **Atlassian:** `atlassian/README.md`

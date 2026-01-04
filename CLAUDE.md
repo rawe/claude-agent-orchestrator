@@ -29,7 +29,6 @@
 * Examples:
   - `uv run python -m main` (run a module)
   - `uv run --script script.py --arg value` (run a script with arguments)
-  - `uv run --script mcps/agent-orchestrator/agent-orchestrator-mcp.py --http-mode` (run MCP server)
 
 ## Testing
 

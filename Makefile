@@ -23,7 +23,7 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-agent-orchestrator stop-mcp-agent-orchestrator start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner
 
 # Default target
 help:
@@ -74,8 +74,6 @@ help:
 	@echo "  make logs-agent-runner    - Tail logs (Ctrl+C to stop watching)"
 	@echo ""
 	@echo "MCP servers (mcps/):"
-	@echo "  make start-mcp-agent-orchestrator - Start Agent Orchestrator MCP"
-	@echo "  make stop-mcp-agent-orchestrator  - Stop Agent Orchestrator MCP"
 	@echo "  make start-mcp-context-store      - Start Context Store MCP"
 	@echo "  make stop-mcp-context-store       - Stop Context Store MCP"
 	@echo "  make start-mcp-atlassian          - Start Atlassian MCP (Jira + Confluence)"
@@ -466,12 +464,11 @@ stop-mcp-neo4j:
 	@cd mcps/neo4j && docker compose down
 
 # Start all MCP servers
-# - Agent Orchestrator and Context Store are REQUIRED (no prefix, will abort on failure)
+# - Context Store is REQUIRED (no prefix, will abort on failure)
 # - Atlassian, ADO, Neo4j are OPTIONAL and need external credentials (- prefix ignores failures)
 #   The "-" prefix tells Make to continue even if the command fails, showing warnings but not stopping
 start-mcps:
 	@echo "Starting all MCP servers..."
-	@"$(MAKE)" --no-print-directory start-mcp-agent-orchestrator
 	@"$(MAKE)" --no-print-directory start-mcp-context-store
 	-@"$(MAKE)" --no-print-directory start-mcp-atlassian
 	-@"$(MAKE)" --no-print-directory start-mcp-ado
@@ -479,56 +476,10 @@ start-mcps:
 
 stop-mcps:
 	@echo "Stopping all MCP servers..."
-	@"$(MAKE)" --no-print-directory stop-mcp-agent-orchestrator
 	@"$(MAKE)" --no-print-directory stop-mcp-context-store
 	@"$(MAKE)" --no-print-directory stop-mcp-atlassian
 	@"$(MAKE)" --no-print-directory stop-mcp-ado
 	@"$(MAKE)" --no-print-directory stop-mcp-neo4j
-
-# Agent Orchestrator MCP server (HTTP mode)
-# Loads configuration from .env file
-AO_MCP_SERVER_SCRIPT := mcps/agent-orchestrator/agent-orchestrator-mcp.py
-AO_MCP_SERVER_PID_FILE := .mcp-agent-orchestrator.pid
-
-start-mcp-agent-orchestrator:
-	@echo "Starting Agent Orchestrator MCP server..."
-	@if [ -f .env ]; then \
-		set -a && . ./.env && set +a; \
-	fi; \
-	PORT=$${AGENT_ORCHESTRATOR_MCP_PORT:-9500}; \
-	HOST=$${AGENT_ORCHESTRATOR_MCP_HOST:-127.0.0.1}; \
-	if [ -f $(AO_MCP_SERVER_PID_FILE) ] && kill -0 $$(cat $(AO_MCP_SERVER_PID_FILE)) 2>/dev/null; then \
-		echo "MCP server already running (PID: $$(cat $(AO_MCP_SERVER_PID_FILE)))"; \
-		exit 1; \
-	fi; \
-	echo "Configuration:"; \
-	echo "  Host: $$HOST"; \
-	echo "  Port: $$PORT"; \
-	echo "  Project Dir: $${AGENT_ORCHESTRATOR_PROJECT_DIR:-<not set, uses tool parameter>}"; \
-	echo ""; \
-	AGENT_ORCHESTRATOR_PROJECT_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR}" \
-	uv run --script $(AO_MCP_SERVER_SCRIPT) --http-mode --host $$HOST --port $$PORT & \
-	echo $$! > $(AO_MCP_SERVER_PID_FILE); \
-	sleep 2; \
-	echo ""; \
-	echo "Agent Orchestrator MCP started (PID: $$(cat $(AO_MCP_SERVER_PID_FILE)))"; \
-	echo "Endpoint: http://$$HOST:$$PORT/mcp"
-
-stop-mcp-agent-orchestrator:
-	@echo "Stopping Agent Orchestrator MCP server..."
-	@if [ -f $(AO_MCP_SERVER_PID_FILE) ]; then \
-		PID=$$(cat $(AO_MCP_SERVER_PID_FILE)); \
-		if kill -0 $$PID 2>/dev/null; then \
-			kill $$PID; \
-			echo "Server stopped (PID: $$PID)"; \
-		else \
-			echo "Server not running (stale PID file)"; \
-		fi; \
-		rm -f $(AO_MCP_SERVER_PID_FILE); \
-	else \
-		echo "No PID file found. Trying to find and kill process..."; \
-		pkill -f "agent-orchestrator-mcp.py --http-mode" 2>/dev/null && echo "Server stopped" || echo "No server found"; \
-	fi
 
 # Context Store MCP server (HTTP mode)
 # Loads configuration from .env file

@@ -112,7 +112,7 @@ The `mcps/` directory contains MCP servers that provide capabilities to agents. 
 
 | MCP Server | Port | Purpose | Requires .env |
 |------------|------|---------|---------------|
-| `agent-orchestrator` | embedded in agent runner | Agent orchestration tools + framework access | No |
+| `agent-orchestrator` | embedded in Agent Runner | Agent orchestration tools + framework access | No |
 | `context-store` | 9501 | Document storage and retrieval | No |
 | `neo4j` | 9003 | Neo4j graph database queries | No (has defaults) |
 | `atlassian` | 9000 | Jira + Confluence integration | Yes |
@@ -130,7 +130,7 @@ make start-mcp-ado                 # Requires mcps/ado/.env
 The **Agent Orchestrator MCP** is embedded in the Agent Runner:
 - When running agents via the framework, the MCP server is automatically available
 - Agent configurations use `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder (dynamically replaced)
-- For external clients (Claude Desktop, Claude Code), a standalone server is still available (see `mcps/agent-orchestrator/`)
+- For external clients (Claude Desktop), start the runner with `--mcp-port 9500` to expose a fixed endpoint
 
 See `mcps/README.md` for detailed setup.
 
@@ -204,8 +204,7 @@ See **[tests/README.md](./tests/README.md)** for setup and test case documentati
 - **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Getting Started Guide](./docs/GETTING_STARTED.md)** - Detailed setup and configuration
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
-- **[Agent Runner](./servers/agent-runner/README.md)** - Run execution bridge details
+- **[Agent Runner](./servers/agent-runner/README.md)** - Run executor with embedded Agent Orchestrator MCP
 - **[Context Store](./servers/context-store/README.md)** - Document storage server with semantic search
 - **[MCP Servers Overview](./mcps/README.md)** - All available MCP servers
-- **[Agent Orchestrator MCP](./mcps/agent-orchestrator/README.md)** - MCP server for agent orchestration
 - **[Context Store MCP](./mcps/context-store/README.md)** - MCP server for document management

@@ -77,8 +77,9 @@ Note: The child session has `parent_session_id` set to the parent's `session_id`
 ## Troubleshooting
 
 ### MCP server not reachable
-- Verify MCP server is running: `curl http://localhost:9500/mcp`
-- Check port matches `agent.mcp.json` config (9500)
+- The MCP server is embedded in the Agent Runner - ensure the runner is running
+- Check the runner logs for the MCP server port (assigned dynamically or via `--mcp-port`)
+- Verify the `agent.mcp.json` uses `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder (replaced at runtime)
 
 ### Agent blueprint not found
 - Verify blueprint is copied (see `tests/README.md` → "Agent Blueprints")

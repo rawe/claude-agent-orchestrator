@@ -2,17 +2,17 @@
 
 ## Status
 
-**Proposal** - Pending review and implementation planning
+**Implemented** - The MCP server is now embedded in the Agent Runner.
 
 ## Context
 
-### Current State
+### Previous State (Historical)
 
-The Agent Orchestrator MCP server (`mcps/agent-orchestrator/`) is a standalone component that:
-1. Exposes MCP tools (`start_session`, `resume_session`, etc.) for spawning child agents
-2. Runs in stdio mode (Claude Desktop/CLI subprocess) or HTTP mode (standalone server)
-3. Makes unauthenticated HTTP calls to the Agent Coordinator
-4. Relies on `AGENT_SESSION_ID` environment variable and HTTP headers to identify the calling session
+The Agent Orchestrator MCP server was previously a standalone component that:
+1. Exposed MCP tools (`start_session`, `resume_session`, etc.) for spawning child agents
+2. Ran in stdio mode (Claude Desktop/CLI subprocess) or HTTP mode (standalone server)
+3. Made unauthenticated HTTP calls to the Agent Coordinator
+4. Relied on `AGENT_SESSION_ID` environment variable and HTTP headers to identify the calling session
 
 ### Problems with Current Architecture
 
@@ -538,7 +538,7 @@ async def handle_mcp_request(self, request, session_id: str):
 
 1. **Schema versioning** - Executor invocation uses `schema_version` field
 2. **Gradual rollout** - Runner can detect executor capabilities
-3. **Standalone MCP preserved** - Keep existing MCP server for `AUTH_ENABLED=false`
+3. **External clients** - Use `--mcp-port` flag on Agent Runner to expose MCP endpoint
 
 ### Migration Steps
 
@@ -547,7 +547,7 @@ async def handle_mcp_request(self, request, session_id: str):
 3. **Step 3:** Remove blueprint resolution from executors
 4. **Step 4:** Add MCP server to Runner
 5. **Step 5:** Update agent blueprints to use Runner's MCP URL
-6. **Step 6:** Deprecate standalone MCP server for authenticated scenarios
+6. **Step 6:** ✅ Standalone MCP server removed - embedded in Agent Runner
 
 ---
 
