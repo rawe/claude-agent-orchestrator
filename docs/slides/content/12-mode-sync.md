@@ -21,10 +21,11 @@ In synchronous mode, the parent agent is blocked while waiting for the child to 
 - **Parent is blocked** while child runs
 - **Result returned immediately** when done
 - **Simplest mental model** - easy to reason about
+- **Not for long-running tasks** - subject to timeout issues
 
 ## Best For
 
-Quick tasks where the result is needed immediately to continue.
+Short-lived sub-agents where the result is needed immediately to continue.
 
 ### When to Use
 

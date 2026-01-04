@@ -4,7 +4,9 @@ title: "Fire & Forget"
 subtitle: "Start it and move on"
 ---
 
-## How It Works
+## Mode 2 of 4: Fire & Forget
+
+### How It Works
 
 The parent agent launches a child agent and immediately continues working without ever looking back. The child runs independently and completes on its own.
 

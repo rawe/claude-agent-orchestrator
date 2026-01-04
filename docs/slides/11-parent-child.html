@@ -3,24 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Parent-Child Agents - Agent Orchestrator</title>
+  <title>Execution Strategies - Agent Orchestrator</title>
   <style>
     :root {
       --color-bg: #0a0f1a;
       --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
       --color-bg-card: #141b2d;
-      --color-coordinator: #3b82f6;
-      --color-runner: #10b981;
-      --color-dashboard: #f59e0b;
       --color-session: #8b5cf6;
-      --color-mcp: #06b6d4;
+      --color-sync: #ec4899;
+      --color-fire: #ef4444;
+      --color-polling: #f59e0b;
+      --color-callback: #06b6d4;
       --color-text: #f1f5f9;
       --color-text-muted: #64748b;
       --color-text-bright: #ffffff;
       --color-border: #1e293b;
       --color-border-light: #334155;
       --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --font-mono: 'SF Mono', monospace;
       --radius-md: 8px;
       --radius-lg: 12px;
       --radius-full: 9999px;
@@ -51,19 +50,19 @@
       position: absolute;
       top: -50%; left: -50%;
       width: 200%; height: 200%;
-      background: radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+      background: radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.08) 0%, transparent 40%);
       pointer-events: none;
     }
     .slide > * { position: relative; z-index: 1; }
     .slide-header { text-align: center; margin-bottom: var(--space-lg); }
     .slide-header h1 {
-      font-size: clamp(2rem, 5vw, 3rem);
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
       font-weight: 700;
       color: var(--color-text-bright);
       margin-bottom: 0.5rem;
     }
     .slide-header .subtitle {
-      font-size: clamp(1rem, 2vw, 1.25rem);
+      font-size: clamp(0.875rem, 2vw, 1.125rem);
       color: var(--color-text-muted);
     }
     .slide-content {
@@ -71,6 +70,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: var(--space-xl);
     }
     .slide-nav {
       display: flex;
@@ -98,188 +98,104 @@
       border-color: var(--color-session);
       transform: translateY(-2px);
     }
-    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
-    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
 
-    /* Tree Diagram */
-    .tree-diagram {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0;
-    }
-
-    /* Parent Agent */
-    .parent-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .parent-box {
-      width: 220px;
-      height: 100px;
-      background: var(--color-bg-card);
-      border: 3px solid var(--color-session);
-      border-radius: var(--radius-lg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-sm);
-      box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
-      position: relative;
-    }
-
-    .parent-crown {
-      position: absolute;
-      top: -20px;
-      font-size: 1.5rem;
-    }
-
-    .parent-icon {
-      font-size: 2rem;
-    }
-
-    .parent-label {
-      font-weight: 700;
-      color: var(--color-session);
-    }
-
-    .parent-role {
-      font-size: 0.75rem;
-      color: var(--color-text-muted);
-    }
-
-    /* MCP Bridge */
-    .mcp-bridge {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: var(--space-lg) 0;
-    }
-
-    .mcp-line-top {
-      width: 2px;
-      height: 30px;
-      background: var(--color-mcp);
-    }
-
-    .mcp-box {
-      background: var(--color-bg-card);
-      border: 2px solid var(--color-mcp);
-      border-radius: var(--radius-md);
-      padding: var(--space-sm) var(--space-lg);
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      box-shadow: 0 0 25px rgba(6, 182, 212, 0.3);
-    }
-
-    .mcp-icon {
-      font-size: 1.25rem;
-    }
-
-    .mcp-label {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--color-mcp);
-    }
-
-    .mcp-sublabel {
-      font-size: 0.6875rem;
-      color: var(--color-text-muted);
-      font-family: var(--font-mono);
-    }
-
-    /* Connection lines to children */
-    .tree-connections {
-      width: 500px;
-      height: 50px;
-    }
-
-    .tree-connections svg {
-      width: 100%;
-      height: 100%;
-    }
-
-    .tree-line {
-      stroke: var(--color-runner);
-      stroke-width: 2;
-      fill: none;
-    }
-
-    .tree-line-animated {
-      stroke-dasharray: 6 4;
-      animation: flowTree 0.8s linear infinite;
-    }
-
-    @keyframes flowTree {
-      to { stroke-dashoffset: -10; }
-    }
-
-    /* Child Agents */
-    .children-container {
+    /* Layout */
+    .content-layout {
       display: flex;
       gap: var(--space-xl);
+      max-width: 1000px;
+      align-items: flex-start;
     }
 
-    .child-box {
-      width: 140px;
-      height: 90px;
-      background: var(--color-bg-card);
-      border: 2px solid var(--color-runner);
-      border-radius: var(--radius-lg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-sm);
-      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    /* Left side - The Question */
+    .question-section {
+      flex: 1;
       opacity: 0;
-      animation: childAppear 0.5s ease forwards;
+      animation: fadeIn 0.5s ease forwards;
     }
 
-    .child-box:nth-child(1) { animation-delay: 0.3s; }
-    .child-box:nth-child(2) { animation-delay: 0.5s; }
-    .child-box:nth-child(3) { animation-delay: 0.7s; }
-
-    @keyframes childAppear {
-      from { opacity: 0; transform: translateY(-20px); }
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes fadeIn {
+      to { opacity: 1; }
     }
 
-    .child-icon {
-      font-size: 1.5rem;
+    .question-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-session);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
     }
 
-    .child-label {
-      font-size: 0.875rem;
+    .question-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-session);
+      margin-bottom: var(--space-sm);
+    }
+
+    .question-text {
+      font-size: 1.1rem;
       font-weight: 600;
       color: var(--color-text-bright);
+      line-height: 1.4;
     }
 
-    .child-task {
-      font-size: 0.6875rem;
+    .choices {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .choice {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-md);
+    }
+
+    .choice-icon {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .choice-content {
+      flex: 1;
+    }
+
+    .choice-title {
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 4px;
+    }
+
+    .choice-desc {
+      font-size: 0.8rem;
       color: var(--color-text-muted);
-      text-align: center;
     }
 
-    /* How it works callout */
-    .how-it-works {
-      position: absolute;
-      right: var(--space-xl);
-      top: 50%;
-      transform: translateY(-50%);
-      width: 250px;
+    /* Right side - Trade-offs & Modes */
+    .tradeoffs-section {
+      flex: 1;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.2s;
+    }
+
+    .tradeoffs-card {
       background: var(--color-bg-card);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
       padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
     }
 
-    .how-title {
-      font-size: 0.875rem;
+    .tradeoffs-title {
+      font-size: 0.9rem;
       font-weight: 600;
       color: var(--color-text-bright);
       margin-bottom: var(--space-md);
@@ -288,117 +204,183 @@
       gap: var(--space-sm);
     }
 
-    .how-steps {
+    .tradeoffs-list {
       display: flex;
       flex-direction: column;
       gap: var(--space-sm);
     }
 
-    .how-step {
+    .tradeoff-item {
       display: flex;
-      align-items: flex-start;
-      gap: var(--space-sm);
-      font-size: 0.8125rem;
-      color: var(--color-text-muted);
+      justify-content: space-between;
+      font-size: 0.8rem;
+      padding: var(--space-sm) 0;
+      border-bottom: 1px solid var(--color-border);
     }
 
-    .step-num {
-      width: 20px;
-      height: 20px;
-      background: var(--color-mcp);
-      border-radius: 50%;
+    .tradeoff-item:last-child {
+      border-bottom: none;
+    }
+
+    .tradeoff-label {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .tradeoff-question {
+      color: var(--color-text-muted);
+      text-align: right;
+    }
+
+    /* Modes Preview */
+    .modes-preview {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+    }
+
+    .modes-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: var(--space-md);
+    }
+
+    .modes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-sm);
+    }
+
+    .mode-pill {
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 0.6875rem;
-      font-weight: 700;
-      color: white;
-      flex-shrink: 0;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-md);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .mode-pill.sync {
+      background: rgba(236, 72, 153, 0.15);
+      border: 1px solid var(--color-sync);
+      color: var(--color-sync);
+    }
+
+    .mode-pill.fire {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--color-fire);
+      color: var(--color-fire);
+    }
+
+    .mode-pill.polling {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid var(--color-polling);
+      color: var(--color-polling);
+    }
+
+    .mode-pill.callback {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid var(--color-callback);
+      color: var(--color-callback);
+    }
+
+    .mode-desc {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+      font-weight: 400;
+    }
+
+    .next-hint {
+      margin-top: var(--space-md);
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
   <div class="slide">
     <header class="slide-header">
-      <h1>Parent-Child Agents</h1>
-      <p class="subtitle">The MCP server enables agents to spawn other agents</p>
+      <h1>Execution Strategies</h1>
+      <p class="subtitle">How should the parent wait for child results?</p>
     </header>
 
     <main class="slide-content">
-      <div class="tree-diagram">
-        <!-- Parent -->
-        <div class="parent-container">
-          <div class="parent-box">
-            <div class="parent-crown">👑</div>
-            <div class="parent-icon">🎭</div>
-            <div class="parent-label">Orchestrator Agent</div>
-            <div class="parent-role">Coordinates the work</div>
+      <div class="content-layout">
+        <!-- Left: The Question -->
+        <div class="question-section">
+          <div class="question-box">
+            <div class="question-label">The Fundamental Question</div>
+            <div class="question-text">When a parent agent spawns a child, it faces a choice...</div>
           </div>
-        </div>
 
-        <!-- MCP Bridge -->
-        <div class="mcp-bridge">
-          <div class="mcp-line-top"></div>
-          <div class="mcp-box">
-            <div class="mcp-icon">🔌</div>
-            <div>
-              <div class="mcp-label">MCP Server</div>
-              <div class="mcp-sublabel">agent-orchestrator-mcp</div>
+          <div class="choices">
+            <div class="choice">
+              <div class="choice-icon">⏳</div>
+              <div class="choice-content">
+                <div class="choice-title">Wait and block?</div>
+                <div class="choice-desc">Simple, but what if the child takes a long time?</div>
+              </div>
+            </div>
+            <div class="choice">
+              <div class="choice-icon">🚀</div>
+              <div class="choice-content">
+                <div class="choice-title">Continue working?</div>
+                <div class="choice-desc">Efficient, but how do we get the result back?</div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Tree Lines -->
-        <svg class="tree-connections" viewBox="0 0 500 50">
-          <defs>
-            <marker id="tree-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-              <polygon points="0 0, 8 3, 0 6" fill="#10b981" />
-            </marker>
-          </defs>
-          <path d="M 250 0 L 250 20 L 80 20 L 80 50" class="tree-line tree-line-animated" marker-end="url(#tree-arrow)"/>
-          <path d="M 250 0 L 250 50" class="tree-line tree-line-animated" marker-end="url(#tree-arrow)"/>
-          <path d="M 250 0 L 250 20 L 420 20 L 420 50" class="tree-line tree-line-animated" marker-end="url(#tree-arrow)"/>
-        </svg>
+        <!-- Right: Trade-offs & Modes -->
+        <div class="tradeoffs-section">
+          <div class="tradeoffs-card">
+            <div class="tradeoffs-title">⚖️ The Trade-offs</div>
+            <div class="tradeoffs-list">
+              <div class="tradeoff-item">
+                <span class="tradeoff-label">Blocking</span>
+                <span class="tradeoff-question">Can parent do other work?</span>
+              </div>
+              <div class="tradeoff-item">
+                <span class="tradeoff-label">Timeouts</span>
+                <span class="tradeoff-question">Will long tasks fail?</span>
+              </div>
+              <div class="tradeoff-item">
+                <span class="tradeoff-label">Token cost</span>
+                <span class="tradeoff-question">How expensive is waiting?</span>
+              </div>
+              <div class="tradeoff-item">
+                <span class="tradeoff-label">Result delivery</span>
+                <span class="tradeoff-question">How does output arrive?</span>
+              </div>
+            </div>
+          </div>
 
-        <!-- Children -->
-        <div class="children-container">
-          <div class="child-box">
-            <div class="child-icon">🔍</div>
-            <div class="child-label">Code Reviewer</div>
-            <div class="child-task">Analyzes PR changes</div>
-          </div>
-          <div class="child-box">
-            <div class="child-icon">🧪</div>
-            <div class="child-label">Test Writer</div>
-            <div class="child-task">Creates unit tests</div>
-          </div>
-          <div class="child-box">
-            <div class="child-icon">📝</div>
-            <div class="child-label">Doc Generator</div>
-            <div class="child-task">Updates README</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- How it works -->
-      <div class="how-it-works">
-        <div class="how-title">💡 How It Works</div>
-        <div class="how-steps">
-          <div class="how-step">
-            <div class="step-num">1</div>
-            <span>Parent has MCP server with orchestration tools</span>
-          </div>
-          <div class="how-step">
-            <div class="step-num">2</div>
-            <span>Calls <code>start_agent</code> tool to spawn children</span>
-          </div>
-          <div class="how-step">
-            <div class="step-num">3</div>
-            <span>Children run in parallel as separate sessions</span>
-          </div>
-          <div class="how-step">
-            <div class="step-num">4</div>
-            <span>Parent aggregates results when complete</span>
+          <div class="modes-preview">
+            <div class="modes-title">Four Strategies</div>
+            <div class="modes-grid">
+              <div class="mode-pill sync">
+                <span>⏸️</span>
+                <span>Synchronous</span>
+              </div>
+              <div class="mode-pill fire">
+                <span>🚀</span>
+                <span>Fire & Forget</span>
+              </div>
+              <div class="mode-pill polling">
+                <span>🔍</span>
+                <span>Polling</span>
+              </div>
+              <div class="mode-pill callback">
+                <span>📞</span>
+                <span>Callback</span>
+              </div>
+            </div>
+            <div class="next-hint">Let's explore each one...</div>
           </div>
         </div>
       </div>

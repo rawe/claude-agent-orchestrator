@@ -283,7 +283,7 @@
           </div>
           <div class="mode-usecase">
             <div class="usecase-label">Best For</div>
-            Quick tasks needing immediate results
+            Short-lived tasks, no timeout risk
           </div>
         </div>
 
@@ -342,7 +342,7 @@
           <div class="mode-props">
             <div class="prop">
               <span class="prop-label">Blocking</span>
-              <span class="prop-value prop-no">No</span>
+              <span class="prop-value prop-yes">Yes (busy wait)</span>
             </div>
             <div class="prop">
               <span class="prop-label">Gets Result</span>
@@ -355,7 +355,7 @@
           </div>
           <div class="mode-usecase">
             <div class="usecase-label">Best For</div>
-            Long tasks, parent has other work
+            Avoids timeout, but wastes tokens
           </div>
         </div>
 
@@ -392,7 +392,7 @@
           </div>
           <div class="mode-usecase">
             <div class="usecase-label">Best For</div>
-            Long tasks, need result, no polling
+            Long tasks, most efficient
           </div>
         </div>
       </div>

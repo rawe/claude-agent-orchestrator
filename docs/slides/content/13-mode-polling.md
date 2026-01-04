@@ -1,34 +1,36 @@
 ---
 id: mode-polling
 title: "Async + Polling"
-subtitle: "Parent works and checks periodically"
+subtitle: "Busy waiting with controlled intervals"
 ---
 
-## Mode 2 of 4: Asynchronous with Polling
+## Mode 3 of 4: Asynchronous with Polling
 
-In async + polling mode, the parent continues working while periodically checking if the child has completed.
+The parent starts a child agent and then enters a busy-wait loop, repeatedly checking for completion.
 
 ### Timeline
 
-1. **Parent starts child** and continues working on other tasks
-2. **Child processes** the delegated task in parallel
-3. **Parent polls** periodically: "Not ready... Not ready... Not ready..."
+1. **Parent starts child** asynchronously (no timeout dependency)
+2. **Child processes** the delegated task
+3. **Parent polls** in a loop: "Not ready... Not ready... Not ready..."
 4. **Child completes** and parent's next poll returns: "Done!"
-5. **Parent receives result** and can use it
+5. **Parent receives result** and continues
 
 ## Characteristics
 
-- **Parent is not blocked** - continues doing useful work
-- **Requires active checking** for completion
-- **Can do other work** while waiting
+- **Parent is blocked** - busy waiting in a polling loop
+- **Avoids MCP timeout issues** - no dependency on tool call timeouts (unlike sync mode)
+- **Consumes tokens** - each poll is an LLM call
+- **Requires tuning** - polling interval affects token cost and latency
 
-## Best For
+## Trade-offs
 
-Long-running tasks where the parent has other work to do but still needs the result.
+Compared to **Sync mode**: Avoids timeout problems but wastes tokens on polling.
+
+Compared to **Callback mode**: More token-expensive and still blocks the parent.
 
 ### When to Use
 
-- Tasks that take significant time to complete
-- When the parent can make progress on other work
-- When you need the result eventually but not immediately
-- Batch processing scenarios
+- When sync mode timeouts are a problem
+- When callback mode is not available
+- Short-to-medium tasks where polling overhead is acceptable

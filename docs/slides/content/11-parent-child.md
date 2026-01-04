@@ -1,31 +1,32 @@
 ---
-id: parent-child
-title: "Parent-Child Agents"
-subtitle: "The MCP server enables agents to spawn other agents"
+id: execution-strategies
+title: "Execution Strategies"
+subtitle: "How should the parent wait for child results?"
 ---
 
-## Hierarchical Agent Structure
+## The Fundamental Question
 
-An **Orchestrator Agent** (parent) can spawn multiple specialized **Child Agents** to divide and conquer complex tasks.
+When a parent agent spawns a child, it faces a choice:
 
-### Example Setup
+- **Wait and block?** Simple, but what if the child takes a long time?
+- **Continue working?** Efficient, but how do we get the result back?
 
-- **Orchestrator Agent** (Parent) - Coordinates the work
-  - **Code Reviewer** (Child) - Analyzes PR changes
-  - **Test Writer** (Child) - Creates unit tests
-  - **Doc Generator** (Child) - Updates README
+## The Trade-offs
 
-## How It Works
+| Concern | Question |
+|---------|----------|
+| **Blocking** | Can the parent do other work while waiting? |
+| **Timeouts** | Will long-running children cause failures? |
+| **Token cost** | How much does waiting/polling cost? |
+| **Result delivery** | How does the parent receive the child's output? |
 
-1. **Parent has MCP server** with orchestration tools
-2. **Calls `start_agent` tool** to spawn children
-3. **Children run in parallel** as separate sessions
-4. **Parent aggregates results** when complete
+## Four Strategies
 
-## The MCP Bridge
+Different answers to these questions lead to four execution modes:
 
-The `agent-orchestrator-mcp` server provides the connection between parent and child agents, enabling:
+1. **Synchronous** - Block and wait
+2. **Fire & Forget** - Don't wait, no result needed
+3. **Polling** - Check periodically
+4. **Callback** - Get notified when done
 
-- Agent spawning via MCP tools
-- Session isolation for each child
-- Result collection and aggregation
+Let's explore each one...

@@ -297,9 +297,9 @@
 <body>
   <div class="slide">
     <header class="slide-header">
-      <div class="mode-badge">🔍 Mode 2 of 4</div>
+      <div class="mode-badge">🔍 Mode 3 of 4</div>
       <h1>Async + Polling</h1>
-      <p class="subtitle">Parent works and checks periodically</p>
+      <p class="subtitle">Busy waiting with controlled intervals</p>
     </header>
 
     <main class="slide-content">
@@ -362,23 +362,23 @@
         <h3 class="info-title">📋 Characteristics</h3>
         <ul class="info-list">
           <li class="info-item">
-            <span class="info-item-icon">🔓</span>
-            <span>Parent is <strong>not blocked</strong></span>
+            <span class="info-item-icon">🔒</span>
+            <span>Parent is <strong>blocked</strong> (busy waiting)</span>
           </li>
           <li class="info-item">
-            <span class="info-item-icon">🔄</span>
-            <span>Requires <strong>active checking</strong> for completion</span>
+            <span class="info-item-icon">✅</span>
+            <span><strong>Avoids timeout</strong> issues (unlike sync)</span>
           </li>
           <li class="info-item">
-            <span class="info-item-icon">⚡</span>
-            <span>Can do other work while waiting</span>
+            <span class="info-item-icon">💰</span>
+            <span><strong>Consumes tokens</strong> - each poll is an LLM call</span>
           </li>
         </ul>
 
         <div class="use-case">
           <div class="use-case-label">Best for</div>
           <div class="use-case-text">
-            Long-running tasks where parent has other work to do but still needs the result
+            When sync timeouts are a problem but callback is not available
           </div>
         </div>
       </div>

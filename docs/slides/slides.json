@@ -1,14 +1,13 @@
 {
   "title": "Agent Orchestrator",
   "subtitle": "A step-by-step introduction to managing multiple AI agents with real-time observability",
-  "totalSlides": 21,
+  "totalSlides": 23,
   "sections": [
     { "id": "intro", "number": "1", "title": "Motivation & Problem", "colorClass": "section-intro" },
     { "id": "components", "number": "2", "title": "Core Components", "colorClass": "section-components" },
     { "id": "chat", "number": "3", "title": "Your First Chat", "colorClass": "section-chat" },
-    { "id": "orchestration", "number": "4", "title": "Multi-Agent Orchestration", "colorClass": "section-orchestration" },
-    { "id": "modes", "number": "5", "title": "Execution Modes", "colorClass": "section-modes" },
-    { "id": "config", "number": "6", "title": "Blueprints & Capabilities", "colorClass": "section-config" },
+    { "id": "config", "number": "4", "title": "Blueprints & Capabilities", "colorClass": "section-config" },
+    { "id": "orchestration", "number": "5", "title": "Multi-Agent Orchestration", "colorClass": "section-orchestration" },
     { "id": "summary", "number": "✓", "title": "Summary", "colorClass": "section-summary" }
   ],
   "mainFlow": [
@@ -88,48 +87,6 @@
       "section": "chat"
     },
     {
-      "id": "parent-child",
-      "file": "11-parent-child.html",
-      "title": "Parent-Child Agents",
-      "icon": "🌳",
-      "section": "orchestration"
-    },
-    {
-      "id": "mode-sync",
-      "file": "12-mode-sync.html",
-      "title": "Synchronous",
-      "icon": "⏸️",
-      "section": "modes"
-    },
-    {
-      "id": "mode-polling",
-      "file": "13-mode-polling.html",
-      "title": "Async + Polling",
-      "icon": "🔍",
-      "section": "modes"
-    },
-    {
-      "id": "mode-fire-forget",
-      "file": "14-mode-fire-forget.html",
-      "title": "Fire & Forget",
-      "icon": "🚀",
-      "section": "modes"
-    },
-    {
-      "id": "mode-callback",
-      "file": "15-mode-callback.html",
-      "title": "Callback",
-      "icon": "📞",
-      "section": "modes"
-    },
-    {
-      "id": "modes-comparison",
-      "file": "16-modes-comparison.html",
-      "title": "Modes Comparison",
-      "icon": "⚖️",
-      "section": "modes"
-    },
-    {
       "id": "blueprints",
       "file": "17-blueprints.html",
       "title": "Agent Blueprints",
@@ -156,6 +113,62 @@
       "title": "Neo4j Example",
       "icon": "🔮",
       "section": "config"
+    },
+    {
+      "id": "orchestrator-capability",
+      "file": "15-orchestrator-capability.html",
+      "title": "Orchestrator Capability",
+      "icon": "🎭",
+      "section": "orchestration"
+    },
+    {
+      "id": "execution-strategies",
+      "file": "11-parent-child.html",
+      "title": "Execution Strategies",
+      "icon": "🎯",
+      "section": "orchestration"
+    },
+    {
+      "id": "mode-sync",
+      "file": "12-mode-sync.html",
+      "title": "Synchronous",
+      "icon": "⏸️",
+      "section": "orchestration"
+    },
+    {
+      "id": "mode-fire-forget",
+      "file": "14-mode-fire-forget.html",
+      "title": "Fire & Forget",
+      "icon": "🚀",
+      "section": "orchestration"
+    },
+    {
+      "id": "mode-polling",
+      "file": "13-mode-polling.html",
+      "title": "Async + Polling",
+      "icon": "🔍",
+      "section": "orchestration"
+    },
+    {
+      "id": "mode-callback",
+      "file": "15-mode-callback.html",
+      "title": "Callback",
+      "icon": "📞",
+      "section": "orchestration"
+    },
+    {
+      "id": "modes-comparison",
+      "file": "16-modes-comparison.html",
+      "title": "Modes Comparison",
+      "icon": "⚖️",
+      "section": "orchestration"
+    },
+    {
+      "id": "resume",
+      "file": "17-resume.html",
+      "title": "Resuming Agents",
+      "icon": "🔄",
+      "section": "orchestration"
     },
     {
       "id": "summary",
