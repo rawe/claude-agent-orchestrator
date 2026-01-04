@@ -21,8 +21,8 @@ Refactoring proposals, consistency fixes, and technical improvements. These are 
 ### [design/](./design/README.md)
 Feature specifications and detailed designs for planned capabilities. Documents here represent work in planning or early development stages.
 
-### [features/](./features/)
-Documentation for features that have been implemented, including usage guides, implementation details, and work package breakdowns for complex features.
+### [features/](./features/README.md)
+Documentation for implemented features including Executor Profiles, Runner Gateway, Capabilities System, and Agent Management. Each document explains what a feature does, why it exists, and how it works.
 
 ### [setup/](./setup/)
 Deployment and configuration guides for external services and infrastructure dependencies.

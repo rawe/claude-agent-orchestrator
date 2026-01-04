@@ -1,6 +1,6 @@
 ---
 description: Setup integration test environment (reset DB, start services)
-argument-hint: [executor]
+argument-hint: [profile]
 ---
 
 # Integration Test Setup
@@ -11,11 +11,11 @@ See `tests/README.md` for full documentation.
 
 ## Input
 
-Executor type: `$ARGUMENTS`
+Profile: `$ARGUMENTS`
 
-If no executor specified, default to `test-executor`.
+If no profile specified, default to `test-executor`.
 
-Valid executors:
+Valid profiles:
 - `test-executor` - Simple echo executor for fast, deterministic tests (default)
 - `claude-code` - Real Claude AI executor for end-to-end validation
 
@@ -28,11 +28,11 @@ Valid executors:
    cd servers/agent-coordinator && uv run python -m main
    ```
 
-3. **Start Agent Runner** with the specified executor in background:
+3. **Start Agent Runner** with the specified profile in background:
    ```bash
-   ./servers/agent-runner/agent-runner -x <executor>
+   ./servers/agent-runner/agent-runner -x <profile>
    ```
-   Use `test-executor` if no executor was specified, otherwise use the provided executor.
+   Use `test-executor` if no profile was specified, otherwise use the provided profile. Note: `-x` is short for `--profile`.
 
 4. **Start SSE Monitor** in background:
    ```bash

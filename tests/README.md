@@ -4,7 +4,7 @@ Manual integration tests for the Agent Orchestrator framework.
 
 ## Overview
 
-Tests verify the Agent Coordinator and Agent Runner work correctly together. Two executor options:
+Tests verify the Agent Coordinator and Agent Runner work correctly together. Two profile options:
 - `test-executor` - Simple echo executor for fast, deterministic tests
 - `claude-code` - Real Claude AI executor for end-to-end validation
 
@@ -77,10 +77,10 @@ curl http://localhost:8765/health
 In another terminal (or background process). Use the helper script:
 
 ```bash
-# With test-executor (fast, deterministic)
+# With test-executor profile (fast, deterministic)
 ./tests/scripts/start-runner test-executor
 
-# Or with claude-code (real AI)
+# Or with claude-code profile (real AI)
 ./tests/scripts/start-runner claude-code
 ```
 
@@ -118,8 +118,8 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 
 | Command | Description |
 |---------|-------------|
-| `/tests:setup [executor]` | Start core services (Coordinator, Runner, sse-monitor). Optional executor: `test-executor` (default) or `claude-code` |
-| `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct executor, handles test-specific setup |
+| `/tests:setup [profile]` | Start core services (Coordinator, Runner, sse-monitor). Optional profile: `test-executor` (default) or `claude-code` |
+| `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct profile, handles test-specific setup |
 | `/tests:run` | Run all tests sequentially with automatic setup and teardown |
 | `/tests:teardown` | Stop all services and cleanup |
 
@@ -129,7 +129,7 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 /tests:case 7
 
 # Or manual control
-/tests:setup claude-code    # Start services with claude-code executor
+/tests:setup claude-code    # Start services with claude-code profile
 /tests:teardown             # Stop everything when done
 ```
 
@@ -244,7 +244,7 @@ If you need to test authentication behavior, do so in a separate environment wit
 
 ### Runs not executing
 - Verify Agent Runner is registered (check runner logs)
-- Ensure using `-x test-executor` flag
+- Ensure using `-x test-executor` profile flag
 
 ### No SSE events
 - Verify sse-monitor connected successfully

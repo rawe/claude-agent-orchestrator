@@ -36,7 +36,7 @@ curl -s http://localhost:8765/agents/python-agent | python3 -m json.tool
 ### Step 3: Start Runner WITH Matching Tags
 
 ```bash
-RUNNER_TAGS=python ./servers/agent-runner/agent-runner -x test-executor
+RUNNER_TAGS=python ./servers/agent-runner/agent-runner -x test-executor  # -x is --profile
 ```
 
 ### Step 4: Verify Runner Registered with Tags

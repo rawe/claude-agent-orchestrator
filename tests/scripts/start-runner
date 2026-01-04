@@ -2,21 +2,21 @@
 # Start Agent Runner with environment variables from .env
 #
 # Usage:
-#   ./tests/scripts/start-runner [executor]
+#   ./tests/scripts/start-runner [profile]
 #
 # Arguments:
-#   executor  - Executor type: test-executor (default) or claude-code
+#   profile  - Executor profile: test-executor (default) or claude-code
 #
 # The script:
 #   - Sources .env and exports all variables
-#   - Starts the runner with the specified executor
+#   - Starts the runner with the specified profile
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-EXECUTOR="${1:-test-executor}"
+PROFILE="${1:-test-executor}"
 
 # Source and export all variables from .env
 if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -28,5 +28,5 @@ else
     exit 1
 fi
 
-# Start runner
-exec "$PROJECT_ROOT/servers/agent-runner/agent-runner" -x "$EXECUTOR"
+# Start runner with profile
+exec "$PROJECT_ROOT/servers/agent-runner/agent-runner" -x "$PROFILE"

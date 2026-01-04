@@ -20,6 +20,7 @@ Profiles use a composable naming pattern with three dimensions:
 
 | Profile | Permission Mode | Setting Sources | Model |
 |---------|-----------------|-----------------|-------|
+| `claude-code` | bypassPermissions | *(none)* | opus |
 | `full-access-project-best` | bypassPermissions | project, local | opus |
 | `full-access-isolated-best` | bypassPermissions | *(none)* | opus |
 | `restricted-project-best` | default | project, local | opus |

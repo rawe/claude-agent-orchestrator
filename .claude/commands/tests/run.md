@@ -16,7 +16,7 @@ See `tests/README.md` for full documentation.
 
 2. **Start services** in background:
    - Agent Coordinator: `cd servers/agent-coordinator && uv run python -m main`
-   - Agent Runner: `./servers/agent-runner/agent-runner -x test-executor`
+   - Agent Runner: `./servers/agent-runner/agent-runner -x test-executor` (note: `-x` is `--profile`)
    - SSE Monitor: `./tests/tools/sse-monitor`
 
 3. **Verify** all services are running and healthy

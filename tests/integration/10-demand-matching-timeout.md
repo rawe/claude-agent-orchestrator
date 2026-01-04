@@ -5,7 +5,7 @@ Verify that a run with demands times out when no runner can satisfy the demands 
 ## Prerequisites
 
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` (NO special tags)
+- Agent Runner running with `-x test-executor` profile (NO special tags)
 
 ## Test Steps
 

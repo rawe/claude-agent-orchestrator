@@ -4,6 +4,8 @@ The Runner Gateway is a local HTTP server that executors use to communicate with
 
 **Base URL:** `http://127.0.0.1:{dynamic_port}` (set via `AGENT_ORCHESTRATOR_API_URL`)
 
+**Feature Documentation:** [Runner Gateway](../../../docs/features/runner-gateway.md) - Architecture, motivation, and concepts
+
 ---
 
 ## Gateway-Specific Endpoints
