@@ -277,7 +277,7 @@
     </header>
 
     <div class="start-section">
-      <a href="01-orchestration.html" class="start-button">
+      <a id="start-button" href="#" class="start-button">
         Start Presentation <span>→</span>
       </a>
       <div class="keyboard-hints">
@@ -286,209 +286,116 @@
       </div>
     </div>
 
-    <!-- Section 1: Introduction -->
-    <section class="section section-intro">
-      <div class="section-header">
-        <div class="section-number">1</div>
-        <h2 class="section-title">Motivation & Problem</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="01-orchestration.html" class="slide-card">
-          <div class="slide-card-icon">🎭</div>
-          <div class="slide-card-number">Slide 01</div>
-          <div class="slide-card-title">Why Orchestration?</div>
-        </a>
-        <a href="02-problem.html" class="slide-card">
-          <div class="slide-card-icon">❓</div>
-          <div class="slide-card-number">Slide 02</div>
-          <div class="slide-card-title">The Challenges</div>
-        </a>
-        <a href="03-solution.html" class="slide-card">
-          <div class="slide-card-icon">💡</div>
-          <div class="slide-card-number">Slide 03</div>
-          <div class="slide-card-title">The Solution Architecture</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Section 2: Core Components -->
-    <section class="section section-components">
-      <div class="section-header">
-        <div class="section-number">2</div>
-        <h2 class="section-title">Core Components</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="04-coordinator.html" class="slide-card">
-          <div class="slide-card-icon">🧠</div>
-          <div class="slide-card-number">Slide 04</div>
-          <div class="slide-card-title">Agent Coordinator</div>
-        </a>
-        <a href="05-runner.html" class="slide-card">
-          <div class="slide-card-icon">⚡</div>
-          <div class="slide-card-number">Slide 05</div>
-          <div class="slide-card-title">Agent Runner</div>
-        </a>
-        <a href="06-context-store.html" class="slide-card">
-          <div class="slide-card-icon">📄</div>
-          <div class="slide-card-number">Slide 06</div>
-          <div class="slide-card-title">Context Store</div>
-        </a>
-        <a href="07-dashboard.html" class="slide-card">
-          <div class="slide-card-icon">📊</div>
-          <div class="slide-card-number">Slide 07</div>
-          <div class="slide-card-title">Dashboard</div>
-        </a>
-        <a href="08-architecture.html" class="slide-card">
-          <div class="slide-card-icon">🔗</div>
-          <div class="slide-card-number">Slide 08</div>
-          <div class="slide-card-title">Architecture Overview</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Section 3: First Chat -->
-    <section class="section section-chat">
-      <div class="section-header">
-        <div class="section-number">3</div>
-        <h2 class="section-title">Your First Chat</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="09-chat-overview.html" class="slide-card">
-          <div class="slide-card-icon">💬</div>
-          <div class="slide-card-number">Slide 09</div>
-          <div class="slide-card-title">Chat Overview</div>
-        </a>
-        <a href="10-chat-flow.html" class="slide-card">
-          <div class="slide-card-icon">🔄</div>
-          <div class="slide-card-number">Slide 10</div>
-          <div class="slide-card-title">Message Flow</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Section 4: Orchestration -->
-    <section class="section section-orchestration">
-      <div class="section-header">
-        <div class="section-number">4</div>
-        <h2 class="section-title">Multi-Agent Orchestration</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="11-parent-child.html" class="slide-card">
-          <div class="slide-card-icon">🌳</div>
-          <div class="slide-card-number">Slide 11</div>
-          <div class="slide-card-title">Parent-Child Agents</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Section 5: Execution Modes -->
-    <section class="section section-modes">
-      <div class="section-header">
-        <div class="section-number">5</div>
-        <h2 class="section-title">Execution Modes</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="12-mode-sync.html" class="slide-card">
-          <div class="slide-card-icon">⏸️</div>
-          <div class="slide-card-number">Slide 12</div>
-          <div class="slide-card-title">Synchronous</div>
-        </a>
-        <a href="13-mode-polling.html" class="slide-card">
-          <div class="slide-card-icon">🔍</div>
-          <div class="slide-card-number">Slide 13</div>
-          <div class="slide-card-title">Async + Polling</div>
-        </a>
-        <a href="14-mode-fire-forget.html" class="slide-card">
-          <div class="slide-card-icon">🚀</div>
-          <div class="slide-card-number">Slide 14</div>
-          <div class="slide-card-title">Fire & Forget</div>
-        </a>
-        <a href="15-mode-callback.html" class="slide-card">
-          <div class="slide-card-icon">📞</div>
-          <div class="slide-card-number">Slide 15</div>
-          <div class="slide-card-title">Callback</div>
-        </a>
-        <a href="16-modes-comparison.html" class="slide-card">
-          <div class="slide-card-icon">⚖️</div>
-          <div class="slide-card-number">Slide 16</div>
-          <div class="slide-card-title">Modes Comparison</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Section 6: Configuration -->
-    <section class="section section-config">
-      <div class="section-header">
-        <div class="section-number">6</div>
-        <h2 class="section-title">Blueprints & Capabilities</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="17-blueprints.html" class="slide-card">
-          <div class="slide-card-icon">📋</div>
-          <div class="slide-card-number">Slide 17</div>
-          <div class="slide-card-title">Agent Blueprints</div>
-        </a>
-        <a href="18-capabilities-problem.html" class="slide-card">
-          <div class="slide-card-icon">📝</div>
-          <div class="slide-card-number">Slide 18</div>
-          <div class="slide-card-title">The Config Problem</div>
-        </a>
-        <a href="19-capabilities-solution.html" class="slide-card">
-          <div class="slide-card-icon">🧩</div>
-          <div class="slide-card-number">Slide 19</div>
-          <div class="slide-card-title">Capabilities</div>
-        </a>
-        <a href="20-capabilities-example.html" class="slide-card">
-          <div class="slide-card-icon">🔮</div>
-          <div class="slide-card-number">Slide 20</div>
-          <div class="slide-card-title">Neo4j Example</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Deep Dives (out of main flow) -->
-    <section class="section section-deepdives">
-      <div class="section-header">
-        <div class="section-number">+</div>
-        <h2 class="section-title">Deep Dives</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="02a-problem-multiagent.html" class="slide-card">
-          <div class="slide-card-icon">🔗</div>
-          <div class="slide-card-number">Slide 02a</div>
-          <div class="slide-card-title">Multi-Agent Coordination</div>
-        </a>
-        <a href="02b-problem-context.html" class="slide-card">
-          <div class="slide-card-icon">📄</div>
-          <div class="slide-card-number">Slide 02b</div>
-          <div class="slide-card-title">Context Sharing</div>
-        </a>
-        <a href="02c-problem-provider.html" class="slide-card">
-          <div class="slide-card-icon">🔌</div>
-          <div class="slide-card-number">Slide 02c</div>
-          <div class="slide-card-title">Provider Lock-in</div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Section 7: Summary -->
-    <section class="section section-summary">
-      <div class="section-header">
-        <div class="section-number">✓</div>
-        <h2 class="section-title">Summary</h2>
-      </div>
-      <div class="slides-grid">
-        <a href="21-summary.html" class="slide-card">
-          <div class="slide-card-icon">🎯</div>
-          <div class="slide-card-number">Slide 21</div>
-          <div class="slide-card-title">Putting It All Together</div>
-        </a>
-      </div>
-    </section>
+    <!-- Sections generated dynamically from slides.json -->
+    <div id="sections-container"></div>
 
     <footer class="footer">
       <p>Agent Orchestrator • Framework for Multi-Agent AI Systems</p>
     </footer>
   </div>
+
+  <script>
+    /**
+     * Index page generator - reads slides.json and builds the navigation grid
+     */
+    (async function() {
+      'use strict';
+
+      try {
+        const response = await fetch('slides.json');
+        if (!response.ok) throw new Error('Failed to load slides.json');
+        const slides = await response.json();
+
+        // Set start button href to first slide
+        const startButton = document.getElementById('start-button');
+        if (startButton && slides.mainFlow.length > 0) {
+          startButton.href = slides.mainFlow[0].file;
+        }
+
+        // Group slides by section
+        const slidesBySection = {};
+        const deepDives = [];
+
+        slides.mainFlow.forEach((slide, index) => {
+          const sectionId = slide.section;
+          if (!slidesBySection[sectionId]) {
+            slidesBySection[sectionId] = [];
+          }
+          slidesBySection[sectionId].push({ ...slide, slideNumber: index + 1 });
+
+          // Collect deep dives
+          if (slide.deepDives) {
+            slide.deepDives.forEach((dd, ddIndex) => {
+              deepDives.push({
+                ...dd,
+                parentId: slide.id,
+                parentSlideNumber: index + 1,
+                letter: String.fromCharCode(97 + ddIndex) // a, b, c...
+              });
+            });
+          }
+        });
+
+        // Generate sections HTML
+        const container = document.getElementById('sections-container');
+        let html = '';
+
+        // Regular sections
+        for (const section of slides.sections) {
+          const sectionSlides = slidesBySection[section.id] || [];
+          if (sectionSlides.length === 0) continue;
+
+          html += `
+            <section class="section ${section.colorClass}">
+              <div class="section-header">
+                <div class="section-number">${section.number}</div>
+                <h2 class="section-title">${section.title}</h2>
+              </div>
+              <div class="slides-grid">
+                ${sectionSlides.map(slide => `
+                  <a href="${slide.file}" class="slide-card">
+                    <div class="slide-card-icon">${slide.icon}</div>
+                    <div class="slide-card-number">Slide ${String(slide.slideNumber).padStart(2, '0')}</div>
+                    <div class="slide-card-title">${slide.title}</div>
+                  </a>
+                `).join('')}
+              </div>
+            </section>
+          `;
+        }
+
+        // Deep dives section
+        if (deepDives.length > 0) {
+          html += `
+            <section class="section section-deepdives">
+              <div class="section-header">
+                <div class="section-number">+</div>
+                <h2 class="section-title">Deep Dives</h2>
+              </div>
+              <div class="slides-grid">
+                ${deepDives.map(dd => `
+                  <a href="${dd.file}" class="slide-card">
+                    <div class="slide-card-icon">${dd.icon}</div>
+                    <div class="slide-card-number">Slide ${String(dd.parentSlideNumber).padStart(2, '0')}${dd.letter}</div>
+                    <div class="slide-card-title">${dd.title}</div>
+                  </a>
+                `).join('')}
+              </div>
+            </section>
+          `;
+        }
+
+        container.innerHTML = html;
+
+      } catch (error) {
+        console.error('Failed to load slides:', error);
+        document.getElementById('sections-container').innerHTML = `
+          <p style="text-align: center; color: var(--color-text-muted);">
+            Failed to load slide navigation. Please check the console for errors.
+          </p>
+        `;
+      }
+    })();
+  </script>
 </body>
 </html>

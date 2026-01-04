@@ -405,19 +405,10 @@
     </main>
 
     <nav class="slide-nav">
-      <a href="10-chat-flow.html" class="nav-prev">←</a>
-      <a href="index.html" class="nav-home">⌂</a>
-      <span class="slide-number">11 / 21</span>
-      <a href="12-mode-sync.html" class="nav-next">→</a>
+      <!-- Navigation rendered by navigation.js -->
     </nav>
   </div>
 
-  <script>
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
-      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
-      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
-    });
-  </script>
+  <script src="navigation.js"></script>
 </body>
 </html>

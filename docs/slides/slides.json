@@ -1,0 +1,168 @@
+{
+  "title": "Agent Orchestrator",
+  "subtitle": "A step-by-step introduction to managing multiple AI agents with real-time observability",
+  "totalSlides": 21,
+  "sections": [
+    { "id": "intro", "number": "1", "title": "Motivation & Problem", "colorClass": "section-intro" },
+    { "id": "components", "number": "2", "title": "Core Components", "colorClass": "section-components" },
+    { "id": "chat", "number": "3", "title": "Your First Chat", "colorClass": "section-chat" },
+    { "id": "orchestration", "number": "4", "title": "Multi-Agent Orchestration", "colorClass": "section-orchestration" },
+    { "id": "modes", "number": "5", "title": "Execution Modes", "colorClass": "section-modes" },
+    { "id": "config", "number": "6", "title": "Blueprints & Capabilities", "colorClass": "section-config" },
+    { "id": "summary", "number": "✓", "title": "Summary", "colorClass": "section-summary" }
+  ],
+  "mainFlow": [
+    {
+      "id": "orchestration",
+      "file": "01-orchestration.html",
+      "title": "Why Orchestration?",
+      "icon": "🎭",
+      "section": "intro"
+    },
+    {
+      "id": "problem",
+      "file": "02-problem.html",
+      "title": "The Challenges",
+      "icon": "❓",
+      "section": "intro",
+      "deepDives": [
+        { "id": "multiagent", "file": "02a-problem-multiagent.html", "title": "Multi-Agent Coordination", "icon": "🔗", "backLabel": "Back to Problem Overview" },
+        { "id": "context", "file": "02b-problem-context.html", "title": "Context Sharing", "icon": "📄", "backLabel": "Back to Problem Overview" },
+        { "id": "provider", "file": "02c-problem-provider.html", "title": "Provider Lock-in", "icon": "🔌", "backLabel": "Back to Problem Overview" }
+      ]
+    },
+    {
+      "id": "solution",
+      "file": "03-solution.html",
+      "title": "The Solution Architecture",
+      "icon": "💡",
+      "section": "intro"
+    },
+    {
+      "id": "coordinator",
+      "file": "04-coordinator.html",
+      "title": "Agent Coordinator",
+      "icon": "🧠",
+      "section": "components"
+    },
+    {
+      "id": "runner",
+      "file": "05-runner.html",
+      "title": "Agent Runner",
+      "icon": "⚡",
+      "section": "components"
+    },
+    {
+      "id": "context-store",
+      "file": "06-context-store.html",
+      "title": "Context Store",
+      "icon": "📄",
+      "section": "components"
+    },
+    {
+      "id": "dashboard",
+      "file": "07-dashboard.html",
+      "title": "Dashboard",
+      "icon": "📊",
+      "section": "components"
+    },
+    {
+      "id": "architecture",
+      "file": "08-architecture.html",
+      "title": "Architecture Overview",
+      "icon": "🔗",
+      "section": "components"
+    },
+    {
+      "id": "chat-overview",
+      "file": "09-chat-overview.html",
+      "title": "Chat Overview",
+      "icon": "💬",
+      "section": "chat"
+    },
+    {
+      "id": "chat-flow",
+      "file": "10-chat-flow.html",
+      "title": "Message Flow",
+      "icon": "🔄",
+      "section": "chat"
+    },
+    {
+      "id": "parent-child",
+      "file": "11-parent-child.html",
+      "title": "Parent-Child Agents",
+      "icon": "🌳",
+      "section": "orchestration"
+    },
+    {
+      "id": "mode-sync",
+      "file": "12-mode-sync.html",
+      "title": "Synchronous",
+      "icon": "⏸️",
+      "section": "modes"
+    },
+    {
+      "id": "mode-polling",
+      "file": "13-mode-polling.html",
+      "title": "Async + Polling",
+      "icon": "🔍",
+      "section": "modes"
+    },
+    {
+      "id": "mode-fire-forget",
+      "file": "14-mode-fire-forget.html",
+      "title": "Fire & Forget",
+      "icon": "🚀",
+      "section": "modes"
+    },
+    {
+      "id": "mode-callback",
+      "file": "15-mode-callback.html",
+      "title": "Callback",
+      "icon": "📞",
+      "section": "modes"
+    },
+    {
+      "id": "modes-comparison",
+      "file": "16-modes-comparison.html",
+      "title": "Modes Comparison",
+      "icon": "⚖️",
+      "section": "modes"
+    },
+    {
+      "id": "blueprints",
+      "file": "17-blueprints.html",
+      "title": "Agent Blueprints",
+      "icon": "📋",
+      "section": "config"
+    },
+    {
+      "id": "capabilities-problem",
+      "file": "18-capabilities-problem.html",
+      "title": "The Config Problem",
+      "icon": "📝",
+      "section": "config"
+    },
+    {
+      "id": "capabilities-solution",
+      "file": "19-capabilities-solution.html",
+      "title": "Capabilities",
+      "icon": "🧩",
+      "section": "config"
+    },
+    {
+      "id": "capabilities-example",
+      "file": "20-capabilities-example.html",
+      "title": "Neo4j Example",
+      "icon": "🔮",
+      "section": "config"
+    },
+    {
+      "id": "summary",
+      "file": "21-summary.html",
+      "title": "Putting It All Together",
+      "icon": "🎯",
+      "section": "summary"
+    }
+  ]
+}

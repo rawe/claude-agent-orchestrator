@@ -390,17 +390,10 @@
     </main>
 
     <nav class="slide-nav">
-      <a href="02-problem.html" class="nav-back" title="Back to overview">←</a>
-      <span class="nav-label">Back to Problem Overview</span>
+      <!-- Navigation rendered by navigation.js -->
     </nav>
   </div>
 
-  <script>
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.key === 'ArrowLeft') {
-        document.querySelector('.nav-back')?.click();
-      }
-    });
-  </script>
+  <script src="navigation.js"></script>
 </body>
 </html>

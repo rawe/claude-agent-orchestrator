@@ -6,12 +6,47 @@ You are editing an HTML slide presentation about the Agent Orchestrator framewor
 
 ```
 docs/slides/
-├── index.html          # Navigation hub - UPDATE when adding/removing slides
+├── slides.json         # SINGLE SOURCE OF TRUTH for navigation - EDIT THIS for slide changes
+├── navigation.js       # Shared navigation script (do not edit)
+├── index.html          # Navigation hub - auto-generated from slides.json
 ├── template.html       # Design system reference - READ for styling patterns
 ├── 01-orchestration.html  # Main flow slides (01 through 21)
 ├── 02a-problem-*.html     # Deep dive slides (out of main flow)
-└── 20-summary.html
+└── 21-summary.html
 ```
+
+## Navigation System
+
+Navigation is **decoupled** from individual slide files. All navigation is defined in `slides.json` and rendered dynamically by `navigation.js`.
+
+### slides.json Structure
+```json
+{
+  "mainFlow": [
+    { "id": "orchestration", "file": "01-orchestration.html", "title": "Why Orchestration?", "icon": "🎭", "section": "intro" },
+    { "id": "problem", "file": "02-problem.html", "title": "The Challenges", "icon": "❓", "section": "intro",
+      "deepDives": [
+        { "id": "multiagent", "file": "02a-problem-multiagent.html", "title": "Multi-Agent Coordination", "icon": "🔗" }
+      ]
+    }
+  ],
+  "sections": [
+    { "id": "intro", "number": "1", "title": "Motivation & Problem", "colorClass": "section-intro" }
+  ]
+}
+```
+
+### How Navigation Works
+- Each slide includes `<script src="navigation.js"></script>`
+- `navigation.js` reads `slides.json`, detects current file, and renders prev/next/home buttons
+- Deep dive links use `data-deep-dive="id"` attributes, filled in by JS
+- `index.html` auto-generates all sections from `slides.json`
+
+### Serve Locally
+```bash
+cd docs/slides && python -m http.server 8000
+```
+Then open http://localhost:8000/index.html
 
 ## Design System (from template.html)
 
@@ -88,23 +123,16 @@ Every slide follows this HTML structure:
     </main>
 
     <nav class="slide-nav">
-      <a href="PREV.html" class="nav-prev">←</a>
-      <a href="index.html" class="nav-home">⌂</a>
-      <span class="slide-number">N / 20</span>
-      <a href="NEXT.html" class="nav-next">→</a>
+      <!-- Navigation rendered by navigation.js -->
     </nav>
   </div>
 
-  <script>
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
-      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
-      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
-    });
-  </script>
+  <script src="navigation.js"></script>
 </body>
 </html>
 ```
+
+**Note:** Navigation is rendered dynamically. Do NOT add hardcoded prev/next links.
 
 ## How To: Common Tasks
 
@@ -118,73 +146,47 @@ Every slide follows this HTML structure:
 ### Add a New Slide
 
 1. **Create the slide file** - Copy an existing slide with similar layout
-2. **Update navigation chain:**
-   - In the new slide: set correct prev/next links
-   - In the previous slide: update `nav-next` to point to new slide
-   - In the next slide: update `nav-prev` to point to new slide
-3. **Update slide numbers** - Update `slide-number` span in all affected slides (e.g., "N / 21")
-4. **Update index.html** - Add the new slide card in the appropriate section
+2. **Edit `slides.json`** - Add entry to `mainFlow` array at the correct position:
+   ```json
+   { "id": "new-slide", "file": "NN-new-slide.html", "title": "New Slide Title", "icon": "🆕", "section": "components" }
+   ```
+3. **Update `totalSlides`** in `slides.json`
+4. **Done!** - Navigation and index.html update automatically
 
 ### Remove a Slide
 
-1. **Fix navigation chain first:**
-   - In the slide before: update `nav-next` to skip the removed slide
-   - In the slide after: update `nav-prev` to skip the removed slide
-2. **Update slide numbers** in all subsequent slides
-3. **Update index.html** - Remove the slide card
-4. **Delete the file**
+1. **Edit `slides.json`** - Remove the entry from `mainFlow` array
+2. **Update `totalSlides`** in `slides.json`
+3. **Delete the file**
+4. **Done!** - No other files need updating
 
 ### Add a Deep Dive Slide (Out of Main Flow)
 
-Deep dives are detail slides accessible via click but **not** in the arrow-key navigation. Use for optional content the presenter can skip.
+Deep dives are detail slides accessible via click but **not** in the arrow-key navigation.
 
 **Naming:** `NNx-topic.html` where `NN` is parent slide number, `x` is letter (a, b, c...)
-- Example: `01a-problem-multiagent.html`, `01b-problem-context.html`
 
-**Structure differences from main slides:**
-```html
-<!-- Header with badge -->
-<div class="badge">Deep Dive</div>
-<h1>Detail Topic</h1>
+1. **Create the slide file** with standard structure (uses `navigation.js`)
+2. **Edit `slides.json`** - Add to parent slide's `deepDives` array:
+   ```json
+   { "id": "topic", "file": "02d-topic.html", "title": "Topic Title", "icon": "🔍", "backLabel": "Back to Parent" }
+   ```
+3. **In parent slide** - Add clickable card with `data-deep-dive` attribute:
+   ```html
+   <a data-deep-dive="topic" class="card">Click for details</a>
+   ```
+4. **Done!** - `navigation.js` fills in the href and handles back navigation
 
-<!-- Navigation: only back link, no prev/next -->
-<nav class="slide-nav">
-  <a href="02-problem.html" class="nav-back">←</a>
-  <span class="nav-label">Back to Overview</span>
-</nav>
+### Rename a Slide File
 
-<!-- Keyboard: Escape or ← returns to parent -->
-<script>
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' || e.key === 'ArrowLeft') {
-      document.querySelector('.nav-back')?.click();
-    }
-  });
-</script>
-```
+1. **Rename the file** (e.g., `05-runner.html` → `05-agent-runner.html`)
+2. **Edit `slides.json`** - Update the `file` property
+3. **Done!** - All navigation updates automatically
 
-**Parent slide:** Add clickable cards that link to deep dives. Arrow keys still go to next main slide.
+### Reorder Slides
 
-**index.html:** Add to `section-deepdives` section (uses `+` badge, smaller card styling).
-
-### Update index.html
-
-The index has sections like:
-```html
-<section class="section section-components">
-  <div class="slides-grid">
-    <a href="03-coordinator.html" class="slide-card">
-      <div class="slide-card-icon">🧠</div>
-      <div class="slide-card-number">Slide 03</div>
-      <div class="slide-card-title">Agent Coordinator</div>
-    </a>
-    <!-- more cards -->
-  </div>
-</section>
-```
-
-To add a slide: add a new `<a class="slide-card">` block.
-To remove: delete the corresponding card.
+1. **Edit `slides.json`** - Move the entry to the new position in `mainFlow` array
+2. **Done!** - Prev/next links and slide numbers update automatically
 
 ## Current Slide Order
 

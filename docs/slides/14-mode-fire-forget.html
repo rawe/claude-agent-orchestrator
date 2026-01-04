@@ -380,19 +380,10 @@
     </main>
 
     <nav class="slide-nav">
-      <a href="13-mode-polling.html" class="nav-prev">←</a>
-      <a href="index.html" class="nav-home">⌂</a>
-      <span class="slide-number">14 / 21</span>
-      <a href="15-mode-callback.html" class="nav-next">→</a>
+      <!-- Navigation rendered by navigation.js -->
     </nav>
   </div>
 
-  <script>
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
-      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
-      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
-    });
-  </script>
+  <script src="navigation.js"></script>
 </body>
 </html>

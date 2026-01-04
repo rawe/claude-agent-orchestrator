@@ -244,7 +244,7 @@
     <main class="slide-content">
       <div class="problems-grid">
 
-        <a href="02a-problem-multiagent.html" class="problem-card">
+        <a data-deep-dive="multiagent" class="problem-card">
           <div class="problem-header">
             <div class="problem-icon">🔗</div>
             <div class="problem-title">Multi-Agent Coordination</div>
@@ -261,7 +261,7 @@
           </div>
         </a>
 
-        <a href="02b-problem-context.html" class="problem-card">
+        <a data-deep-dive="context" class="problem-card">
           <div class="problem-header">
             <div class="problem-icon">📄</div>
             <div class="problem-title">Context Sharing</div>
@@ -278,7 +278,7 @@
           </div>
         </a>
 
-        <a href="02c-problem-provider.html" class="problem-card">
+        <a data-deep-dive="provider" class="problem-card">
           <div class="problem-header">
             <div class="problem-icon">🔌</div>
             <div class="problem-title">Provider Lock-in</div>
@@ -299,19 +299,10 @@
     </main>
 
     <nav class="slide-nav">
-      <a href="01-orchestration.html" class="nav-prev">←</a>
-      <a href="index.html" class="nav-home">⌂</a>
-      <span class="slide-number">2 / 21</span>
-      <a href="03-solution.html" class="nav-next">→</a>
+      <!-- Navigation rendered by navigation.js -->
     </nav>
   </div>
 
-  <script>
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') document.querySelector('.nav-prev:not(.disabled)')?.click();
-      if (e.key === 'ArrowRight') document.querySelector('.nav-next:not(.disabled)')?.click();
-      if (e.key === 'Home' || e.key === 'h') document.querySelector('.nav-home')?.click();
-    });
-  </script>
+  <script src="navigation.js"></script>
 </body>
 </html>
