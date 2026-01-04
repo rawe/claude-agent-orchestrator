@@ -36,7 +36,7 @@ This starts:
 - **Agent Coordinator** at http://localhost:8765
 - **Context Store** at http://localhost:8766
 - **Neo4j** at http://localhost:7475
-- **MCP Servers** (Agent Orchestrator, Context Store, Neo4j)
+- **MCP Servers** (Context Store, Neo4j)
 
 > **Note:** Atlassian and Azure DevOps MCPs require credentials in `.env` files and will be skipped if not configured. See [mcps/README.md](./mcps/README.md) for setup.
 
@@ -87,10 +87,10 @@ agent-orchestrator-framework/
 ├── servers/                           # Backend servers
 │   ├── agent-coordinator/             # Session management + event capture + agent registry
 │   ├── agent-runner/                  # Run executor (polls coordinator, runs Claude Code)
+│   │   └── lib/agent_orchestrator_mcp/  # Embedded Agent Orchestrator MCP server
 │   └── context-store/                 # Document storage
 │
 ├── mcps/                              # MCP servers (agent capabilities)
-│   ├── agent-orchestrator/            # Agent orchestration MCP (dual-purpose: capabilities + framework access)
 │   ├── context-store/                 # Document management MCP
 │   ├── neo4j/                         # Neo4j graph database MCP (Docker)
 │   ├── atlassian/                     # Jira + Confluence MCP (Docker, requires credentials)
