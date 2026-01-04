@@ -235,7 +235,7 @@
   <div class="slide">
     <header class="slide-header">
       <h1>The Configuration Problem</h1>
-      <p class="subtitle">Copy-pasting leads to inconsistency</p>
+      <p class="subtitle">Duplication leads to inconsistency</p>
     </header>
 
     <main class="slide-content">
@@ -249,10 +249,16 @@
             <div class="config-section">
               <div class="config-label">MCP Config</div>
               <div class="config-block config-duplicate">
-                neo4j-server:<br>
-                &nbsp;&nbsp;url: bolt://...<br>
-                &nbsp;&nbsp;user: neo4j<br>
-                &nbsp;&nbsp;pass: ****
+                "neo4j": {<br>
+                &nbsp;&nbsp;"type": "http",<br>
+                &nbsp;&nbsp;"url": "http://..."<br>
+                }
+              </div>
+            </div>
+            <div class="config-section">
+              <div class="config-label">System Prompt</div>
+              <div class="config-block config-duplicate" style="font-family: var(--font-sans); font-style: italic;">
+                "Graph has nodes: Person, Project..."
               </div>
             </div>
           </div>
@@ -267,10 +273,16 @@
             <div class="config-section">
               <div class="config-label">MCP Config</div>
               <div class="config-block config-duplicate">
-                neo4j-server:<br>
-                &nbsp;&nbsp;url: bolt://...<br>
-                &nbsp;&nbsp;user: neo4j<br>
-                &nbsp;&nbsp;pass: ****
+                "neo4j": {<br>
+                &nbsp;&nbsp;"type": "http",<br>
+                &nbsp;&nbsp;"url": "http://..."<br>
+                }
+              </div>
+            </div>
+            <div class="config-section">
+              <div class="config-label">System Prompt</div>
+              <div class="config-block config-duplicate" style="font-family: var(--font-sans); font-style: italic;">
+                "Graph has nodes: Person, Project..."
               </div>
             </div>
           </div>
@@ -285,10 +297,16 @@
             <div class="config-section">
               <div class="config-label">MCP Config</div>
               <div class="config-block config-duplicate">
-                neo4j-server:<br>
-                &nbsp;&nbsp;url: bolt://...<br>
-                &nbsp;&nbsp;user: neo4j<br>
-                &nbsp;&nbsp;pass: ****
+                "neo4j": {<br>
+                &nbsp;&nbsp;"type": "http",<br>
+                &nbsp;&nbsp;"url": "http://..."<br>
+                }
+              </div>
+            </div>
+            <div class="config-section">
+              <div class="config-label">System Prompt</div>
+              <div class="config-block config-duplicate" style="font-family: var(--font-sans); font-style: italic;">
+                "Graph has nodes: Person, Project..."
               </div>
             </div>
           </div>
@@ -299,24 +317,24 @@
         <h3>❌ Problems</h3>
         <ul class="problem-list">
           <li class="problem-item">
-            <span class="problem-icon">📋</span>
+            <span class="problem-icon">🔌</span>
             <div class="problem-content">
-              <h4>Duplication</h4>
-              <p>Same config copied across many blueprints</p>
+              <h4>Config Drift</h4>
+              <p>MCP endpoints diverge across blueprints</p>
             </div>
           </li>
           <li class="problem-item">
-            <span class="problem-icon">🔄</span>
+            <span class="problem-icon">🧠</span>
             <div class="problem-content">
-              <h4>Update Nightmare</h4>
-              <p>Change password? Update every blueprint manually</p>
+              <h4>Knowledge Drift</h4>
+              <p>Agents learn different "truths" about the schema</p>
             </div>
           </li>
           <li class="problem-item">
             <span class="problem-icon">⚠️</span>
             <div class="problem-content">
-              <h4>Drift Risk</h4>
-              <p>Configs diverge over time, causing bugs</p>
+              <h4>Update Nightmare</h4>
+              <p>Endpoint changes? Update every blueprint manually</p>
             </div>
           </li>
         </ul>

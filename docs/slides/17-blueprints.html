@@ -191,6 +191,24 @@
       color: var(--color-session);
     }
 
+    .tag-discovery {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--color-dashboard);
+      border-radius: var(--radius-full);
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: var(--color-dashboard);
+    }
+
+    .tag-demand {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      border-radius: var(--radius-full);
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: #10b981;
+    }
+
     /* Explanation Panel */
     .explanation {
       max-width: 350px;
@@ -277,11 +295,16 @@
             </div>
           </div>
           <div class="blueprint-section">
-            <div class="section-label">📊 Metadata</div>
-            <div class="section-content">
-              version: 1.0<br>
-              category: development<br>
-              timeout: 300s
+            <div class="section-label">🏷️ Tags (discovery)</div>
+            <div class="mcp-list">
+              <span class="tag-discovery">development</span>
+              <span class="tag-discovery">code-quality</span>
+            </div>
+          </div>
+          <div class="blueprint-section">
+            <div class="section-label">⚡ Demands (runner must have)</div>
+            <div class="mcp-list">
+              <span class="tag-demand">docker</span>
             </div>
           </div>
         </div>
@@ -294,28 +317,21 @@
             <div class="exp-icon">♻️</div>
             <div class="exp-content">
               <h4>Reusable</h4>
-              <p>Define once, use across many sessions</p>
-            </div>
-          </li>
-          <li class="explanation-item">
-            <div class="exp-icon">📍</div>
-            <div class="exp-content">
-              <h4>Single Source of Truth</h4>
-              <p>All agents of a type share the same config</p>
+              <p>Define once, spawn many agent instances from it</p>
             </div>
           </li>
           <li class="explanation-item">
             <div class="exp-icon">🔄</div>
             <div class="exp-content">
-              <h4>Version Controlled</h4>
-              <p>Track changes, rollback when needed</p>
+              <h4>Consistent</h4>
+              <p>All instances share the same abilities and MCP servers</p>
             </div>
           </li>
           <li class="explanation-item">
             <div class="exp-icon">🎯</div>
             <div class="exp-content">
               <h4>Specialized</h4>
-              <p>Each agent focused on a specific task</p>
+              <p>Each blueprint focused on a specific task</p>
             </div>
           </li>
         </ul>

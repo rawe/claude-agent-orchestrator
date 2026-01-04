@@ -18,14 +18,15 @@ A blueprint is a reusable configuration template that defines an agent's identit
 - git
 - github
 
-**Metadata:**
-- version: 1.0
-- category: development
-- timeout: 300s
+**Tags:** (for discovery)
+- development
+- code-quality
+
+**Demands:** (runner must satisfy)
+- tags: docker
 
 ## Why Blueprints?
 
-- **Reusable** - Define once, use across many sessions
-- **Single Source of Truth** - All agents of a type share the same config
-- **Version Controlled** - Track changes, rollback when needed
-- **Specialized** - Each agent focused on a specific task
+- **Reusable** - Define once, spawn many agent instances from it
+- **Consistent** - All instances share the same abilities and MCP servers
+- **Specialized** - Each blueprint focused on a specific task

@@ -298,21 +298,23 @@
           <div class="cap-section">
             <div class="cap-section-label">🔌 MCP Server Config</div>
             <div class="cap-config-block">
-              <span class="code-key">neo4j-mcp</span>:<br>
-              &nbsp;&nbsp;<span class="code-key">command</span>: <span class="code-string">"npx neo4j-mcp"</span><br>
-              &nbsp;&nbsp;<span class="code-key">env</span>:<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-key">NEO4J_URI</span>: <span class="code-string">"bolt://localhost:7687"</span><br>
-              &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-key">NEO4J_USER</span>: <span class="code-string">"neo4j"</span><br>
-              &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-key">NEO4J_PASS</span>: <span class="code-string">"${NEO4J_PASSWORD}"</span>
+              <span class="code-key">"neo4j"</span>: {<br>
+              &nbsp;&nbsp;<span class="code-key">"type"</span>: <span class="code-string">"http"</span>,<br>
+              &nbsp;&nbsp;<span class="code-key">"url"</span>: <span class="code-string">"http://localhost:9501/mcp"</span><br>
+              }
             </div>
           </div>
           <div class="cap-section">
-            <div class="cap-section-label">🔧 Allowed Tools</div>
-            <div class="tools-list">
-              <span class="tool-tag">neo4j_query</span>
-              <span class="tool-tag">neo4j_create</span>
-              <span class="tool-tag">neo4j_update</span>
-              <span class="tool-tag">neo4j_delete</span>
+            <div class="cap-section-label">📖 Domain Knowledge (Text)</div>
+            <div class="cap-config-block" style="font-family: var(--font-sans); line-height: 1.6;">
+              <strong style="color: var(--color-neo4j);">Ontology:</strong><br><br>
+              <strong>Nodes:</strong> Person, Project, Module, Document<br><br>
+              <strong>Relations:</strong><br>
+              • AUTHORED (Person → Document)<br>
+              • WORKS_ON (Person → Project)<br>
+              • DEPENDS_ON (Module → Module)<br>
+              • BELONGS_TO (Module → Project)<br><br>
+              <em style="color: var(--color-text-muted);">Use parameterized Cypher queries. Prefer MATCH patterns.</em>
             </div>
           </div>
         </div>
@@ -325,7 +327,7 @@
             <span class="agent-icon">🔍</span>
             <div class="agent-info">
               <h4>code-reviewer</h4>
-              <p>Stores review findings</p>
+              <p>Queries architecture relationships</p>
             </div>
             <span class="agent-badge">✓</span>
           </div>
@@ -333,7 +335,7 @@
             <span class="agent-icon">📝</span>
             <div class="agent-info">
               <h4>doc-writer</h4>
-              <p>Queries architecture info</p>
+              <p>Finds documentation gaps</p>
             </div>
             <span class="agent-badge">✓</span>
           </div>
@@ -341,7 +343,7 @@
             <span class="agent-icon">🔗</span>
             <div class="agent-info">
               <h4>dependency-analyzer</h4>
-              <p>Maps code relationships</p>
+              <p>Maps module dependencies</p>
             </div>
             <span class="agent-badge">✓</span>
           </div>
@@ -349,7 +351,7 @@
 
         <div class="update-callout">
           <span class="update-icon">💡</span>
-          <span class="update-text">Change password once → all 3 agents updated automatically</span>
+          <span class="update-text">Change endpoint or schema once → all agents updated automatically</span>
         </div>
       </div>
     </main>

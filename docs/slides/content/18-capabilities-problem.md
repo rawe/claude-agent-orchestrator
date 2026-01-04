@@ -1,35 +1,55 @@
 ---
 id: capabilities-problem
 title: "The Configuration Problem"
-subtitle: "Copy-pasting leads to inconsistency"
+subtitle: "Duplication leads to inconsistency"
 ---
 
 ## The Problem
 
-When multiple agents need the same MCP server configuration (like Neo4j), you end up copying the same config across all blueprints:
+When multiple agents need the same tool (like Neo4j), you duplicate:
 
-```yaml
-# code-reviewer blueprint
-neo4j-server:
-  url: bolt://...
-  user: neo4j
-  pass: ****
+### 1. MCP Server Config
 
-# doc-writer blueprint
-neo4j-server:
-  url: bolt://...
-  user: neo4j
-  pass: ****
+```json
+// code-reviewer/agent.mcp.json
+{
+  "mcpServers": {
+    "neo4j": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
+    }
+  }
+}
 
-# test-writer blueprint
-neo4j-server:
-  url: bolt://...
-  user: neo4j
-  pass: ****
+// doc-writer/agent.mcp.json
+{
+  "mcpServers": {
+    "neo4j": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
+    }
+  }
+}
+
+// test-writer/agent.mcp.json
+{
+  "mcpServers": {
+    "neo4j": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
+    }
+  }
+}
 ```
 
-## Problems
+### 2. Usage Knowledge
 
-- **Duplication** - Same config copied across many blueprints
-- **Update Nightmare** - Change password? Update every blueprint manually
-- **Drift Risk** - Configs diverge over time, causing bugs
+Each agent's system prompt repeats how to use it:
+
+> "The Neo4j graph has nodes: Person, Project, Module. Use MATCH patterns to query relationships like AUTHORED and DEPENDS_ON..."
+
+## The Pain
+
+- **Config drift** - MCP endpoints diverge across blueprints
+- **Knowledge drift** - Agents learn different "truths" about the schema
+- **Update nightmare** - Endpoint changes? Update every blueprint manually

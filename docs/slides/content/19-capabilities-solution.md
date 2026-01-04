@@ -1,42 +1,47 @@
 ---
 id: capabilities-solution
 title: "Capabilities"
-subtitle: "Extract common config into reusable modules"
+subtitle: "Reusable modules that bundle config and knowledge"
 ---
 
 ## The Solution
 
-Instead of duplicating config, extract it into a **Capability** that blueprints can reference.
+Extract shared configuration and knowledge into a **Capability** that blueprints reference.
 
-## How It Works
+## A Capability Contains
 
-**Blueprint** references a capability by name:
+### 1. MCP Server Config
+Which tool endpoint to use:
 
-```yaml
-# code-reviewer blueprint
-capabilities:
-  - neo4j-kg
-own_config:
-  prompt: "Review code..."
-  metadata: {...}
+```json
+{
+  "mcpServers": {
+    "neo4j": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
+    }
+  }
+}
 ```
 
-**Capability** contains the shared configuration:
+### 2. Text (Domain Knowledge)
+How to use it properly:
 
-```yaml
-# neo4j-kg capability
-mcp_servers:
-  neo4j:
-    url: bolt://...
-    user: neo4j
-allowed_tools:
-  - neo4j_query
-  - neo4j_write
+> "The knowledge graph contains nodes: Person, Project, Module. Relations include AUTHORED, DEPENDS_ON, and WORKS_ON. Always use parameterized Cypher queries..."
+
+## Blueprint References Capability
+
+```json
+{
+  "name": "code-reviewer",
+  "description": "Reviews code for quality",
+  "capabilities": ["neo4j-knowledge-graph"]
+}
 ```
 
 ## At Runtime: Merge
 
-The system merges the blueprint's own config with all referenced capabilities to create the **Resolved Agent**:
+The system merges the blueprint with all referenced capabilities:
 
-- **From Blueprint**: prompt, metadata
-- **From Capability**: neo4j connection, allowed tools
+- **System prompt** = blueprint prompt + capability text
+- **MCP servers** = blueprint servers + capability servers

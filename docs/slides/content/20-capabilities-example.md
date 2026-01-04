@@ -6,32 +6,42 @@ subtitle: "One capability, many agents"
 
 ## The neo4j-knowledge-graph Capability
 
-Graph database access for agents.
-
 ### MCP Server Config
 
-```yaml
-neo4j-mcp:
-  command: "npx neo4j-mcp"
-  env:
-    NEO4J_URI: "bolt://localhost:7687"
-    NEO4J_USER: "neo4j"
-    NEO4J_PASS: "${NEO4J_PASSWORD}"
+```json
+{
+  "mcpServers": {
+    "neo4j": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
+    }
+  }
+}
 ```
 
-### Allowed Tools
+### Domain Knowledge (Text)
 
-- `neo4j_query`
-- `neo4j_create`
-- `neo4j_update`
-- `neo4j_delete`
+> **Ontology:**
+> The knowledge graph contains the following structure:
+>
+> **Nodes:** Person, Project, Module, Document
+>
+> **Relations:**
+> - AUTHORED (Person → Document)
+> - WORKS_ON (Person → Project)
+> - DEPENDS_ON (Module → Module)
+> - BELONGS_TO (Module → Project)
+>
+> Always use parameterized Cypher queries. Prefer MATCH patterns over raw node IDs.
 
 ## Agents Using This Capability
 
-- **code-reviewer** - Stores review findings
-- **doc-writer** - Queries architecture info
-- **dependency-analyzer** - Maps code relationships
+| Agent | Purpose |
+|-------|---------|
+| code-reviewer | Queries architecture relationships |
+| doc-writer | Finds documentation gaps |
+| dependency-analyzer | Maps module dependencies |
 
 ## The Benefit
 
-**Change password once, all 3 agents updated automatically**
+**Change endpoint or schema once → all agents updated automatically**

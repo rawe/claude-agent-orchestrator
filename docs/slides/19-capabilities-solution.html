@@ -347,7 +347,7 @@
   <div class="slide">
     <header class="slide-header">
       <h1>Capabilities</h1>
-      <p class="subtitle">Extract common config into reusable modules</p>
+      <p class="subtitle">Reusable modules that bundle config and knowledge</p>
     </header>
 
     <main class="slide-content">
@@ -376,14 +376,16 @@
             <div class="cap-icon">🧩</div>
             <span class="cap-name">neo4j-kg</span>
           </div>
-          <div class="cap-config">
-            mcp_servers:<br>
-            &nbsp;&nbsp;neo4j:<br>
-            &nbsp;&nbsp;&nbsp;&nbsp;url: bolt://...<br>
-            &nbsp;&nbsp;&nbsp;&nbsp;user: neo4j<br>
-            allowed_tools:<br>
-            &nbsp;&nbsp;- neo4j_query<br>
-            &nbsp;&nbsp;- neo4j_write
+          <div class="cap-section-label" style="font-size: 0.625rem; color: var(--color-text-muted); margin-bottom: 4px;">MCP Config</div>
+          <div class="cap-config" style="margin-bottom: var(--space-sm);">
+            "neo4j": {<br>
+            &nbsp;&nbsp;"type": "http",<br>
+            &nbsp;&nbsp;"url": "http://..."<br>
+            }
+          </div>
+          <div class="cap-section-label" style="font-size: 0.625rem; color: var(--color-text-muted); margin-bottom: 4px;">Text (Knowledge)</div>
+          <div class="cap-config" style="font-family: var(--font-sans); font-style: italic;">
+            "Nodes: Person, Project. Relations: AUTHORED, WORKS_ON..."
           </div>
         </div>
 
@@ -401,17 +403,19 @@
             <span class="result-badge">Runtime</span>
           </div>
           <div class="result-section">
-            <div class="result-label">From Blueprint</div>
+            <div class="result-label">System Prompt (merged)</div>
             <div class="result-config">
-              <span class="from-blueprint">prompt: "Review code..."</span><br>
-              <span class="from-blueprint">metadata: {...}</span>
+              <span class="from-blueprint">Blueprint prompt</span><br>
+              <span style="color: var(--color-text-muted);">+</span><br>
+              <span class="from-capability">Capability text</span>
             </div>
           </div>
           <div class="result-section">
-            <div class="result-label">From Capability</div>
+            <div class="result-label">MCP Servers (merged)</div>
             <div class="result-config">
-              <span class="from-capability">neo4j: bolt://...</span><br>
-              <span class="from-capability">tools: [neo4j_*]</span>
+              <span class="from-blueprint">Blueprint servers</span><br>
+              <span style="color: var(--color-text-muted);">+</span><br>
+              <span class="from-capability">Capability servers</span>
             </div>
           </div>
         </div>
