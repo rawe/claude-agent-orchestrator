@@ -8,12 +8,45 @@ You are editing an HTML slide presentation about the Agent Orchestrator framewor
 docs/slides/
 ├── slides.json         # SINGLE SOURCE OF TRUTH for navigation - EDIT THIS for slide changes
 ├── navigation.js       # Shared navigation script (do not edit)
+├── content/            # Markdown content files (source of truth for content)
+│   ├── 01-orchestration.md
+│   └── ...
 ├── index.html          # Navigation hub - auto-generated from slides.json
 ├── template.html       # Design system reference - READ for styling patterns
 ├── 01-orchestration.html  # Main flow slides (01 through 21)
 ├── 02a-problem-*.html     # Deep dive slides (out of main flow)
 └── 21-summary.html
 ```
+
+## Content-First Workflow
+
+**Why:** Markdown files are smaller than HTML (~1KB vs ~10KB), reducing context size for AI editing sessions.
+
+**How it works:**
+- `content/*.md` = source of truth for **what** to present (text, message, ideas)
+- `*.html` = **how** it's visualized (layout, CSS, animations)
+
+**Naming convention:** 1:1 mapping between markdown and HTML:
+- `content/04-coordinator.md` → `04-coordinator.html`
+- `content/02a-problem-multiagent.md` → `02a-problem-multiagent.html`
+
+**Front matter schema:**
+```yaml
+---
+id: coordinator       # Unique ID from slides.json
+title: "Agent Coordinator"
+subtitle: "The central brain"
+accentColor: coordinator  # Optional: coordinator|runner|dashboard|session
+parentId: problem     # Only for deep dives
+---
+```
+
+**Editing workflow:**
+1. Edit the markdown file in `content/`
+2. Tell the AI: "I updated `content/04-coordinator.md`, please adjust the HTML"
+3. AI reads markdown, updates `04-coordinator.html` accordingly
+
+**Important:** The markdown may contain more detail than the HTML shows. It captures the message/ideas; the HTML is just one visual representation.
 
 ## Navigation System
 
