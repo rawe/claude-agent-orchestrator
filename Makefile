@@ -361,9 +361,10 @@ start-agent-runner:
 	echo "Configuration:"; \
 	echo "  Project Dir: $$PROJ_DIR"; \
 	echo "  Coordinator: $${AGENT_ORCHESTRATOR_API_URL:-http://localhost:8765}"; \
+	echo "  MCP Port:    9500"; \
 	echo "  Log file:    $(AGENT_RUNNER_LOG_FILE)"; \
 	echo ""; \
-	$(AGENT_RUNNER_SCRIPT) --profile full-access-isolated-best --project-dir "$$PROJ_DIR" > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
+	$(AGENT_RUNNER_SCRIPT) --profile full-access-isolated-best --project-dir "$$PROJ_DIR" --mcp-port 9500 > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
 	echo $$! > $(AGENT_RUNNER_PID_FILE); \
 	sleep 2; \
 	echo "Agent Runner started (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \
@@ -403,9 +404,10 @@ run-agent-runner:
 	fi; \
 	echo "Starting Agent Runner in foreground (Ctrl+C to stop)..."; \
 	echo "  Project Dir: $$PROJ_DIR"; \
+	echo "  MCP Port:    9500"; \
 	if [ -n "$$VERBOSE_FLAG" ]; then echo "  Verbose: enabled"; fi; \
 	echo ""; \
-	$(AGENT_RUNNER_SCRIPT) --profile full-access-isolated-best --project-dir "$$PROJ_DIR" $$VERBOSE_FLAG
+	$(AGENT_RUNNER_SCRIPT) --profile full-access-isolated-best --project-dir "$$PROJ_DIR" --mcp-port 9500 $$VERBOSE_FLAG
 
 # Run agent runner in foreground with verbose output (shortcut)
 run-agent-runner-v:
