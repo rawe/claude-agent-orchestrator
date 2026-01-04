@@ -156,11 +156,15 @@ def error_exit(message: str, exit_code: int = 1) -> None:
     """
     Print error message to stderr and exit.
 
+    Flushes stderr before exiting to ensure error message is captured
+    when running as a subprocess with piped output.
+
     Args:
         message: Error message to display
         exit_code: Exit code (default: 1)
     """
     print(f"Error: {message}", file=sys.stderr)
+    sys.stderr.flush()
     sys.exit(exit_code)
 
 

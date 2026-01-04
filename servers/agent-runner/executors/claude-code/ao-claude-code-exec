@@ -164,11 +164,14 @@ def main(
     except ValueError as e:
         error_exit(str(e))
     except FileNotFoundError as e:
-        error_exit(str(e))
+        error_exit(f"{invocation.mode.capitalize()} failed: {e}")
     except ImportError as e:
-        error_exit(str(e))
+        error_exit(f"{invocation.mode.capitalize()} failed (import error): {e}")
     except Exception as e:
-        error_exit(f"Unexpected error: {e}")
+        error_exit(
+            f"{invocation.mode.capitalize()} failed for session '{invocation.session_id}': "
+            f"Unexpected error: {type(e).__name__}: {e}"
+        )
 
 
 def run_start(inv: ExecutorInvocation):
@@ -243,7 +246,7 @@ def run_resume(inv: ExecutorInvocation):
     Schema 2.0: Uses agent_blueprint for MCP servers (Runner handles fetching/resolution).
     """
     from executor_config import get_api_url
-    from session_client import SessionClient, SessionClientError
+    from session_client import SessionClient, SessionClientError, SessionNotFoundError
     from claude_client import run_session_sync
     from utils import debug_log
 
@@ -254,25 +257,36 @@ def run_resume(inv: ExecutorInvocation):
     try:
         client = SessionClient(api_url)
         session_data = client.get_session(inv.session_id)
+    except SessionNotFoundError:
+        raise ValueError(
+            f"Resume failed: Session '{inv.session_id}' not found. "
+            "The session may have been deleted or never created."
+        )
     except SessionClientError as e:
-        raise ValueError(f"Failed to connect to session manager: {e}")
+        raise ValueError(
+            f"Resume failed: Cannot connect to session manager for '{inv.session_id}'. "
+            f"API URL: {api_url}. Error: {e}"
+        )
 
     if not session_data:
         raise ValueError(
-            f"Session '{inv.session_id}' does not exist. "
-            "Use mode='start' to create it"
+            f"Resume failed: Session '{inv.session_id}' returned empty data. "
+            "Use mode='start' to create a new session."
         )
 
     # Extract session data
     executor_session_id = session_data.get("executor_session_id")
-    session_project_dir = Path(session_data.get("project_dir", str(Path.cwd())))
+    session_status = session_data.get("status", "unknown")
+    # Use 'or' to handle both missing and explicitly None project_dir
+    session_project_dir = Path(session_data.get("project_dir") or str(Path.cwd()))
     session_agent = session_data.get("agent_name")
 
     # Validate executor_session_id exists (needed for Claude SDK resume)
     if not executor_session_id:
         raise ValueError(
-            f"Session '{inv.session_id}' has no executor_session_id. "
-            "Cannot resume - session may not have started successfully"
+            f"Resume failed: Session '{inv.session_id}' has no executor_session_id "
+            f"(status={session_status}, agent={session_agent or 'none'}). "
+            "The session may not have started successfully or was never bound to an executor."
         )
 
     # 3. Get MCP servers from blueprint (Runner provides resolved blueprint)

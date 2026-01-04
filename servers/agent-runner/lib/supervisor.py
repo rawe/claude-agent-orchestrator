@@ -96,12 +96,35 @@ class RunSupervisor:
         # Remove from registry first
         self.registry.remove_run(run_id)
 
-        # Get any output
+        # Get any output from the process
+        # Read directly from pipes instead of using communicate() to avoid
+        # "I/O operation on closed file" errors when process exits quickly
         stdout, stderr = "", ""
         try:
-            stdout, stderr = running_run.process.communicate(timeout=1.0)
-        except Exception:
-            pass
+            # Check pipe status for diagnostics
+            stdout_status = "closed" if (not running_run.process.stdout or running_run.process.stdout.closed) else "open"
+            stderr_status = "closed" if (not running_run.process.stderr or running_run.process.stderr.closed) else "open"
+
+            # Try reading directly from pipes
+            if running_run.process.stdout and not running_run.process.stdout.closed:
+                stdout = running_run.process.stdout.read() or ""
+            if running_run.process.stderr and not running_run.process.stderr.closed:
+                stderr = running_run.process.stderr.read() or ""
+
+            # Log if pipes were already closed (helps diagnose fast-exit issues)
+            if stdout_status == "closed" or stderr_status == "closed":
+                logger.debug(
+                    f"Process {run_id} pipes status: stdout={stdout_status}, stderr={stderr_status}"
+                )
+        except Exception as e:
+            # Fall back to communicate() if direct read fails
+            try:
+                stdout, stderr = running_run.process.communicate(timeout=5.0)
+            except Exception as e2:
+                logger.warning(
+                    f"Failed to get output from process {run_id}: "
+                    f"direct read: {e}, communicate: {e2}"
+                )
 
         if return_code == 0:
             logger.info(f"Agent run {run_id} completed successfully (session={running_run.session_id})")
@@ -110,8 +133,29 @@ class RunSupervisor:
             except Exception as e:
                 logger.error(f"Failed to report completion for {run_id}: {e}")
         else:
-            error_msg = stderr.strip() if stderr else f"Process exited with code {return_code}"
-            logger.error(f"Agent run {run_id} failed: {error_msg}")
+            # Build error message: prefer stderr, fall back to stdout, then generic message
+            if stderr and stderr.strip():
+                error_msg = stderr.strip()
+            elif stdout and stdout.strip():
+                error_msg = f"(stdout) {stdout.strip()}"
+            else:
+                error_msg = f"Process exited with code {return_code}"
+
+            # Log detailed failure info for debugging
+            logger.error(f"Agent run {run_id} failed (exit_code={return_code}, session={running_run.session_id})")
+            logger.error(f"  Error: {error_msg}")
+            if stdout and stdout.strip():
+                # Truncate long output for logging
+                stdout_preview = stdout.strip()[:1000]
+                if len(stdout.strip()) > 1000:
+                    stdout_preview += "... (truncated)"
+                logger.debug(f"  stdout: {stdout_preview}")
+            if stderr and stderr.strip():
+                stderr_preview = stderr.strip()[:1000]
+                if len(stderr.strip()) > 1000:
+                    stderr_preview += "... (truncated)"
+                logger.debug(f"  stderr: {stderr_preview}")
+
             try:
                 self.api_client.report_failed(self.runner_id, run_id, error_msg)
             except Exception as e:
