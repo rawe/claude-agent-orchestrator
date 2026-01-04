@@ -109,8 +109,8 @@
 
     .cycle-container {
       position: relative;
-      width: 500px;
-      height: 300px;
+      width: 520px;
+      height: 380px;
     }
 
     /* Central Runner Box */
@@ -168,13 +168,13 @@
     .step-heartbeat { top: 50%; left: 0; transform: translateY(-50%); }
 
     .step-icon {
-      width: 64px;
-      height: 64px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.75rem;
+      font-size: 2rem;
       background: var(--color-bg-card);
       border: 2px solid var(--color-runner);
     }
@@ -259,20 +259,20 @@
       <div class="runner-diagram">
         <div class="cycle-container">
           <div class="cycle-arrows">
-            <svg viewBox="0 0 500 300">
+            <svg viewBox="0 0 520 380">
               <defs>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                   <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
                 </marker>
               </defs>
               <!-- Poll to Execute -->
-              <path d="M 280 50 Q 350 50 380 100" class="arrow-path" marker-end="url(#arrowhead)"/>
+              <path d="M 295 70 Q 380 70 420 130" class="arrow-path" marker-end="url(#arrowhead)"/>
               <!-- Execute to Report -->
-              <path d="M 420 180 Q 420 230 350 260" class="arrow-path" marker-end="url(#arrowhead)"/>
+              <path d="M 455 240 Q 455 300 380 330" class="arrow-path" marker-end="url(#arrowhead)"/>
               <!-- Report to Heartbeat -->
-              <path d="M 150 260 Q 80 230 80 180" class="arrow-path" marker-end="url(#arrowhead)"/>
+              <path d="M 140 330 Q 65 300 65 240" class="arrow-path" marker-end="url(#arrowhead)"/>
               <!-- Heartbeat to Poll -->
-              <path d="M 80 120 Q 80 50 150 40" class="arrow-path" marker-end="url(#arrowhead)"/>
+              <path d="M 65 140 Q 65 70 140 55" class="arrow-path" marker-end="url(#arrowhead)"/>
             </svg>
           </div>
 
