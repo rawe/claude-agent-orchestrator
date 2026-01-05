@@ -74,7 +74,7 @@ See [Event model](DATA_MODELS.md#event) in DATA_MODELS.md
   "session": Session
 }
 ```
-Sent when a new session is created via POST /sessions or POST /runs (for start_session).
+Sent when a new session is created via POST /runs with `type: "start_session"`.
 
 **Session Update:**
 ```json
@@ -152,41 +152,6 @@ Get all sessions.
   "sessions": [Session, ...]
 }
 ```
-
-#### POST /sessions
-
-Create a new session with full metadata.
-
-**Request Body:**
-```json
-{
-  "session_id": "ses_abc123def456",
-  "project_dir": "/path/to/project",    // optional
-  "agent_name": "researcher",           // optional
-  "parent_session_id": "ses_parent123", // optional
-  "execution_mode": "sync"              // optional, default: sync
-}
-```
-
-**Response:**
-```json
-{
-  "ok": true,
-  "session": Session
-}
-```
-
-**Error (Session Exists):**
-```json
-{
-  "detail": "Session already exists"
-}
-```
-**Status Code:** `409 Conflict`
-
-**Notes:**
-- `session_id` is coordinator-generated (format: `ses_{12-char-hex}`)
-- `execution_mode` controls parent-child session interaction: `sync`, `async_poll`, `async_callback`
 
 #### GET /sessions/{session_id}
 
@@ -389,7 +354,7 @@ See [Event model](DATA_MODELS.md#event)
 ```
 
 **Notes:**
-- Session must exist (created via POST /sessions first)
+- Session must exist (created via POST /runs with `type: "start_session"`)
 - If event_type is `session_stop`, session status is updated to `finished`
 
 #### POST /events
@@ -409,7 +374,7 @@ See [Event model](DATA_MODELS.md#event)
 **Notes:**
 - Creates session if `session_start` event
 - Updates status to `finished` if `session_stop` event
-- Prefer POST /sessions + POST /sessions/{id}/events for new integrations
+- Prefer POST /runs (with `type: "start_session"`) + POST /sessions/{id}/events for new integrations
 
 ---
 

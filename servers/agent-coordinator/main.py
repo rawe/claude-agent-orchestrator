@@ -298,44 +298,6 @@ async def list_sessions():
     return {"sessions": get_sessions()}
 
 
-@app.post("/sessions", tags=["Sessions"], status_code=201)
-async def create_session_endpoint(session: SessionCreate):
-    """Create a new session with full metadata.
-
-    The `session_id` is coordinator-generated and must be provided.
-    This is typically called by the runner after receiving a run.
-    """
-    timestamp = datetime.now(timezone.utc).isoformat()
-
-    # Determine parent_session_id: prefer run's value over request's value
-    parent_session_id = session.parent_session_id
-
-    # Check if there's a running/claimed run for this session_id
-    run = run_queue.get_run_by_session_id(session.session_id)
-    if run and run.parent_session_id:
-        parent_session_id = run.parent_session_id
-        if DEBUG:
-            print(f"[DEBUG] Session {session.session_id} inheriting parent {parent_session_id} from run {run.run_id}", flush=True)
-
-    try:
-        new_session = create_session(
-            session_id=session.session_id,
-            timestamp=timestamp,
-            project_dir=session.project_dir,
-            agent_name=session.agent_name,
-            parent_session_id=parent_session_id,
-        )
-    except Exception as e:
-        if "UNIQUE constraint failed" in str(e):
-            raise HTTPException(status_code=409, detail="Session already exists")
-        raise
-
-    # Broadcast to SSE clients
-    await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=session.session_id)
-
-    return {"ok": True, "session": new_session}
-
-
 @app.post("/sessions/{session_id}/bind", tags=["Sessions"])
 async def bind_session_endpoint(session_id: str, binding: SessionBind):
     """Bind executor information to a session after framework starts.

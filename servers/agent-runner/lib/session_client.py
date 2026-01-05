@@ -64,29 +64,6 @@ class SessionClient:
         except httpx.RequestError as e:
             raise SessionClientError(f"Request failed: {e}")
 
-    def create_session(
-        self,
-        session_id: str,
-        project_dir: Optional[str] = None,
-        agent_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Create new session with full metadata.
-
-        session_id is coordinator-generated (ADR-010).
-        parent_session_id is set by Agent Coordinator from the Run.
-        """
-        data = {
-            "session_id": session_id,
-        }
-        if project_dir is not None:
-            data["project_dir"] = project_dir
-        if agent_name is not None:
-            data["agent_name"] = agent_name
-
-        result = self._request("POST", "/sessions", json_data=data)
-        return result.get("session", result)
-
     def bind(
         self,
         session_id: str,
