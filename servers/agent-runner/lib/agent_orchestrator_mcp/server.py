@@ -120,20 +120,20 @@ class MCPServer:
             description="""Start a new agent session.
 
 Args:
-    agent_name: Name of the agent blueprint to use
     prompt: Initial prompt for the session
+    agent_name: Agent blueprint name (optional)
     project_dir: Optional project directory path
     mode: Execution mode - "sync" (wait for result), "async_poll" (return immediately, poll status), or "async_callback" (return immediately, receive callback)
 
 Returns:
     For sync: {"session_id": "...", "result": "..."}
-    For async: {"session_id": "...", "run_id": "...", "status": "pending"}
+    For async: {"session_id": "...", "status": "pending"}
 """
         )
         async def start_agent_session(
-            agent_name: str,
             prompt: str,
             ctx: Context,
+            agent_name: Optional[str] = None,
             project_dir: Optional[str] = None,
             mode: str = "sync",
         ) -> dict:
@@ -160,7 +160,7 @@ Args:
 
 Returns:
     For sync: {"session_id": "...", "result": "..."}
-    For async: {"session_id": "...", "run_id": "...", "status": "pending"}
+    For async: {"session_id": "...", "status": "pending"}
 """
         )
         async def resume_agent_session(

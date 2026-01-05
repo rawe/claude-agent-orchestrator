@@ -112,26 +112,25 @@ class AgentOrchestratorTools:
     async def start_agent_session(
         self,
         ctx: RequestContext,
-        agent_name: str,
         prompt: str,
+        agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
         mode: str = "sync",
     ) -> dict:
         """Start a new agent session.
 
-        Creates a new session with the specified agent blueprint and prompt.
-        The session is executed by an available runner.
+        Creates a new session and executes it via an available runner.
 
         Args:
             ctx: Request context with parent session ID for callbacks
-            agent_name: Name of the agent blueprint to use
             prompt: Initial prompt for the session
+            agent_name: Agent blueprint name (optional)
             project_dir: Optional project directory path
             mode: Execution mode - "sync", "async_poll", or "async_callback"
 
         Returns:
             For sync mode: {"session_id": "...", "result": "..."}
-            For async modes: {"session_id": "...", "run_id": "...", "status": "pending"}
+            For async modes: {"session_id": "...", "status": "pending"}
 
         Raises:
             ToolError: If session creation or execution fails
@@ -205,7 +204,6 @@ class AgentOrchestratorTools:
                 # Async mode - return immediately
                 return {
                     "session_id": session_id,
-                    "run_id": run_id,
                     "status": "pending",
                 }
 
@@ -231,7 +229,7 @@ class AgentOrchestratorTools:
 
         Returns:
             For sync mode: {"session_id": "...", "result": "..."}
-            For async modes: {"session_id": "...", "run_id": "...", "status": "pending"}
+            For async modes: {"session_id": "...", "status": "pending"}
 
         Raises:
             ToolError: If session doesn't exist or resume fails
@@ -304,7 +302,6 @@ class AgentOrchestratorTools:
                 # Async mode - return immediately
                 return {
                     "session_id": session_id,
-                    "run_id": run_id,
                     "status": "pending",
                 }
 
