@@ -5,6 +5,8 @@ node_modules
 dist
 dist-node
 *.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 
 # Local env files
 .env

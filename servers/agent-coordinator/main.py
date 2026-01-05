@@ -11,7 +11,7 @@ import asyncio
 import uuid as uuid_module
 
 from database import (
-    init_db, insert_session, insert_event, get_sessions, get_events,
+    init_db, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
@@ -247,47 +247,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/events", tags=["Events (Legacy)"], response_model=OkResponse)
-async def receive_event(event: Event):
-    """Receive events from hook scripts and broadcast to SSE clients.
-
-    Events are posted using session_id (coordinator-generated).
-
-    **DEPRECATION NOTE**: This endpoint will be removed once all clients migrate to
-    `POST /sessions/{session_id}/events` for event posting.
-    """
-
-    # Debug: Log incoming event
-    if DEBUG:
-        print(f"[DEBUG] Received event: type={event.event_type}, session_id={event.session_id}", flush=True)
-        print(f"[DEBUG] Event data: {event.model_dump()}", flush=True)
-
-    try:
-        # Update database
-        if event.event_type == SessionEventType.SESSION_START.value:
-            insert_session(event.session_id, event.timestamp)
-            if DEBUG:
-                print(f"[DEBUG] Inserted session: {event.session_id}", flush=True)
-        elif event.event_type == SessionEventType.SESSION_STOP.value:
-            # Update session status to finished
-            update_session_status(event.session_id, "finished")
-            if DEBUG:
-                print(f"[DEBUG] Updated session status to finished: {event.session_id}", flush=True)
-
-        insert_event(event)
-        if DEBUG:
-            print(f"[DEBUG] Inserted event successfully", flush=True)
-
-        # Broadcast to SSE clients
-        event_data = {"data": event.model_dump()}
-        await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=event.session_id)
-
-        return {"ok": True}
-
-    except Exception as e:
-        print(f"[ERROR] Failed to process event: {e}", flush=True)
-        print(f"[ERROR] Event that failed: {event.model_dump()}", flush=True)
-        raise
 
 @app.get("/sessions", tags=["Sessions"], response_model=SessionListResponse)
 async def list_sessions():
@@ -584,14 +543,6 @@ async def add_session_event(session_id: str, event: Event):
 
     return {"ok": True}
 
-
-@app.get("/events/{session_id}", tags=["Events (Legacy)"], response_model=EventListResponse)
-async def list_events(session_id: str):
-    """Get events for a specific session.
-
-    **DEPRECATION NOTE**: Prefer `GET /sessions/{session_id}/events`.
-    """
-    return {"events": get_events(session_id)}
 
 @app.patch("/sessions/{session_id}/metadata", tags=["Sessions"])
 async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):

@@ -17,11 +17,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/sessions/, '/sessions'),
       },
-      '/api/events': {
-        target: 'http://localhost:8765',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/events/, '/events'),
-      },
       '/api/documents': {
         target: 'http://localhost:8766',
         changeOrigin: true,

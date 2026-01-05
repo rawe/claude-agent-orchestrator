@@ -22,7 +22,7 @@ export const sessionService = {
    * Get events for a specific session
    */
   async getSessionEvents(sessionId: string): Promise<SessionEvent[]> {
-    const response = await agentOrchestratorApi.get<{ events: SessionEvent[] }>(`/events/${sessionId}`);
+    const response = await agentOrchestratorApi.get<{ events: SessionEvent[] }>(`/sessions/${sessionId}/events`);
     return response.data.events;
   },
 

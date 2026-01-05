@@ -335,10 +335,6 @@ Get events for a specific session.
 
 Events are returned in ascending timestamp order (oldest first).
 
-#### GET /events/{session_id}
-
-Legacy endpoint. Same as GET /sessions/{session_id}/events.
-
 #### POST /sessions/{session_id}/events
 
 Add an event to a session.
@@ -356,25 +352,6 @@ See [Event model](DATA_MODELS.md#event)
 **Notes:**
 - Session must exist (created via POST /runs with `type: "start_session"`)
 - If event_type is `session_stop`, session status is updated to `finished`
-
-#### POST /events
-
-Legacy endpoint for sending events.
-
-**Request Body:**
-See [Event model](DATA_MODELS.md#event)
-
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
-**Notes:**
-- Creates session if `session_start` event
-- Updates status to `finished` if `session_stop` event
-- Prefer POST /runs (with `type: "start_session"`) + POST /sessions/{id}/events for new integrations
 
 ---
 
