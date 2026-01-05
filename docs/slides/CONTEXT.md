@@ -75,12 +75,6 @@ Navigation is **decoupled** from individual slide files. All navigation is defin
 - Deep dive links use `data-deep-dive="id"` attributes, filled in by JS
 - `index.html` auto-generates all sections from `slides.json`
 
-### Serve Locally
-```bash
-cd docs/slides && python -m http.server 8000
-```
-Then open http://localhost:8000/index.html
-
 ## Design System (from template.html)
 
 ### Colors - Always Use These Variables
@@ -171,7 +165,7 @@ Every slide follows this HTML structure:
 
 ### Edit Slide Content
 
-1. Open the specific slide file (e.g., `05-dashboard.html`)
+1. Open the specific slide file (e.g., `07-dashboard.html`)
 2. Find `<main class="slide-content">` - this contains the visual content
 3. Keep the header and nav sections unchanged
 4. Use existing CSS classes for consistency
@@ -244,11 +238,11 @@ Deep dives are detail slides accessible via click but **not** in the arrow-key n
 ## Visual Patterns Reference
 
 For complex diagrams, look at these files as examples:
-- **SVG architecture diagram:** `07-architecture.html`
-- **Sequence diagram:** `09-chat-flow.html`
+- **SVG architecture diagram:** `08-architecture.html`
+- **Sequence diagram:** `10-chat-flow.html`
 - **Timeline diagrams:** `12-mode-sync.html` through `15-mode-callback.html`
 - **Comparison grid:** `16-modes-comparison.html`
-- **Card layouts:** `02-solution.html`, `17-blueprints.html`
+- **Card layouts:** `03-solution.html`, `17-blueprints.html`
 
 ## Key CSS Patterns
 
@@ -283,3 +277,13 @@ box-shadow: 0 0 30px rgba(59, 130, 246, 0.3); /* Use component color */
 ---
 
 **To get started:** Read `template.html` for the complete design system, then open the specific slide you want to edit.
+
+## Serve Locally
+
+A local HTTP server is required because navigation uses `fetch()` to load `slides.json`.
+
+```bash
+cd docs/slides && python -m http.server 8000
+```
+
+Then open http://localhost:8000/index.html
