@@ -8,4 +8,5 @@ Once implemented, features are documented in [features/](../features/README.md).
 
 | Document | Description |
 |----------|-------------|
+| [Structured Output Schema Enforcement](./structured-output-schema-enforcement.md) | Enforcing JSON Schema compliance on agent outputs |
 | [Deterministic Task Execution](./deterministic-task-execution.md) | Running deterministic tasks alongside AI agents |
