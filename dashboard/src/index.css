@@ -132,6 +132,75 @@ body {
   @apply bg-gray-100 font-semibold;
 }
 
+/* Markdown content styling for user messages (dark background) */
+.markdown-content-user {
+  @apply text-sm text-white;
+}
+
+.markdown-content-user h1 {
+  @apply text-xl font-bold mt-4 mb-2 text-white;
+}
+
+.markdown-content-user h2 {
+  @apply text-lg font-semibold mt-3 mb-2 text-white;
+}
+
+.markdown-content-user h3 {
+  @apply text-base font-semibold mt-2 mb-1 text-white;
+}
+
+.markdown-content-user p {
+  @apply my-2;
+}
+
+.markdown-content-user ul, .markdown-content-user ol {
+  @apply my-2 ml-4;
+}
+
+.markdown-content-user li {
+  @apply my-1;
+}
+
+.markdown-content-user code {
+  @apply bg-primary-700 px-1 py-0.5 rounded text-sm font-mono text-primary-200;
+}
+
+.markdown-content-user pre {
+  @apply bg-primary-700 text-white p-3 rounded-md overflow-x-auto my-2;
+}
+
+.markdown-content-user pre code {
+  @apply bg-transparent p-0 text-white;
+}
+
+.markdown-content-user blockquote {
+  @apply border-l-4 border-primary-400 pl-4 italic text-primary-200 my-2;
+}
+
+.markdown-content-user a {
+  @apply text-primary-200 hover:underline;
+}
+
+.markdown-content-user table {
+  @apply border-collapse border border-primary-400 my-2;
+}
+
+.markdown-content-user th, .markdown-content-user td {
+  @apply border border-primary-400 px-3 py-1;
+}
+
+.markdown-content-user th {
+  @apply bg-primary-700 font-semibold text-white;
+}
+
+.markdown-content-user strong {
+  @apply text-white font-semibold;
+}
+
+.markdown-content-user em {
+  @apply text-white italic;
+}
+
 /* JSON syntax highlighting */
 .json-key {
   @apply text-purple-600;
