@@ -14,7 +14,8 @@ from database import (
     init_db, insert_session, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
-    update_session_parent, bind_session_executor, get_session_affinity
+    update_session_parent, bind_session_executor, get_session_affinity,
+    SessionAlreadyExistsError
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -1395,7 +1396,8 @@ async def deregister_runner(
 async def create_run(run_create: RunCreate):
     """Create a new run for the runner to execute.
 
-    If `session_id` is not provided, coordinator generates one (ADR-010).
+    If `session_id` is not provided for `start_session`, coordinator generates one (ADR-010).
+    For `resume_session`, `session_id` is required.
     Returns both `run_id` and `session_id` in the response.
 
     For `start_session` runs, a new session is created with status 'pending'.
@@ -1404,6 +1406,10 @@ async def create_run(run_create: RunCreate):
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
     """
+    # Validate: resume_session requires session_id
+    if run_create.type == RunType.RESUME_SESSION and not run_create.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required for resume_session")
+
     # For start runs, create session FIRST (runs table has FK to sessions)
     if run_create.type == RunType.START_SESSION:
         # Generate session_id if not provided
@@ -1424,9 +1430,9 @@ async def create_run(run_create: RunCreate):
             )
             if DEBUG:
                 print(f"[DEBUG] Created pending session {session_id} (mode={run_create.execution_mode.value})", flush=True)
-        except Exception as e:
-            if "UNIQUE constraint failed" in str(e):
-                raise HTTPException(status_code=409, detail=f"Session '{session_id}' already exists")
+        except SessionAlreadyExistsError as e:
+            raise HTTPException(status_code=409, detail=f"Session '{e.session_id}' already exists")
+        except Exception:
             raise
 
     # Create the run (session must exist for FK constraint)

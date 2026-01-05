@@ -4,6 +4,13 @@ import json
 
 DB_PATH = Path(".agent-orchestrator/observability.db")
 
+
+class SessionAlreadyExistsError(Exception):
+    """Raised when attempting to create a session that already exists."""
+    def __init__(self, session_id: str):
+        self.session_id = session_id
+        super().__init__(f"Session '{session_id}' already exists")
+
 def init_db():
     """Initialize database with schema"""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -313,7 +320,14 @@ def create_session(
     Session is created with status='pending' by default (before executor binds).
     Status changes to 'running' when executor binds.
     execution_mode controls callback behavior per ADR-003.
+
+    Raises:
+        SessionAlreadyExistsError: If session_id already exists.
     """
+    # Check if session already exists before attempting insert
+    if get_session_by_id(session_id) is not None:
+        raise SessionAlreadyExistsError(session_id)
+
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("""
