@@ -14,8 +14,8 @@ from database import (
     init_db, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
-    update_session_parent, update_session_execution_mode, bind_session_executor,
-    get_session_affinity, SessionAlreadyExistsError
+    update_session_parent, bind_session_executor, get_session_affinity,
+    get_run_by_session_id, SessionAlreadyExistsError
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -509,28 +509,30 @@ async def add_session_event(session_id: str, event: Event):
         await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
 
         # Callback processing: handle child completion and pending notifications
-        # Check execution_mode to determine if callback should be triggered (ADR-003)
-        # parent_session_id is always set for hierarchy tracking, but callbacks only
-        # trigger when execution_mode == ASYNC_CALLBACK
-        parent_session_id = updated_session.get("parent_session_id")
-        execution_mode = updated_session.get("execution_mode", "sync")
+        # Look up the run that was executing - execution_mode is stored on runs, not sessions
+        # This ensures callbacks work correctly even when resuming with different modes
+        current_run = get_run_by_session_id(session_id, active_only=False)
 
-        if parent_session_id and execution_mode == ExecutionMode.ASYNC_CALLBACK.value:
-            # This is a child session with callback mode - notify parent
-            parent_session = get_session_by_id(parent_session_id)
-            parent_status = parent_session["status"] if parent_session else "not_found"
+        if current_run:
+            parent_session_id = current_run.get("parent_session_id")
+            execution_mode = current_run.get("execution_mode", "sync")
 
-            # Get the child's result
-            child_result = get_session_result(session_id)
+            if parent_session_id and execution_mode == ExecutionMode.ASYNC_CALLBACK.value:
+                # This is a child session with callback mode - notify parent
+                parent_session = get_session_by_id(parent_session_id)
+                parent_status = parent_session["status"] if parent_session else "not_found"
 
-            if DEBUG:
-                print(f"[DEBUG] Child '{session_id}' completed (mode=async_callback), parent '{parent_session_id}' status={parent_status}", flush=True)
+                # Get the child's result
+                child_result = get_session_result(session_id)
 
-            callback_processor.on_child_completed(
-                child_session_id=session_id,
-                parent_session=parent_session,
-                child_result=child_result,
-            )
+                if DEBUG:
+                    print(f"[DEBUG] Child '{session_id}' completed (mode=async_callback), parent '{parent_session_id}' status={parent_status}", flush=True)
+
+                callback_processor.on_child_completed(
+                    child_session_id=session_id,
+                    parent_session=parent_session,
+                    child_result=child_result,
+                )
 
         # Check if this session has pending child callbacks to flush
         flushed = callback_processor.on_session_stopped(session_id)
@@ -1082,24 +1084,13 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
     # Update run status to running
     run = run_queue.update_run_status(run_id, RunStatus.RUNNING)
 
-    # Link run's parent_session_id and execution_mode to session (for resume case)
-    # CRITICAL: execution_mode MUST be updated on resume, otherwise callbacks won't trigger!
-    # The callback check at session_stop uses the SESSION's execution_mode, not the RUN's.
-    # If a session was created with sync/async_poll but resumed with async_callback,
-    # the callback will only work if we update the session's execution_mode here.
+    # Link run's parent_session_id to session (for resume case - hierarchy tracking)
+    # Note: execution_mode is NOT synced to session - callback logic uses run's execution_mode
     session = get_session_by_id(run.session_id)
-    if session:
-        # Session exists (resume case) - update parent and execution_mode
-        if run.parent_session_id:
-            update_session_parent(run.session_id, run.parent_session_id)
-            if DEBUG:
-                print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
-
-        # Always update execution_mode on resume to ensure callbacks work correctly
-        update_session_execution_mode(run.session_id, run.execution_mode.value)
+    if session and run.parent_session_id:
+        update_session_parent(run.session_id, run.parent_session_id)
         if DEBUG:
-            print(f"[DEBUG] Updated session {run.session_id} execution_mode to {run.execution_mode.value}", flush=True)
-    # If session doesn't exist yet (start case), POST /sessions will pick up parent/mode from run
+            print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
 
     if DEBUG:
         print(f"[DEBUG] Run {run_id} started by runner {request.runner_id}", flush=True)
@@ -1348,10 +1339,9 @@ async def create_run(run_create: RunCreate):
                 project_dir=run_create.project_dir,
                 agent_name=run_create.agent_name,
                 parent_session_id=run_create.parent_session_id,
-                execution_mode=run_create.execution_mode.value,
             )
             if DEBUG:
-                print(f"[DEBUG] Created pending session {session_id} (mode={run_create.execution_mode.value})", flush=True)
+                print(f"[DEBUG] Created pending session {session_id}", flush=True)
         except SessionAlreadyExistsError as e:
             raise HTTPException(status_code=409, detail=f"Session '{e.session_id}' already exists")
         except Exception:

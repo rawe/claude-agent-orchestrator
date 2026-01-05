@@ -21,9 +21,8 @@ CREATE TABLE sessions (
     agent_name TEXT,
     last_resumed_at TEXT,
     parent_session_id TEXT REFERENCES sessions(session_id) ON DELETE SET NULL,
-    execution_mode TEXT DEFAULT 'sync',
     executor_session_id TEXT,
-    executor_type TEXT,
+    executor_profile TEXT,
     hostname TEXT
 );
 ```
@@ -39,10 +38,11 @@ CREATE TABLE sessions (
 | `agent_name` | TEXT | YES | Name of the agent blueprint used for this session |
 | `last_resumed_at` | TEXT | YES | ISO 8601 timestamp when session was last resumed |
 | `parent_session_id` | TEXT | YES | ID of the parent session (foreign key, for hierarchy tracking) |
-| `execution_mode` | TEXT | NO | How parent-child sessions interact: `sync`, `async_poll`, `async_callback` |
 | `executor_session_id` | TEXT | YES | Framework's session ID (e.g., Claude SDK UUID) |
-| `executor_type` | TEXT | YES | Type of executor running this session (e.g., `claude-code`) |
+| `executor_profile` | TEXT | YES | Profile used by executor (e.g., `coding`) |
 | `hostname` | TEXT | YES | Machine hostname where session is running |
+
+**Note:** `execution_mode` is stored in the **runs** table, not sessions. Each run can have a different execution mode, allowing execution behavior to vary per-run.
 
 **Indexes:**
 - Primary key index on `session_id`

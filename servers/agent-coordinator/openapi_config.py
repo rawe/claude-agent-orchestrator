@@ -148,7 +148,6 @@ class SessionResponse(BaseModel):
     project_dir: Optional[str] = Field(None, description="Project directory path")
     agent_name: Optional[str] = Field(None, description="Agent blueprint name")
     parent_session_id: Optional[str] = Field(None, description="Parent session ID for hierarchical orchestration")
-    execution_mode: str = Field(default="sync", description="Execution mode (sync, async_poll, async_callback)")
     executor_session_id: Optional[str] = Field(None, description="Framework's session ID after binding")
     executor_profile: Optional[str] = Field(None, description="Executor profile name")
     hostname: Optional[str] = Field(None, description="Host where session is running")

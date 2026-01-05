@@ -48,9 +48,8 @@ Common data structures used by the Agent Coordinator.
   "agent_name": "string (optional)",
   "last_resumed_at": "ISO 8601 string (optional)",
   "parent_session_id": "string (optional)",
-  "execution_mode": "sync | async_poll | async_callback",
   "executor_session_id": "string (optional)",
-  "executor_type": "string (optional)",
+  "executor_profile": "string (optional)",
   "hostname": "string (optional)"
 }
 ```
@@ -63,10 +62,11 @@ Common data structures used by the Agent Coordinator.
 - `agent_name` - Optional name of the agent blueprint that created this session
 - `last_resumed_at` - Optional timestamp when session was last resumed
 - `parent_session_id` - Optional ID of the parent session (for hierarchy tracking)
-- `execution_mode` - How parent-child sessions interact (default: `sync`)
 - `executor_session_id` - Framework's session ID (e.g., Claude SDK UUID)
-- `executor_type` - Type of executor running this session (e.g., `claude-code`)
+- `executor_profile` - Profile used by executor (e.g., `coding`)
 - `hostname` - Machine hostname where session is running
+
+**Note:** `execution_mode` is stored on **Runs**, not Sessions. Each run can have a different execution mode, and execution behavior is determined by the run's execution_mode. See the Run model below.
 
 **Session Status Values:**
 - `pending` - Session created but execution not yet started
@@ -74,11 +74,6 @@ Common data structures used by the Agent Coordinator.
 - `stopping` - Stop requested, waiting for termination
 - `stopped` - Session was terminated by stop command
 - `finished` - Session completed normally
-
-**Execution Modes:**
-- `sync` - Parent waits for child completion, receives result directly
-- `async_poll` - Parent continues immediately, polls for child status/result
-- `async_callback` - Parent continues immediately, coordinator auto-resumes parent when child completes
 
 ## Run
 
@@ -117,7 +112,7 @@ Common data structures used by the Agent Coordinator.
 - `prompt` - User prompt/instruction for the agent
 - `project_dir` - Optional project directory path
 - `parent_session_id` - Optional parent session ID (for hierarchy tracking)
-- `execution_mode` - How parent-child sessions interact (default: `sync`)
+- `execution_mode` - Execution mode for callback behavior (default: `sync`). See Execution Modes below.
 - `demands` - Runner demands for capability matching (see below)
 - `status` - Current run status
 - `runner_id` - ID of the runner that claimed/executed the run
@@ -136,6 +131,11 @@ Common data structures used by the Agent Coordinator.
 - `completed` - Run completed successfully
 - `failed` - Run execution failed (or no matching runner within timeout)
 - `stopped` - Run was stopped (terminated by stop command)
+
+**Execution Modes:**
+- `sync` - Parent waits for child completion, receives result directly
+- `async_poll` - Parent continues immediately, polls for child status/result
+- `async_callback` - Parent continues immediately, coordinator auto-resumes parent when child completes
 
 ## Runner Demands
 

@@ -22,7 +22,6 @@ def init_db():
     # Sessions table - Phase 3 (ADR-010) schema
     # session_id is coordinator-generated at run creation
     # executor_session_id stores the framework's ID (e.g., Claude SDK UUID)
-    # execution_mode controls callback behavior per ADR-003
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
@@ -32,7 +31,6 @@ def init_db():
             agent_name TEXT,
             last_resumed_at TEXT,
             parent_session_id TEXT REFERENCES sessions(session_id) ON DELETE SET NULL,
-            execution_mode TEXT DEFAULT 'sync',
             executor_session_id TEXT,
             executor_profile TEXT,
             hostname TEXT
@@ -313,13 +311,14 @@ def create_session(
     project_dir: str = None,
     agent_name: str = None,
     parent_session_id: str = None,
-    execution_mode: str = "sync"
 ) -> dict:
     """Create a new session with full metadata at creation time.
 
     Session is created with status='pending' by default (before executor binds).
     Status changes to 'running' when executor binds.
-    execution_mode controls callback behavior per ADR-003.
+
+    Note: execution_mode is stored on runs, not sessions. Callback behavior
+    is determined by the run's execution_mode (ADR-003).
 
     Raises:
         SessionAlreadyExistsError: If session_id already exists.
@@ -331,9 +330,9 @@ def create_session(
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("""
-        INSERT INTO sessions (session_id, status, created_at, project_dir, agent_name, parent_session_id, execution_mode)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (session_id, status, timestamp, project_dir, agent_name, parent_session_id, execution_mode))
+        INSERT INTO sessions (session_id, status, created_at, project_dir, agent_name, parent_session_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (session_id, status, timestamp, project_dir, agent_name, parent_session_id))
     conn.commit()
     conn.close()
     return get_session_by_id(session_id)
@@ -453,29 +452,6 @@ def update_session_parent(session_id: str, parent_session_id: str) -> None:
     conn.execute(
         "UPDATE sessions SET parent_session_id = ? WHERE session_id = ?",
         (parent_session_id, session_id)
-    )
-    conn.commit()
-    conn.close()
-
-
-def update_session_execution_mode(session_id: str, execution_mode: str) -> None:
-    """Update the execution_mode of a session.
-
-    CRITICAL: This must be called when resuming a session with a different execution_mode.
-    The execution_mode determines callback behavior (ADR-003):
-    - sync: Parent waits for child
-    - async_poll: Parent polls for status
-    - async_callback: Coordinator auto-resumes parent when child completes
-
-    If execution_mode is not updated on resume, callbacks will NOT be triggered
-    because the callback check uses the SESSION's execution_mode, not the RUN's.
-    See: callback_processor.py and main.py session_stop event handler.
-    """
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "UPDATE sessions SET execution_mode = ? WHERE session_id = ?",
-        (execution_mode, session_id)
     )
     conn.commit()
     conn.close()

@@ -2,7 +2,7 @@
 
 Verify that an orchestrator agent can spawn a child agent in synchronous mode (`mode=sync`).
 
-**Note**: As of ADR-003, `parent_session_id` is always set for child sessions regardless of execution mode. The `execution_mode` field controls callback behavior, not the parent-child relationship.
+**Note**: As of ADR-003, `parent_session_id` is always set for child sessions regardless of execution mode. The run's `execution_mode` field controls callback behavior, not the parent-child relationship (execution_mode is stored on runs, not sessions).
 
 ## Prerequisites
 

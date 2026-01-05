@@ -273,13 +273,13 @@ class SessionCreate(BaseModel):
 
     session_id is coordinator-generated at run creation.
     No session_name - that concept is removed per ADR-010.
-    execution_mode controls callback behavior per ADR-003.
+
+    Note: execution_mode is stored on runs, not sessions.
     """
     session_id: str
     project_dir: Optional[str] = None
     agent_name: Optional[str] = None
     parent_session_id: Optional[str] = None
-    execution_mode: ExecutionMode = ExecutionMode.SYNC
 
 
 class SessionBind(BaseModel):
