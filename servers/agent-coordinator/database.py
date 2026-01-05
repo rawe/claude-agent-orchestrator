@@ -458,6 +458,29 @@ def update_session_parent(session_id: str, parent_session_id: str) -> None:
     conn.close()
 
 
+def update_session_execution_mode(session_id: str, execution_mode: str) -> None:
+    """Update the execution_mode of a session.
+
+    CRITICAL: This must be called when resuming a session with a different execution_mode.
+    The execution_mode determines callback behavior (ADR-003):
+    - sync: Parent waits for child
+    - async_poll: Parent polls for status
+    - async_callback: Coordinator auto-resumes parent when child completes
+
+    If execution_mode is not updated on resume, callbacks will NOT be triggered
+    because the callback check uses the SESSION's execution_mode, not the RUN's.
+    See: callback_processor.py and main.py session_stop event handler.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(
+        "UPDATE sessions SET execution_mode = ? WHERE session_id = ?",
+        (execution_mode, session_id)
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_session_affinity(session_id: str) -> dict | None:
     """Get session affinity information for resume routing.
 

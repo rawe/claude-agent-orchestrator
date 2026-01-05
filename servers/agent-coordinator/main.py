@@ -14,8 +14,8 @@ from database import (
     init_db, insert_event, get_sessions, get_events,
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
-    update_session_parent, bind_session_executor, get_session_affinity,
-    SessionAlreadyExistsError
+    update_session_parent, update_session_execution_mode, bind_session_executor,
+    get_session_affinity, SessionAlreadyExistsError
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -1082,15 +1082,24 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
     # Update run status to running
     run = run_queue.update_run_status(run_id, RunStatus.RUNNING)
 
-    # Link run's parent_session_id to session (for resume case where session already exists)
-    if run.parent_session_id:
-        session = get_session_by_id(run.session_id)
-        if session:
-            # Session exists (resume case) - update parent
+    # Link run's parent_session_id and execution_mode to session (for resume case)
+    # CRITICAL: execution_mode MUST be updated on resume, otherwise callbacks won't trigger!
+    # The callback check at session_stop uses the SESSION's execution_mode, not the RUN's.
+    # If a session was created with sync/async_poll but resumed with async_callback,
+    # the callback will only work if we update the session's execution_mode here.
+    session = get_session_by_id(run.session_id)
+    if session:
+        # Session exists (resume case) - update parent and execution_mode
+        if run.parent_session_id:
             update_session_parent(run.session_id, run.parent_session_id)
             if DEBUG:
                 print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
-        # If session doesn't exist yet (start case), POST /sessions will pick up parent from run
+
+        # Always update execution_mode on resume to ensure callbacks work correctly
+        update_session_execution_mode(run.session_id, run.execution_mode.value)
+        if DEBUG:
+            print(f"[DEBUG] Updated session {run.session_id} execution_mode to {run.execution_mode.value}", flush=True)
+    # If session doesn't exist yet (start case), POST /sessions will pick up parent/mode from run
 
     if DEBUG:
         print(f"[DEBUG] Run {run_id} started by runner {request.runner_id}", flush=True)
