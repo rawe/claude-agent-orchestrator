@@ -439,23 +439,32 @@ export function AgentEditor({
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {availableCapabilities.map((cap) => (
-                    <button
-                      key={cap.name}
-                      type="button"
-                      onClick={() => toggleCapability(cap.name)}
-                      title={cap.description}
-                      className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                        watchedCapabilities?.includes(cap.name)
-                          ? 'bg-purple-50 border-purple-300 text-purple-700'
-                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {cap.name}
-                      {cap.has_mcp && <span className="ml-1 text-xs opacity-60">⚙</span>}
-                      {cap.has_text && <span className="ml-0.5 text-xs opacity-60">📝</span>}
-                    </button>
-                  ))}
+                  {availableCapabilities.map((cap) => {
+                    const isSelected = watchedCapabilities?.includes(cap.name);
+                    // Build tooltip with capability details
+                    const tooltipParts = [cap.description];
+                    if (cap.has_mcp || cap.has_text) {
+                      const includes = [];
+                      if (cap.has_mcp) includes.push('MCP servers');
+                      if (cap.has_text) includes.push('system prompt');
+                      tooltipParts.push(`Includes: ${includes.join(', ')}`);
+                    }
+                    return (
+                      <button
+                        key={cap.name}
+                        type="button"
+                        onClick={() => toggleCapability(cap.name)}
+                        title={tooltipParts.join('\n')}
+                        className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                          isSelected
+                            ? 'bg-purple-50 border-purple-300 text-purple-700'
+                            : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {cap.name}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
               {hasCapabilities && (
