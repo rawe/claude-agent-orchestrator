@@ -42,8 +42,10 @@ See `tests/README.md`.
 
 **Agent Coordinator** (port 8765):
 ```bash
-cd servers/agent-coordinator && AUTH_ENABLED=false CORS_ORIGINS=* AGENT_ORCHESTRATOR_AGENTS_DIR=$(pwd)/../../config/agents uv run python -m main
+cd servers/agent-coordinator && AUTH_ENABLED=false DOCS_ENABLED=true CORS_ORIGINS=* AGENT_ORCHESTRATOR_AGENTS_DIR=$(pwd)/../../config/agents uv run python -m main
 ```
+
+- API docs available at: http://localhost:8765/docs (Swagger UI) or http://localhost:8765/redoc
 
 **Dashboard** (port 3000):
 ```bash

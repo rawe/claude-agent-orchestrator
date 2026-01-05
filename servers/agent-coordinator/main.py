@@ -23,6 +23,16 @@ from models import (
     ExecutionMode, StreamEventType, SessionEventType,
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary
 )
+from openapi_config import (
+    API_TITLE, API_DESCRIPTION, API_VERSION, API_CONTACT, API_LICENSE,
+    OPENAPI_TAGS, SECURITY_SCHEMES,
+    OkResponse, ErrorDetail, SessionResponse, SessionListResponse,
+    SessionCreateResponse, SessionAffinityResponse, SessionResultResponse,
+    SessionStatusResponse, SessionDeleteResponse, EventListResponse,
+    RunResponse, RunCreateResponse, RunListResponse,
+    RunnerRegisterResponse, RunnerInfoResponse, RunnerListResponse, RunnerPollResponse,
+    HealthResponse
+)
 import agent_storage
 from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError
 import capability_storage
@@ -58,6 +68,10 @@ RUN_NO_MATCH_TIMEOUT = int(os.getenv("RUN_NO_MATCH_TIMEOUT", "300"))  # 5 minute
 # - "stale": Recover runs older than 5 minutes (default)
 # - "all": Aggressively recover all non-terminal runs
 RUN_RECOVERY_MODE = os.getenv("RUN_RECOVERY_MODE", "stale")
+
+# OpenAPI documentation toggle
+# Set DOCS_ENABLED=true to enable /docs, /redoc, and /openapi.json (disabled by default for security)
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", "false").lower() in ("true", "1", "yes")
 
 # Initialize run_queue with recovery mode now that env vars are loaded
 run_queue = init_run_queue(recovery_mode=RUN_RECOVERY_MODE)
@@ -176,13 +190,49 @@ async def lifespan(app: FastAPI):
     sse_manager.clear_all()
 
 
+def custom_openapi():
+    """Custom OpenAPI schema with security schemes."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+    openapi_schema = get_openapi(
+        title=API_TITLE,
+        version=API_VERSION,
+        description=API_DESCRIPTION,
+        routes=app.routes,
+        tags=OPENAPI_TAGS,
+        contact=API_CONTACT,
+        license_info=API_LICENSE,
+    )
+
+    # Add security schemes
+    openapi_schema["components"]["securitySchemes"] = SECURITY_SCHEMES
+    # Apply security globally (can be overridden per-operation)
+    openapi_schema["security"] = [{"ApiKeyAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
 app = FastAPI(
-    title="Agent Coordinator",
-    description="Unified service for agent session management and agent blueprint registry",
-    version="0.4.0",  # Bumped for auth support
+    title=API_TITLE,
+    description=API_DESCRIPTION,
+    version=API_VERSION,
+    contact=API_CONTACT,
+    license_info=API_LICENSE,
+    openapi_tags=OPENAPI_TAGS,
     lifespan=lifespan,
     dependencies=[Depends(verify_api_key)],
+    # Disable docs endpoints when DOCS_ENABLED=false (for production)
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
+
+# Override OpenAPI schema to include security schemes (only if docs enabled)
+if DOCS_ENABLED:
+    app.openapi = custom_openapi
 
 # Enable CORS for frontend
 # CORS_ORIGINS must be set via environment variable
@@ -196,16 +246,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/events")
+@app.post("/events", tags=["Events (Legacy)"], response_model=OkResponse)
 async def receive_event(event: Event):
-    """Receive events from hook scripts and broadcast to WebSocket clients
+    """Receive events from hook scripts and broadcast to SSE clients.
 
     Events are posted using session_id (coordinator-generated).
-    
-    DEPRECATION NOTE: The session_start event handling below will be removed
-    once all clients migrate to POST /sessions for session creation.
-    The session_stop handling will also migrate to POST /sessions/{id}/events.
-    Keep backward compatibility during migration.
+
+    **DEPRECATION NOTE**: This endpoint will be removed once all clients migrate to
+    `POST /sessions/{session_id}/events` for event posting.
     """
 
     # Debug: Log incoming event
@@ -240,17 +288,21 @@ async def receive_event(event: Event):
         print(f"[ERROR] Event that failed: {event.model_dump()}", flush=True)
         raise
 
-@app.get("/sessions")
+@app.get("/sessions", tags=["Sessions"], response_model=SessionListResponse)
 async def list_sessions():
-    """Get all sessions"""
+    """Get all sessions.
+
+    Returns all sessions with their current status and metadata.
+    """
     return {"sessions": get_sessions()}
 
 
-@app.post("/sessions")
+@app.post("/sessions", tags=["Sessions"], status_code=201)
 async def create_session_endpoint(session: SessionCreate):
     """Create a new session with full metadata.
 
-    session_id is coordinator-generated and must be provided.
+    The `session_id` is coordinator-generated and must be provided.
+    This is typically called by the runner after receiving a run.
     """
     timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -283,13 +335,13 @@ async def create_session_endpoint(session: SessionCreate):
     return {"ok": True, "session": new_session}
 
 
-@app.post("/sessions/{session_id}/bind")
+@app.post("/sessions/{session_id}/bind", tags=["Sessions"])
 async def bind_session_endpoint(session_id: str, binding: SessionBind):
     """Bind executor information to a session after framework starts.
 
     Called by executor after it gets the framework's session ID.
-    Updates session status to 'running'.
-    See ADR-010 for details.
+    Updates session status to 'running' and stores affinity information
+    for resume routing. See ADR-010 for details.
     """
     result = bind_session_executor(
         session_id=session_id,
@@ -311,27 +363,33 @@ async def bind_session_endpoint(session_id: str, binding: SessionBind):
     return {"ok": True, "session": result}
 
 
-@app.get("/sessions/{session_id}")
+@app.get("/sessions/{session_id}", tags=["Sessions"])
 async def get_session_endpoint(session_id: str):
-    """Get single session details"""
+    """Get single session details."""
     session = get_session_by_id(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"session": session}
 
 
-@app.get("/sessions/{session_id}/status")
+@app.get("/sessions/{session_id}/status", tags=["Sessions"], response_model=SessionStatusResponse)
 async def get_session_status(session_id: str):
-    """Get session status: running, finished, or not_existent"""
+    """Get session status: running, finished, or not_existent.
+
+    Quick status check without full session details.
+    """
     session = get_session_by_id(session_id)
     if session is None:
         return {"status": "not_existent"}
     return {"status": session["status"]}
 
 
-@app.get("/sessions/{session_id}/result")
+@app.get("/sessions/{session_id}/result", tags=["Sessions"])
 async def get_session_result_endpoint(session_id: str):
-    """Get result text from last assistant message"""
+    """Get result text from last assistant message.
+
+    Only available for sessions with status 'finished'.
+    """
     session = get_session_by_id(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -346,12 +404,12 @@ async def get_session_result_endpoint(session_id: str):
     return {"result": result}
 
 
-@app.get("/sessions/{session_id}/affinity")
+@app.get("/sessions/{session_id}/affinity", tags=["Sessions"], response_model=SessionAffinityResponse)
 async def get_session_affinity_endpoint(session_id: str):
     """Get session affinity information for resume routing.
 
-    Returns hostname, project_dir, executor_type, executor_session_id
-    needed to route resume requests to the correct runner.
+    Returns hostname, project_dir, executor_profile needed to route
+    resume requests to the correct runner. See ADR-010 and ADR-011.
     """
     affinity = get_session_affinity(session_id)
     if affinity is None:
@@ -424,14 +482,14 @@ async def _stop_run(run: Run) -> dict:
     return result
 
 
-@app.post("/sessions/{session_id}/stop")
+@app.post("/sessions/{session_id}/stop", tags=["Sessions"])
 async def stop_session(session_id: str):
     """Stop a running session by signaling its runner.
 
     Finds the active run for this session and queues a stop command.
     The runner will receive the stop command on its next poll and terminate the process.
 
-    This endpoint is robust and handles various states:
+    This endpoint is idempotent and handles various states:
     - If session is 'stopping', returns success (already stopping)
     - If session is 'stopped' or 'finished', returns appropriate message
     - If no active run found but session exists, updates status accordingly
@@ -491,18 +549,22 @@ async def stop_session(session_id: str):
     return await _stop_run(run)
 
 
-@app.get("/sessions/{session_id}/events")
+@app.get("/sessions/{session_id}/events", tags=["Sessions"], response_model=EventListResponse)
 async def get_session_events(session_id: str):
-    """Get events for a specific session"""
+    """Get events for a specific session."""
     session = get_session_by_id(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"events": get_events(session_id)}
 
 
-@app.post("/sessions/{session_id}/events")
+@app.post("/sessions/{session_id}/events", tags=["Sessions"], response_model=OkResponse, status_code=201)
 async def add_session_event(session_id: str, event: Event):
-    """Add event to session (must exist)"""
+    """Add event to session.
+
+    Handles special event types like `session_stop` which updates session status to 'finished'
+    and triggers callback processing for async_callback mode sessions.
+    """
     session = get_session_by_id(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -560,14 +622,17 @@ async def add_session_event(session_id: str, event: Event):
     return {"ok": True}
 
 
-@app.get("/events/{session_id}")
+@app.get("/events/{session_id}", tags=["Events (Legacy)"], response_model=EventListResponse)
 async def list_events(session_id: str):
-    """Get events for a specific session"""
+    """Get events for a specific session.
+
+    **DEPRECATION NOTE**: Prefer `GET /sessions/{session_id}/events`.
+    """
     return {"events": get_events(session_id)}
 
-@app.patch("/sessions/{session_id}/metadata")
+@app.patch("/sessions/{session_id}/metadata", tags=["Sessions"])
 async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
-    """Update session metadata (project_dir, agent_name, executor fields)"""
+    """Update session metadata (project_dir, agent_name, executor fields)."""
 
     # Verify session exists
     session = get_session_by_id(session_id)
@@ -594,9 +659,9 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
     return {"ok": True, "session": updated_session}
 
 
-@app.delete("/sessions/{session_id}")
+@app.delete("/sessions/{session_id}", tags=["Sessions"])
 async def delete_session_endpoint(session_id: str):
-    """Delete a session and all its events and runs"""
+    """Delete a session and all its events and runs."""
 
     # Delete from database (cascade deletes runs and events)
     result = delete_session(session_id)
@@ -629,7 +694,7 @@ async def delete_session_endpoint(session_id: str):
 # SSE Endpoint (ADR-013)
 # ==============================================================================
 
-@app.get("/sse/sessions")
+@app.get("/sse/sessions", tags=["SSE"])
 async def sse_sessions(
     request: Request,
     session_id: Optional[str] = Query(None, description="Filter to single session"),
@@ -639,9 +704,17 @@ async def sse_sessions(
 ):
     """SSE endpoint for real-time session updates.
 
-    Provides the same events as WebSocket /ws but using Server-Sent Events.
-    Supports filtering by session_id and automatic reconnection via Last-Event-ID.
+    Returns a `text/event-stream` response with Server-Sent Events.
 
+    **Event Types:**
+    - `init`: Initial state with all matching sessions
+    - `session_created`: New session created
+    - `session_updated`: Session state changed
+    - `session_deleted`: Session removed
+    - `event`: Session event (tool call, message, etc.)
+    - `run_failed`: Run timeout or failure
+
+    **Reconnection:** Use the `Last-Event-ID` header to resume from last event.
     See ADR-013 for design rationale.
     """
     connection_id = str(uuid_module.uuid4())
@@ -711,13 +784,13 @@ async def sse_sessions(
 # Agent Registry Routes (merged from agent-registry service)
 # ==============================================================================
 
-@app.get("/health")
+@app.get("/health", tags=["Health"], response_model=HealthResponse)
 def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
 
 
-@app.get("/agents", response_model=list[Agent], response_model_exclude_none=True)
+@app.get("/agents", tags=["Agents"], response_model=list[Agent], response_model_exclude_none=True)
 def list_agents(
     tags: Optional[str] = Query(
         default=None,
@@ -743,7 +816,7 @@ def list_agents(
     return agents
 
 
-@app.get("/agents/{name}", response_model=Agent, response_model_exclude_none=True)
+@app.get("/agents/{name}", tags=["Agents"], response_model=Agent, response_model_exclude_none=True)
 def get_agent(name: str, raw: bool = Query(False, description="Return raw agent without capability resolution")):
     """
     Get agent by name.
@@ -769,9 +842,9 @@ def get_agent(name: str, raw: bool = Query(False, description="Return raw agent 
     return agent
 
 
-@app.post("/agents", response_model=Agent, status_code=201, response_model_exclude_none=True)
+@app.post("/agents", tags=["Agents"], response_model=Agent, status_code=201, response_model_exclude_none=True)
 def create_agent(data: AgentCreate):
-    """Create a new agent."""
+    """Create a new agent blueprint."""
     try:
         validate_agent_name(data.name)
     except ValueError as e:
@@ -784,9 +857,9 @@ def create_agent(data: AgentCreate):
         raise HTTPException(status_code=409, detail=str(e))
 
 
-@app.patch("/agents/{name}", response_model=Agent, response_model_exclude_none=True)
+@app.patch("/agents/{name}", tags=["Agents"], response_model=Agent, response_model_exclude_none=True)
 def update_agent(name: str, updates: AgentUpdate):
-    """Update an existing agent (partial update)."""
+    """Update an existing agent blueprint (partial update)."""
     try:
         agent = agent_storage.update_agent(name, updates)
     except MissingCapabilityError as e:
@@ -804,15 +877,15 @@ def update_agent(name: str, updates: AgentUpdate):
     return agent
 
 
-@app.delete("/agents/{name}", status_code=204)
+@app.delete("/agents/{name}", tags=["Agents"], status_code=204)
 def delete_agent(name: str):
-    """Delete an agent."""
+    """Delete an agent blueprint."""
     if not agent_storage.delete_agent(name):
         raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
     return None
 
 
-@app.patch("/agents/{name}/status", response_model=Agent, response_model_exclude_none=True)
+@app.patch("/agents/{name}/status", tags=["Agents"], response_model=Agent, response_model_exclude_none=True)
 def update_agent_status(name: str, data: AgentStatusUpdate):
     """Update agent status (active/inactive)."""
     agent = agent_storage.set_agent_status(name, data.status)
@@ -825,17 +898,16 @@ def update_agent_status(name: str, data: AgentStatusUpdate):
 # Capability Registry Routes (Capabilities System)
 # ==============================================================================
 
-@app.get("/capabilities", response_model=list[CapabilitySummary])
+@app.get("/capabilities", tags=["Capabilities"], response_model=list[CapabilitySummary])
 def list_capabilities():
-    """
-    List all capabilities.
+    """List all capabilities.
 
     Returns summary view with metadata (has_text, has_mcp, mcp_server_names).
     """
     return capability_storage.list_capabilities()
 
 
-@app.get("/capabilities/{name}", response_model=Capability, response_model_exclude_none=True)
+@app.get("/capabilities/{name}", tags=["Capabilities"], response_model=Capability, response_model_exclude_none=True)
 def get_capability(name: str):
     """Get capability by name with full content."""
     capability = capability_storage.get_capability(name)
@@ -844,7 +916,7 @@ def get_capability(name: str):
     return capability
 
 
-@app.post("/capabilities", response_model=Capability, status_code=201, response_model_exclude_none=True)
+@app.post("/capabilities", tags=["Capabilities"], response_model=Capability, status_code=201, response_model_exclude_none=True)
 def create_capability(data: CapabilityCreate):
     """Create a new capability."""
     try:
@@ -859,7 +931,7 @@ def create_capability(data: CapabilityCreate):
         raise HTTPException(status_code=409, detail=str(e))
 
 
-@app.patch("/capabilities/{name}", response_model=Capability, response_model_exclude_none=True)
+@app.patch("/capabilities/{name}", tags=["Capabilities"], response_model=Capability, response_model_exclude_none=True)
 def update_capability(name: str, updates: CapabilityUpdate):
     """Update an existing capability (partial update)."""
     capability = capability_storage.update_capability(name, updates)
@@ -874,10 +946,9 @@ def _get_agents_using_capability(capability_name: str) -> list[str]:
     return [a.name for a in agents if capability_name in a.capabilities]
 
 
-@app.delete("/capabilities/{name}", status_code=204)
+@app.delete("/capabilities/{name}", tags=["Capabilities"], status_code=204)
 def delete_capability(name: str):
-    """
-    Delete a capability.
+    """Delete a capability.
 
     Fails with 409 Conflict if capability is referenced by any agents.
     """
@@ -950,20 +1021,16 @@ class RunStoppedRequest(BaseModel):
     signal: str = "SIGTERM"
 
 
-@app.post("/runner/register")
+@app.post("/runner/register", tags=["Runners"], response_model=RunnerRegisterResponse)
 async def register_runner(request: RunnerRegisterRequest):
     """Register a runner instance.
 
-    Required properties (hostname, project_dir, executor_type) are used to
+    Required properties (hostname, project_dir, executor_profile) are used to
     derive a deterministic runner_id. Registration fails if a runner with
     the same identity is already online (409 Conflict).
 
-    If the existing runner is stale, this is treated as a reconnection
-    (the old runner probably crashed).
-
+    If the existing runner is stale, this is treated as a reconnection.
     Optional tags are capabilities the runner offers (ADR-011).
-
-    Returns runner_id and configuration for polling.
     """
     try:
         runner = runner_registry.register_runner(
@@ -1010,15 +1077,18 @@ async def register_runner(request: RunnerRegisterRequest):
     )
 
 
-@app.get("/runner/runs")
+@app.get("/runner/runs", tags=["Runners"])
 async def poll_for_runs(runner_id: str = Query(..., description="The registered runner ID")):
     """Long-poll for available runs or stop commands.
 
-    Holds the connection open for up to RUNNER_POLL_TIMEOUT seconds,
-    returning immediately if a run or stop command is available.
-    Returns 204 No Content if nothing available after timeout.
-    Returns {"deregistered": true} if runner has been deregistered.
-    Returns {"stop_runs": [...]} if there are runs to stop.
+    Holds connection open for up to 30 seconds, returning immediately if
+    a run or stop command is available.
+
+    **Responses:**
+    - `{"run": {...}}` - Run to execute
+    - `{"stop_runs": [...]}` - Session IDs to stop
+    - `{"deregistered": true}` - Runner was deregistered
+    - `204 No Content` - Nothing available after timeout
 
     Only runs whose demands match the runner's capabilities will be claimed.
     See ADR-011 for demand matching logic.
@@ -1083,7 +1153,7 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
     return Response(status_code=204)
 
 
-@app.post("/runner/runs/{run_id}/started")
+@app.post("/runner/runs/{run_id}/started", tags=["Runners"], response_model=OkResponse)
 async def report_run_started(run_id: str, request: RunnerIdRequest):
     """Report that run execution has started."""
     # Verify runner
@@ -1114,7 +1184,7 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
     return {"ok": True}
 
 
-@app.post("/runner/runs/{run_id}/completed")
+@app.post("/runner/runs/{run_id}/completed", tags=["Runners"], response_model=OkResponse)
 async def report_run_completed(run_id: str, request: RunCompletedRequest):
     """Report that run completed successfully."""
     # Verify runner
@@ -1153,7 +1223,7 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
     return {"ok": True}
 
 
-@app.post("/runner/runs/{run_id}/failed")
+@app.post("/runner/runs/{run_id}/failed", tags=["Runners"], response_model=OkResponse)
 async def report_run_failed(run_id: str, request: RunFailedRequest):
     """Report that run execution failed."""
     # Verify runner
@@ -1187,12 +1257,12 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
     return {"ok": True}
 
 
-@app.post("/runner/runs/{run_id}/stopped")
+@app.post("/runner/runs/{run_id}/stopped", tags=["Runners"], response_model=OkResponse)
 async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     """Report that run was stopped (terminated by stop command).
 
     Called by runner after terminating a process in response to a stop command.
-    Updates session status to 'stopped' and broadcasts to WebSocket clients.
+    Updates session status to 'stopped' and broadcasts to SSE clients.
     """
     # Verify runner
     if not runner_registry.get_runner(request.runner_id):
@@ -1230,7 +1300,7 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     return {"ok": True}
 
 
-@app.post("/runner/heartbeat")
+@app.post("/runner/heartbeat", tags=["Runners"], response_model=OkResponse)
 async def runner_heartbeat(request: RunnerIdRequest):
     """Keep runner registration alive."""
     if not runner_registry.heartbeat(request.runner_id):
@@ -1254,13 +1324,13 @@ class RunnerWithStatus(BaseModel):
     seconds_since_heartbeat: float
 
 
-@app.get("/runners")
+@app.get("/runners", tags=["Runners"])
 async def list_runners():
     """List all registered runners with their status.
 
     Returns all runners with status (managed by background lifecycle task):
-    - "online": heartbeat within threshold
-    - "stale": no heartbeat for 2+ minutes (connection may be lost)
+    - `online`: heartbeat within threshold
+    - `stale`: no heartbeat for 2+ minutes (connection may be lost)
     """
     runners = runner_registry.get_all_runners()
     result = []
@@ -1287,20 +1357,16 @@ async def list_runners():
     return {"runners": result}
 
 
-@app.delete("/runners/{runner_id}")
+@app.delete("/runners/{runner_id}", tags=["Runners"])
 async def deregister_runner(
     runner_id: str,
     self_initiated: bool = Query(False, alias="self", description="True if runner is deregistering itself"),
 ):
     """Deregister a runner.
 
-    Two modes:
+    **Two modes:**
     - External (dashboard): Marks runner for deregistration, signals on next poll
     - Self-initiated (runner shutdown): Immediately removes from registry
-
-    Args:
-        runner_id: The runner to deregister
-        self_initiated: If true, runner is deregistering itself (immediate removal)
     """
     # Check if runner exists
     if not runner_registry.get_runner(runner_id):
@@ -1325,15 +1391,15 @@ async def deregister_runner(
 # Runs API Routes (for creating and querying runs)
 # ==============================================================================
 
-@app.post("/runs")
+@app.post("/runs", tags=["Runs"], response_model=RunCreateResponse, status_code=201)
 async def create_run(run_create: RunCreate):
     """Create a new run for the runner to execute.
 
-    If session_id is not provided, coordinator generates one (ADR-010).
-    Returns both run_id and session_id in the response.
+    If `session_id` is not provided, coordinator generates one (ADR-010).
+    Returns both `run_id` and `session_id` in the response.
 
-    For resume runs, run_queue.add_run() enriches with agent_name and project_dir
-    from the existing session so the Runner has complete information for blueprint resolution.
+    For `start_session` runs, a new session is created with status 'pending'.
+    For `resume_session` runs, affinity demands ensure the run goes to the same runner.
 
     Demands are merged from blueprint (if agent_name provided) and additional_demands.
     See ADR-011 for demand matching logic.
@@ -1425,7 +1491,7 @@ async def create_run(run_create: RunCreate):
     return {"run_id": run.run_id, "session_id": run.session_id, "status": run.status}
 
 
-@app.get("/runs")
+@app.get("/runs", tags=["Runs"], response_model=RunListResponse)
 async def list_runs(
     status: Optional[str] = Query(None, description="Filter by status (e.g., 'completed', 'failed', 'pending')"),
 ):
@@ -1440,7 +1506,7 @@ async def list_runs(
     return {"runs": [run.model_dump() for run in runs]}
 
 
-@app.get("/runs/{run_id}")
+@app.get("/runs/{run_id}", tags=["Runs"], response_model=RunResponse)
 async def get_run(run_id: str):
     """Get run status and details.
 
@@ -1454,7 +1520,7 @@ async def get_run(run_id: str):
     return run.model_dump()
 
 
-@app.post("/runs/{run_id}/stop")
+@app.post("/runs/{run_id}/stop", tags=["Runs"])
 async def stop_run(run_id: str):
     """Stop a running run by signaling its runner.
 

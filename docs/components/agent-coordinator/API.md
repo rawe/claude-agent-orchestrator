@@ -6,11 +6,46 @@ API documentation for the Agent Coordinator server.
 
 ---
 
-## WebSocket
+## Interactive API Documentation
 
-Real-time updates for sessions and events.
+The Agent Coordinator provides auto-generated OpenAPI documentation that stays in sync with the code:
 
-**URL:** `ws://127.0.0.1:8765/ws`
+| Format | URL | Description |
+|--------|-----|-------------|
+| **Swagger UI** | [`/docs`](http://127.0.0.1:8765/docs) | Interactive API explorer with try-it-out |
+| **ReDoc** | [`/redoc`](http://127.0.0.1:8765/redoc) | Clean, readable documentation |
+| **OpenAPI JSON** | [`/openapi.json`](http://127.0.0.1:8765/openapi.json) | Raw OpenAPI 3.1.0 specification |
+
+> **Note:** The interactive docs are the authoritative source. This markdown file provides additional context but may lag behind the implementation.
+
+### Enabling/Disabling Documentation Endpoints
+
+The documentation endpoints can be controlled via the `DOCS_ENABLED` environment variable:
+
+| Setting | Behavior |
+|---------|----------|
+| `DOCS_ENABLED=false` | (Default) All documentation endpoints return 404 Not Found |
+| `DOCS_ENABLED=true` | `/docs`, `/redoc`, `/openapi.json` are available |
+
+**Development (docs enabled):**
+```bash
+AUTH_ENABLED=false DOCS_ENABLED=true uv run python -m main
+```
+
+**Production (docs disabled):**
+```bash
+AUTH_ENABLED=true DOCS_ENABLED=false uv run python -m main
+```
+
+> **Security Note:** The documentation endpoints are NOT protected by authentication even when `AUTH_ENABLED=true`. For public deployments, set `DOCS_ENABLED=false` to prevent exposing your API schema.
+
+---
+
+## Server-Sent Events (SSE)
+
+Real-time updates for sessions and events via SSE (migrated from WebSocket per ADR-013).
+
+**URL:** `GET /sse/sessions`
 
 ### Server → Client Messages
 
@@ -80,12 +115,26 @@ Sent when a run fails (e.g., no matching runner within timeout).
 
 See [Event Types](DATA_MODELS.md#event-types) for detailed schemas.
 
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string | Filter to single session |
+| `include_init` | bool | Include initial state on connect (default: true) |
+
+### Headers
+
+| Header | Description |
+|--------|-------------|
+| `Last-Event-ID` | Resume from last event (for reconnection) |
+
 ### Connection Flow
 
-1. Client connects to WebSocket
-2. Server sends initial state with all sessions
-3. Server broadcasts new events as they arrive
-4. Client updates UI in real-time
+1. Client connects via `EventSource` or fetch with streaming
+2. Server sends `init` event with all matching sessions (unless resuming)
+3. Server broadcasts events as they occur
+4. Client receives events with unique IDs for resumption
+5. Heartbeat sent every 30s to keep connection alive
 
 ---
 
