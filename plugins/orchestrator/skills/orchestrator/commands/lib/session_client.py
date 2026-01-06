@@ -74,7 +74,7 @@ class SessionClient:
         return result.get("sessions", [])
 
     def add_event(self, session_id: str, event: Dict[str, Any]) -> None:
-        """Add event to session. Handles session_stop specially on server."""
+        """Add event to session. Handles run_completed specially on server."""
         # Ensure session_id is set in event
         event_data = dict(event)
         event_data["session_id"] = session_id

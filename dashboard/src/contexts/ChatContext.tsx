@@ -278,10 +278,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   //
   // MESSAGE FLOW:
   // 1. session_created/session_updated → Update session state
-  // 2. session_start → Handle session resume (callback or manual)
+  // 2. run_start → Handle session resume (callback or manual)
   // 3. message (user OR assistant) → Add/update messages
   // 4. post_tool → Track tool calls
-  // 5. session_stop → Mark session as finished
+  // 5. run_completed → Mark session as finished
   //
   // KEY DESIGN: Both user AND assistant messages are processed uniformly.
   // This handles callback mode where user messages come from the backend.
@@ -342,16 +342,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setSessionId(event.session_id);
       }
 
-      // --- SESSION RESUME (session_start) ---
-      // This fires when a session is resumed (e.g., callback mode)
+      // --- RUN START ---
+      // This fires when a run starts (e.g., callback mode resume)
       // We set up pending state but DON'T return early - subsequent events need processing
-      if (event.event_type === 'session_start') {
+      if (event.event_type === 'run_start') {
         handleSessionResume(currentAgentStatus, currentPendingMessageId, currentIsLoading);
         // NO RETURN - let subsequent message events be processed
       }
 
-      // --- SESSION STOP ---
-      if (event.event_type === 'session_stop') {
+      // --- RUN COMPLETED ---
+      if (event.event_type === 'run_completed') {
         handleSessionStop(currentPendingMessageId);
         return;
       }
@@ -378,11 +378,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   /**
    * Handle session being stopped (user clicked stop)
-   * Note: Only updates status. Pending message will be completed by session_stop event.
+   * Note: Only updates status. Pending message will be completed by run_completed event.
    */
   function handleSessionStopping() {
     setAgentStatus('stopping');
-    // DON'T clear pending message here - let session_stop event handle it
+    // DON'T clear pending message here - let run_completed event handle it
   }
 
   /**
@@ -390,13 +390,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
    *
    * IMPORTANT: "finished" means agent's turn ended, NOT "session is done forever".
    * All sessions are resumable. Only update status to enable user input.
-   * Let message events and session_stop handle pending message completion.
+   * Let message events and run_completed handle pending message completion.
    */
   function handleSessionFinished() {
     setAgentStatus('finished');
     // DON'T clear pending message here!
     // - Message events will update it with actual content
-    // - session_stop event will complete it if still pending
+    // - run_completed event will complete it if still pending
   }
 
   /**

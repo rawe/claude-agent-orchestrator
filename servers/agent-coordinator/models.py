@@ -49,21 +49,10 @@ class SessionEventType(str, Enum):
     Event types that occur within an agent session.
 
     These are logged in the events table and represent the lifecycle
-    and activities of an agent session.
-
-    TODO: Rename SESSION_START -> RUN_START and SESSION_STOP -> RUN_STOP
-    These events are part of our Run API and should reflect that naming.
-    This rename requires coordination across:
-    - Agent Runner executors (claude-code/ao-claude-code-exec)
-    - Dashboard and other frontends listening to these events
-    - Any external integrations using the events API
-    Consider a migration period with both old and new names accepted.
+    and activities of an agent session (specifically, of runs within a session).
     """
-    # TODO: Rename to RUN_START (see class docstring for migration notes)
-    SESSION_START = "session_start"  # Run/session started
-
-    # TODO: Rename to RUN_STOP (see class docstring for migration notes)
-    SESSION_STOP = "session_stop"    # Run/session stopped/finished
+    RUN_START = "run_start"          # Run execution started
+    RUN_COMPLETED = "run_completed"  # Run execution completed
 
     PRE_TOOL = "pre_tool"            # Before tool execution
     POST_TOOL = "post_tool"          # After tool execution
@@ -316,7 +305,7 @@ class Event(BaseModel):
     session_id is the coordinator-generated ID.
     executor_session_id is the framework's ID (optional, for correlation).
     """
-    event_type: str  # 'session_start' | 'pre_tool' | 'post_tool' | 'session_stop' | 'message'
+    event_type: str  # 'run_start' | 'pre_tool' | 'post_tool' | 'run_completed' | 'message'
     session_id: str
     timestamp: str
     # Tool-related fields (pre_tool and post_tool)

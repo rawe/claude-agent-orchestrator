@@ -6,7 +6,7 @@ Common data structures used by the Agent Coordinator.
 
 ```json
 {
-  "event_type": "session_start | pre_tool | post_tool | session_stop | message",
+  "event_type": "run_start | pre_tool | post_tool | run_completed | message",
   "session_id": "string",
   "timestamp": "ISO 8601 string",
   "tool_name": "string (optional)",
@@ -22,10 +22,10 @@ Common data structures used by the Agent Coordinator.
 
 ### Event Types
 
-- `session_start` - Agent session started
+- `run_start` - Run execution started (fires on every run, including resumes)
 - `pre_tool` - Tool about to be executed
 - `post_tool` - Tool execution completed
-- `session_stop` - Agent session stopped
+- `run_completed` - Run execution completed
 - `message` - Agent or user message
 
 ### Message Content Block
@@ -263,10 +263,10 @@ When a run is created using an agent with `demands`, those demands are merged wi
 
 ## Examples
 
-### SessionStart Event
+### RunStart Event
 ```json
 {
-  "event_type": "session_start",
+  "event_type": "run_start",
   "session_id": "ses_abc123def456",
   "timestamp": "2025-11-16T10:30:00.000000Z"
 }
@@ -300,10 +300,10 @@ When a run is created using an agent with `demands`, those demands are merged wi
 }
 ```
 
-### SessionStop Event
+### RunCompleted Event
 ```json
 {
-  "event_type": "session_stop",
+  "event_type": "run_completed",
   "session_id": "ses_abc123def456",
   "timestamp": "2025-11-16T10:35:00.000000Z",
   "exit_code": 0,

@@ -119,16 +119,16 @@ Note which callbacks are missing. If Wave 1 agents (1-3) are affected more than 
 
 ```
 # Wave 1 completions (~5 sec)
-{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child1>", ...}}
-{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child2>", ...}}
-{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child3>", ...}}
+{"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_<child1>", ...}}
+{"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_<child2>", ...}}
+{"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_<child3>", ...}}
 
 # Wave 2 completions (~10 sec)
-{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child4>", ...}}
-{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child5>", ...}}
+{"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_<child4>", ...}}
+{"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_<child5>", ...}}
 
 # Parent resumes (should see 5 resume events)
-{"type": "event", "data": {"event_type": "session_start", "session_id": "ses_<parent>", ...}}
+{"type": "event", "data": {"event_type": "run_start", "session_id": "ses_<parent>", ...}}
 ```
 
 ## Troubleshooting

@@ -39,10 +39,10 @@ The commands automatically connect to the Agent Coordinator at the default URL.
 - `project_dir` - Working directory
 
 **Events:**
-- `session_start` - Session begins
+- `run_start` - Run execution begins
 - `message` - User/assistant messages
 - `pre_tool` / `post_tool` - Tool execution
-- `session_stop` - Session ends
+- `run_completed` - Run execution completes
 
 ## Configuration
 

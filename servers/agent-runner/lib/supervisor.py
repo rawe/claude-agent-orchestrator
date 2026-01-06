@@ -4,7 +4,7 @@ Supervisor Thread - monitors running agent run subprocesses for completion.
 Checks subprocess status periodically and reports completion/failure.
 
 NOTE: Callback processing has been moved to agent-coordinator (callback_processor.py).
-The agent-coordinator now handles callbacks when it receives session_stop events,
+The agent-coordinator now handles callbacks when it receives run_completed events,
 which allows proper queuing when the parent is busy. See:
 - docs/features/06-callback-queue-busy-parent.md
 - servers/agent-coordinator/services/callback_processor.py
@@ -91,7 +91,7 @@ class RunSupervisor:
         """Handle agent run completion (success or failure).
 
         Reports completion status to agent-coordinator. Callback processing
-        is handled by agent-coordinator when it receives the session_stop event.
+        is handled by agent-coordinator when it receives the run_completed event.
         """
         # Remove from registry first
         self.registry.remove_run(run_id)

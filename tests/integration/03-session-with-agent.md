@@ -98,9 +98,9 @@ Watch the sse-monitor output.
    {"type": "session_updated", "session": {"session_id": "ses_...", "status": "finished", "agent_name": "<agent-name>", ...}}
    ```
 
-6. **session_stop**
+6. **run_completed**
    ```json
-   {"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
+   {"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
    ```
 
 ## Verification Checklist
@@ -111,7 +111,7 @@ Watch the sse-monitor output.
 - [ ] `agent_name` in session_created matches the requested agent
 - [ ] `agent_name` in session_updated matches the requested agent
 - [ ] With `claude-code`: Response reflects the agent's system_prompt/capabilities
-- [ ] session_stop has exit_code 0 and reason "completed"
+- [ ] run_completed has exit_code 0 and reason "completed"
 
 ## Executor-Specific Behavior
 

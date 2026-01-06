@@ -28,9 +28,9 @@ type EventFilter = {
 function getTimelineDotColor(eventType: EventType, hasError: boolean): string {
   if (hasError) return 'bg-red-500';
   switch (eventType) {
-    case 'session_start':
+    case 'run_start':
       return 'bg-emerald-500';
-    case 'session_stop':
+    case 'run_completed':
       return 'bg-gray-400';
     case 'pre_tool':
     case 'post_tool':
@@ -62,7 +62,7 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
       if (event.event_type === 'message') {
         return filters.messages;
       }
-      if (event.event_type === 'session_start' || event.event_type === 'session_stop') {
+      if (event.event_type === 'run_start' || event.event_type === 'run_completed') {
         return filters.session;
       }
       return true;
@@ -77,7 +77,7 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
           acc.tools++;
         } else if (event.event_type === 'message') {
           acc.messages++;
-        } else if (event.event_type === 'session_start' || event.event_type === 'session_stop') {
+        } else if (event.event_type === 'run_start' || event.event_type === 'run_completed') {
           acc.session++;
         }
         return acc;
@@ -201,7 +201,7 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
               {/* Events */}
               <div className="space-y-3">
                 {filteredEvents.map((event) => {
-                  const hasError = !!(event.error || (event.event_type === 'session_stop' && event.exit_code !== 0));
+                  const hasError = !!(event.error || (event.event_type === 'run_completed' && event.exit_code !== 0));
                   const dotColor = getTimelineDotColor(event.event_type, hasError);
 
                   return (

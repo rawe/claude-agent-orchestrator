@@ -59,7 +59,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
       } else if (message.type === 'event' && message.data) {
         // Update session status based on events
         const event = message.data;
-        if (event.event_type === 'session_start') {
+        if (event.event_type === 'run_start') {
           // Check if session already exists
           setSessions((prev) => {
             const exists = prev.some((s) => s.session_id === event.session_id);
@@ -78,7 +78,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
               ...prev,
             ];
           });
-        } else if (event.event_type === 'session_stop') {
+        } else if (event.event_type === 'run_completed') {
           setSessions((prev) =>
             prev.map((s) =>
               s.session_id === event.session_id

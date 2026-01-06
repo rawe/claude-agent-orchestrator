@@ -1,4 +1,4 @@
-export type EventType = 'session_start' | 'session_stop' | 'pre_tool' | 'post_tool' | 'message';
+export type EventType = 'run_start' | 'run_completed' | 'pre_tool' | 'post_tool' | 'message';
 
 export type MessageRole = 'user' | 'assistant';
 
@@ -20,7 +20,7 @@ export interface SessionEvent {
   tool_input?: Record<string, unknown>;
   tool_output?: unknown;
   error?: string;
-  // Session stop events
+  // Run completion events
   exit_code?: number;
   reason?: string;
   // Message events

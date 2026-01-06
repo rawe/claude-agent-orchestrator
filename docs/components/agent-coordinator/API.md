@@ -107,10 +107,10 @@ Sent when a run fails (e.g., no matching runner within timeout).
 
 ### Event Types
 
-- `session_start` - When an agent session starts
+- `run_start` - When a run execution starts
 - `pre_tool` - Before a tool executes (shows input parameters)
 - `post_tool` - After a tool executes (shows input + output)
-- `session_stop` - When a session ends
+- `run_completed` - When a run execution completes
 - `message` - Agent or user messages
 
 See [Event Types](DATA_MODELS.md#event-types) for detailed schemas.
@@ -351,7 +351,7 @@ See [Event model](DATA_MODELS.md#event)
 
 **Notes:**
 - Session must exist (created via POST /runs with `type: "start_session"`)
-- If event_type is `session_stop`, session status is updated to `finished`
+- If event_type is `run_completed`, session status is updated to `finished`
 
 ---
 

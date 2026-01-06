@@ -130,7 +130,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       };
 
     case 'ADD_ASSISTANT_MESSAGE':
-      // Add a complete assistant message (for messages arriving after session_stop)
+      // Add a complete assistant message (for messages arriving after run_completed)
       // Deduplication: skip if message already exists (StrictMode safeguard)
       if (messageExists(
         state.messages,
@@ -334,11 +334,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const event: SessionEvent = message.data;
 
       switch (event.event_type) {
-        case 'session_start':
+        case 'run_start':
           dispatch({ type: 'SET_AGENT_STATUS', status: 'running' });
           break;
 
-        case 'session_stop':
+        case 'run_completed':
           dispatch({ type: 'SET_AGENT_STATUS', status: 'finished' });
           completeAssistantMessage();
           break;
@@ -390,7 +390,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 // Update existing pending message
                 dispatch({ type: 'UPDATE_ASSISTANT_MESSAGE', content: textContent });
               } else {
-                // No pending message - agent sent additional response after session_stop
+                // No pending message - agent sent additional response after run_completed
                 // Create a new complete message
                 dispatch({
                   type: 'ADD_ASSISTANT_MESSAGE',

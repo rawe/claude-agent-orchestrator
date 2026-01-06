@@ -498,10 +498,10 @@ async def add_session_event(session_id: str, event: Event):
     # Insert event
     insert_event(event)
 
-    # NOTE: Session lifecycle events (session_start, session_stop) are handled by the
+    # NOTE: Session lifecycle events (run_start, run_completed) are handled by the
     # agent runner endpoints, not this endpoint:
-    # - POST /runner/runs/{run_id}/started  -> inserts session_start, broadcasts SSE
-    # - POST /runner/runs/{run_id}/completed -> updates session status, inserts session_stop, triggers callbacks
+    # - POST /runner/runs/{run_id}/started  -> inserts run_start, broadcasts SSE
+    # - POST /runner/runs/{run_id}/completed -> updates session status, inserts run_completed, triggers callbacks
 
     # Broadcast event to SSE clients
     event_data = {"data": event.model_dump()}
@@ -1040,7 +1040,7 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
     This is the authoritative signal that a run has started. It:
     - Updates run status to RUNNING
     - Links parent session for hierarchy tracking
-    - Inserts session_start event for audit trail
+    - Inserts run_start event for audit trail
     - Broadcasts to SSE clients
     """
     # Verify runner
@@ -1063,14 +1063,14 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
         if DEBUG:
             print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
 
-    # === Session start event (moved from executor) ===
-    # Insert session_start event for audit trail and SSE notification.
+    # === Run start event (moved from executor) ===
+    # Insert run_start event for audit trail and SSE notification.
     # This provides a consistent event for both new sessions and resumes.
     # Previously, only the executor sent this (and only for resume mode).
     session_id = run.session_id
     if session_id:
         start_event = Event(
-            event_type=SessionEventType.SESSION_START.value,
+            event_type=SessionEventType.RUN_START.value,
             session_id=session_id,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
@@ -1081,7 +1081,7 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
         await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=session_id)
 
         if DEBUG:
-            print(f"[DEBUG] Inserted session_start event for session '{session_id}'", flush=True)
+            print(f"[DEBUG] Inserted run_start event for session '{session_id}'", flush=True)
 
     if DEBUG:
         print(f"[DEBUG] Run {run_id} started by runner {request.runner_id}", flush=True)
@@ -1110,9 +1110,9 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
     if DEBUG:
         print(f"[DEBUG] Run {run_id} completed by runner {request.runner_id}", flush=True)
 
-    # === Session finish handling (moved from POST /sessions/{session_id}/events) ===
-    # The agent runner is now the authoritative source for session completion.
-    # Previously, the executor sent a session_stop event; now the supervisor
+    # === Run completion handling (moved from POST /sessions/{session_id}/events) ===
+    # The agent runner is now the authoritative source for run completion.
+    # Previously, the executor sent a run_completed event; now the supervisor
     # reports run completion which triggers this logic.
 
     session_id = run.session_id
@@ -1120,9 +1120,9 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
         # Update session status to finished and broadcast to SSE clients
         await update_session_status_and_broadcast(session_id, "finished")
 
-        # Insert session_stop event for audit trail (moved from executor)
+        # Insert run_completed event for audit trail (moved from executor)
         stop_event = Event(
-            event_type=SessionEventType.SESSION_STOP.value,
+            event_type=SessionEventType.RUN_COMPLETED.value,
             session_id=session_id,
             timestamp=datetime.now(timezone.utc).isoformat(),
             exit_code=0,
@@ -1130,12 +1130,12 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
         )
         insert_event(stop_event)
 
-        # Broadcast session_stop event to SSE clients
+        # Broadcast run_completed event to SSE clients
         event_data = {"data": stop_event.model_dump()}
         await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=session_id)
 
         if DEBUG:
-            print(f"[DEBUG] Inserted session_stop event for session '{session_id}'", flush=True)
+            print(f"[DEBUG] Inserted run_completed event for session '{session_id}'", flush=True)
 
         # Handle async_callback child completion - notify parent session
         if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK.value:

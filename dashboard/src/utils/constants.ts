@@ -27,8 +27,8 @@ export const STATUS_ICONS = {
 
 // Event type icons
 export const EVENT_ICONS = {
-  session_start: '🚀',
-  session_stop: '🏁',
+  run_start: '🚀',
+  run_completed: '🏁',
   pre_tool: '🔧',
   post_tool: '✅',
   message: '💬',

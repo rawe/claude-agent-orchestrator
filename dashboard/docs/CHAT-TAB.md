@@ -92,10 +92,10 @@ The Chat tab reuses the **existing SSE connection** from the dashboard. The SSE 
   }
 }
 
-// Session start/resume (used for callback detection)
+// Run start/resume (used for callback detection)
 { type: 'event', data: {
     session_id,
-    event_type: 'session_start'
+    event_type: 'run_start'
   }
 }
 
@@ -109,10 +109,10 @@ The Chat tab reuses the **existing SSE connection** from the dashboard. The SSE 
   }
 }
 
-// Session stopped
+// Run completed
 { type: 'event', data: {
     session_id,
-    event_type: 'session_stop',
+    event_type: 'run_completed',
     exit_code: 0
   }
 }
@@ -160,7 +160,7 @@ The Chat tab supports automatic updates when a session resumes via the callback 
          │ 5. Callback resumes parent
          ▼
     ┌─────────┐
-    │ running │  ◄── session_start event triggers refresh
+    │ running │  ◄── run_start event triggers refresh
     └────┬────┘
          │
          │ 6. Chat fetches updated events
@@ -178,9 +178,9 @@ The callback resume detection is implemented in `ChatContext.tsx`:
 
 1. **Session Matching**: Sessions are matched by `session_id` or `linkedSessionId`
 
-2. **Callback Detection**: Listens for `session_start` events on finished sessions
+2. **Callback Detection**: Listens for `run_start` events on finished sessions
    ```typescript
-   if (event.event_type === 'session_start') {
+   if (event.event_type === 'run_start') {
      const wasFinished = currentAgentStatus === 'finished';
      if (wasFinished && !currentPendingMessageId) {
        // Callback resume detected!

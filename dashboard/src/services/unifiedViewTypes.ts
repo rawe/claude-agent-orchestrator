@@ -69,8 +69,8 @@ export type ExecutionMode = (typeof ExecutionModeValues)[keyof typeof ExecutionM
  * Event type values - matches backend SessionEventType
  */
 export const EventTypeValues = {
-  SESSION_START: 'session_start',
-  SESSION_STOP: 'session_stop',
+  RUN_START: 'run_start',
+  RUN_COMPLETED: 'run_completed',
   PRE_TOOL: 'pre_tool',
   POST_TOOL: 'post_tool',
   MESSAGE: 'message',

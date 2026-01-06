@@ -23,10 +23,10 @@ export function formatDuration(ms: number): string {
 
 export function getEventTypeStyles(type: string): string {
   switch (type) {
-    case 'session_start':
+    case 'run_start':
     case 'session_resume':
       return 'bg-blue-100 text-blue-700 border-blue-200';
-    case 'session_stop':
+    case 'run_completed':
       return 'bg-gray-100 text-gray-700 border-gray-200';
     case 'tool_call':
       return 'bg-purple-100 text-purple-700 border-purple-200';

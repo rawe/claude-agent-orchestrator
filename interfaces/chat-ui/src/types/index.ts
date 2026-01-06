@@ -11,7 +11,7 @@ export interface ContentBlock {
 
 // Event from SSE stream
 export interface SessionEvent {
-  event_type: 'session_start' | 'session_stop' | 'pre_tool' | 'post_tool' | 'message';
+  event_type: 'run_start' | 'run_completed' | 'pre_tool' | 'post_tool' | 'message';
   session_id: string;
   timestamp: string;
 
@@ -21,7 +21,7 @@ export interface SessionEvent {
   tool_output?: unknown;
   error?: string;
 
-  // Session stop events
+  // Run completion events
   exit_code?: number;
   reason?: string;
 

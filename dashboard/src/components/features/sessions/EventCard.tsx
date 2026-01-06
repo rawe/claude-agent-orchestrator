@@ -33,21 +33,21 @@ type EventConfig = {
 };
 
 const eventConfig: Record<EventType, EventConfig> = {
-  session_start: {
+  run_start: {
     icon: Play,
     accentColor: 'bg-emerald-500',
     bgColor: 'bg-white',
     iconBg: 'bg-emerald-100',
     iconColor: 'text-emerald-600',
-    label: 'Session Started',
+    label: 'Run Started',
   },
-  session_stop: {
+  run_completed: {
     icon: Square,
     accentColor: 'bg-gray-400',
     bgColor: 'bg-white',
     iconBg: 'bg-gray-100',
     iconColor: 'text-gray-600',
-    label: 'Session Ended',
+    label: 'Run Completed',
   },
   pre_tool: {
     icon: Wrench,
@@ -129,7 +129,7 @@ export function EventCard({ event, forceExpanded = false }: EventCardProps) {
     label: event.event_type,
   };
 
-  const hasError = event.error || (event.event_type === 'session_stop' && event.exit_code !== 0);
+  const hasError = event.error || (event.event_type === 'run_completed' && event.exit_code !== 0);
   const Icon = hasError ? AlertCircle : config.icon;
   const accentColor = hasError ? 'bg-red-500' : config.accentColor;
   const iconBg = hasError ? 'bg-red-100' : config.iconBg;
@@ -143,14 +143,14 @@ export function EventCard({ event, forceExpanded = false }: EventCardProps) {
 
   const renderContent = () => {
     switch (event.event_type) {
-      case 'session_start':
+      case 'run_start':
         return (
           <div className="text-sm text-gray-500">
             Session ID: <span className="font-mono text-gray-700">{event.session_id.slice(0, 12)}...</span>
           </div>
         );
 
-      case 'session_stop':
+      case 'run_completed':
         return (
           <div className="text-sm space-y-1">
             <div className="flex items-center gap-2">

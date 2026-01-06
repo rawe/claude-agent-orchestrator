@@ -63,7 +63,7 @@ Note: The child session has `parent_session_id` set to the parent's `session_id`
 
 ### Child Session Complete
 ```json
-{"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_<child>", "exit_code": 0, ...}}
+{"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_<child>", "exit_code": 0, ...}}
 ```
 
 ## Verification Checklist

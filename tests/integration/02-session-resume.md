@@ -68,9 +68,9 @@ Watch the sse-monitor output.
    {"type": "session_updated", "session": {"session_id": "ses_...", "status": "running", ...}}
    ```
 
-2. **session_start** (resume event)
+2. **run_start** (resume event)
    ```json
-   {"type": "event", "data": {"event_type": "session_start", "session_id": "ses_...", ...}}
+   {"type": "event", "data": {"event_type": "run_start", "session_id": "ses_...", ...}}
    ```
 
 3. **message (user)**
@@ -88,9 +88,9 @@ Watch the sse-monitor output.
    {"type": "session_updated", "session": {"session_id": "ses_...", "status": "finished", ...}}
    ```
 
-6. **session_stop**
+6. **run_completed**
    ```json
-   {"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
+   {"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
    ```
 
 ## Verification Checklist
@@ -99,10 +99,10 @@ Watch the sse-monitor output.
 - [ ] `session_id` matches the original session (from start)
 - [ ] `session_id` is consistent across all events
 - [ ] `last_resumed_at` is set (was `null` before resume)
-- [ ] session_start event received (indicates resume)
+- [ ] run_start event received (indicates resume)
 - [ ] User message content matches the resume prompt
 - [ ] Assistant message received (content depends on executor type)
-- [ ] session_stop has exit_code 0 and reason "completed"
+- [ ] run_completed has exit_code 0 and reason "completed"
 - [ ] `executor_session_id` from original session is used for resume
 
 ## Verify Session History

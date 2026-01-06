@@ -77,13 +77,13 @@ CREATE TABLE events (
 |--------|------|----------|-------------|
 | `id` | INTEGER | NO | Auto-incrementing primary key |
 | `session_id` | TEXT | NO | Foreign key to `sessions.session_id` (cascades on delete) |
-| `event_type` | TEXT | NO | Event type: `session_start`, `pre_tool`, `post_tool`, `message`, `session_stop` |
+| `event_type` | TEXT | NO | Event type: `run_start`, `pre_tool`, `post_tool`, `message`, `run_completed` |
 | `timestamp` | TEXT | NO | ISO 8601 timestamp when event occurred |
 | `tool_name` | TEXT | YES | Name of the tool (for tool-related events) |
 | `tool_input` | TEXT | YES | JSON string of tool input parameters |
 | `tool_output` | TEXT | YES | JSON string of tool output/response |
 | `error` | TEXT | YES | Error message (if tool execution failed) |
-| `exit_code` | INTEGER | YES | Exit code (for session_stop events) |
+| `exit_code` | INTEGER | YES | Exit code (for run_completed events) |
 | `reason` | TEXT | YES | Reason for session stop (e.g., "completed", "stopped") |
 | `role` | TEXT | YES | Message role: `user`, `assistant` (for message events) |
 | `content` | TEXT | YES | JSON array of message content blocks |
@@ -94,8 +94,8 @@ CREATE TABLE events (
 
 ## Event Types
 
-### session_start
-- Sent when a new agent session begins
+### run_start
+- Sent when a run execution begins (fires for every run, including resumes)
 - Fields: `session_id`, `event_type`, `timestamp`
 
 ### pre_tool
@@ -110,8 +110,8 @@ CREATE TABLE events (
 - Sent for user and assistant messages
 - Fields: `session_id`, `event_type`, `timestamp`, `role`, `content`
 
-### session_stop
-- Sent when a session ends
+### run_completed
+- Sent when a run execution completes
 - Fields: `session_id`, `event_type`, `timestamp`, `exit_code`, `reason`
 
 ## JSON Fields

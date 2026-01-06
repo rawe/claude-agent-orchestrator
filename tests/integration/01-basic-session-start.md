@@ -49,9 +49,9 @@ Watch the sse-monitor output.
    {"type": "session_created", "session": {"session_id": "ses_...", "status": "pending", "agent_name": null, ...}}
    ```
 
-2. **session_start** (when runner reports run started)
+2. **run_start** (when runner reports run started)
    ```json
-   {"type": "event", "data": {"event_type": "session_start", "session_id": "ses_...", "timestamp": "...", ...}}
+   {"type": "event", "data": {"event_type": "run_start", "session_id": "ses_...", "timestamp": "...", ...}}
    ```
    Note: Emitted by coordinator when agent runner calls `report_run_started`.
 
@@ -77,21 +77,21 @@ Watch the sse-monitor output.
    {"type": "session_updated", "session": {"session_id": "ses_...", "status": "finished", ...}}
    ```
 
-7. **session_stop**
+7. **run_completed**
    ```json
-   {"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
+   {"type": "event", "data": {"event_type": "run_completed", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
    ```
    Note: Emitted by coordinator when agent runner calls `report_run_completed`.
 
 ## Verification Checklist
 
-- [ ] All events received in correct order (session_created, session_start, session_updated:running, user message, assistant message, session_updated:finished, session_stop)
+- [ ] All events received in correct order (session_created, run_start, session_updated:running, user message, assistant message, session_updated:finished, run_completed)
 - [ ] `session_id` is consistent across all events (format: `ses_...`)
 - [ ] `session_id` in response matches events
-- [ ] `session_start` event received (emitted by agent runner via report_run_started)
+- [ ] `run_start` event received (emitted by agent runner via report_run_started)
 - [ ] User message content matches the prompt sent
 - [ ] Assistant message received (content depends on executor type)
-- [ ] session_stop has exit_code 0 and reason "completed"
+- [ ] run_completed has exit_code 0 and reason "completed"
 - [ ] Timestamps are sequential (each event timestamp >= previous)
 - [ ] Session bound with `executor_session_id` when status changes to running
 

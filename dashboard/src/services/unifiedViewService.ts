@@ -105,11 +105,11 @@ function adaptEvent(event: SessionEvent): UnifiedEvent {
   let summary = '';
 
   switch (event.event_type) {
-    case EventTypeValues.SESSION_START:
-      summary = 'Session started';
+    case EventTypeValues.RUN_START:
+      summary = 'Run started';
       break;
-    case EventTypeValues.SESSION_STOP:
-      summary = event.reason ?? `Session stopped (exit code: ${event.exit_code ?? 'unknown'})`;
+    case EventTypeValues.RUN_COMPLETED:
+      summary = event.reason ?? `Run completed (exit code: ${event.exit_code ?? 'unknown'})`;
       break;
     case EventTypeValues.PRE_TOOL:
       summary = `Calling: ${event.tool_name ?? 'unknown tool'}`;
