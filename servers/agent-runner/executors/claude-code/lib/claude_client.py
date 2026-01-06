@@ -325,12 +325,8 @@ async def run_claude_session(
                                         session_id=session_id,
                                         last_resumed_at=datetime.now(UTC).isoformat()
                                     )
-                                    # Send session_start event to notify frontend of running state
-                                    session_client.add_event(session_id, {
-                                        "event_type": "session_start",
-                                        "session_id": session_id,
-                                        "timestamp": datetime.now(UTC).isoformat(),
-                                    })
+                                    # NOTE: Session start event is emitted by the agent runner via
+                                    # POST /runner/runs/{run_id}/started when this process launches.
                                 except SessionClientError as e:
                                     import sys
                                     print(f"Warning: Session update failed: {e}", file=sys.stderr)
@@ -369,18 +365,8 @@ async def run_claude_session(
                         except SessionClientError:
                             pass  # Silent failure
 
-            # Send session_stop event after message loop completes
-            if session_id:
-                try:
-                    session_client.add_event(session_id, {
-                        "event_type": "session_stop",
-                        "session_id": session_id,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "exit_code": 0,
-                        "reason": "completed"
-                    })
-                except SessionClientError:
-                    pass  # Silent failure
+            # NOTE: Session completion is signaled by the agent runner's supervisor
+            # via POST /runner/runs/{run_id}/completed when this process exits.
 
     except Exception as e:
         # Propagate SDK errors with context

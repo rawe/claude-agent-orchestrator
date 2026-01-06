@@ -750,43 +750,38 @@ This section documents where callback notifications to parent agents are trigger
 
 ### Trigger Locations
 
+All callback triggers are unified in the Runner API endpoints:
+
 | Event | Trigger Location | Endpoint/Handler | Notes |
 |-------|------------------|------------------|-------|
-| **Success** | `main.py:406-438` | `POST /sessions/{session_id}/events` | Triggered when `session_stop` event is received |
-| **Failure** | `main.py:843-858` | `POST /runner/runs/{run_id}/failed` | Triggered when runner reports run failure |
-| **Stopped** | `main.py:881-896` | `POST /runner/runs/{run_id}/stopped` | Triggered when runner reports run was stopped |
+| **Success** | `main.py` | `POST /runner/runs/{run_id}/completed` | Triggered when runner reports run completion |
+| **Failure** | `main.py` | `POST /runner/runs/{run_id}/failed` | Triggered when runner reports run failure |
+| **Stopped** | `main.py` | `POST /runner/runs/{run_id}/stopped` | Triggered when runner reports run was stopped |
 
 ### Implementation Details
 
-**Success Callback** (`POST /sessions/{session_id}/events`):
-- Triggered by: Claude Code executor posting `session_stop` event via Sessions API
-- Flow: Event received → session status updated to `finished` → checks for `parent_session_name` → calls `callback_processor.on_child_completed()`
+**Success Callback** (`POST /runner/runs/{run_id}/completed`):
+- Triggered by: Agent Runner (supervisor) calling `report_completed()` when process exits with code 0
+- Flow: Run marked as `COMPLETED` → session status updated to `finished` → checks `run.parent_session_id` → calls `callback_processor.on_child_completed()`
 - Result passed: Yes (retrieves child result via `get_session_result()`)
 
 **Failure Callback** (`POST /runner/runs/{run_id}/failed`):
 - Triggered by: Agent Runner calling `report_failed()` when subprocess exits with error
-- Flow: Run marked as `FAILED` → checks `run.parent_session_name` → calls `callback_processor.on_child_completed(child_failed=True)`
+- Flow: Run marked as `FAILED` → checks `run.parent_session_id` → calls `callback_processor.on_child_completed(child_failed=True)`
 - Error passed: Yes (error from runner's `request.error`)
 
 **Stopped Callback** (`POST /runner/runs/{run_id}/stopped`):
 - Triggered by: Agent Runner calling `report_stopped()` after terminating a process
-- Flow: Run marked as `STOPPED` → checks `run.parent_session_name` → calls `callback_processor.on_child_completed(child_failed=True)`
+- Flow: Run marked as `STOPPED` → session status updated to `stopped` → checks `run.parent_session_id` → calls `callback_processor.on_child_completed(child_failed=True)`
 - Error passed: Yes (hardcoded message: "Session was manually stopped")
 
 ### Architectural Note
 
-> **TODO: Unify Success Callback Trigger**
->
-> Currently, success callbacks use a different pattern than failure/stopped callbacks:
-> - **Success**: Triggered via Sessions API (`POST /sessions/{id}/events`) when `session_stop` event arrives
-> - **Failure/Stopped**: Triggered via Runner API (`POST /runner/runs/{id}/failed|stopped`)
->
-> For architectural consistency, consider moving the success callback trigger to `POST /runner/runs/{run_id}/completed`. This would:
-> 1. Unify all callback triggers in the Runner API endpoints
-> 2. Make the callback flow consistent across all completion types
-> 3. Simplify understanding of the callback architecture
->
-> The current approach works because the executor posts `session_stop` events before exiting, but the Runner also reports `completed` after the process exits. Moving the success callback to the `/completed` endpoint would create a uniform pattern.
+All callback triggers are now unified in the Runner API endpoints, providing a consistent pattern:
+- The agent runner's supervisor monitors executor processes
+- When a process exits, the appropriate endpoint is called (completed/failed/stopped)
+- The coordinator updates run and session status, then triggers callbacks if applicable
+- Executors no longer send lifecycle events (session_start, session_stop) - this is handled by the runner
 
 ## Implementation Plan
 

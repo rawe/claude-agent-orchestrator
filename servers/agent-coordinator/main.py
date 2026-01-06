@@ -15,7 +15,7 @@ from database import (
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
-    get_run_by_session_id, SessionAlreadyExistsError
+    SessionAlreadyExistsError
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -484,8 +484,8 @@ async def get_session_events(session_id: str):
 async def add_session_event(session_id: str, event: Event):
     """Add event to session.
 
-    Handles special event types like `session_stop` which updates session status to 'finished'
-    and triggers callback processing for async_callback mode sessions.
+    Stores the event in the database and broadcasts it to SSE clients.
+    Used by executors to record messages, tool calls, and other session events.
     """
     session = get_session_by_id(session_id)
     if session is None:
@@ -498,46 +498,10 @@ async def add_session_event(session_id: str, event: Event):
     # Insert event
     insert_event(event)
 
-    # Handle session_stop special case: update status to finished
-    if event.event_type == SessionEventType.SESSION_STOP.value:
-        update_session_status(session_id, "finished")
-
-        # Get updated session and broadcast session_updated
-        updated_session = get_session_by_id(session_id)
-
-        # Broadcast to SSE clients
-        await sse_manager.broadcast(StreamEventType.SESSION_UPDATED, {"session": updated_session}, session_id=session_id)
-
-        # Callback processing: handle child completion and pending notifications
-        # Look up the run that was executing - execution_mode is stored on runs, not sessions
-        # This ensures callbacks work correctly even when resuming with different modes
-        current_run = get_run_by_session_id(session_id, active_only=False)
-
-        if current_run:
-            parent_session_id = current_run.get("parent_session_id")
-            execution_mode = current_run.get("execution_mode", "sync")
-
-            if parent_session_id and execution_mode == ExecutionMode.ASYNC_CALLBACK.value:
-                # This is a child session with callback mode - notify parent
-                parent_session = get_session_by_id(parent_session_id)
-                parent_status = parent_session["status"] if parent_session else "not_found"
-
-                # Get the child's result
-                child_result = get_session_result(session_id)
-
-                if DEBUG:
-                    print(f"[DEBUG] Child '{session_id}' completed (mode=async_callback), parent '{parent_session_id}' status={parent_status}", flush=True)
-
-                callback_processor.on_child_completed(
-                    child_session_id=session_id,
-                    parent_session=parent_session,
-                    child_result=child_result,
-                )
-
-        # Check if this session has pending child callbacks to flush
-        flushed = callback_processor.on_session_stopped(session_id)
-        if flushed > 0 and DEBUG:
-            print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
+    # NOTE: Session lifecycle events (session_start, session_stop) are handled by the
+    # agent runner endpoints, not this endpoint:
+    # - POST /runner/runs/{run_id}/started  -> inserts session_start, broadcasts SSE
+    # - POST /runner/runs/{run_id}/completed -> updates session status, inserts session_stop, triggers callbacks
 
     # Broadcast event to SSE clients
     event_data = {"data": event.model_dump()}
@@ -1071,7 +1035,14 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
 
 @app.post("/runner/runs/{run_id}/started", tags=["Runners"], response_model=OkResponse)
 async def report_run_started(run_id: str, request: RunnerIdRequest):
-    """Report that run execution has started."""
+    """Report that run execution has started.
+
+    This is the authoritative signal that a run has started. It:
+    - Updates run status to RUNNING
+    - Links parent session for hierarchy tracking
+    - Inserts session_start event for audit trail
+    - Broadcasts to SSE clients
+    """
     # Verify runner
     if not runner_registry.get_runner(request.runner_id):
         raise HTTPException(status_code=401, detail="Runner not registered")
@@ -1092,6 +1063,26 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
         if DEBUG:
             print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
 
+    # === Session start event (moved from executor) ===
+    # Insert session_start event for audit trail and SSE notification.
+    # This provides a consistent event for both new sessions and resumes.
+    # Previously, only the executor sent this (and only for resume mode).
+    session_id = run.session_id
+    if session_id:
+        start_event = Event(
+            event_type=SessionEventType.SESSION_START.value,
+            session_id=session_id,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        insert_event(start_event)
+
+        # Broadcast to SSE clients
+        event_data = {"data": start_event.model_dump()}
+        await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=session_id)
+
+        if DEBUG:
+            print(f"[DEBUG] Inserted session_start event for session '{session_id}'", flush=True)
+
     if DEBUG:
         print(f"[DEBUG] Run {run_id} started by runner {request.runner_id}", flush=True)
 
@@ -1100,7 +1091,14 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
 
 @app.post("/runner/runs/{run_id}/completed", tags=["Runners"], response_model=OkResponse)
 async def report_run_completed(run_id: str, request: RunCompletedRequest):
-    """Report that run completed successfully."""
+    """Report that run completed successfully.
+
+    This is the authoritative signal that a run has completed. It:
+    - Updates run status to COMPLETED
+    - Updates session status to 'finished'
+    - Handles async_callback child completion notifications
+    - Flushes any pending callbacks for this session
+    """
     # Verify runner
     if not runner_registry.get_runner(request.runner_id):
         raise HTTPException(status_code=401, detail="Runner not registered")
@@ -1112,28 +1110,56 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
     if DEBUG:
         print(f"[DEBUG] Run {run_id} completed by runner {request.runner_id}", flush=True)
 
-   # TODO: ADD - Move success callback here from POST /sessions/{session_id}/events
-    # This will unify callback triggers with failure/stopped callbacks.
-    # Implementation pattern (same as report_run_failed and report_run_stopped):
-    # TODO: check for correctnes because this was written as pseudo code
-    # if run.parent_session_id:
-    #     parent_session = get_session_by_id(run.parent_session_id)
-    #     parent_status = parent_session["status"] if parent_session else "not_found"
-    #     child_session = get_session_by_id(run.session_id)
-    #     child_result = get_session_result(child_session["session_id"]) if child_session else None
-    #
-    #     if DEBUG:
-    #         print(f"[DEBUG] Run completed for child '{run.session_name}', notifying parent '{run.parent_session_name}'", flush=True)
-    #
-    #     callback_processor.on_child_completed(
-    #         child_session_id=run.session_id,
-    #         parent_session_id=run.parent_session_id,
-    #         parent_status=parent_status,
-    #         child_result=child_result,
-    #     )
-    #
-    # See: docs/features/agent-callback-architecture.md "Callback Trigger Implementation"
-    # END TODO: ADD
+    # === Session finish handling (moved from POST /sessions/{session_id}/events) ===
+    # The agent runner is now the authoritative source for session completion.
+    # Previously, the executor sent a session_stop event; now the supervisor
+    # reports run completion which triggers this logic.
+
+    session_id = run.session_id
+    if session_id:
+        # Update session status to finished and broadcast to SSE clients
+        await update_session_status_and_broadcast(session_id, "finished")
+
+        # Insert session_stop event for audit trail (moved from executor)
+        stop_event = Event(
+            event_type=SessionEventType.SESSION_STOP.value,
+            session_id=session_id,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            exit_code=0,
+            reason="completed",
+        )
+        insert_event(stop_event)
+
+        # Broadcast session_stop event to SSE clients
+        event_data = {"data": stop_event.model_dump()}
+        await sse_manager.broadcast(StreamEventType.EVENT, event_data, session_id=session_id)
+
+        if DEBUG:
+            print(f"[DEBUG] Inserted session_stop event for session '{session_id}'", flush=True)
+
+        # Handle async_callback child completion - notify parent session
+        if run.parent_session_id and run.execution_mode == ExecutionMode.ASYNC_CALLBACK.value:
+            parent_session = get_session_by_id(run.parent_session_id)
+
+            if DEBUG:
+                parent_status = parent_session["status"] if parent_session else "not_found"
+                print(f"[DEBUG] Run completed for child '{session_id}' (mode=async_callback), "
+                      f"notifying parent '{run.parent_session_id}' status={parent_status}", flush=True)
+
+            # Get the child's result for the callback
+            child_result = get_session_result(session_id)
+
+            callback_processor.on_child_completed(
+                child_session_id=session_id,
+                parent_session=parent_session,
+                child_result=child_result,
+            )
+
+        # Flush any pending callbacks for this session (when it was a parent)
+        flushed = callback_processor.on_session_stopped(session_id)
+        if flushed > 0 and DEBUG:
+            print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
+
     return {"ok": True}
 
 

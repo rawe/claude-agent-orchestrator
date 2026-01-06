@@ -49,38 +49,46 @@ Watch the sse-monitor output.
    {"type": "session_created", "session": {"session_id": "ses_...", "status": "pending", "agent_name": null, ...}}
    ```
 
-2. **session_updated** (status: running, when executor binds)
+2. **session_start** (when runner reports run started)
+   ```json
+   {"type": "event", "data": {"event_type": "session_start", "session_id": "ses_...", "timestamp": "...", ...}}
+   ```
+   Note: Emitted by coordinator when agent runner calls `report_run_started`.
+
+3. **session_updated** (status: running, when executor binds)
    ```json
    {"type": "session_updated", "session": {"session_id": "ses_...", "status": "running", "executor_session_id": "<uuid>", ...}}
    ```
 
-3. **message (user)**
+4. **message (user)**
    ```json
    {"type": "event", "data": {"event_type": "message", "session_id": "ses_...", "role": "user", "content": [{"type": "text", "text": "Hello, this is a test message"}], ...}}
    ```
 
-4. **message (assistant)**
+5. **message (assistant)**
    ```json
    {"type": "event", "data": {"event_type": "message", "session_id": "ses_...", "role": "assistant", "content": [{"type": "text", "text": "<response from executor>"}], ...}}
    ```
    - With `test-executor`: `"[TEST-EXECUTOR] Received: Hello, this is a test message"`
    - With `claude-code`: Actual Claude response
 
-5. **session_updated** (status: finished)
+6. **session_updated** (status: finished)
    ```json
    {"type": "session_updated", "session": {"session_id": "ses_...", "status": "finished", ...}}
    ```
 
-6. **session_stop**
+7. **session_stop**
    ```json
    {"type": "event", "data": {"event_type": "session_stop", "session_id": "ses_...", "exit_code": 0, "reason": "completed", ...}}
    ```
+   Note: Emitted by coordinator when agent runner calls `report_run_completed`.
 
 ## Verification Checklist
 
-- [ ] All events received in correct order (session_created, session_updated:running, user message, assistant message, session_updated:finished, session_stop)
+- [ ] All events received in correct order (session_created, session_start, session_updated:running, user message, assistant message, session_updated:finished, session_stop)
 - [ ] `session_id` is consistent across all events (format: `ses_...`)
 - [ ] `session_id` in response matches events
+- [ ] `session_start` event received (emitted by agent runner via report_run_started)
 - [ ] User message content matches the prompt sent
 - [ ] Assistant message received (content depends on executor type)
 - [ ] session_stop has exit_code 0 and reason "completed"
