@@ -34,25 +34,27 @@ _lock = threading.Lock()
 
 
 # Callback resume prompt templates
-CALLBACK_PROMPT_TEMPLATE = """The child agent session "{child_session_id}" has completed.
-
+# Uses XML-like tags to distinguish callbacks from user messages (see ADR-014)
+# Note: Content inside tags is NOT XML-escaped - it's meant to be read by AI, not parsed as XML
+CALLBACK_PROMPT_TEMPLATE = """<agent-callback session="{child_session_id}" status="completed">
 ## Child Result
 
 {child_result}
+</agent-callback>
 
 Please continue with the orchestration based on this result."""
 
-CALLBACK_FAILED_PROMPT_TEMPLATE = """The child agent session "{child_session_id}" has failed.
-
+CALLBACK_FAILED_PROMPT_TEMPLATE = """<agent-callback session="{child_session_id}" status="failed">
 ## Error
 
 {child_error}
+</agent-callback>
 
 Please handle this failure and continue with the orchestration."""
 
-AGGREGATED_CALLBACK_PROMPT_TEMPLATE = """Multiple child agent sessions have completed.
-
+AGGREGATED_CALLBACK_PROMPT_TEMPLATE = """<agent-callback type="aggregated" count="{count}">
 {children_results}
+</agent-callback>
 
 Please continue with the orchestration based on these results."""
 
@@ -227,16 +229,17 @@ def _create_resume_run(
         results_parts = []
         for child_id, result, failed, error in children:
             if failed:
-                status = "FAILED"
-                child_result = error or "Unknown error"
+                status = "failed"
+                content = error or "Unknown error"
             else:
                 status = "completed"
-                child_result = result or "(No result available)"
+                content = result or "(No result available)"
 
-            results_parts.append(f"### Child: {child_id} ({status})\n\n{child_result}")
+            results_parts.append(f"### Child: {child_id} (status: {status})\n\n{content}")
 
         prompt = AGGREGATED_CALLBACK_PROMPT_TEMPLATE.format(
-            children_results="\n\n---\n\n".join(results_parts)
+            count=len(children),
+            children_results="\n\n---\n\n".join(results_parts),
         )
 
     try:

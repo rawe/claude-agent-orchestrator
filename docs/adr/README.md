@@ -34,6 +34,7 @@ Each ADR follows this structure:
 | [ADR-011](./ADR-011-runner-capabilities-and-run-demands.md) | Runner Capabilities and Run Demands | Proposed | 2025-12-18 |
 | [ADR-012](./ADR-012-runner-identity-and-registration.md) | Runner Identity and Registration | Proposed | 2025-12-18 |
 | [ADR-013](./ADR-013-websocket-to-sse-migration.md) | WebSocket to SSE Migration | Proposed | 2025-12-21 |
+| [ADR-014](./ADR-014-callback-message-format.md) | Callback Message Format with XML Tags | Proposed | 2026-01-06 |
 
 ## Creating a New ADR
 
