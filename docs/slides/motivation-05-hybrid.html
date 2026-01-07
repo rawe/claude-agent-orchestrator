@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hybrid Execution - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-session: #8b5cf6;
+      --color-dashboard: #f59e0b;
+      --color-executor: #ec4899;
+      --color-success: #22c55e;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 40%),
+                  radial-gradient(circle at 80% 50%, rgba(16, 185, 129, 0.06) 0%, transparent 40%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-md); }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-session);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Two worlds container */
+    .worlds-container {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 0;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    /* World columns */
+    .world {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .world.ai { animation-delay: 0.1s; }
+    .world.deterministic { animation-delay: 0.3s; }
+
+    .world-header {
+      text-align: center;
+      margin-bottom: var(--space-sm);
+    }
+
+    .world-icon {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .world-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .world.ai .world-title { color: var(--color-session); }
+    .world.deterministic .world-title { color: var(--color-runner); }
+
+    /* Agent boxes */
+    .world-agents {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .agent-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--agent-color);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      box-shadow: 0 0 15px var(--agent-glow);
+    }
+
+    .world.ai .agent-box {
+      --agent-color: var(--color-session);
+      --agent-glow: rgba(139, 92, 246, 0.15);
+    }
+    .world.deterministic .agent-box {
+      --agent-color: var(--color-runner);
+      --agent-glow: rgba(16, 185, 129, 0.15);
+    }
+
+    .agent-box-icon {
+      font-size: 1.25rem;
+    }
+
+    .agent-box-name {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--color-text-bright);
+    }
+
+    /* Characteristics */
+    .characteristics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      justify-content: center;
+      margin-top: auto;
+    }
+
+    .char-tag {
+      font-size: 0.625rem;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .world.ai .char-tag {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--color-session);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .world.deterministic .char-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--color-runner);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Bridge */
+    .bridge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-md);
+      min-width: 140px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.5s;
+    }
+
+    .bridge-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-dashboard);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      text-align: center;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.2);
+    }
+
+    .bridge-icon {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .bridge-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-dashboard);
+      margin-bottom: var(--space-xs);
+    }
+
+    .bridge-subtitle {
+      font-size: 0.625rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Arrows */
+    .bridge-arrows {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin: var(--space-sm) 0;
+    }
+
+    .arrow-left, .arrow-right {
+      width: 40px;
+      height: 2px;
+      background: var(--color-border-light);
+      position: relative;
+    }
+
+    .arrow-left::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: -4px;
+      border-right: 6px solid var(--color-session);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+    }
+
+    .arrow-right::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: -4px;
+      border-left: 6px solid var(--color-runner);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+    }
+
+    .arrow-label {
+      font-size: 0.5625rem;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    /* Why deterministic */
+    .why-section {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-lg);
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.7s;
+    }
+
+    .why-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+    }
+
+    .why-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+
+    .why-label strong {
+      color: var(--color-runner);
+    }
+
+    /* Takeaway */
+    .takeaway {
+      text-align: center;
+      max-width: 600px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.9s;
+    }
+
+    .takeaway-text {
+      font-size: 1rem;
+      color: var(--color-text-muted);
+    }
+
+    .takeaway-text strong {
+      color: var(--color-text-bright);
+    }
+
+    .takeaway-text .highlight {
+      color: var(--color-dashboard);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 800px) {
+      .worlds-container {
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+      .bridge {
+        flex-direction: row;
+        min-width: auto;
+      }
+      .bridge-arrows {
+        flex-direction: column;
+        margin: 0 var(--space-sm);
+      }
+      .arrow-left, .arrow-right {
+        width: 2px;
+        height: 30px;
+      }
+      .why-section {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Hybrid Execution</h1>
+      <p class="subtitle">Bridging AI and programs</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="worlds-container">
+
+        <!-- AI World -->
+        <div class="world ai">
+          <div class="world-header">
+            <div class="world-icon">🧠</div>
+            <div class="world-title">AI Agents</div>
+          </div>
+          <div class="world-agents">
+            <div class="agent-box">
+              <span class="agent-box-icon">🔍</span>
+              <span class="agent-box-name">Research Agent</span>
+            </div>
+            <div class="agent-box">
+              <span class="agent-box-icon">📊</span>
+              <span class="agent-box-name">Analysis Agent</span>
+            </div>
+          </div>
+          <div class="characteristics">
+            <span class="char-tag">Reasoning</span>
+            <span class="char-tag">Flexible</span>
+            <span class="char-tag">Natural Language</span>
+          </div>
+        </div>
+
+        <!-- Bridge -->
+        <div class="bridge">
+          <div class="bridge-arrows">
+            <div class="arrow-left"></div>
+            <span class="arrow-label">Prompt</span>
+          </div>
+          <div class="bridge-box">
+            <div class="bridge-icon">🔄</div>
+            <div class="bridge-title">Schema Bridge</div>
+            <div class="bridge-subtitle">Bidirectional</div>
+          </div>
+          <div class="bridge-arrows">
+            <span class="arrow-label">Structured</span>
+            <div class="arrow-right"></div>
+          </div>
+        </div>
+
+        <!-- Deterministic World -->
+        <div class="world deterministic">
+          <div class="world-header">
+            <div class="world-icon">⚙️</div>
+            <div class="world-title">Deterministic Agents</div>
+          </div>
+          <div class="world-agents">
+            <div class="agent-box">
+              <span class="agent-box-icon">🕷️</span>
+              <span class="agent-box-name">Crawler</span>
+            </div>
+            <div class="agent-box">
+              <span class="agent-box-icon">📑</span>
+              <span class="agent-box-name">Indexer</span>
+            </div>
+            <div class="agent-box">
+              <span class="agent-box-icon">🗄️</span>
+              <span class="agent-box-name">Database</span>
+            </div>
+          </div>
+          <div class="characteristics">
+            <span class="char-tag">Fast</span>
+            <span class="char-tag">Reliable</span>
+            <span class="char-tag">Structured I/O</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="why-section">
+        <div class="why-item">
+          <span class="why-icon">⚡</span>
+          <span class="why-label"><strong>Faster</strong> — No LLM overhead</span>
+        </div>
+        <div class="why-item">
+          <span class="why-icon">✓</span>
+          <span class="why-label"><strong>Reliable</strong> — Same input = same output</span>
+        </div>
+        <div class="why-item">
+          <span class="why-icon">🎯</span>
+          <span class="why-label"><strong>Efficient</strong> — Optimized for task</span>
+        </div>
+      </div>
+
+      <div class="takeaway">
+        <p class="takeaway-text">
+          <strong>Both as equals.</strong> AI agents and deterministic agents can orchestrate and call each other. The <span class="highlight">schema bridge</span> is the key challenge.
+        </p>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

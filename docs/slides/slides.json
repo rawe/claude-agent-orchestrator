@@ -1,8 +1,9 @@
 {
   "title": "Agent Orchestrator",
   "subtitle": "A step-by-step introduction to managing multiple AI agents with real-time observability",
-  "totalSlides": 23,
+  "totalSlides": 25,
   "sections": [
+    { "id": "motivation", "number": "0", "title": "Vision & Goals", "colorClass": "section-motivation" },
     { "id": "intro", "number": "1", "title": "Motivation & Problem", "colorClass": "section-intro" },
     { "id": "components", "number": "2", "title": "Core Components", "colorClass": "section-components" },
     { "id": "chat", "number": "3", "title": "Your First Chat", "colorClass": "section-chat" },
@@ -11,6 +12,30 @@
     { "id": "summary", "number": "✓", "title": "Summary", "colorClass": "section-summary" }
   ],
   "mainFlow": [
+    {
+      "id": "motivation-problem",
+      "file": "motivation-01-problem.html",
+      "title": "The Problem",
+      "icon": "❗",
+      "section": "motivation"
+    },
+    {
+      "id": "motivation-vision",
+      "file": "motivation-02-vision.html",
+      "title": "The Vision",
+      "icon": "🎯",
+      "section": "motivation",
+      "deepDives": [
+        { "id": "foundation", "file": "motivation-03-foundation.html", "title": "Reusable Foundation", "icon": "🏗️", "backLabel": "Back to Vision" },
+        { "id": "refinement", "file": "motivation-04-refinement.html", "title": "Progressive Refinement", "icon": "🔄", "backLabel": "Back to Vision" },
+        { "id": "hybrid", "file": "motivation-05-hybrid.html", "title": "Hybrid Execution", "icon": "⚡", "backLabel": "Back to Vision" },
+        { "id": "interfaces", "file": "motivation-06-interfaces.html", "title": "Clean Interfaces", "icon": "🔌", "backLabel": "Back to Vision" },
+        { "id": "provider", "file": "motivation-07-provider.html", "title": "Provider Independence", "icon": "🔓", "backLabel": "Back to Vision" },
+        { "id": "accessibility", "file": "motivation-10-accessibility.html", "title": "Everyone Can Contribute", "icon": "👥", "backLabel": "Back to Vision" },
+        { "id": "collaboration", "file": "motivation-08-collaboration.html", "title": "Decentralized Collaboration", "icon": "🤝", "backLabel": "Back to Vision" },
+        { "id": "context", "file": "motivation-09-context.html", "title": "Context Engineering", "icon": "🧠", "backLabel": "Back to Vision" }
+      ]
+    },
     {
       "id": "orchestration",
       "file": "01-orchestration.html",

@@ -6,8 +6,9 @@ This folder contains all project documentation organized by purpose and audience
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | System overview, terminology, and component structure |
-| [GETTING_STARTED.md](./GETTING_STARTED.md) | Prerequisites and setup guide for local development |
+| [VISION.md](./VISION.md) | Project vision, core pillars, and long-term goals. Start here to understand *why* this framework exists |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System overview, core terminology, and component structure. Understand *how* the Agent Orchestrator works |
+| [GETTING_STARTED.md](./GETTING_STARTED.md) | Prerequisites, setup instructions, and quick start guide for local development |
 
 ## Documentation Map
 

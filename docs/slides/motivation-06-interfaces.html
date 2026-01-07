@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clean Interfaces - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-session: #8b5cf6;
+      --color-dashboard: #f59e0b;
+      --color-executor: #ec4899;
+      --color-success: #22c55e;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-md); }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-session);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Hub container */
+    .hub-container {
+      position: relative;
+      width: 700px;
+      height: 340px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.1s;
+    }
+
+    /* Center hub */
+    .hub-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--color-bg-card);
+      border: 3px solid var(--color-session);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      text-align: center;
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.25);
+      z-index: 10;
+    }
+
+    .hub-icon {
+      font-size: 2rem;
+      margin-bottom: var(--space-sm);
+    }
+
+    .hub-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--color-session);
+      margin-bottom: var(--space-sm);
+    }
+
+    .hub-interfaces {
+      display: flex;
+      gap: var(--space-xs);
+      justify-content: center;
+    }
+
+    .interface-tag {
+      font-size: 0.5625rem;
+      padding: 2px 6px;
+      border-radius: var(--radius-full);
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--color-session);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      font-weight: 500;
+    }
+
+    /* Spokes (external systems) */
+    .spoke {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      opacity: 0;
+      animation: spokeAppear 0.4s ease forwards;
+    }
+
+    .spoke:nth-child(2) { animation-delay: 0.3s; }
+    .spoke:nth-child(3) { animation-delay: 0.4s; }
+    .spoke:nth-child(4) { animation-delay: 0.5s; }
+    .spoke:nth-child(5) { animation-delay: 0.6s; }
+
+    .spoke-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      transition: all var(--transition-normal);
+    }
+
+    .spoke-box:hover {
+      border-color: var(--color-session);
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+    }
+
+    .spoke-icon {
+      font-size: 1.25rem;
+    }
+
+    .spoke-content {
+      text-align: left;
+    }
+
+    .spoke-name {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .spoke-via {
+      font-size: 0.625rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Connector lines */
+    .spoke-line {
+      width: 100px;
+      height: 2px;
+      background: var(--color-border-light);
+      position: relative;
+    }
+
+    .spoke-line::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-session);
+    }
+
+    /* Position spokes */
+    .spoke.top {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      flex-direction: column;
+    }
+    .spoke.top .spoke-line {
+      width: 2px;
+      height: 40px;
+    }
+    .spoke.top .spoke-line::after {
+      bottom: -3px;
+      left: -2px;
+    }
+
+    .spoke.right {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      flex-direction: row-reverse;
+    }
+    .spoke.right .spoke-line::after {
+      left: -3px;
+      top: -2px;
+    }
+
+    .spoke.bottom {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      flex-direction: column-reverse;
+    }
+    .spoke.bottom .spoke-line {
+      width: 2px;
+      height: 40px;
+    }
+    .spoke.bottom .spoke-line::after {
+      top: -3px;
+      left: -2px;
+    }
+
+    .spoke.left {
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .spoke.left .spoke-line::after {
+      right: -3px;
+      top: -2px;
+    }
+
+    /* Principles */
+    .principles {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.8s;
+    }
+
+    .principle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .principle-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+
+    .principle-text {
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+    }
+
+    .principle-text strong {
+      color: var(--color-session);
+    }
+
+    /* Takeaway */
+    .takeaway {
+      text-align: center;
+      max-width: 500px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 1s;
+    }
+
+    .takeaway-text {
+      font-size: 1rem;
+      color: var(--color-text-muted);
+    }
+
+    .takeaway-text strong {
+      color: var(--color-text-bright);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes spokeAppear {
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 600px) {
+      .hub-container {
+        width: 100%;
+        max-width: 350px;
+        height: 400px;
+      }
+      .spoke-line {
+        width: 30px;
+      }
+      .principles {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Clean Interfaces</h1>
+      <p class="subtitle">Easy to connect, easy to adapt</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="hub-container">
+        <!-- Center Hub -->
+        <div class="hub-center">
+          <div class="hub-icon">🔌</div>
+          <div class="hub-title">Agent Orchestrator</div>
+          <div class="hub-interfaces">
+            <span class="interface-tag">REST API</span>
+            <span class="interface-tag">WebSocket</span>
+            <span class="interface-tag">Callbacks</span>
+          </div>
+        </div>
+
+        <!-- Top Spoke -->
+        <div class="spoke top">
+          <div class="spoke-box">
+            <span class="spoke-icon">🌐</span>
+            <div class="spoke-content">
+              <div class="spoke-name">Web App</div>
+              <div class="spoke-via">via API</div>
+            </div>
+          </div>
+          <div class="spoke-line"></div>
+        </div>
+
+        <!-- Right Spoke -->
+        <div class="spoke right">
+          <div class="spoke-box">
+            <span class="spoke-icon">⌨️</span>
+            <div class="spoke-content">
+              <div class="spoke-name">CLI Tool</div>
+              <div class="spoke-via">via API</div>
+            </div>
+          </div>
+          <div class="spoke-line"></div>
+        </div>
+
+        <!-- Bottom Spoke -->
+        <div class="spoke bottom">
+          <div class="spoke-box">
+            <span class="spoke-icon">🔗</span>
+            <div class="spoke-content">
+              <div class="spoke-name">Webhook Service</div>
+              <div class="spoke-via">via Callbacks</div>
+            </div>
+          </div>
+          <div class="spoke-line"></div>
+        </div>
+
+        <!-- Left Spoke -->
+        <div class="spoke left">
+          <div class="spoke-box">
+            <span class="spoke-icon">🧩</span>
+            <div class="spoke-content">
+              <div class="spoke-name">Other Framework</div>
+              <div class="spoke-via">via API</div>
+            </div>
+          </div>
+          <div class="spoke-line"></div>
+        </div>
+      </div>
+
+      <div class="principles">
+        <div class="principle">
+          <span class="principle-icon">⚡</span>
+          <span class="principle-text"><strong>Simple</strong> — Minutes, not hours</span>
+        </div>
+        <div class="principle">
+          <span class="principle-icon">🔄</span>
+          <span class="principle-text"><strong>Consistent</strong> — Same patterns everywhere</span>
+        </div>
+        <div class="principle">
+          <span class="principle-icon">🔧</span>
+          <span class="principle-text"><strong>Adaptable</strong> — Extend without changes</span>
+        </div>
+      </div>
+
+      <div class="takeaway">
+        <p class="takeaway-text">
+          <strong>One way to connect, works for everyone.</strong> If you've built a web app, you can integrate with this.
+        </p>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

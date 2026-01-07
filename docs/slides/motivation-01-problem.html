@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Problem - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-warning: #f59e0b;
+      --color-error: #ef4444;
+      --color-coordinator: #3b82f6;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --radius-full: 9999px;
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(239, 68, 68, 0.06) 0%, transparent 40%),
+                  radial-gradient(circle at 70% 70%, rgba(245, 158, 11, 0.06) 0%, transparent 40%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-lg); }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-session);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Barriers Layout */
+    .barriers-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-md);
+      max-width: 1100px;
+      width: 100%;
+    }
+
+    .barrier-card {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-error);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md) var(--space-lg);
+      min-width: 140px;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: barrierAppear 0.5s ease forwards;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+    }
+
+    .barrier-card:nth-child(1) { animation-delay: 0.1s; }
+    .barrier-card:nth-child(2) { animation-delay: 0.2s; }
+    .barrier-card:nth-child(4) { animation-delay: 0.4s; }
+    .barrier-card:nth-child(5) { animation-delay: 0.5s; }
+
+    .barrier-icon {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .barrier-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--color-error);
+      margin-bottom: var(--space-xs);
+    }
+
+    .barrier-desc {
+      font-size: 0.6875rem;
+      color: var(--color-text-muted);
+      line-height: 1.3;
+    }
+
+    /* Center: The squeezed agent work */
+    .agent-work {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-coordinator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-sm) var(--space-md);
+      text-align: center;
+      opacity: 0;
+      animation: workAppear 0.6s ease forwards;
+      animation-delay: 0.6s;
+      box-shadow: 0 0 25px rgba(59, 130, 246, 0.2);
+      position: relative;
+    }
+
+    .agent-work::before,
+    .agent-work::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 20px;
+      height: 2px;
+      background: var(--color-error);
+      opacity: 0.5;
+    }
+    .agent-work::before { left: -24px; }
+    .agent-work::after { right: -24px; }
+
+    .work-icon {
+      font-size: 1.25rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .work-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-coordinator);
+      white-space: nowrap;
+    }
+
+    .work-subtitle {
+      font-size: 0.625rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Takeaway message */
+    .takeaway {
+      text-align: center;
+      max-width: 700px;
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+      animation-delay: 0.8s;
+    }
+
+    .takeaway-main {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--color-text-bright);
+      font-weight: 500;
+      margin-bottom: var(--space-sm);
+    }
+
+    .takeaway-sub {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+
+    .highlight {
+      color: var(--color-warning);
+    }
+
+    @keyframes barrierAppear {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes workAppear {
+      to { opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 900px) {
+      .barriers-container {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+      }
+      .barrier-card {
+        min-width: 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>The Problem</h1>
+      <p class="subtitle">Why we need something new</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="barriers-container">
+        <div class="barrier-card">
+          <div class="barrier-icon">🔧</div>
+          <div class="barrier-title">Infrastructure</div>
+          <div class="barrier-desc">Rebuilt for every project</div>
+        </div>
+
+        <div class="barrier-card">
+          <div class="barrier-icon">🔗</div>
+          <div class="barrier-title">Coordination</div>
+          <div class="barrier-desc">Agents stepping on each other</div>
+        </div>
+
+        <div class="agent-work">
+          <div class="work-icon">🤖</div>
+          <div class="work-title">Agent Work</div>
+          <div class="work-subtitle">squeezed</div>
+        </div>
+
+        <div class="barrier-card">
+          <div class="barrier-icon">📋</div>
+          <div class="barrier-title">Context</div>
+          <div class="barrier-desc">Right info at the right time</div>
+        </div>
+
+        <div class="barrier-card">
+          <div class="barrier-icon">⚡</div>
+          <div class="barrier-title">AI-Program Gap</div>
+          <div class="barrier-desc">No clean way to combine</div>
+        </div>
+      </div>
+
+      <div class="barrier-card" style="animation-delay: 0.3s; border-color: var(--color-warning); box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);">
+        <div class="barrier-icon">👤</div>
+        <div class="barrier-title" style="color: var(--color-warning);">Accessibility</div>
+        <div class="barrier-desc">Only programmers can contribute</div>
+      </div>
+
+      <div class="takeaway">
+        <p class="takeaway-main">
+          We spend more time <span class="highlight">wiring things together</span> than on what agents actually do.
+        </p>
+        <p class="takeaway-sub">
+          Frameworks exist (LangChain, AutoGen, etc.) — but they're generic, opinionated, and still require deep programming knowledge.
+        </p>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

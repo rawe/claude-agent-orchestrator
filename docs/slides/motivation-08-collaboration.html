@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decentralized Collaboration - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-session: #8b5cf6;
+      --color-dashboard: #f59e0b;
+      --color-executor: #ec4899;
+      --color-success: #22c55e;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(34, 197, 94, 0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-md); }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-session);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Network container */
+    .network-container {
+      position: relative;
+      width: 700px;
+      height: 380px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.1s;
+    }
+
+    /* Center hub */
+    .center-hub {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-sm);
+      z-index: 10;
+    }
+
+    .orchestrator-box {
+      background: var(--color-bg-card);
+      border: 3px solid var(--color-coordinator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md) var(--space-lg);
+      text-align: center;
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.25);
+    }
+
+    .orchestrator-icon {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .orchestrator-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--color-coordinator);
+    }
+
+    .knowledge-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-success);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      text-align: center;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+    }
+
+    .knowledge-icon {
+      font-size: 1rem;
+      margin-right: var(--space-xs);
+    }
+
+    .knowledge-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-success);
+    }
+
+    /* Team members */
+    .team-member {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xs);
+      opacity: 0;
+      animation: memberAppear 0.5s ease forwards;
+    }
+
+    .team-member.developer { top: 10px; left: 50%; transform: translateX(-50%); animation-delay: 0.3s; }
+    .team-member.designer { bottom: 30px; left: 80px; animation-delay: 0.4s; }
+    .team-member.pm { bottom: 30px; right: 80px; animation-delay: 0.5s; }
+
+    .member-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-xs);
+    }
+
+    .member-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-runner);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xs);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+    }
+
+    .member-icon {
+      font-size: 1.5rem;
+    }
+
+    .member-name {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--color-runner);
+    }
+
+    .member-agents {
+      display: flex;
+      gap: var(--space-xs);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .agent-tag {
+      font-size: 0.5625rem;
+      padding: 2px 6px;
+      border-radius: var(--radius-full);
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--color-runner);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Connection lines (simplified) */
+    .connection-line {
+      position: absolute;
+      background: var(--color-border-light);
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    .line-dev {
+      width: 2px;
+      height: 60px;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      animation-delay: 0.6s;
+    }
+
+    .line-designer {
+      width: 100px;
+      height: 2px;
+      bottom: 140px;
+      left: 140px;
+      transform: rotate(30deg);
+      animation-delay: 0.7s;
+    }
+
+    .line-pm {
+      width: 100px;
+      height: 2px;
+      bottom: 140px;
+      right: 140px;
+      transform: rotate(-30deg);
+      animation-delay: 0.8s;
+    }
+
+    /* Vision points */
+    .vision-points {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.9s;
+      flex-wrap: wrap;
+    }
+
+    .vision-point {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+    }
+
+    .vision-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+
+    .vision-point strong {
+      color: var(--color-success);
+    }
+
+    /* Takeaway */
+    .takeaway {
+      text-align: center;
+      max-width: 550px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 1.1s;
+    }
+
+    .takeaway-text {
+      font-size: 1rem;
+      color: var(--color-text-muted);
+    }
+
+    .takeaway-text strong {
+      color: var(--color-text-bright);
+    }
+
+    .takeaway-text .highlight {
+      color: var(--color-success);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes memberAppear {
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 750px) {
+      .network-container {
+        width: 100%;
+        max-width: 400px;
+        height: 450px;
+      }
+      .team-member.designer { left: 20px; }
+      .team-member.pm { right: 20px; }
+      .vision-points {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Decentralized Collaboration</h1>
+      <p class="subtitle">Everyone contributes</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="network-container">
+        <!-- Connection lines -->
+        <div class="connection-line line-dev"></div>
+        <div class="connection-line line-designer"></div>
+        <div class="connection-line line-pm"></div>
+
+        <!-- Center Hub -->
+        <div class="center-hub">
+          <div class="orchestrator-box">
+            <div class="orchestrator-icon">🌐</div>
+            <div class="orchestrator-title">Shared Orchestrator</div>
+          </div>
+          <div class="knowledge-box">
+            <span class="knowledge-icon">📚</span>
+            <span class="knowledge-title">Knowledge Base</span>
+          </div>
+        </div>
+
+        <!-- Developer -->
+        <div class="team-member developer">
+          <span class="member-label">Developer's Machine</span>
+          <div class="member-box">
+            <div class="member-icon">👨‍💻</div>
+            <div class="member-name">Runner</div>
+            <div class="member-agents">
+              <span class="agent-tag">Code Agent</span>
+              <span class="agent-tag">Test Agent</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Designer -->
+        <div class="team-member designer">
+          <span class="member-label">Designer's Machine</span>
+          <div class="member-box">
+            <div class="member-icon">👩‍🎨</div>
+            <div class="member-name">Runner</div>
+            <div class="member-agents">
+              <span class="agent-tag">Design Review</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PM -->
+        <div class="team-member pm">
+          <span class="member-label">PM's Machine</span>
+          <div class="member-box">
+            <div class="member-icon">👔</div>
+            <div class="member-name">Runner</div>
+            <div class="member-agents">
+              <span class="agent-tag">Requirements</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="vision-points">
+        <div class="vision-point">
+          <span class="vision-icon">🛠️</span>
+          <span><strong>Programmers</strong> build capabilities</span>
+        </div>
+        <div class="vision-point">
+          <span class="vision-icon">📝</span>
+          <span><strong>Domain experts</strong> describe agents</span>
+        </div>
+        <div class="vision-point">
+          <span class="vision-icon">🤝</span>
+          <span><strong>Everyone</strong> can access</span>
+        </div>
+      </div>
+
+      <div class="takeaway">
+        <p class="takeaway-text">
+          <strong>Different people, different agents, one system.</strong> Your expertise, your agents — <span class="highlight">shared with the team</span>.
+        </p>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

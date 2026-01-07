@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reusable Foundation - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-coordinator: #3b82f6;
+      --color-runner: #10b981;
+      --color-session: #8b5cf6;
+      --color-dashboard: #f59e0b;
+      --color-executor: #ec4899;
+      --color-success: #22c55e;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.06) 0%, transparent 40%),
+                  radial-gradient(circle at 70% 70%, rgba(16, 185, 129, 0.06) 0%, transparent 40%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header { text-align: center; margin-bottom: var(--space-md); }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-session);
+      transform: translateY(-2px);
+    }
+    .slide-nav a.disabled { opacity: 0.3; pointer-events: none; }
+    .slide-number { font-size: 0.875rem; color: var(--color-text-muted); min-width: 60px; text-align: center; }
+
+    /* Layers container */
+    .layers-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-sm);
+      max-width: 900px;
+      width: 100%;
+    }
+
+    /* Layer labels */
+    .layer-section {
+      width: 100%;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .layer-section.top { animation-delay: 0.3s; }
+    .layer-section.bottom { animation-delay: 0.1s; }
+
+    .layer-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .layer-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    .focus-hint {
+      font-size: 0.75rem;
+      color: var(--color-coordinator);
+      font-weight: 500;
+    }
+
+    /* Top layer - Your Agents */
+    .agents-row {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .agent-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--agent-color);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md) var(--space-lg);
+      text-align: center;
+      min-width: 140px;
+      box-shadow: 0 0 20px var(--agent-glow);
+      opacity: 0;
+      transform: translateY(-20px);
+      animation: agentAppear 0.4s ease forwards;
+    }
+
+    .agent-box:nth-child(1) { --agent-color: var(--color-session); --agent-glow: rgba(139, 92, 246, 0.2); animation-delay: 0.4s; }
+    .agent-box:nth-child(2) { --agent-color: var(--color-dashboard); --agent-glow: rgba(245, 158, 11, 0.2); animation-delay: 0.5s; }
+    .agent-box:nth-child(3) { --agent-color: var(--color-executor); --agent-glow: rgba(236, 72, 153, 0.2); animation-delay: 0.6s; }
+    .agent-box:nth-child(4) { --agent-color: var(--color-success); --agent-glow: rgba(34, 197, 94, 0.2); animation-delay: 0.7s; }
+
+    .agent-icon {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .agent-name {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+    }
+
+    .agent-type {
+      font-size: 0.625rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Connector arrows */
+    .connectors {
+      display: flex;
+      justify-content: center;
+      gap: 100px;
+      margin: var(--space-sm) 0;
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+      animation-delay: 0.8s;
+    }
+
+    .connector {
+      width: 2px;
+      height: 30px;
+      background: linear-gradient(to bottom, var(--color-text-muted), var(--color-coordinator));
+      position: relative;
+    }
+
+    .connector::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--color-coordinator);
+    }
+
+    /* Bottom layer - Core */
+    .core-layer {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-coordinator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      width: 100%;
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+      opacity: 0;
+      animation: coreAppear 0.5s ease forwards;
+      animation-delay: 0.2s;
+    }
+
+    .core-header {
+      text-align: center;
+      margin-bottom: var(--space-md);
+    }
+
+    .core-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--color-coordinator);
+    }
+
+    .core-subtitle {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+    }
+
+    .core-components {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-lg);
+      flex-wrap: wrap;
+    }
+
+    .core-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .core-item-icon {
+      font-size: 1rem;
+    }
+
+    .core-item-label {
+      font-size: 0.8125rem;
+      color: var(--color-text);
+      font-weight: 500;
+    }
+
+    /* Takeaway */
+    .takeaway {
+      text-align: center;
+      max-width: 600px;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 1s;
+    }
+
+    .takeaway-text {
+      font-size: 1rem;
+      color: var(--color-text-muted);
+    }
+
+    .takeaway-text strong {
+      color: var(--color-text-bright);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes agentAppear {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes coreAppear {
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 700px) {
+      .agents-row {
+        flex-wrap: wrap;
+      }
+      .agent-box {
+        min-width: 120px;
+      }
+      .connectors {
+        gap: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Reusable Foundation</h1>
+      <p class="subtitle">Build once, use everywhere</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="layers-container">
+
+        <!-- Top Layer: Your Agents -->
+        <div class="layer-section top">
+          <div class="layer-label">
+            Your Agents <span class="focus-hint">← You focus here</span>
+          </div>
+          <div class="agents-row">
+            <div class="agent-box">
+              <div class="agent-icon">📚</div>
+              <div class="agent-name">Knowledge Agent</div>
+              <div class="agent-type">Your team</div>
+            </div>
+            <div class="agent-box">
+              <div class="agent-icon">🔍</div>
+              <div class="agent-name">Research Agent</div>
+              <div class="agent-type">Your team</div>
+            </div>
+            <div class="agent-box">
+              <div class="agent-icon">💬</div>
+              <div class="agent-name">Support Agent</div>
+              <div class="agent-type">Your team</div>
+            </div>
+            <div class="agent-box">
+              <div class="agent-icon">⚙️</div>
+              <div class="agent-name">Your Agent</div>
+              <div class="agent-type">Your team</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connectors -->
+        <div class="connectors">
+          <div class="connector"></div>
+          <div class="connector"></div>
+          <div class="connector"></div>
+          <div class="connector"></div>
+        </div>
+
+        <!-- Bottom Layer: Core -->
+        <div class="layer-section bottom">
+          <div class="layer-label">Agent Orchestrator Core</div>
+          <div class="core-layer">
+            <div class="core-header">
+              <div class="core-title">Agent Orchestrator</div>
+              <div class="core-subtitle">We handle the infrastructure</div>
+            </div>
+            <div class="core-components">
+              <div class="core-item">
+                <span class="core-item-icon">🧠</span>
+                <span class="core-item-label">Coordinator</span>
+              </div>
+              <div class="core-item">
+                <span class="core-item-icon">⚡</span>
+                <span class="core-item-label">Runners</span>
+              </div>
+              <div class="core-item">
+                <span class="core-item-icon">📊</span>
+                <span class="core-item-label">Monitoring</span>
+              </div>
+              <div class="core-item">
+                <span class="core-item-icon">💾</span>
+                <span class="core-item-label">State</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="takeaway">
+        <p class="takeaway-text">
+          <strong>Don't reinvent the wheel.</strong> The core handles orchestration, execution, and monitoring — so you can focus on your agents.
+        </p>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>
