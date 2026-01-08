@@ -130,6 +130,24 @@ Use JSON Schema Draft 7 for validation (widely supported, stable).
 
 ---
 
+## Note: Temporary MCP Validation
+
+Phase 1 added temporary `prompt` validation in the MCP tools (`start_agent_session`, `resume_agent_session`) as a quick check:
+
+```python
+prompt = parameters.get("prompt")
+if not prompt or not isinstance(prompt, str):
+    raise ToolError("Missing required parameter: 'prompt'")
+```
+
+This is **superseded by Phase 3** validation at the Coordinator. Options when implementing Phase 3:
+- **Remove MCP validation**: Coordinator handles all validation, MCP tools just forward requests
+- **Keep as early check**: Provides fast feedback before network round-trip to Coordinator
+
+Recommended: Remove MCP validation to avoid duplicate logic and ensure consistent error formats.
+
+---
+
 ## Files to Modify
 
 | File | Change |
@@ -138,7 +156,7 @@ Use JSON Schema Draft 7 for validation (widely supported, stable).
 | `servers/agent-coordinator/database.py` | Add `type`, `parameters_schema` columns |
 | `servers/agent-coordinator/main.py` | Agent list includes schema; create_run validates |
 | `servers/agent-coordinator/services/run_queue.py` | Parameter validation logic |
-| `servers/agent-runner/lib/agent_orchestrator_mcp/tools.py` | list_agent_blueprints returns schema |
+| `servers/agent-runner/lib/agent_orchestrator_mcp/tools.py` | list_agent_blueprints returns schema; optionally remove temporary prompt validation |
 
 ---
 

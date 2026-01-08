@@ -426,9 +426,11 @@ function RunDetailPanel({ run, onClose }: RunDetailPanelProps) {
         </div>
 
         <div>
-          <h5 className="text-sm font-medium text-gray-700 mb-2">Prompt</h5>
+          <h5 className="text-sm font-medium text-gray-700 mb-2">Parameters</h5>
           <div className="p-2 bg-gray-50 rounded text-sm text-gray-700 max-h-24 overflow-y-auto">
-            {run.prompt}
+            {typeof run.parameters?.prompt === 'string'
+              ? run.parameters.prompt
+              : JSON.stringify(run.parameters, null, 2)}
           </div>
         </div>
 

@@ -199,7 +199,7 @@ class RunExecutor:
     def _build_payload(self, run: Run, mode: str) -> dict:
         """Build JSON payload for ao-*-exec.
 
-        Schema 2.1: If agent_name is specified and blueprint_resolver is configured,
+        Schema 2.2: If agent_name is specified and blueprint_resolver is configured,
         fetches and resolves the blueprint, including it as agent_blueprint in the payload.
         Also includes executor_config from the profile if configured.
 
@@ -214,7 +214,7 @@ class RunExecutor:
             "schema_version": SCHEMA_VERSION,
             "mode": mode,
             "session_id": run.session_id,
-            "prompt": run.prompt,
+            "parameters": run.parameters,
         }
 
         # Add project_dir for start mode

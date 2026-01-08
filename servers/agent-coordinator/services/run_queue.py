@@ -65,11 +65,12 @@ class RunCreate(BaseModel):
 
     session_id is optional - coordinator generates it if not provided (ADR-010).
     execution_mode controls callback behavior per ADR-003.
+    parameters is the unified input dict - for AI agents, use {"prompt": "..."}.
     """
     type: RunType
     session_id: Optional[str] = None  # Coordinator generates if not provided
     agent_name: Optional[str] = None
-    prompt: str
+    parameters: dict  # Unified input - e.g., {"prompt": "..."} for AI agents
     project_dir: Optional[str] = None
     parent_session_id: Optional[str] = None
     execution_mode: ExecutionMode = ExecutionMode.SYNC
@@ -83,7 +84,7 @@ class Run(BaseModel):
     type: RunType
     session_id: str  # Coordinator-generated (ADR-010)
     agent_name: Optional[str] = None
-    prompt: str
+    parameters: dict  # Unified input - e.g., {"prompt": "..."} for AI agents
     project_dir: Optional[str] = None
     parent_session_id: Optional[str] = None
     execution_mode: ExecutionMode = ExecutionMode.SYNC  # ADR-003
@@ -98,6 +99,11 @@ class Run(BaseModel):
     completed_at: Optional[str] = None
     # Timeout for no-match scenarios (ISO timestamp)
     timeout_at: Optional[str] = None
+
+    @property
+    def prompt(self) -> Optional[str]:
+        """Helper to extract prompt from parameters (for AI agents)."""
+        return self.parameters.get("prompt") if self.parameters else None
 
 
 def generate_session_id() -> str:
@@ -243,7 +249,7 @@ class RunQueue:
             session_id=d["session_id"],
             type=RunType(d["type"]),
             agent_name=d.get("agent_name"),
-            prompt=d["prompt"],
+            parameters=json.loads(d["parameters"]) if d.get("parameters") else {},
             project_dir=d.get("project_dir"),
             parent_session_id=d.get("parent_session_id"),
             execution_mode=ExecutionMode(d.get("execution_mode", "sync")),
@@ -284,7 +290,7 @@ class RunQueue:
                 run_id=run_id,
                 session_id=session_id,
                 run_type=run_create.type.value,
-                prompt=run_create.prompt,
+                parameters=json.dumps(run_create.parameters),
                 created_at=created_at,
                 agent_name=agent_name,
                 project_dir=project_dir,
@@ -299,7 +305,7 @@ class RunQueue:
                 session_id=session_id,
                 type=run_create.type,
                 agent_name=agent_name,
-                prompt=run_create.prompt,
+                parameters=run_create.parameters,
                 project_dir=project_dir,
                 parent_session_id=run_create.parent_session_id,
                 execution_mode=run_create.execution_mode,

@@ -55,7 +55,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "start_session",
     "agent_name": "python-agent",
-    "prompt": "Hello"
+    "parameters": {"prompt": "Hello"}
   }'
 ```
 

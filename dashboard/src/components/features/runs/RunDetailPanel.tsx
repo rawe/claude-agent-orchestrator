@@ -260,11 +260,15 @@ export function RunDetailPanel({ run, isOpen, onClose }: RunDetailPanelProps) {
           </div>
         </div>
 
-        {/* Prompt */}
+        {/* Parameters */}
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Prompt</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-2">Parameters</h4>
           <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">{run.prompt}</pre>
+            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+              {typeof run.parameters?.prompt === 'string'
+                ? run.parameters.prompt
+                : JSON.stringify(run.parameters, null, 2)}
+            </pre>
           </div>
         </div>
 

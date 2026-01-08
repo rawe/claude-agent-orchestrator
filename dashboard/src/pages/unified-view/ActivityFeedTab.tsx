@@ -228,11 +228,15 @@ function ActivityCard({ activity, expanded, onToggle, animate }: ActivityCardPro
                 </div>
 
                 <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">Prompt</div>
+                  <div className="text-xs text-gray-500 uppercase mb-1">Parameters</div>
                   <div className="bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto">
                     <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">
-                      {activity.run.prompt.slice(0, 300)}
-                      {activity.run.prompt.length > 300 ? '...' : ''}
+                      {(() => {
+                        const displayText = typeof activity.run.parameters?.prompt === 'string'
+                          ? activity.run.parameters.prompt
+                          : JSON.stringify(activity.run.parameters, null, 2);
+                        return displayText.slice(0, 300) + (displayText.length > 300 ? '...' : '');
+                      })()}
                     </pre>
                   </div>
                 </div>

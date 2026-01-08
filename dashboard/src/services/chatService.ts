@@ -13,7 +13,7 @@ export interface BlueprintListResponse {
 }
 
 export interface SessionStartRequest {
-  prompt: string;
+  parameters: Record<string, unknown>;  // Unified input - e.g., {"prompt": "..."} for AI agents
   agent_blueprint_name?: string;
   project_dir?: string;
   async_mode: boolean;
@@ -26,7 +26,7 @@ export interface SessionStartResponse {
 }
 
 export interface SessionResumeRequest {
-  prompt: string;
+  parameters: Record<string, unknown>;  // Unified input - e.g., {"prompt": "..."} for AI agents
   async_mode: boolean;
 }
 
@@ -35,7 +35,7 @@ interface CreateRunRequest {
   type: 'start_session' | 'resume_session';
   session_id?: string; // Only for resume_session
   agent_name?: string;
-  prompt: string;
+  parameters: Record<string, unknown>;  // Unified input - e.g., {"prompt": "..."} for AI agents
   project_dir?: string;
 }
 
@@ -69,7 +69,7 @@ export const chatService = {
   async startSession(request: SessionStartRequest): Promise<SessionStartResponse> {
     const runRequest: CreateRunRequest = {
       type: 'start_session',
-      prompt: request.prompt,
+      parameters: request.parameters,
       ...(request.agent_blueprint_name && { agent_name: request.agent_blueprint_name }),
       ...(request.project_dir && { project_dir: request.project_dir }),
     };
@@ -92,7 +92,7 @@ export const chatService = {
     const runRequest: CreateRunRequest = {
       type: 'resume_session',
       session_id: sessionId,
-      prompt: request.prompt,
+      parameters: request.parameters,
     };
 
     const response = await agentOrchestratorApi.post<CreateRunResponse>('/runs', runRequest);

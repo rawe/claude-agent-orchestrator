@@ -54,7 +54,7 @@ def init_db():
             session_id TEXT NOT NULL,
             type TEXT NOT NULL,
             agent_name TEXT,
-            prompt TEXT NOT NULL,
+            parameters TEXT NOT NULL,
             project_dir TEXT,
             parent_session_id TEXT,
             execution_mode TEXT NOT NULL DEFAULT 'sync',
@@ -488,7 +488,7 @@ def create_run(
     run_id: str,
     session_id: str,
     run_type: str,
-    prompt: str,
+    parameters: str,  # JSON string of parameters dict
     created_at: str,
     agent_name: str = None,
     project_dir: str = None,
@@ -505,13 +505,13 @@ def create_run(
     cursor.execute(
         """
         INSERT INTO runs (
-            run_id, session_id, type, prompt, created_at,
+            run_id, session_id, type, parameters, created_at,
             agent_name, project_dir, parent_session_id,
             execution_mode, demands, status, timeout_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            run_id, session_id, run_type, prompt, created_at,
+            run_id, session_id, run_type, parameters, created_at,
             agent_name, project_dir, parent_session_id,
             execution_mode, demands, status, timeout_at
         )

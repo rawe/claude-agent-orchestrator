@@ -4,7 +4,12 @@ Executor Invocation Payload
 Handles parsing and validation of JSON payloads for the unified ao-*-exec entrypoint.
 Replaces individual CLI arguments with a structured, versioned schema.
 
-Schema version: 2.1
+Schema version: 2.2
+
+Changes in 2.2:
+- prompt: str replaced with parameters: dict (unified input model)
+- For AI agents, parameters contains {"prompt": "..."}
+- Helper property .prompt extracts parameters["prompt"]
 
 Runner resolves blueprint and placeholders before spawning executor.
 Executor receives fully resolved agent_blueprint.
@@ -21,22 +26,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Current schema version - used by both runner (to build) and executor (to validate)
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = "2.2"
 
-# Supported schema versions
+# Supported schema versions (no backward compat - all clients in monorepo)
 SUPPORTED_VERSIONS = {SCHEMA_VERSION}
 
 # JSON Schema for documentation and --schema flag
 INVOCATION_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "ExecutorInvocation",
-    "description": "Schema 2.1 - Executor receives resolved agent_blueprint and executor_config",
+    "description": "Schema 2.2 - Unified input via parameters dict (replaces prompt string)",
     "type": "object",
-    "required": ["schema_version", "mode", "session_id", "prompt"],
+    "required": ["schema_version", "mode", "session_id", "parameters"],
     "properties": {
         "schema_version": {
             "type": "string",
-            "const": "2.1",
+            "const": "2.2",
             "description": "Schema version",
         },
         "mode": {
@@ -49,9 +54,9 @@ INVOCATION_SCHEMA = {
             "minLength": 1,
             "description": "Coordinator-generated session identifier (ADR-010)",
         },
-        "prompt": {
-            "type": "string",
-            "description": "User input text (may be long)",
+        "parameters": {
+            "type": "object",
+            "description": "Input parameters - for AI agents: {\"prompt\": \"...\"}",
         },
         "project_dir": {
             "type": "string",
@@ -102,7 +107,7 @@ class ExecutorInvocation:
         schema_version: Schema version for forward compatibility
         mode: Execution mode ('start' or 'resume')
         session_id: Coordinator-generated session identifier (ADR-010)
-        prompt: User input text
+        parameters: Input parameters dict - for AI agents: {"prompt": "..."}
         project_dir: Working directory path (start mode only)
         agent_blueprint: Fully resolved agent blueprint
         executor_config: Executor-specific configuration (schema depends on executor type)
@@ -112,11 +117,16 @@ class ExecutorInvocation:
     schema_version: str
     mode: Literal["start", "resume"]
     session_id: str
-    prompt: str
+    parameters: dict[str, Any]
     project_dir: Optional[str] = None
     agent_blueprint: Optional[dict[str, Any]] = None
     executor_config: Optional[dict[str, Any]] = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def prompt(self) -> Optional[str]:
+        """Helper to extract prompt from parameters (for AI agents)."""
+        return self.parameters.get("prompt") if self.parameters else None
 
     @classmethod
     def from_stdin(cls) -> "ExecutorInvocation":
@@ -158,7 +168,7 @@ class ExecutorInvocation:
             raise ValueError(f"Invalid JSON: {e}")
 
         # Validate required fields
-        required_fields = ("schema_version", "mode", "session_id", "prompt")
+        required_fields = ("schema_version", "mode", "session_id", "parameters")
         for f in required_fields:
             if f not in data:
                 raise ValueError(f"Missing required field: {f}")
@@ -187,7 +197,7 @@ class ExecutorInvocation:
             "schema_version",
             "mode",
             "session_id",
-            "prompt",
+            "parameters",
             "project_dir",
             "agent_blueprint",
             "executor_config",
@@ -201,7 +211,7 @@ class ExecutorInvocation:
             schema_version=data["schema_version"],
             mode=data["mode"],
             session_id=data["session_id"],
-            prompt=data["prompt"],
+            parameters=data["parameters"],
             project_dir=data.get("project_dir"),
             agent_blueprint=data.get("agent_blueprint"),
             executor_config=data.get("executor_config"),
@@ -210,11 +220,11 @@ class ExecutorInvocation:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        d = {
+        d: dict[str, Any] = {
             "schema_version": self.schema_version,
             "mode": self.mode,
             "session_id": self.session_id,
-            "prompt": self.prompt,
+            "parameters": self.parameters,
         }
         if self.agent_blueprint:
             d["agent_blueprint"] = self.agent_blueprint
@@ -234,15 +244,22 @@ class ExecutorInvocation:
         """
         Log invocation summary without sensitive data.
 
-        Logs schema version, mode, session ID, and prompt length
-        (not the actual prompt content for security).
+        Logs schema version, mode, session ID, and parameters info
+        (not the actual content for security).
         """
         if self.agent_blueprint:
             agent_info = f"blueprint={self.agent_blueprint.get('name', 'unnamed')}"
         else:
             agent_info = "no_agent"
 
+        # Log prompt length if present, otherwise parameters keys
+        prompt = self.prompt
+        if prompt:
+            params_info = f"prompt_len={len(prompt)}"
+        else:
+            params_info = f"params_keys={list(self.parameters.keys())}"
+
         logger.info(
             f"Invocation: version={self.schema_version} mode={self.mode} "
-            f"session={self.session_id} {agent_info} prompt_len={len(self.prompt)}"
+            f"session={self.session_id} {agent_info} {params_info}"
         )

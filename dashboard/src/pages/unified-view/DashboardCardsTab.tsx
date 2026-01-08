@@ -727,10 +727,12 @@ function SessionDetailPanel({ sessionWithRuns, stats, sessionsById, onClose }: S
                       <div className="px-4 pb-4 border-t border-gray-100">
                         <div className="mt-3 space-y-3">
                           <div>
-                            <div className="text-xs text-gray-500 uppercase mb-1">Prompt</div>
+                            <div className="text-xs text-gray-500 uppercase mb-1">Parameters</div>
                             <div className="bg-gray-50 rounded-lg p-3 max-h-24 overflow-y-auto">
                               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">
-                                {run.prompt}
+                                {typeof run.parameters?.prompt === 'string'
+                                  ? run.parameters.prompt
+                                  : JSON.stringify(run.parameters, null, 2)}
                               </pre>
                             </div>
                           </div>

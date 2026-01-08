@@ -222,7 +222,7 @@ class RunResponse(BaseModel):
     type: str = Field(..., description="Run type (start_session, resume_session)")
     session_id: str = Field(..., description="Associated session ID")
     agent_name: Optional[str] = Field(None, description="Agent blueprint name")
-    prompt: str = Field(..., description="Work to execute")
+    parameters: dict = Field(..., description="Input parameters for the run")
     status: str = Field(..., description="Run status")
     project_dir: Optional[str] = None
     parent_session_id: Optional[str] = None

@@ -93,7 +93,7 @@ class CoordinatorClient:
     async def create_run(
         self,
         run_type: str,
-        prompt: str,
+        parameters: dict,
         session_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
@@ -105,7 +105,7 @@ class CoordinatorClient:
 
         Args:
             run_type: "start_session" or "resume_session"
-            prompt: User prompt
+            parameters: Input parameters - for AI agents: {"prompt": "..."}
             session_id: Session ID (required for resume_session)
             agent_name: Agent blueprint name (for start_session)
             project_dir: Project directory (for start_session)
@@ -120,7 +120,7 @@ class CoordinatorClient:
 
         data: dict[str, Any] = {
             "type": run_type,
-            "prompt": prompt,
+            "parameters": parameters,
         }
         if session_id:
             data["session_id"] = session_id

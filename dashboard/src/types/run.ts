@@ -16,7 +16,7 @@ export interface Run {
   type: RunType;
   session_id: string;
   agent_name: string | null;
-  prompt: string;
+  parameters: Record<string, unknown>;  // Unified input - e.g., {"prompt": "..."} for AI agents
   project_dir: string | null;
   parent_session_id: string | null;
   execution_mode: ExecutionMode;

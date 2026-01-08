@@ -112,7 +112,7 @@ class AgentOrchestratorTools:
     async def start_agent_session(
         self,
         ctx: RequestContext,
-        prompt: str,
+        parameters: dict,
         agent_name: Optional[str] = None,
         project_dir: Optional[str] = None,
         mode: str = "sync",
@@ -123,7 +123,7 @@ class AgentOrchestratorTools:
 
         Args:
             ctx: Request context with parent session ID for callbacks
-            prompt: Initial prompt for the session
+            parameters: Input parameters - for AI agents: {"prompt": "..."}
             agent_name: Agent blueprint name (optional)
             project_dir: Optional project directory path
             mode: Execution mode - "sync", "async_poll", or "async_callback"
@@ -135,11 +135,19 @@ class AgentOrchestratorTools:
         Raises:
             ToolError: If session creation or execution fails
         """
-        # Validate prompt length
-        if len(prompt) > MAX_PROMPT_LENGTH:
+        import json as _json
+        # Validate parameters size (use JSON length as proxy)
+        params_len = len(_json.dumps(parameters))
+        if params_len > MAX_PROMPT_LENGTH:
             raise ToolError(
-                f"Prompt too long: {len(prompt)} characters (max {MAX_PROMPT_LENGTH})"
+                f"Parameters too large: {params_len} characters (max {MAX_PROMPT_LENGTH})"
             )
+
+        # Validate required 'prompt' parameter for AI agents
+        # Note: Future deterministic agents may have different required parameters
+        prompt = parameters.get("prompt")
+        if not prompt or not isinstance(prompt, str):
+            raise ToolError("Missing required parameter: 'prompt'")
 
         # Parse execution mode
         try:
@@ -167,7 +175,7 @@ class AgentOrchestratorTools:
             # Create run with execution mode (ADR-003)
             result = await self._client.create_run(
                 run_type="start_session",
-                prompt=prompt,
+                parameters=parameters,
                 agent_name=agent_name,
                 project_dir=project_dir,
                 parent_session_id=parent_session_id,
@@ -214,17 +222,17 @@ class AgentOrchestratorTools:
         self,
         ctx: RequestContext,
         session_id: str,
-        prompt: str,
+        parameters: dict,
         mode: str = "sync",
     ) -> dict:
         """Resume an existing agent session.
 
-        Continues a previously started session with a new prompt.
+        Continues a previously started session with new input.
 
         Args:
             ctx: Request context with parent session ID for callbacks
             session_id: ID of the session to resume
-            prompt: Continuation prompt
+            parameters: Input parameters - for AI agents: {"prompt": "..."}
             mode: Execution mode - "sync", "async_poll", or "async_callback"
 
         Returns:
@@ -234,11 +242,19 @@ class AgentOrchestratorTools:
         Raises:
             ToolError: If session doesn't exist or resume fails
         """
-        # Validate prompt length
-        if len(prompt) > MAX_PROMPT_LENGTH:
+        import json as _json
+        # Validate parameters size (use JSON length as proxy)
+        params_len = len(_json.dumps(parameters))
+        if params_len > MAX_PROMPT_LENGTH:
             raise ToolError(
-                f"Prompt too long: {len(prompt)} characters (max {MAX_PROMPT_LENGTH})"
+                f"Parameters too large: {params_len} characters (max {MAX_PROMPT_LENGTH})"
             )
+
+        # Validate required 'prompt' parameter for AI agents
+        # Note: Future deterministic agents may have different required parameters
+        prompt = parameters.get("prompt")
+        if not prompt or not isinstance(prompt, str):
+            raise ToolError("Missing required parameter: 'prompt'")
 
         # Parse execution mode
         try:
@@ -268,7 +284,7 @@ class AgentOrchestratorTools:
             result = await self._client.create_run(
                 run_type="resume_session",
                 session_id=session_id,
-                prompt=prompt,
+                parameters=parameters,
                 parent_session_id=parent_session_id,
                 execution_mode=exec_mode.value,
                 additional_demands=ctx.additional_demands or None,

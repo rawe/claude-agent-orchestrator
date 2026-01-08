@@ -29,7 +29,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "start_session",
     "agent_name": "agent-orchestrator",
-    "prompt": "Start a child agent. The child should just say hello and exit.",
+    "parameters": {"prompt": "Start a child agent. The child should just say hello and exit."},
     "project_dir": "."
   }'
 ```

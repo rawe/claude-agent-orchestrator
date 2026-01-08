@@ -18,7 +18,7 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "prompt": "Hello, this is a test message",
+    "parameters": {"prompt": "Hello, this is a test message"},
     "project_dir": "."
   }'
 ```

@@ -50,7 +50,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "start_session",
     "agent_name": "<agent-name-from-step-1>",
-    "prompt": "Hello, what can you do?",
+    "parameters": {"prompt": "Hello, what can you do?"},
     "project_dir": "."
   }'
 ```

@@ -21,7 +21,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "start_session",
     "agent_name": "agent-orchestrator",
-    "prompt": "Start a child agent using the agent_blueprint_name=\"super-fancy-unicorn-agent\" in callback mode. The prompt should be: just say hello. Wait for the callback result.",
+    "parameters": {"prompt": "Start a child agent using the agent_blueprint_name=\"super-fancy-unicorn-agent\" in callback mode. The prompt should be: just say hello. Wait for the callback result."},
     "project_dir": "."
   }'
 ```
@@ -53,7 +53,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "resume_session",
     "session_id": "<parent_session_id>",
-    "prompt": "What happened with the child agent you tried to start? What was the error?",
+    "parameters": {"prompt": "What happened with the child agent you tried to start? What was the error?"},
     "project_dir": "."
   }'
 ```

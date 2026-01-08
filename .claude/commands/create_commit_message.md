@@ -1,6 +1,7 @@
 ---
 name: Create Commit Message
 description: Create commit messages without AI attribution.
+context: fork
 ---
 
 Create a concise commit message, do not do the commit.

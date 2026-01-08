@@ -170,12 +170,14 @@ function RunBlock({ run, defaultExpanded = false }: RunBlockProps) {
               className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
             >
               <ChevronRight className={`w-4 h-4 transition-transform ${showPrompt ? 'rotate-90' : ''}`} />
-              <span className="font-medium">Prompt</span>
+              <span className="font-medium">Parameters</span>
             </button>
             {showPrompt && (
               <div className="mt-2 p-3 bg-white rounded border border-gray-200">
                 <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
-                  {run.prompt}
+                  {typeof run.parameters?.prompt === 'string'
+                    ? run.parameters.prompt
+                    : JSON.stringify(run.parameters, null, 2)}
                 </pre>
               </div>
             )}

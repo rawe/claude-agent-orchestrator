@@ -177,7 +177,7 @@ export interface UnifiedRun {
   // Run info
   type: RunType;
   status: RunStatus;
-  prompt: string;
+  parameters: Record<string, unknown>;  // Unified input - e.g., {"prompt": "..."} for AI agents
   agentName: string | null;
   projectDir: string | null;
   parentSessionId: string | null;

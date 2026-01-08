@@ -21,7 +21,7 @@ curl -X POST http://localhost:8765/runs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "start_session",
-    "prompt": "Initial message",
+    "parameters": {"prompt": "Initial message"},
     "project_dir": "."
   }'
 ```
@@ -38,7 +38,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "resume_session",
     "session_id": "<session_id_from_previous_run>",
-    "prompt": "This is a follow-up message"
+    "parameters": {"prompt": "This is a follow-up message"}
   }'
 ```
 

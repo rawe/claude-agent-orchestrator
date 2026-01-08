@@ -246,7 +246,7 @@ def _create_resume_run(
         run = run_queue.add_run(RunCreate(
             type=RunType.RESUME_SESSION,
             session_id=parent_session_id,
-            prompt=prompt,
+            parameters={"prompt": prompt},
         ))
         logger.info(f"Created callback resume run {run.run_id} for parent '{parent_session_id}' with {len(children)} child result(s)")
         return run.run_id

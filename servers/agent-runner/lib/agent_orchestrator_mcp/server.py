@@ -120,7 +120,7 @@ class MCPServer:
             description="""Start a new agent session.
 
 Args:
-    prompt: Initial prompt for the session
+    parameters: Input parameters dict - for AI agents: {"prompt": "your prompt here"}
     agent_name: Agent blueprint name (optional)
     project_dir: Optional project directory path
     mode: Execution mode - "sync" (wait for result), "async_poll" (return immediately, poll status), or "async_callback" (return immediately, receive callback)
@@ -131,7 +131,7 @@ Returns:
 """
         )
         async def start_agent_session(
-            prompt: str,
+            parameters: dict,
             ctx: Context,
             agent_name: Optional[str] = None,
             project_dir: Optional[str] = None,
@@ -143,7 +143,7 @@ Returns:
                 return await self._tools.start_agent_session(
                     ctx=req_ctx,
                     agent_name=agent_name,
-                    prompt=prompt,
+                    parameters=parameters,
                     project_dir=project_dir,
                     mode=mode,
                 )
@@ -155,7 +155,7 @@ Returns:
 
 Args:
     session_id: ID of the session to resume
-    prompt: Continuation prompt
+    parameters: Input parameters dict - for AI agents: {"prompt": "continuation prompt"}
     mode: Execution mode - "sync", "async_poll", or "async_callback"
 
 Returns:
@@ -165,7 +165,7 @@ Returns:
         )
         async def resume_agent_session(
             session_id: str,
-            prompt: str,
+            parameters: dict,
             ctx: Context,
             mode: str = "sync",
         ) -> dict:
@@ -175,7 +175,7 @@ Returns:
                 return await self._tools.resume_agent_session(
                     ctx=req_ctx,
                     session_id=session_id,
-                    prompt=prompt,
+                    parameters=parameters,
                     mode=mode,
                 )
             except ToolError as e:

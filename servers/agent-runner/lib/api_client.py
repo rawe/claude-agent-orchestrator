@@ -51,14 +51,20 @@ class Run:
     """Agent run to execute.
 
     session_id is coordinator-generated per ADR-010.
+    parameters contains input - for AI agents: {"prompt": "..."}.
     """
     run_id: str
     type: str  # "start_session" or "resume_session"
     session_id: str
     agent_name: Optional[str]
-    prompt: str
+    parameters: dict  # Unified input - e.g., {"prompt": "..."} for AI agents
     project_dir: Optional[str]
     parent_session_id: Optional[str] = None
+
+    @property
+    def prompt(self) -> Optional[str]:
+        """Helper to extract prompt from parameters (for AI agents)."""
+        return self.parameters.get("prompt") if self.parameters else None
 
 
 @dataclass
@@ -223,7 +229,7 @@ class CoordinatorAPIClient:
                 type=run_data["type"],
                 session_id=run_data["session_id"],
                 agent_name=run_data.get("agent_name"),
-                prompt=run_data["prompt"],
+                parameters=run_data["parameters"],
                 project_dir=run_data.get("project_dir"),
                 parent_session_id=run_data.get("parent_session_id"),
             )

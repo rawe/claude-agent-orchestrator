@@ -79,7 +79,7 @@ function adaptRun(
     sessionId: run.session_id,
     type: run.type as UnifiedRun['type'],
     status: run.status as UnifiedRun['status'],
-    prompt: run.prompt,
+    parameters: run.parameters,
     agentName: run.agent_name ?? null,
     projectDir: run.project_dir ?? null,
     parentSessionId: run.parent_session_id ?? null,

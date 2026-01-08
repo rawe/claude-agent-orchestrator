@@ -58,7 +58,7 @@ export type StreamMessage =
 export interface RunRequest {
   type: 'start_session' | 'resume_session';
   session_id?: string;  // Required for resume_session
-  prompt: string;
+  parameters: Record<string, unknown>;  // Unified input - e.g., {"prompt": "..."} for AI agents
   agent_name?: string;
   project_dir?: string;
   parent_session_id?: string;

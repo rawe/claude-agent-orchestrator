@@ -35,7 +35,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "start_session",
     "agent_name": "agent-orchestrator",
-    "prompt": "Start 5 child agents in callback mode with these wait times:\n- Agent 1: wait 5 seconds, then respond \"callback-001\"\n- Agent 2: wait 5 seconds, then respond \"callback-002\"\n- Agent 3: wait 5 seconds, then respond \"callback-003\"\n- Agent 4: wait 10 seconds, then respond \"callback-004\"\n- Agent 5: wait 10 seconds, then respond \"callback-005\"\n\nEach agent must ONLY run: sleep N && echo \"callback-XXX\"\nDo not respond until you have received all callbacks.",
+    "parameters": {"prompt": "Start 5 child agents in callback mode with these wait times:\n- Agent 1: wait 5 seconds, then respond \"callback-001\"\n- Agent 2: wait 5 seconds, then respond \"callback-002\"\n- Agent 3: wait 5 seconds, then respond \"callback-003\"\n- Agent 4: wait 10 seconds, then respond \"callback-004\"\n- Agent 5: wait 10 seconds, then respond \"callback-005\"\n\nEach agent must ONLY run: sleep N && echo \"callback-XXX\"\nDo not respond until you have received all callbacks."},
     "project_dir": "."
   }'
 ```
@@ -73,7 +73,7 @@ curl -X POST http://localhost:8765/runs \
   -d '{
     "type": "resume_session",
     "session_id": "<parent_session_id>",
-    "prompt": "IMPORTANT: Check your conversation history ONLY. Do NOT use any tools or API calls.\n\nList ALL child agent callbacks you received in this session. For each callback, state:\n1. The agent session ID\n2. The callback message content\n\nThen confirm: Did you receive callbacks from ALL 5 agents? Answer YES or NO, and list any missing agents."
+    "parameters": {"prompt": "IMPORTANT: Check your conversation history ONLY. Do NOT use any tools or API calls.\n\nList ALL child agent callbacks you received in this session. For each callback, state:\n1. The agent session ID\n2. The callback message content\n\nThen confirm: Did you receive callbacks from ALL 5 agents? Answer YES or NO, and list any missing agents."}
   }'
 ```
 

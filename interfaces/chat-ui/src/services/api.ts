@@ -60,7 +60,7 @@ export const chatService = {
   async startSession(prompt: string): Promise<{ runId: string; sessionId: string }> {
     const request: RunRequest = {
       type: 'start_session',
-      prompt,
+      parameters: { prompt },
       agent_name: config.agentBlueprint,
     };
 
@@ -82,7 +82,7 @@ export const chatService = {
     const request: RunRequest = {
       type: 'resume_session',
       session_id: sessionId,
-      prompt,
+      parameters: { prompt },
     };
 
     try {
