@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The AI-Program Gap - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-info: #3b82f6;
+      --color-success: #10b981;
+      --color-error: #ef4444;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                  radial-gradient(circle at 70% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-header .badge {
+      display: inline-block;
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid var(--color-info);
+      color: var(--color-info);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-info);
+      transform: translateY(-2px);
+    }
+
+    /* Two worlds diagram */
+    .diagram-container {
+      flex: 1;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .worlds-container {
+      display: flex;
+      gap: var(--space-md);
+      align-items: stretch;
+    }
+
+    .world-box {
+      flex: 1;
+      background: var(--color-bg-card);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    .world-box.ai {
+      border: 2px solid var(--color-info);
+      animation-delay: 0.1s;
+    }
+
+    .world-box.program {
+      border: 2px solid var(--color-success);
+      animation-delay: 0.2s;
+    }
+
+    .world-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .world-icon { font-size: 1.25rem; }
+
+    .world-title {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    .world-box.ai .world-title { color: var(--color-info); }
+    .world-box.program .world-title { color: var(--color-success); }
+
+    .world-traits {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .trait {
+      font-size: 0.6875rem;
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .trait-icon { font-size: 0.75rem; }
+
+    .gap-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      background: rgba(239, 68, 68, 0.1);
+      border: 2px dashed var(--color-error);
+      border-radius: var(--radius-lg);
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+      animation-delay: 0.4s;
+    }
+
+    .gap-icon {
+      font-size: 1.5rem;
+      color: var(--color-error);
+    }
+
+    .gap-text {
+      font-size: 0.75rem;
+      color: var(--color-error);
+      text-align: center;
+      font-weight: 600;
+    }
+
+    /* Challenges List */
+    .challenges-container {
+      flex: 1;
+      max-width: 380px;
+    }
+
+    .challenge-category {
+      margin-bottom: var(--space-lg);
+    }
+
+    .category-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-error);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .challenge-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .challenge-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .challenge-item:nth-child(1) { animation-delay: 0.3s; }
+    .challenge-item:nth-child(2) { animation-delay: 0.4s; }
+    .challenge-item:nth-child(3) { animation-delay: 0.5s; }
+
+    .challenge-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .challenge-text {
+      font-size: 0.875rem;
+      color: var(--color-text);
+      line-height: 1.4;
+    }
+
+    .challenge-text strong {
+      color: var(--color-text-bright);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <div class="badge">Deep Dive</div>
+      <h1>The AI-Program Gap</h1>
+      <p class="subtitle">Two worlds that don't easily connect</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="diagram-container">
+        <div class="worlds-container">
+          <div class="world-box ai">
+            <div class="world-header">
+              <span class="world-icon">🧠</span>
+              <span class="world-title">AI Agents</span>
+            </div>
+            <div class="world-traits">
+              <span class="trait"><span class="trait-icon">✨</span> Flexible, handles ambiguity</span>
+              <span class="trait"><span class="trait-icon">💬</span> Natural language I/O</span>
+              <span class="trait"><span class="trait-icon">🐢</span> Slow (LLM inference)</span>
+              <span class="trait"><span class="trait-icon">🎲</span> Non-deterministic</span>
+              <span class="trait"><span class="trait-icon">💰</span> Expensive (tokens)</span>
+            </div>
+          </div>
+
+          <div class="world-box program">
+            <div class="world-header">
+              <span class="world-icon">⚙️</span>
+              <span class="world-title">Programs</span>
+            </div>
+            <div class="world-traits">
+              <span class="trait"><span class="trait-icon">📐</span> Rigid, follows rules</span>
+              <span class="trait"><span class="trait-icon">📦</span> Structured I/O (JSON)</span>
+              <span class="trait"><span class="trait-icon">🚀</span> Fast (milliseconds)</span>
+              <span class="trait"><span class="trait-icon">✓</span> Deterministic</span>
+              <span class="trait"><span class="trait-icon">💚</span> Cheap (compute)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gap-indicator">
+          <span class="gap-icon">⚡</span>
+          <span class="gap-text">No clean way to combine as equals</span>
+        </div>
+      </div>
+
+      <div class="challenges-container">
+        <div class="challenge-category">
+          <div class="category-title">AI Calling Programs</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Format mismatch</strong> - AI must format requests correctly</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Error handling</strong> becomes prompt engineering</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="challenge-category">
+          <div class="category-title">Programs Calling AI</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Async complexity</strong> - waiting for slow responses</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Output validation</strong> - AI content is unpredictable</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="challenge-category">
+          <div class="category-title">Orchestration</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Different models</strong> - async vs sync, different errors</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">❓</span>
+              <span class="challenge-text"><strong>Scaling mismatch</strong> - different characteristics</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <!-- Navigation rendered by navigation.js -->
+    </nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

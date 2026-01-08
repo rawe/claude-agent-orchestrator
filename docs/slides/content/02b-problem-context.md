@@ -2,7 +2,7 @@
 id: context
 title: "Context Sharing Problem"
 subtitle: "How agents share knowledge without wasting context windows"
-parentId: problem
+parentId: motivation-problem
 ---
 
 ## Typical Research Handover

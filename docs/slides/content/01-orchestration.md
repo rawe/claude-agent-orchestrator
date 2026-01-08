@@ -1,7 +1,8 @@
 ---
-id: orchestration
-title: "Why Orchestration?"
-subtitle: "From overloaded single agent to specialized team"
+id: agent-overload
+title: "Agent Overload"
+subtitle: "When a single agent tries to do everything"
+parentId: motivation-problem
 ---
 
 ## The Problem: Single Agent Overload

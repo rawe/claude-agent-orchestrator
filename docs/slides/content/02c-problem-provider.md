@@ -2,7 +2,7 @@
 id: provider
 title: "Provider Lock-in"
 subtitle: "The challenge of building provider-agnostic agent systems"
-parentId: problem
+parentId: motivation-problem
 ---
 
 ## The Lock-in Problem

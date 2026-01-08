@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infrastructure Overhead - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-warning: #f59e0b;
+      --color-session: #8b5cf6;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-header .badge {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--color-warning);
+      color: var(--color-warning);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-warning);
+      transform: translateY(-2px);
+    }
+
+    /* Diagram: Repetition cycle */
+    .diagram-container {
+      flex: 1;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    .project-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      width: 100%;
+    }
+
+    .project-box {
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-warning);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      opacity: 0;
+      animation: slideIn 0.4s ease forwards;
+    }
+
+    .project-box:nth-child(1) { animation-delay: 0.1s; }
+    .project-box:nth-child(2) { animation-delay: 0.3s; }
+    .project-box:nth-child(3) { animation-delay: 0.5s; }
+
+    .project-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .project-icon { font-size: 1.25rem; }
+    .project-name {
+      font-weight: 600;
+      color: var(--color-text-bright);
+      font-size: 0.875rem;
+    }
+
+    .rebuild-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .rebuild-item {
+      font-size: 0.6875rem;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 0.125rem 0.5rem;
+      border-radius: var(--radius-full);
+      color: var(--color-warning);
+    }
+
+    .repeat-indicator {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      color: var(--color-warning);
+      font-size: 0.875rem;
+      font-weight: 600;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Challenges List */
+    .challenges-container {
+      flex: 1;
+      max-width: 400px;
+    }
+
+    .challenge-category {
+      margin-bottom: var(--space-lg);
+    }
+
+    .category-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-warning);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .challenge-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .challenge-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .challenge-item:nth-child(1) { animation-delay: 0.2s; }
+    .challenge-item:nth-child(2) { animation-delay: 0.3s; }
+    .challenge-item:nth-child(3) { animation-delay: 0.4s; }
+
+    .challenge-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .challenge-text {
+      font-size: 0.875rem;
+      color: var(--color-text);
+      line-height: 1.4;
+    }
+
+    .challenge-text strong {
+      color: var(--color-text-bright);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <div class="badge">Deep Dive</div>
+      <h1>Infrastructure Overhead</h1>
+      <p class="subtitle">Rebuilding the same foundation for every project</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="diagram-container">
+        <div class="project-stack">
+          <div class="project-box">
+            <div class="project-header">
+              <span class="project-icon">📁</span>
+              <span class="project-name">Project A</span>
+            </div>
+            <div class="rebuild-items">
+              <span class="rebuild-item">Orchestration</span>
+              <span class="rebuild-item">Execution</span>
+              <span class="rebuild-item">Monitoring</span>
+              <span class="rebuild-item">State</span>
+            </div>
+          </div>
+
+          <div class="project-box">
+            <div class="project-header">
+              <span class="project-icon">📁</span>
+              <span class="project-name">Project B</span>
+            </div>
+            <div class="rebuild-items">
+              <span class="rebuild-item">Orchestration</span>
+              <span class="rebuild-item">Execution</span>
+              <span class="rebuild-item">Monitoring</span>
+              <span class="rebuild-item">State</span>
+            </div>
+          </div>
+
+          <div class="project-box">
+            <div class="project-header">
+              <span class="project-icon">📁</span>
+              <span class="project-name">Project C</span>
+            </div>
+            <div class="rebuild-items">
+              <span class="rebuild-item">Orchestration</span>
+              <span class="rebuild-item">Execution</span>
+              <span class="rebuild-item">Monitoring</span>
+              <span class="rebuild-item">State</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="repeat-indicator">
+          <span>🔄</span>
+          <span>Same problems, solved again and again</span>
+        </div>
+      </div>
+
+      <div class="challenges-container">
+        <div class="challenge-category">
+          <div class="category-title">What Gets Rebuilt</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">🔗</span>
+              <span class="challenge-text"><strong>Orchestration</strong> - Session management, message routing, lifecycles</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">⚡</span>
+              <span class="challenge-text"><strong>Execution</strong> - Process spawning, health checks, error handling</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">📊</span>
+              <span class="challenge-text"><strong>Observability</strong> - Event streaming, logging, dashboards</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="challenge-category">
+          <div class="category-title">The Cost</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">⏱️</span>
+              <span class="challenge-text"><strong>Weeks</strong> spent on infrastructure before any agent logic</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">🐛</span>
+              <span class="challenge-text"><strong>New bugs</strong> in each reimplementation</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">🏝️</span>
+              <span class="challenge-text"><strong>Knowledge silos</strong> - solutions don't transfer</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <!-- Navigation rendered by navigation.js -->
+    </nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

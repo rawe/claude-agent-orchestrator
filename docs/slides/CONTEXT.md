@@ -219,21 +219,40 @@ Deep dives are detail slides accessible via click but **not** in the arrow-key n
 
 | # | File | Section |
 |---|------|---------|
-| 1-3 | 01-orchestration, 02-problem, 03-solution | Motivation & Problem |
+| 1-2 | motivation-01-problem, motivation-02-vision | Vision & Goals |
+| 3 | 03-solution | Solution Overview |
 | 4-8 | 04-coordinator through 08-architecture | Core Components |
 | 9-10 | 09-chat-overview, 10-chat-flow | First Chat |
-| 11 | 11-parent-child | Parent-Child Orchestration |
-| 12-16 | 12-mode-sync through 16-modes-comparison | Execution Modes |
-| 17-20 | 17-blueprints through 20-capabilities-example | Config System |
-| 21 | 21-summary | Summary |
+| 11-14 | 17-blueprints through 20-capabilities-example | Blueprints & Capabilities |
+| 15-22 | 15-orchestrator-capability through 17-resume | Multi-Agent Orchestration |
+| 23 | 21-summary | Summary |
 
 ### Deep Dives (Out of Main Flow)
 
-| File | Parent | Topic |
-|------|--------|-------|
-| 02a-problem-multiagent.html | 02-problem | Multi-Agent Coordination |
-| 02b-problem-context.html | 02-problem | Context Sharing |
-| 02c-problem-provider.html | 02-problem | Provider Lock-in |
+**Problem Deep Dives (under motivation-01-problem):**
+
+| File | ID | Topic |
+|------|-----|-------|
+| 01-orchestration.html | agent-overload | Agent Overload |
+| 02d-problem-infrastructure.html | infrastructure | Infrastructure Overhead |
+| 02a-problem-multiagent.html | multiagent | Multi-Agent Coordination |
+| 02b-problem-context.html | context-challenge | Context Sharing |
+| 02e-problem-hybrid.html | hybrid-gap | AI-Program Gap |
+| 02f-problem-accessibility.html | accessibility | Programmer Barrier |
+| 02c-problem-provider.html | provider-lockin | Provider Lock-in |
+
+**Vision Deep Dives (under motivation-02-vision):**
+
+| File | ID | Topic |
+|------|-----|-------|
+| motivation-03-foundation.html | foundation | Reusable Foundation |
+| motivation-04-refinement.html | refinement | Progressive Refinement |
+| motivation-05-hybrid.html | hybrid | Hybrid Execution |
+| motivation-06-interfaces.html | interfaces | Clean Interfaces |
+| motivation-07-provider.html | provider | Provider Independence |
+| motivation-08-collaboration.html | collaboration | Decentralized Collaboration |
+| motivation-09-context.html | context | Context Engineering |
+| motivation-10-accessibility.html | accessibility | Everyone Can Contribute |
 
 ## Visual Patterns Reference
 

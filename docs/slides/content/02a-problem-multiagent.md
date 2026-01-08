@@ -2,7 +2,7 @@
 id: multiagent
 title: "Multi-Agent Coordination"
 subtitle: "The challenge of orchestrating multiple AI agents"
-parentId: problem
+parentId: motivation-problem
 ---
 
 ## The Coordination Challenge

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Why Orchestration - Agent Orchestrator</title>
+  <title>Agent Overload - Agent Orchestrator</title>
   <style>
     :root {
       --color-bg: #0a0f1a;
@@ -66,6 +66,19 @@
     .slide-header .subtitle {
       font-size: clamp(1rem, 2vw, 1.25rem);
       color: var(--color-text-muted);
+    }
+    .slide-header .badge {
+      display: inline-block;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--color-error);
+      color: var(--color-error);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
     }
     .slide-content {
       flex: 1;
@@ -385,8 +398,9 @@
 <body>
   <div class="slide">
     <header class="slide-header">
-      <h1>Why Orchestration?</h1>
-      <p class="subtitle">From overloaded single agent to specialized team</p>
+      <div class="badge">Deep Dive</div>
+      <h1>Agent Overload</h1>
+      <p class="subtitle">When a single agent tries to do everything</p>
     </header>
 
     <main class="slide-content">

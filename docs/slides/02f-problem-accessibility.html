@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Programmer Barrier - Agent Orchestrator</title>
+  <style>
+    :root {
+      --color-bg: #0a0f1a;
+      --color-bg-gradient: linear-gradient(135deg, #0a0f1a 0%, #1a1f35 100%);
+      --color-bg-card: #141b2d;
+      --color-text: #f1f5f9;
+      --color-text-muted: #64748b;
+      --color-text-bright: #ffffff;
+      --color-border: #1e293b;
+      --color-border-light: #334155;
+      --color-warning: #f59e0b;
+      --color-error: #ef4444;
+      --color-success: #10b981;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --transition-normal: 250ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-bg-gradient);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-xl);
+      position: relative;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+    .slide-header h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+    .slide-header .subtitle {
+      font-size: clamp(0.875rem, 1.5vw, 1rem);
+      color: var(--color-text-muted);
+    }
+    .slide-header .badge {
+      display: inline-block;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--color-warning);
+      color: var(--color-warning);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .slide-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-lg);
+      padding: var(--space-md) 0;
+    }
+    .slide-nav a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text);
+      text-decoration: none;
+      font-size: 1.25rem;
+      transition: all var(--transition-normal);
+    }
+    .slide-nav a:hover {
+      background: #1e2844;
+      border-color: var(--color-warning);
+      transform: translateY(-2px);
+    }
+
+    /* Diagram: Excluded roles */
+    .diagram-container {
+      flex: 1;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    .roles-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      width: 100%;
+    }
+
+    .role-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .role-box {
+      flex: 1;
+      background: var(--color-bg-card);
+      border-radius: var(--radius-lg);
+      padding: var(--space-sm) var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    .role-box.included {
+      border: 2px solid var(--color-success);
+    }
+
+    .role-box.excluded {
+      border: 2px dashed var(--color-error);
+      opacity: 0.6;
+    }
+
+    .role-box:nth-child(1) { animation-delay: 0.1s; }
+    .role-box:nth-child(2) { animation-delay: 0.15s; }
+
+    .role-icon { font-size: 1.25rem; }
+
+    .role-info {
+      flex: 1;
+    }
+
+    .role-name {
+      font-weight: 600;
+      font-size: 0.8125rem;
+      color: var(--color-text-bright);
+    }
+
+    .role-status {
+      font-size: 0.6875rem;
+      color: var(--color-text-muted);
+    }
+
+    .role-box.included .role-status { color: var(--color-success); }
+    .role-box.excluded .role-status { color: var(--color-error); }
+
+    .barrier-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm);
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: var(--radius-lg);
+      opacity: 0;
+      animation: fadeIn 0.4s ease forwards;
+      animation-delay: 0.3s;
+    }
+
+    .barrier-icon { font-size: 1.25rem; }
+
+    .barrier-text {
+      font-size: 0.75rem;
+      color: var(--color-error);
+      font-weight: 600;
+    }
+
+    /* Challenges List */
+    .challenges-container {
+      flex: 1;
+      max-width: 400px;
+    }
+
+    .challenge-category {
+      margin-bottom: var(--space-lg);
+    }
+
+    .category-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-warning);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .challenge-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .challenge-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .challenge-item:nth-child(1) { animation-delay: 0.2s; }
+    .challenge-item:nth-child(2) { animation-delay: 0.3s; }
+    .challenge-item:nth-child(3) { animation-delay: 0.4s; }
+    .challenge-item:nth-child(4) { animation-delay: 0.5s; }
+
+    .challenge-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .challenge-text {
+      font-size: 0.875rem;
+      color: var(--color-text);
+      line-height: 1.4;
+    }
+
+    .challenge-text strong {
+      color: var(--color-text-bright);
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <div class="badge">Deep Dive</div>
+      <h1>The Programmer Barrier</h1>
+      <p class="subtitle">Only developers can build and contribute agents</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="diagram-container">
+        <div class="roles-diagram">
+          <div class="role-row">
+            <div class="role-box included">
+              <span class="role-icon">👨‍💻</span>
+              <div class="role-info">
+                <div class="role-name">Developer</div>
+                <div class="role-status">Can contribute</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="barrier-line">
+            <span class="barrier-icon">🚧</span>
+            <span class="barrier-text">Code barrier</span>
+            <span class="barrier-icon">🚧</span>
+          </div>
+
+          <div class="role-row">
+            <div class="role-box excluded">
+              <span class="role-icon">📋</span>
+              <div class="role-info">
+                <div class="role-name">Product Manager</div>
+                <div class="role-status">Knows requirements</div>
+              </div>
+            </div>
+            <div class="role-box excluded">
+              <span class="role-icon">🧠</span>
+              <div class="role-info">
+                <div class="role-name">Domain Expert</div>
+                <div class="role-status">Knows the business</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="role-row">
+            <div class="role-box excluded">
+              <span class="role-icon">🎨</span>
+              <div class="role-info">
+                <div class="role-name">Designer</div>
+                <div class="role-status">Knows the UX</div>
+              </div>
+            </div>
+            <div class="role-box excluded">
+              <span class="role-icon">🎧</span>
+              <div class="role-info">
+                <div class="role-name">Support</div>
+                <div class="role-status">Knows customers</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="challenges-container">
+        <div class="challenge-category">
+          <div class="category-title">To Define an Agent Today</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">💻</span>
+              <span class="challenge-text"><strong>Write code</strong> - Prompts embedded in Python/TS</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">🔧</span>
+              <span class="challenge-text"><strong>Configure tools</strong> - JSON/YAML with specific syntax</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">🐳</span>
+              <span class="challenge-text"><strong>Set up MCP</strong> - Docker, networking, APIs</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">🐛</span>
+              <span class="challenge-text"><strong>Debug</strong> - Development environment required</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="challenge-category">
+          <div class="category-title">The Cost</div>
+          <ul class="challenge-list">
+            <li class="challenge-item">
+              <span class="challenge-icon">🐌</span>
+              <span class="challenge-text"><strong>Slow iteration</strong> - Experts wait for developers</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">📉</span>
+              <span class="challenge-text"><strong>Lost nuance</strong> - Translation loses detail</span>
+            </li>
+            <li class="challenge-item">
+              <span class="challenge-icon">🚪</span>
+              <span class="challenge-text"><strong>Bottlenecks</strong> - Developers as gatekeepers</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <!-- Navigation rendered by navigation.js -->
+    </nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>
