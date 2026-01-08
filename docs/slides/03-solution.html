@@ -234,28 +234,46 @@
       font-weight: 500;
     }
 
-    .problem-tag.coordination {
+    .problem-tag.agent-overload {
       background: rgba(239, 68, 68, 0.15);
-      color: var(--color-problem-coord);
+      color: #ef4444;
       border: 1px solid rgba(239, 68, 68, 0.3);
     }
 
-    .problem-tag.context-sharing {
+    .problem-tag.coordination {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .problem-tag.infrastructure {
       background: rgba(245, 158, 11, 0.15);
-      color: var(--color-problem-context);
+      color: #f59e0b;
       border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .problem-tag.context-sharing {
+      background: rgba(139, 92, 246, 0.15);
+      color: #8b5cf6;
+      border: 1px solid rgba(139, 92, 246, 0.3);
     }
 
     .problem-tag.provider {
       background: rgba(59, 130, 246, 0.15);
-      color: var(--color-problem-provider);
+      color: #3b82f6;
       border: 1px solid rgba(59, 130, 246, 0.3);
     }
 
     .problem-tag.observability {
-      background: rgba(139, 92, 246, 0.15);
-      color: var(--color-context);
-      border: 1px solid rgba(139, 92, 246, 0.3);
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .problem-tag.accessibility {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
     }
 
     /* Click hint */
@@ -310,13 +328,13 @@
   <div class="slide">
     <header class="slide-header">
       <h1>The Solution Architecture</h1>
-      <p class="subtitle">Four components solving three challenges</p>
+      <p class="subtitle">Four components addressing the core challenges</p>
     </header>
 
     <main class="slide-content">
       <div class="solution-grid">
 
-        <a href="04-coordinator.html" class="solution-card coordinator">
+        <a data-deep-dive="coordinator" class="solution-card coordinator">
           <div class="card-header">
             <div class="card-icon">🧠</div>
             <h2 class="card-title">Coordinator</h2>
@@ -326,7 +344,9 @@
           </p>
           <div class="solves-label">Solves</div>
           <div class="problem-tags">
-            <span class="problem-tag coordination">Multi-Agent</span>
+            <span class="problem-tag agent-overload">Agent Overload</span>
+            <span class="problem-tag coordination">Coordination</span>
+            <span class="problem-tag infrastructure">Infrastructure</span>
           </div>
           <div class="card-footer">
             <span class="click-hint">Details</span>
@@ -334,7 +354,7 @@
           </div>
         </a>
 
-        <a href="05-runner.html" class="solution-card runner">
+        <a data-deep-dive="runner" class="solution-card runner">
           <div class="card-header">
             <div class="card-icon">⚡</div>
             <h2 class="card-title">Runner</h2>
@@ -344,8 +364,8 @@
           </p>
           <div class="solves-label">Solves</div>
           <div class="problem-tags">
-            <span class="problem-tag coordination">Multi-Agent</span>
             <span class="problem-tag provider">Provider Lock-in</span>
+            <span class="problem-tag infrastructure">Infrastructure</span>
           </div>
           <div class="card-footer">
             <span class="click-hint">Details</span>
@@ -353,7 +373,7 @@
           </div>
         </a>
 
-        <a href="06-context-store.html" class="solution-card context">
+        <a data-deep-dive="context-store" class="solution-card context">
           <div class="card-header">
             <div class="card-icon">📄</div>
             <h2 class="card-title">Context Store</h2>
@@ -371,7 +391,7 @@
           </div>
         </a>
 
-        <a href="07-dashboard.html" class="solution-card dashboard">
+        <a data-deep-dive="dashboard" class="solution-card dashboard">
           <div class="card-header">
             <div class="card-icon">📊</div>
             <h2 class="card-title">Dashboard</h2>
@@ -382,6 +402,7 @@
           <div class="solves-label">Provides</div>
           <div class="problem-tags">
             <span class="problem-tag observability">Observability</span>
+            <span class="problem-tag accessibility">Accessibility</span>
           </div>
           <div class="card-footer">
             <span class="click-hint">Details</span>

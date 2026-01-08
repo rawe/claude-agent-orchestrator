@@ -1,7 +1,7 @@
 {
   "title": "Agent Orchestrator",
   "subtitle": "A step-by-step introduction to managing multiple AI agents with real-time observability",
-  "totalSlides": 23,
+  "totalSlides": 19,
   "sections": [
     { "id": "motivation", "number": "0", "title": "Vision & Goals", "colorClass": "section-motivation" },
     { "id": "intro", "number": "1", "title": "Solution Overview", "colorClass": "section-intro" },
@@ -45,40 +45,18 @@
         { "id": "context", "file": "motivation-09-context.html", "title": "Context Engineering", "icon": "🧠", "backLabel": "Back to Vision" }
       ]
     },
-        {
+    {
       "id": "solution",
       "file": "03-solution.html",
       "title": "The Solution Architecture",
       "icon": "💡",
-      "section": "intro"
-    },
-    {
-      "id": "coordinator",
-      "file": "04-coordinator.html",
-      "title": "Agent Coordinator",
-      "icon": "🧠",
-      "section": "components"
-    },
-    {
-      "id": "runner",
-      "file": "05-runner.html",
-      "title": "Agent Runner",
-      "icon": "⚡",
-      "section": "components"
-    },
-    {
-      "id": "context-store",
-      "file": "06-context-store.html",
-      "title": "Context Store",
-      "icon": "📄",
-      "section": "components"
-    },
-    {
-      "id": "dashboard",
-      "file": "07-dashboard.html",
-      "title": "Dashboard",
-      "icon": "📊",
-      "section": "components"
+      "section": "intro",
+      "deepDives": [
+        { "id": "coordinator", "file": "04-coordinator.html", "title": "Agent Coordinator", "icon": "🧠", "backLabel": "Back to Solution" },
+        { "id": "runner", "file": "05-runner.html", "title": "Agent Runner", "icon": "⚡", "backLabel": "Back to Solution" },
+        { "id": "context-store", "file": "06-context-store.html", "title": "Context Store", "icon": "📄", "backLabel": "Back to Solution" },
+        { "id": "dashboard", "file": "07-dashboard.html", "title": "Dashboard", "icon": "📊", "backLabel": "Back to Solution" }
+      ]
     },
     {
       "id": "architecture",
