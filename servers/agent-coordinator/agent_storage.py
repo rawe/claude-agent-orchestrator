@@ -110,6 +110,12 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         if demands_data:
             demands = RunnerDemands(**demands_data)
 
+        # Read agent type (default: "autonomous")
+        agent_type = data.get("type", "autonomous")
+
+        # Read parameters_schema (JSON Schema for parameter validation)
+        parameters_schema = data.get("parameters_schema")
+
         # Check status via .disabled file
         status = "inactive" if (agent_dir / ".disabled").exists() else "active"
 
@@ -119,6 +125,8 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         return Agent(
             name=name,
             description=description,
+            type=agent_type,
+            parameters_schema=parameters_schema,
             system_prompt=system_prompt,
             mcp_servers=mcp_servers,
             skills=skills,
@@ -251,6 +259,8 @@ def _resolve_agent_capabilities(agent: Agent) -> Agent:
     return Agent(
         name=agent.name,
         description=agent.description,
+        type=agent.type,
+        parameters_schema=agent.parameters_schema,
         system_prompt=merged_system_prompt,
         mcp_servers=merged_mcp_servers if merged_mcp_servers else None,
         skills=agent.skills,
@@ -329,6 +339,10 @@ def create_agent(data: AgentCreate) -> Agent:
 
     # Write agent.json
     agent_data = {"name": data.name, "description": data.description}
+    # Always write type (explicit is better than relying on defaults)
+    agent_data["type"] = data.type
+    if data.parameters_schema:
+        agent_data["parameters_schema"] = data.parameters_schema
     if data.skills:
         agent_data["skills"] = data.skills
     if data.tags:
@@ -377,6 +391,15 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
         agent_data = json.load(f)
 
     # Apply updates
+    if updates.type is not None:
+        agent_data["type"] = updates.type
+
+    if updates.parameters_schema is not None:
+        if updates.parameters_schema:
+            agent_data["parameters_schema"] = updates.parameters_schema
+        else:
+            agent_data.pop("parameters_schema", None)
+
     if updates.description is not None:
         agent_data["description"] = updates.description
 

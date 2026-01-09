@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
-import { Agent, AgentCreate, AgentDemands, MCPServerConfig, SKILLS } from '@/types';
+import { Agent, AgentCreate, AgentDemands, AgentType, MCPServerConfig, SKILLS } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { Eye, Code, X, AlertCircle, Info, Package } from 'lucide-react';
@@ -20,6 +20,7 @@ interface AgentEditorProps {
 interface FormData {
   name: string;
   description: string;
+  type: AgentType;
   system_prompt: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
@@ -57,6 +58,7 @@ export function AgentEditor({
     defaultValues: {
       name: '',
       description: '',
+      type: 'autonomous',
       system_prompt: '',
       mcp_servers: null,
       skills: [],
@@ -78,6 +80,7 @@ export function AgentEditor({
       reset({
         name: agent.name,
         description: agent.description,
+        type: agent.type || 'autonomous',
         system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
@@ -89,6 +92,7 @@ export function AgentEditor({
       reset({
         name: '',
         description: '',
+        type: 'autonomous',
         system_prompt: '',
         mcp_servers: null,
         skills: [],
@@ -163,6 +167,7 @@ export function AgentEditor({
       const createData: AgentCreate = {
         name: data.name,
         description: data.description,
+        type: data.type,
         system_prompt: data.system_prompt || undefined,
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
@@ -256,6 +261,52 @@ export function AgentEditor({
               {errors.description && (
                 <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>
               )}
+            </div>
+
+            {/* Agent Type */}
+            <div>
+              <label className="label">Agent Type</label>
+              <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="autonomous"
+                        checked={field.value === 'autonomous'}
+                        onChange={() => field.onChange('autonomous')}
+                        className="w-4 h-4 text-primary-600"
+                      />
+                      <span className="text-sm font-medium">Autonomous</span>
+                      <span className="text-xs text-gray-500">(interprets intent)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="procedural"
+                        checked={field.value === 'procedural'}
+                        onChange={() => field.onChange('procedural')}
+                        className="w-4 h-4 text-primary-600"
+                      />
+                      <span className="text-sm font-medium">Procedural</span>
+                      <span className="text-xs text-gray-500">(follows defined procedure)</span>
+                    </label>
+                  </div>
+                )}
+              />
+              <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p>
+                    <strong>Autonomous:</strong> AI agents that interpret user intent. Requires {`{"prompt": "..."}`} parameters.
+                  </p>
+                  <p className="mt-1">
+                    <strong>Procedural:</strong> Agents that follow a defined procedure with specific parameters.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Tags */}

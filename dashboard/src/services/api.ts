@@ -49,9 +49,18 @@ const handleError = (error: unknown) => {
       throw new Error(message);
     }
 
-    const message = error.response?.data?.detail || error.response?.data?.message || error.message;
+    // Parameter validation error - preserve structured error for UI display
+    // The error.response.data.detail contains the structured error info
+    const detail = error.response?.data?.detail;
+    if (detail && typeof detail === 'object' && detail.error === 'parameter_validation_failed') {
+      console.error('Parameter validation error:', detail);
+      // Throw the structured error object for components to handle
+      throw detail;
+    }
+
+    const message = detail || error.response?.data?.message || error.message;
     console.error('API Error:', message);
-    throw new Error(message);
+    throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
   }
   throw error;
 };

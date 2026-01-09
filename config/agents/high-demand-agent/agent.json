@@ -1,6 +1,7 @@
 {
   "name": "high-demand-agent",
   "description": "an agent with non fulfillable demands",
+  "type": "autonomous",
   "demands": {
     "tags": [
       "non-existing-demand"

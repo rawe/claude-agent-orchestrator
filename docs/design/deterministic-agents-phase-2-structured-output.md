@@ -25,7 +25,7 @@ Introduce a dedicated `result` event type for storing session results. AI agents
 
 **File:** `servers/agent-coordinator/database.py`
 - Events table: Add columns for structured result data
-  - `result_type TEXT` - Discriminator: `"agent"` or `"deterministic"`
+  - `result_type TEXT` - Discriminator: `"autonomous"` or `"procedural"`
   - `result_data TEXT` - JSON structured output (nullable)
 - `insert_event()`: Handle new result event fields
 - `get_session_result()` (lines 409-427):
@@ -42,7 +42,7 @@ Introduce a dedicated `result` event type for storing session results. AI agents
       "event_type": "result",
       "session_id": session_id,
       "timestamp": datetime.now(UTC).isoformat(),
-      "result_type": "agent",
+      "result_type": "autonomous",
       "result_text": message.result
   })
   ```
@@ -69,7 +69,7 @@ Introduce a dedicated `result` event type for storing session results. AI agents
   "event_type": "result",
   "session_id": "ses_abc123",
   "timestamp": "2026-01-08T12:00:00Z",
-  "result_type": "agent",
+  "result_type": "autonomous",
   "result_text": "Here is the research summary...",
   "result_data": null
 }
@@ -77,7 +77,7 @@ Introduce a dedicated `result` event type for storing session results. AI agents
 
 **Fields:**
 - `event_type`: Always `"result"`
-- `result_type`: `"agent"` for AI agents, `"deterministic"` for deterministic (Phase 4)
+- `result_type`: `"autonomous"` for AI agents, `"procedural"` for procedural (Phase 4)
 - `result_text`: Text output (required)
 - `result_data`: Structured JSON output (optional, Phase 4 will use this)
 
@@ -126,12 +126,12 @@ These columns are nullable - only populated for `result` event types.
 
 1. **Result event stored:**
    - After AI agent completes, events table contains `event_type='result'`
-   - Event has `result_type='agent'` and `result_text` populated
+   - Event has `result_type='autonomous'` and `result_text` populated
 
 2. **Result extraction works:**
    ```bash
    curl /sessions/{session_id}/result
-   # Returns: {"result_type": "agent", "result_text": "...", "result_data": null}
+   # Returns: {"result_type": "autonomous", "result_text": "...", "result_data": null}
    ```
 
 3. **Legacy fallback works:**

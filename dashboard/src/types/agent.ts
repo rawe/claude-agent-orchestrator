@@ -1,5 +1,8 @@
 export type AgentStatus = 'active' | 'inactive';
 
+// Agent type: autonomous agents interpret intent, procedural agents follow defined procedures
+export type AgentType = 'autonomous' | 'procedural';
+
 // Agent Demands (ADR-011)
 // Requirements the agent demands to be satisfied before a session can run
 export interface AgentDemands {
@@ -27,6 +30,8 @@ export type MCPServerConfig = MCPServerStdio | MCPServerHttp;
 export interface Agent {
   name: string;
   description: string;
+  type: AgentType;
+  parameters_schema: Record<string, unknown> | null;  // JSON Schema for parameter validation
   system_prompt: string | null;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[] | null;
@@ -41,6 +46,8 @@ export interface Agent {
 export interface AgentCreate {
   name: string;
   description: string;
+  type?: AgentType;  // Defaults to 'autonomous'
+  parameters_schema?: Record<string, unknown> | null;  // JSON Schema for parameter validation
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
@@ -50,6 +57,8 @@ export interface AgentCreate {
 }
 
 export interface AgentUpdate {
+  type?: AgentType;
+  parameters_schema?: Record<string, unknown> | null;  // JSON Schema for parameter validation
   description?: string;
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;

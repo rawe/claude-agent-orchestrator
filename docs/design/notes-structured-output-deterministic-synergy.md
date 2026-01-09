@@ -193,7 +193,7 @@ Enhanced with output schema:
 ```
 GET /agents/{name}/schema
 → {
-    type: "deterministic",
+    type: "procedural",
     parameters_schema: {...},   // INPUT contract
     output_schema: {...}        // OUTPUT contract
   }
@@ -203,7 +203,7 @@ For AI agents:
 ```
 GET /agents/{name}/schema
 → {
-    type: "agent",
+    type: "autonomous",
     default_output_schema: {...}  // Optional blueprint default
   }
 ```
@@ -329,8 +329,8 @@ With complete schemas, tasks become fully self-describing:
 │  1. Orchestrator: "What tasks are available?"                    │
 │     GET /agents                                                  │
 │     → [                                                          │
-│         {name: "web-crawler", type: "deterministic", ...},       │
-│         {name: "ai-analyzer", type: "agent", ...}                │
+│         {name: "web-crawler", type: "procedural", ...},       │
+│         {name: "ai-analyzer", type: "autonomous", ...}                │
 │       ]                                                          │
 │                                                                  │
 │  2. Orchestrator: "What does web-crawler accept/produce?"        │
@@ -474,13 +474,13 @@ async def get_agent_schema(name: str):
 
     if agent.type == "deterministic":
         return {
-            "type": "deterministic",
+            "type": "procedural",
             "parameters_schema": agent.parameters_schema,
             "output_schema": agent.output_schema  # NEW
         }
     else:
         return {
-            "type": "agent",
+            "type": "autonomous",
             "default_output_schema": agent.default_output_schema
         }
 ```
@@ -617,7 +617,7 @@ AI agents can accept structured context alongside the prompt:
 ```json
 {
   "name": "code-reviewer",
-  "type": "agent",
+  "type": "autonomous",
   "parameters_schema": {
     "type": "object",
     "required": ["prompt"],

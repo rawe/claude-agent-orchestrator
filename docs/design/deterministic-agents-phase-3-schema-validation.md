@@ -20,8 +20,8 @@ Enable AI orchestrators to discover agent schemas and validate parameters before
 
 **File:** `servers/agent-coordinator/main.py`
 - Agent list endpoint: Include `type` and `parameters_schema` in response
-- AI agents: `type: "agent"`, no `parameters_schema` (implicit schema applies)
-- Deterministic agents (Phase 4): `type: "deterministic"`, full `parameters_schema`
+- AI agents: `type: "autonomous"`, no `parameters_schema` (implicit schema applies)
+- Deterministic agents (Phase 4): `type: "procedural"`, full `parameters_schema`
 
 **Response format:**
 ```json
@@ -29,12 +29,12 @@ Enable AI orchestrators to discover agent schemas and validate parameters before
   "agents": [
     {
       "name": "researcher",
-      "type": "agent",
+      "type": "autonomous",
       "description": "Research assistant"
     },
     {
       "name": "web-crawler",
-      "type": "deterministic",
+      "type": "procedural",
       "description": "Crawls websites",
       "parameters_schema": { ... }
     }
@@ -94,7 +94,7 @@ Including `parameters_schema` in the error enables AI self-correction.
 ### 5. Agent Blueprint Storage
 
 **File:** `servers/agent-coordinator/database.py`
-- Agents/blueprints table: Add `type` column (`"agent"` or `"deterministic"`)
+- Agents/blueprints table: Add `type` column (`"autonomous"` or `"procedural"`)
 - Add `parameters_schema` column (JSON, nullable for AI agents)
 
 ---
@@ -165,7 +165,7 @@ Recommended: Remove MCP validation to avoid duplicate logic and ensure consisten
 1. **Agent listing includes type:**
    ```bash
    curl /agents
-   # Returns: [{"name": "researcher", "type": "agent", ...}]
+   # Returns: [{"name": "researcher", "type": "autonomous", ...}]
    ```
 
 2. **Valid parameters accepted:**

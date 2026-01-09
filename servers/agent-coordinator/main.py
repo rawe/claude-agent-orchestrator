@@ -44,7 +44,10 @@ from datetime import datetime, timezone
 init_db()
 
 # Import run queue types and init function
-from services.run_queue import init_run_queue, RunCreate, Run, RunStatus, RunType
+from services.run_queue import (
+    init_run_queue, RunCreate, Run, RunStatus, RunType,
+    ParameterValidationError, validate_parameters, IMPLICIT_AUTONOMOUS_SCHEMA
+)
 # Import runner registry and other services
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError
 from services.stop_command_queue import stop_command_queue
@@ -1350,6 +1353,44 @@ async def create_run(run_create: RunCreate):
     if run_create.type == RunType.RESUME_SESSION and not run_create.session_id:
         raise HTTPException(status_code=400, detail="session_id is required for resume_session")
 
+    # Parameter validation (Phase 3: Schema Discovery & Validation)
+    # Validate parameters against agent's schema or implicit autonomous schema
+    agent = None
+    if run_create.agent_name:
+        agent = agent_storage.get_agent(run_create.agent_name)
+
+    try:
+        if agent:
+            # Validate against agent's schema (or implicit schema if none defined)
+            validate_parameters(run_create.parameters, agent)
+        else:
+            # No agent specified - use implicit autonomous schema
+            from jsonschema import Draft7Validator
+            validator = Draft7Validator(IMPLICIT_AUTONOMOUS_SCHEMA)
+            errors = list(validator.iter_errors(run_create.parameters))
+            if errors:
+                raise ParameterValidationError("(no agent)", errors, IMPLICIT_AUTONOMOUS_SCHEMA)
+    except ParameterValidationError as e:
+        # Return structured validation error for AI self-correction
+        validation_errors = [
+            {
+                "path": f"$.{'.'.join(str(p) for p in err.absolute_path)}" if err.absolute_path else "$",
+                "message": err.message,
+                "schema_path": "/".join(str(p) for p in err.schema_path)
+            }
+            for err in e.errors
+        ]
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "parameter_validation_failed",
+                "message": "Parameters do not match agent's parameters_schema",
+                "agent_name": e.agent_name,
+                "validation_errors": validation_errors,
+                "parameters_schema": e.schema
+            }
+        )
+
     # For start runs, create session FIRST (runs table has FK to sessions)
     if run_create.type == RunType.START_SESSION:
         # Generate session_id if not provided
@@ -1403,11 +1444,9 @@ async def create_run(run_create: RunCreate):
                 print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
                       f"hostname={affinity.get('hostname')}, executor_profile={affinity.get('executor_profile')}", flush=True)
 
-    # Load blueprint demands if agent_name provided
-    if run_create.agent_name:
-        agent = agent_storage.get_agent(run_create.agent_name)
-        if agent and agent.demands:
-            blueprint_demands = agent.demands
+    # Load blueprint demands from agent (already loaded for validation)
+    if agent and agent.demands:
+        blueprint_demands = agent.demands
 
     # Parse additional_demands from request
     if run_create.additional_demands:

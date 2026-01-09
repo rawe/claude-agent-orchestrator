@@ -1,5 +1,6 @@
 {
   "name": "simple-agent",
   "description": "a simple agent",
+  "type": "autonomous",
   "tags": ["internal"]
 }

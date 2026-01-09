@@ -38,3 +38,29 @@ export interface StopRunResponse {
   status: string;
   message?: string;
 }
+
+// Parameter Validation Error Types (Phase 3: Schema Discovery & Validation)
+export interface ValidationError {
+  path: string;          // JSON path to the invalid field (e.g., "$.prompt")
+  message: string;       // Human-readable error message
+  schema_path: string;   // Path in schema where constraint is defined
+}
+
+export interface ParameterValidationErrorResponse {
+  error: 'parameter_validation_failed';
+  message: string;
+  agent_name: string;
+  validation_errors: ValidationError[];
+  parameters_schema: Record<string, unknown>;
+}
+
+export function isParameterValidationError(
+  error: unknown
+): error is ParameterValidationErrorResponse {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'error' in error &&
+    (error as Record<string, unknown>).error === 'parameter_validation_failed'
+  );
+}

@@ -136,8 +136,8 @@ Listing endpoint returns type indicator without full schema (token-efficient):
 ```json
 {
   "agents": [
-    {"name": "web-researcher", "type": "agent", "description": "..."},
-    {"name": "web-crawler", "type": "deterministic", "description": "...", "has_schema": true}
+    {"name": "web-researcher", "type": "autonomous", "description": "..."},
+    {"name": "web-crawler", "type": "procedural", "description": "...", "has_schema": true}
   ]
 }
 ```

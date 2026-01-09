@@ -59,21 +59,33 @@ class AgentOrchestratorTools:
         Returns active blueprints filtered by the X-Agent-Tags header from the request.
         If no tags header is present, returns all active blueprints.
 
+        Each blueprint includes:
+        - name: Agent identifier
+        - description: Human-readable description
+        - type: "autonomous" (interprets intent) or "procedural" (follows defined procedure)
+        - tags: List of tags for filtering
+        - parameters_schema: JSON Schema for parameter validation (null for autonomous agents)
+
+        Autonomous agents require {"prompt": string} parameters.
+        Procedural agents require parameters matching their parameters_schema.
+
         Args:
             ctx: Request context with tags filter
 
         Returns:
-            List of agent blueprint dictionaries with name, description, and tags
+            List of agent blueprint dictionaries with type and schema info
         """
         try:
             agents = await self._client.list_agents(tags=ctx.tags)
 
-            # Return simplified agent info
+            # Return agent info with type and schema
             return [
                 {
                     "name": agent.get("name"),
                     "description": agent.get("description", ""),
+                    "type": agent.get("type", "autonomous"),
                     "tags": agent.get("tags", []),
+                    "parameters_schema": agent.get("parameters_schema"),
                 }
                 for agent in agents
             ]
@@ -143,11 +155,9 @@ class AgentOrchestratorTools:
                 f"Parameters too large: {params_len} characters (max {MAX_PROMPT_LENGTH})"
             )
 
-        # Validate required 'prompt' parameter for AI agents
-        # Note: Future deterministic agents may have different required parameters
-        prompt = parameters.get("prompt")
-        if not prompt or not isinstance(prompt, str):
-            raise ToolError("Missing required parameter: 'prompt'")
+        # Parameter validation is now handled by the Coordinator (Phase 3: Schema Validation)
+        # The Coordinator validates parameters against the agent's parameters_schema
+        # or implicit schema for autonomous agents. See run_queue.py for details.
 
         # Parse execution mode
         try:
@@ -255,11 +265,9 @@ class AgentOrchestratorTools:
                 f"Parameters too large: {params_len} characters (max {MAX_PROMPT_LENGTH})"
             )
 
-        # Validate required 'prompt' parameter for AI agents
-        # Note: Future deterministic agents may have different required parameters
-        prompt = parameters.get("prompt")
-        if not prompt or not isinstance(prompt, str):
-            raise ToolError("Missing required parameter: 'prompt'")
+        # Parameter validation is now handled by the Coordinator (Phase 3: Schema Validation)
+        # The Coordinator validates parameters against the agent's parameters_schema
+        # or implicit schema for autonomous agents. See run_queue.py for details.
 
         # Parse execution mode
         try:

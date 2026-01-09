@@ -156,7 +156,7 @@ The unified model naturally enables rich inputs for AI agents:
 ```json
 {
   "name": "code-reviewer",
-  "type": "agent",
+  "type": "autonomous",
   "parameters_schema": {
     "type": "object",
     "required": ["prompt"],
@@ -277,12 +277,12 @@ GET /agents
   "agents": [
     {
       "name": "researcher",
-      "type": "agent",
+      "type": "autonomous",
       "description": "Research assistant for technical topics"
     },
     {
       "name": "web-crawler",
-      "type": "deterministic",
+      "type": "procedural",
       "description": "Crawls websites to specified depth",
       "parameters_schema": {
         "type": "object",
@@ -299,8 +299,8 @@ GET /agents
 ```
 
 **Key design decisions:**
-- AI agents return `type: "agent"` with no `parameters_schema` (implicit schema applies)
-- Deterministic agents return `type: "deterministic"` with full `parameters_schema` inline
+- AI agents return `type: "autonomous"` with no `parameters_schema` (implicit schema applies)
+- Deterministic agents return `type: "procedural"` with full `parameters_schema` inline
 - Schema is included in listing to minimize round-trips (AI sees schema immediately)
 
 #### MCP Tool: `list_agent_blueprints`
@@ -418,7 +418,7 @@ Modern LLMs (like Claude) are excellent at reading JSON schemas and producing ma
 AI Orchestrator receives task: "Crawl example.com and extract product data"
     │
     ├─► 1. list_agent_blueprints()
-    │      Returns: [{name: "web-crawler", type: "deterministic",
+    │      Returns: [{name: "web-crawler", type: "procedural",
     │                 parameters_schema: {url: string, depth: int, ...}}]
     │
     ├─► 2. AI reasons: "I need to call web-crawler with url and depth"
@@ -489,7 +489,7 @@ Deterministic agents send a dedicated `result` event:
   "event_type": "result",
   "session_id": "ses_abc123",
   "timestamp": "2026-01-08T12:00:00Z",
-  "result_type": "deterministic",
+  "result_type": "procedural",
   "result_text": "raw stdout output",
   "result_data": {
     "pages_crawled": 42,
@@ -504,7 +504,7 @@ Deterministic agents send a dedicated `result` event:
 
 **Fields:**
 - `event_type`: Always `"result"` for result events
-- `result_type`: `"deterministic"` or `"agent"` (for future AI agent migration)
+- `result_type`: `"procedural"` or `"autonomous"` (for future AI agent migration)
 - `result_text`: Raw text output (stdout for deterministic, last message for AI)
 - `result_data`: Structured JSON output (optional, parsed from stdout if valid JSON)
 - `exit_code`: Process exit code (deterministic only)
@@ -529,7 +529,7 @@ When a callback is triggered, the coordinator extracts the result from the `resu
   "callback_type": "child_completed",
   "child_session_id": "ses_abc123",
   "result": {
-    "result_type": "deterministic",
+    "result_type": "procedural",
     "result_text": "...",
     "result_data": {...},
     "exit_code": 0
@@ -547,7 +547,7 @@ For consistency, AI agents could migrate to the unified `result` event format:
 {
   "event_type": "result",
   "session_id": "ses_abc123",
-  "result_type": "agent",
+  "result_type": "autonomous",
   "result_text": "Here is the research summary..."
 }
 ```
@@ -626,7 +626,7 @@ def main():
         "event_type": "result",
         "session_id": inv.session_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "result_type": "deterministic",
+        "result_type": "procedural",
         "result_text": result.stdout,
         "exit_code": result.returncode,
     }
@@ -723,7 +723,7 @@ Coordinator
 ```json
 // profiles/deterministic.json
 {
-  "type": "deterministic",
+  "type": "procedural",
   "command": "executors/deterministic/ao-deterministic-exec",
   "blueprints_dir": "~/.agent-runner/blueprints"
 }
@@ -833,7 +833,7 @@ cd servers/agent-coordinator && uv add jsonschema
    - Handle name collisions with `name@runner_id` suffix
 
 5. **Add `type` and `parameters_schema` to agents list**
-   - Return `type: "agent"` or `type: "deterministic"`
+   - Return `type: "autonomous"` or `type: "procedural"`
    - Return `parameters_schema` inline for deterministic agents
    - AI agents return no schema (implicit `{prompt: string}` applies)
 
@@ -845,7 +845,7 @@ cd servers/agent-coordinator && uv add jsonschema
 
 7. **Support structured result events**
    - Add `RESULT` to `SessionEventType` enum
-   - Extend events table with `result_type` (discriminator: `"agent"` | `"deterministic"`) and `result_data` (JSON) columns
+   - Extend events table with `result_type` (discriminator: `"autonomous"` | `"procedural"`) and `result_data` (JSON) columns
    - Update `get_session_result()` to prioritize `result` events, falling back to legacy `message` extraction for backward compatibility
    - Include structured result in callback payload
 
@@ -882,7 +882,7 @@ Deterministic agents send a structured `result` event to the coordinator:
   "event_type": "result",
   "session_id": "ses_abc123",
   "timestamp": "2026-01-08T12:00:00Z",
-  "result_type": "deterministic",
+  "result_type": "procedural",
   "result_text": "...raw stdout...",
   "result_data": {
     "pages_crawled": 42,

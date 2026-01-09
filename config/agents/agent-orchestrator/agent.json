@@ -1,6 +1,7 @@
 {
   "name": "agent-orchestrator",
   "description": "Agent able to spawn other internal and public facing agents.",
+  "type": "autonomous",
   "tags": [
     "external",
     "internal",

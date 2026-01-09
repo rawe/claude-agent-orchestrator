@@ -64,6 +64,10 @@ class SessionEventType(str, Enum):
 # Agent Models (from agent-registry)
 # ==============================================================================
 
+# Agent type: autonomous agents interpret intent, procedural agents follow defined procedures
+AgentType = Literal["autonomous", "procedural"]
+
+
 class MCPServerStdio(BaseModel):
     """MCP server configuration for stdio transport (command-based)."""
 
@@ -98,6 +102,8 @@ class AgentBase(BaseModel):
 class AgentCreate(AgentBase):
     """Request body for creating an agent."""
 
+    type: AgentType = "autonomous"
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
@@ -109,6 +115,8 @@ class AgentCreate(AgentBase):
 class AgentUpdate(BaseModel):
     """Request body for updating an agent (partial)."""
 
+    type: Optional[AgentType] = None
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     description: Optional[str] = None
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
@@ -121,6 +129,8 @@ class AgentUpdate(BaseModel):
 class Agent(AgentBase):
     """Full agent representation."""
 
+    type: AgentType = "autonomous"
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None

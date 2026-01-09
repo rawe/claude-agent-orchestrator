@@ -1,6 +1,7 @@
 {
   "name": "neo4j-agent",
   "description": "A simple agent with access to Neo4j graph database, it should be used for simple interactions like querying, creating, and managing graph data.",
+  "type": "autonomous",
   "tags": [
     "internal",
     "graph"

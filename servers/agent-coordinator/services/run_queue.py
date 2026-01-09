@@ -26,7 +26,10 @@ if TYPE_CHECKING:
     from services.runner_registry import RunnerInfo
 
 # Import ExecutionMode for runtime use
-from models import ExecutionMode
+from models import ExecutionMode, Agent
+
+# JSON Schema validation for parameters
+from jsonschema import Draft7Validator
 
 # Import database functions for persistence
 from database import (
@@ -43,6 +46,53 @@ from database import (
     recover_stale_runs as db_recover_stale_runs,
     recover_all_active_runs as db_recover_all_active_runs,
 )
+
+
+# ==============================================================================
+# Parameter Validation (Phase 3: Schema Discovery & Validation)
+# ==============================================================================
+
+# Implicit schema for autonomous agents (no explicit parameters_schema)
+# Ensures {"prompt": string} requirement for AI agents
+IMPLICIT_AUTONOMOUS_SCHEMA = {
+    "type": "object",
+    "required": ["prompt"],
+    "properties": {
+        "prompt": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": False
+}
+
+
+class ParameterValidationError(Exception):
+    """Raised when parameters don't match agent's parameters_schema."""
+
+    def __init__(self, agent_name: str, errors: list, schema: dict):
+        self.agent_name = agent_name
+        self.errors = errors  # jsonschema ValidationError list
+        self.schema = schema
+        super().__init__(f"Parameter validation failed for agent '{agent_name}'")
+
+
+def validate_parameters(parameters: dict, agent: Agent) -> None:
+    """
+    Validate parameters against agent's schema.
+
+    For autonomous agents without explicit parameters_schema, uses IMPLICIT_AUTONOMOUS_SCHEMA.
+    For procedural agents, uses the agent's parameters_schema.
+
+    Args:
+        parameters: The parameters dict to validate
+        agent: The agent whose schema to validate against
+
+    Raises:
+        ParameterValidationError: If parameters don't match schema
+    """
+    schema = agent.parameters_schema or IMPLICIT_AUTONOMOUS_SCHEMA
+    validator = Draft7Validator(schema)
+    errors = list(validator.iter_errors(parameters))
+    if errors:
+        raise ParameterValidationError(agent.name, errors, schema)
 
 
 class RunType(str, Enum):

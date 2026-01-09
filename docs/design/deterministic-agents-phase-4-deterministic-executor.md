@@ -118,7 +118,7 @@ Extend registration payload:
 **File:** `servers/agent-coordinator/main.py`
 - `register_runner()` (lines 904-952): Accept `blueprints` array
 - Store blueprints bound to `runner_id`
-- Set `type: "deterministic"` for these blueprints
+- Set `type: "procedural"` for these blueprints
 
 ### 5. Coordinator Blueprint Storage
 
@@ -134,7 +134,7 @@ Store runner-owned blueprints:
 blueprints:
   - name (TEXT, PRIMARY KEY with runner_id)
   - runner_id (TEXT, FOREIGN KEY → runners)
-  - type (TEXT: "agent" | "deterministic")
+  - type (TEXT: "autonomous" | "procedural")
   - description (TEXT)
   - command (TEXT, nullable - deterministic only)
   - parameters_schema (TEXT, JSON)
@@ -195,7 +195,7 @@ The executor sends a `result` event after execution:
   "event_type": "result",
   "session_id": "ses_abc123",
   "timestamp": "2026-01-08T12:00:00Z",
-  "result_type": "deterministic",
+  "result_type": "procedural",
   "result_text": "raw stdout output",
   "result_data": { "pages_crawled": 42 },
   "exit_code": 0
@@ -253,7 +253,7 @@ The executor sends a `result` event after execution:
 5. **Execution:**
    - Executor receives invocation with `command` and `parameters`
    - Subprocess executed with CLI arguments
-   - Result event stored with `result_type: "deterministic"`
+   - Result event stored with `result_type: "procedural"`
 
 6. **Callback works:**
    - Parent agent receives callback with structured result

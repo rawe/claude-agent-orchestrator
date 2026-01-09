@@ -1,6 +1,7 @@
 {
   "name": "agent-orchestrator-internal",
   "description": "Internal facing agent able to spawn other internal agents",
+  "type": "autonomous",
   "tags": [
     "internal",
     "orchestration",

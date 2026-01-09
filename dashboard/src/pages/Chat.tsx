@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { chatService } from '@/services/chatService';
 import type { Agent, Session } from '@/types';
+import { isParameterValidationError } from '@/types/run';
 import { useNotification, useSSE, useChat, useSessions } from '@/contexts';
 import { Button, Spinner, Dropdown } from '@/components/common';
 import type { DropdownOption } from '@/components/common';
@@ -309,7 +310,18 @@ export function Chat() {
       setAgentStatus('starting');
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      let errorMessage: string;
+
+      // Handle parameter validation errors with detailed feedback
+      if (isParameterValidationError(err)) {
+        const validationDetails = err.validation_errors
+          .map((e) => `- ${e.path}: ${e.message}`)
+          .join('\n');
+        errorMessage = `Parameter validation failed:\n${validationDetails}`;
+      } else {
+        errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      }
+
       // Update assistant message with error
       setMessages((prev) =>
         prev.map((msg) =>
@@ -318,7 +330,7 @@ export function Chat() {
             : msg
         )
       );
-      showError(errorMessage);
+      showError(isParameterValidationError(err) ? 'Parameter validation failed' : errorMessage);
       setAgentStatus('error');
       setIsLoading(false);
       setPendingMessageId(null);

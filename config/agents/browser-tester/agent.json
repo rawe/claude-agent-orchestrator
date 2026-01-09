@@ -1,5 +1,6 @@
 {
   "name": "browser-tester",
   "description": "Specialist in browser automation and end-to-end testing using Playwright",
+  "type": "autonomous",
   "tags": ["internal", "testing"]
 }

@@ -28,7 +28,7 @@ api.interceptors.request.use(async (requestConfig) => {
 // Error handler with auth-specific messages
 function handleError(error: unknown): never {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<{ detail?: string; message?: string }>;
+    const axiosError = error as AxiosError<{ detail?: unknown; message?: string }>;
     const status = axiosError.response?.status;
 
     // Auth-specific error messages
@@ -39,7 +39,14 @@ function handleError(error: unknown): never {
       throw new Error('Access denied. Invalid or expired token.');
     }
 
-    const message = axiosError.response?.data?.detail
+    // Parameter validation error - preserve structured error for UI display
+    const detail = axiosError.response?.data?.detail;
+    if (detail && typeof detail === 'object' && (detail as Record<string, unknown>).error === 'parameter_validation_failed') {
+      // Throw the structured error object for components to handle
+      throw detail;
+    }
+
+    const message = (typeof detail === 'string' ? detail : null)
       || axiosError.response?.data?.message
       || axiosError.message
       || 'An error occurred';

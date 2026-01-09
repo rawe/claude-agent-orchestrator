@@ -202,6 +202,20 @@ export function AgentTable({
           </button>
         ),
       }),
+      columnHelper.accessor('type', {
+        header: 'Type',
+        cell: (info) => {
+          const agentType = info.getValue() || 'autonomous';
+          return (
+            <Badge
+              size="sm"
+              variant={agentType === 'autonomous' ? 'info' : 'warning'}
+            >
+              {agentType}
+            </Badge>
+          );
+        },
+      }),
       columnHelper.accessor('description', {
         header: 'Description',
         cell: (info) => (
