@@ -140,7 +140,7 @@ def run_start(inv: ExecutorInvocation) -> None:
     # Save session data
     save_session_data(session_id, session_data)
 
-    # Send assistant message event
+    # Send assistant message event (for conversation history)
     try:
         client.add_event(session_id, {
             "event_type": "message",
@@ -148,6 +148,18 @@ def run_start(inv: ExecutorInvocation) -> None:
             "timestamp": datetime.now(UTC).isoformat(),
             "role": "assistant",
             "content": [{"type": "text", "text": response}],
+        })
+    except SessionClientError:
+        pass
+
+    # Send result event (for structured output)
+    try:
+        client.add_event(session_id, {
+            "event_type": "result",
+            "session_id": session_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "result_text": response,
+            "result_data": None,  # AI agents produce text only
         })
     except SessionClientError:
         pass
@@ -211,7 +223,7 @@ def run_resume(inv: ExecutorInvocation) -> None:
     # Save session data
     save_session_data(session_id, session_data)
 
-    # Send assistant message event
+    # Send assistant message event (for conversation history)
     try:
         client.add_event(session_id, {
             "event_type": "message",
@@ -219,6 +231,18 @@ def run_resume(inv: ExecutorInvocation) -> None:
             "timestamp": datetime.now(UTC).isoformat(),
             "role": "assistant",
             "content": [{"type": "text", "text": response}],
+        })
+    except SessionClientError:
+        pass
+
+    # Send result event (for structured output)
+    try:
+        client.add_event(session_id, {
+            "event_type": "result",
+            "session_id": session_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "result_text": response,
+            "result_data": None,  # AI agents produce text only
         })
     except SessionClientError:
         pass

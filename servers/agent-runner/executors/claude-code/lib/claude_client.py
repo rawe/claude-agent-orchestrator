@@ -352,7 +352,7 @@ async def run_claude_session(
                     # Capture result (overwrite each time to get final result)
                     result = message.result
 
-                    # Send assistant message event to API
+                    # Send assistant message event to API (for conversation history)
                     if message.result and session_id:
                         try:
                             session_client.add_event(session_id, {
@@ -361,6 +361,19 @@ async def run_claude_session(
                                 "timestamp": datetime.now(UTC).isoformat(),
                                 "role": "assistant",
                                 "content": [{"type": "text", "text": message.result}]
+                            })
+                        except SessionClientError:
+                            pass  # Silent failure
+
+                    # Send result event (for structured output)
+                    if message.result and session_id:
+                        try:
+                            session_client.add_event(session_id, {
+                                "event_type": "result",
+                                "session_id": session_id,
+                                "timestamp": datetime.now(UTC).isoformat(),
+                                "result_text": message.result,
+                                "result_data": None  # AI agents produce text only
                             })
                         except SessionClientError:
                             pass  # Silent failure

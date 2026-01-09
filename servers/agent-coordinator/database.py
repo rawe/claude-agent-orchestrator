@@ -106,7 +106,9 @@ def init_db():
             exit_code INTEGER,
             reason TEXT,
             role TEXT,
-            content TEXT
+            content TEXT,
+            result_text TEXT,
+            result_data TEXT
         )
     """)
 
@@ -199,8 +201,8 @@ def insert_event(event):
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("""
         INSERT INTO events
-        (session_id, event_type, timestamp, tool_name, tool_input, tool_output, error, exit_code, reason, role, content)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (session_id, event_type, timestamp, tool_name, tool_input, tool_output, error, exit_code, reason, role, content, result_text, result_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         event.session_id,
         event.event_type,
@@ -212,7 +214,9 @@ def insert_event(event):
         event.exit_code,
         event.reason,
         event.role,
-        json.dumps(event.content) if event.content else None
+        json.dumps(event.content) if event.content else None,
+        event.result_text,
+        json.dumps(event.result_data) if event.result_data else None
     ))
     conn.commit()
     conn.close()
@@ -249,6 +253,8 @@ def get_events(session_id: str, limit: int = 100):
             event['tool_output'] = json.loads(event['tool_output'])
         if event['content']:
             event['content'] = json.loads(event['content'])
+        if event.get('result_data'):
+            event['result_data'] = json.loads(event['result_data'])
         events.append(event)
 
     conn.close()
@@ -406,25 +412,29 @@ def get_session_by_id(session_id: str) -> dict | None:
     return dict(row) if row else None
 
 
-def get_session_result(session_id: str) -> str | None:
-    """Extract result from the last assistant message event"""
+def get_session_result(session_id: str) -> dict | None:
+    """Get structured result from result event.
+
+    Returns:
+        dict with {result_text, result_data} or None if no result event exists.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.execute("""
-        SELECT content FROM events
-        WHERE session_id = ? AND event_type = 'message' AND role = 'assistant'
+        SELECT result_text, result_data FROM events
+        WHERE session_id = ? AND event_type = 'result'
         ORDER BY timestamp DESC LIMIT 1
     """, (session_id,))
     row = cursor.fetchone()
     conn.close()
 
-    if not row or not row['content']:
+    if not row:
         return None
 
-    content = json.loads(row['content'])
-    if content and len(content) > 0 and 'text' in content[0]:
-        return content[0]['text']
-    return None
+    return {
+        "result_text": row["result_text"],
+        "result_data": json.loads(row["result_data"]) if row["result_data"] else None
+    }
 
 
 def get_session_by_executor_session_id(executor_session_id: str) -> dict | None:

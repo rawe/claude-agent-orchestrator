@@ -21,7 +21,7 @@ from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConf
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
-    ExecutionMode, StreamEventType, SessionEventType,
+    ExecutionMode, StreamEventType, SessionEventType, SessionResult,
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary
 )
 from openapi_config import (
@@ -306,10 +306,11 @@ async def get_session_status(session_id: str):
     return {"status": session["status"]}
 
 
-@app.get("/sessions/{session_id}/result", tags=["Sessions"])
-async def get_session_result_endpoint(session_id: str):
-    """Get result text from last assistant message.
+@app.get("/sessions/{session_id}/result", tags=["Sessions"], response_model=SessionResult)
+async def get_session_result_endpoint(session_id: str) -> SessionResult:
+    """Get structured result from session.
 
+    Returns the result event data with result_text and result_data fields.
     Only available for sessions with status 'finished'.
     """
     session = get_session_by_id(session_id)
@@ -323,7 +324,7 @@ async def get_session_result_endpoint(session_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="No result found")
 
-    return {"result": result}
+    return SessionResult(**result)
 
 
 @app.get("/sessions/{session_id}/affinity", tags=["Sessions"], response_model=SessionAffinityResponse)

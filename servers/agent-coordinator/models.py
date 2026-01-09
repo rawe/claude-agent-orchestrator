@@ -57,6 +57,7 @@ class SessionEventType(str, Enum):
     PRE_TOOL = "pre_tool"            # Before tool execution
     POST_TOOL = "post_tool"          # After tool execution
     MESSAGE = "message"              # Assistant or user message
+    RESULT = "result"                # Session result (structured output)
 
 
 # ==============================================================================
@@ -305,7 +306,7 @@ class Event(BaseModel):
     session_id is the coordinator-generated ID.
     executor_session_id is the framework's ID (optional, for correlation).
     """
-    event_type: str  # 'run_start' | 'pre_tool' | 'post_tool' | 'run_completed' | 'message'
+    event_type: str  # 'run_start' | 'pre_tool' | 'post_tool' | 'run_completed' | 'message' | 'result'
     session_id: str
     timestamp: str
     # Tool-related fields (pre_tool and post_tool)
@@ -319,3 +320,17 @@ class Event(BaseModel):
     # Message fields
     role: Optional[str] = None  # 'assistant' | 'user'
     content: Optional[List[dict]] = None  # Array of content blocks
+    # Result fields (for event_type='result')
+    result_text: Optional[str] = None  # Human-readable result text
+    result_data: Optional[dict] = None  # Structured JSON output (for deterministic agents)
+
+
+class SessionResult(BaseModel):
+    """Structured result from a session.
+
+    Returned by GET /sessions/{session_id}/result endpoint.
+    - result_text: Human-readable output (always present for completed sessions)
+    - result_data: Structured JSON output (present for deterministic agents, null for AI agents)
+    """
+    result_text: Optional[str] = None
+    result_data: Optional[dict] = None

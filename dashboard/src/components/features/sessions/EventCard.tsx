@@ -14,6 +14,7 @@ import {
   AlertCircle,
   User,
   Bot,
+  FileOutput,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -72,6 +73,14 @@ const eventConfig: Record<EventType, EventConfig> = {
     iconBg: 'bg-violet-100',
     iconColor: 'text-violet-600',
     label: 'Message',
+  },
+  result: {
+    icon: FileOutput,
+    accentColor: 'bg-teal-500',
+    bgColor: 'bg-white',
+    iconBg: 'bg-teal-100',
+    iconColor: 'text-teal-600',
+    label: 'Session Result',
   },
 };
 
@@ -138,6 +147,7 @@ export function EventCard({ event, forceExpanded = false }: EventCardProps) {
   const hasExpandableContent =
     event.event_type === 'pre_tool' ||
     event.event_type === 'post_tool' ||
+    event.event_type === 'result' ||
     (event.event_type === 'message' &&
       event.content?.some((b) => b.type === 'text' && b.text && b.text.length > 200));
 
@@ -273,6 +283,38 @@ export function EventCard({ event, forceExpanded = false }: EventCardProps) {
                 return null;
               })}
             </div>
+          </div>
+        );
+
+      case 'result':
+        return (
+          <div className="space-y-3">
+            {/* Result text */}
+            {event.result_text && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Result Text</div>
+                <div className="prose prose-sm max-w-none text-gray-700">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {expanded ? event.result_text : event.result_text.slice(0, 200) + (event.result_text.length > 200 ? '...' : '')}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {/* Structured data (only show if present and expanded) */}
+            {expanded && event.result_data && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-teal-600 uppercase tracking-wide">Structured Data</div>
+                <CodeBlock content={JSON.stringify(event.result_data, null, 2)} variant="success" />
+              </div>
+            )}
+
+            {/* Indicator for structured data when collapsed */}
+            {!expanded && event.result_data && (
+              <div className="text-xs text-teal-600">
+                + Structured data available (expand to view)
+              </div>
+            )}
           </div>
         );
 

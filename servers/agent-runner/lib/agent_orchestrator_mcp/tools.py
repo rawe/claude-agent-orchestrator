@@ -193,15 +193,20 @@ class AgentOrchestratorTools:
                         run_id=run_id,
                         session_id=session_id,
                     )
-                    # Truncate result if too long
-                    if len(session_result) > MAX_RESULT_LENGTH:
-                        session_result = (
-                            session_result[:MAX_RESULT_LENGTH]
+                    # session_result is now {result_text, result_data}
+                    result_text = session_result.get("result_text") or ""
+                    result_data = session_result.get("result_data")
+
+                    # Truncate result_text if too long
+                    if len(result_text) > MAX_RESULT_LENGTH:
+                        result_text = (
+                            result_text[:MAX_RESULT_LENGTH]
                             + f"\n\n[Result truncated at {MAX_RESULT_LENGTH} characters]"
                         )
                     return {
                         "session_id": session_id,
-                        "result": session_result,
+                        "result_text": result_text,
+                        "result_data": result_data,
                     }
                 except RunTimeoutError as e:
                     raise ToolError(f"Session timed out: {e}")
@@ -299,15 +304,20 @@ class AgentOrchestratorTools:
                         run_id=run_id,
                         session_id=session_id,
                     )
-                    # Truncate result if too long
-                    if len(session_result) > MAX_RESULT_LENGTH:
-                        session_result = (
-                            session_result[:MAX_RESULT_LENGTH]
+                    # session_result is now {result_text, result_data}
+                    result_text = session_result.get("result_text") or ""
+                    result_data = session_result.get("result_data")
+
+                    # Truncate result_text if too long
+                    if len(result_text) > MAX_RESULT_LENGTH:
+                        result_text = (
+                            result_text[:MAX_RESULT_LENGTH]
                             + f"\n\n[Result truncated at {MAX_RESULT_LENGTH} characters]"
                         )
                     return {
                         "session_id": session_id,
-                        "result": session_result,
+                        "result_text": result_text,
+                        "result_data": result_data,
                     }
                 except RunTimeoutError as e:
                     raise ToolError(f"Session timed out: {e}")
@@ -359,7 +369,7 @@ class AgentOrchestratorTools:
             session_id: ID of the session
 
         Returns:
-            {"session_id": "...", "result": "..."}
+            {"session_id": "...", "result_text": "...", "result_data": ...}
 
         Raises:
             ToolError: If session not found or not finished
@@ -375,17 +385,21 @@ class AgentOrchestratorTools:
                 )
 
             result = await self._client.get_session_result(session_id)
+            # result is now {result_text, result_data}
+            result_text = result.get("result_text") or ""
+            result_data = result.get("result_data")
 
-            # Truncate if too long
-            if len(result) > MAX_RESULT_LENGTH:
-                result = (
-                    result[:MAX_RESULT_LENGTH]
+            # Truncate result_text if too long
+            if len(result_text) > MAX_RESULT_LENGTH:
+                result_text = (
+                    result_text[:MAX_RESULT_LENGTH]
                     + f"\n\n[Result truncated at {MAX_RESULT_LENGTH} characters]"
                 )
 
             return {
                 "session_id": session_id,
-                "result": result,
+                "result_text": result_text,
+                "result_data": result_data,
             }
         except CoordinatorClientError as e:
             raise ToolError(f"Failed to get result: {e}")

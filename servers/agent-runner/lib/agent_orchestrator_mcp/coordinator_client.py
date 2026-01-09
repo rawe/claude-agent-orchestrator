@@ -170,7 +170,7 @@ class CoordinatorClient:
         session_id: str,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
         timeout: float = DEFAULT_TIMEOUT,
-    ) -> str:
+    ) -> dict:
         """Wait for run to complete and return session result.
 
         Args:
@@ -180,7 +180,7 @@ class CoordinatorClient:
             timeout: Maximum wait time in seconds
 
         Returns:
-            Session result text
+            Structured result dict {result_text, result_data}
 
         Raises:
             RunTimeoutError: If run doesn't complete in time
@@ -246,8 +246,12 @@ class CoordinatorClient:
         except httpx.RequestError as e:
             raise CoordinatorClientError(f"Request failed: {e}")
 
-    async def get_session_result(self, session_id: str) -> str:
-        """Get session result via GET /sessions/{session_id}/result."""
+    async def get_session_result(self, session_id: str) -> dict:
+        """Get session result via GET /sessions/{session_id}/result.
+
+        Returns:
+            Structured result dict {result_text, result_data}
+        """
         client = await self._ensure_client()
 
         try:
@@ -256,7 +260,8 @@ class CoordinatorClient:
                 headers=self._get_auth_headers(),
             )
             response.raise_for_status()
-            return response.json().get("result", "")
+            # Returns {result_text, result_data}
+            return response.json()
         except httpx.HTTPStatusError as e:
             raise CoordinatorClientError(f"Failed to get result: {e.response.text}")
         except httpx.RequestError as e:

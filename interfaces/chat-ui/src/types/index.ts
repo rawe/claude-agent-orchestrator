@@ -11,7 +11,7 @@ export interface ContentBlock {
 
 // Event from SSE stream
 export interface SessionEvent {
-  event_type: 'run_start' | 'run_completed' | 'pre_tool' | 'post_tool' | 'message';
+  event_type: 'run_start' | 'run_completed' | 'pre_tool' | 'post_tool' | 'message' | 'result';
   session_id: string;
   timestamp: string;
 
@@ -28,6 +28,10 @@ export interface SessionEvent {
   // Message events
   role?: 'user' | 'assistant';
   content?: ContentBlock[];
+
+  // Result events (for event_type='result')
+  result_text?: string;
+  result_data?: Record<string, unknown>;
 }
 
 // Session object

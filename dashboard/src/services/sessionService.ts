@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { agentOrchestratorApi } from './api';
-import type { Session, SessionMetadataUpdate, SessionEvent } from '@/types';
+import type { Session, SessionMetadataUpdate, SessionEvent, SessionResult } from '@/types';
 
 interface StopSessionResponse {
   ok: boolean;
@@ -69,5 +69,13 @@ export const sessionService = {
         message: 'Failed to stop session',
       };
     }
+  },
+
+  /**
+   * Get structured result from a finished session
+   */
+  async getSessionResult(sessionId: string): Promise<SessionResult> {
+    const response = await agentOrchestratorApi.get<SessionResult>(`/sessions/${sessionId}/result`);
+    return response.data;
   },
 };

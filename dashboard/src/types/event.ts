@@ -1,4 +1,4 @@
-export type EventType = 'run_start' | 'run_completed' | 'pre_tool' | 'post_tool' | 'message';
+export type EventType = 'run_start' | 'run_completed' | 'pre_tool' | 'post_tool' | 'message' | 'result';
 
 export type MessageRole = 'user' | 'assistant';
 
@@ -8,6 +8,11 @@ export interface MessageContent {
   name?: string;
   input?: Record<string, unknown>;
   content?: unknown;
+}
+
+export interface SessionResult {
+  result_text: string | null;
+  result_data: Record<string, unknown> | null;
 }
 
 export interface SessionEvent {
@@ -26,6 +31,9 @@ export interface SessionEvent {
   // Message events
   role?: MessageRole;
   content?: MessageContent[];
+  // Result events (for event_type='result')
+  result_text?: string;
+  result_data?: Record<string, unknown>;
 }
 
 export interface StreamMessage {

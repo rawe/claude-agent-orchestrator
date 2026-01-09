@@ -406,6 +406,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             }
           }
           break;
+
+        case 'result':
+          // Result events contain structured output (result_text, result_data)
+          // The chat UI displays message events directly, so result events
+          // are primarily for structured data extraction and callbacks.
+          // No UI action needed here.
+          break;
       }
     }
   }, [setSessionId, completeAssistantMessage]);

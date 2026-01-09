@@ -39,7 +39,8 @@ _lock = threading.Lock()
 CALLBACK_PROMPT_TEMPLATE = """<agent-callback session="{child_session_id}" status="completed">
 ## Child Result
 
-{child_result}
+{result_text}
+{result_data_section}
 </agent-callback>
 
 Please continue with the orchestration based on this result."""
@@ -62,7 +63,7 @@ Please continue with the orchestration based on these results."""
 def on_child_completed(
     child_session_id: str,
     parent_session: Optional[dict],
-    child_result: Optional[str] = None,
+    child_result: Optional[dict] = None,
     child_failed: bool = False,
     child_error: Optional[str] = None,
 ) -> bool:
@@ -71,7 +72,7 @@ def on_child_completed(
     Args:
         child_session_id: ID of the completed child session
         parent_session: Parent session dict (must contain session_id and status)
-        child_result: Result text from the child session
+        child_result: Structured result dict {result_text, result_data} from the child session
         child_failed: Whether the child failed
         child_error: Error message if child failed
 
@@ -177,11 +178,15 @@ def on_session_stopped(session_id: str) -> int:
 def _queue_notification(
     parent_session_id: str,
     child_session_id: str,
-    child_result: Optional[str],
+    child_result: Optional[dict],
     child_failed: bool,
     child_error: Optional[str],
 ) -> None:
-    """Queue a callback notification for later delivery."""
+    """Queue a callback notification for later delivery.
+
+    Args:
+        child_result: Structured result dict {result_text, result_data}
+    """
     with _lock:
         if parent_session_id not in _pending_notifications:
             _pending_notifications[parent_session_id] = []
@@ -193,15 +198,24 @@ def _queue_notification(
     logger.debug(f"Queued callback: {child_session_id} -> {parent_session_id}")
 
 
+def _format_result_data_section(result_data: Optional[dict]) -> str:
+    """Format result_data as a markdown section if present."""
+    if result_data is None:
+        return ""
+    import json
+    return f"\n## Structured Data\n\n```json\n{json.dumps(result_data, indent=2)}\n```"
+
+
 def _create_resume_run(
     parent_session_id: str,
-    children: List[tuple],  # [(child_id, result, failed, error), ...]
+    children: List[tuple],  # [(child_id, result_dict, failed, error), ...]
 ) -> Optional[str]:
     """Create a resume run for the parent with child results.
 
     Args:
         parent_session_id: Session ID to resume
-        children: List of (child_id, result, failed, error) tuples
+        children: List of (child_id, result_dict, failed, error) tuples
+                  where result_dict is {result_text, result_data} or None
 
     Returns:
         Run ID if created successfully, None on error
@@ -213,27 +227,42 @@ def _create_resume_run(
 
     # Build the callback prompt
     if len(children) == 1:
-        child_id, result, failed, error = children[0]
+        child_id, result_dict, failed, error = children[0]
         if failed:
             prompt = CALLBACK_FAILED_PROMPT_TEMPLATE.format(
                 child_session_id=child_id,
                 child_error=error or "Unknown error",
             )
         else:
+            # Extract structured result
+            result_text = "(No result available)"
+            result_data = None
+            if result_dict:
+                result_text = result_dict.get("result_text") or "(No result available)"
+                result_data = result_dict.get("result_data")
+
             prompt = CALLBACK_PROMPT_TEMPLATE.format(
                 child_session_id=child_id,
-                child_result=result or "(No result available)",
+                result_text=result_text,
+                result_data_section=_format_result_data_section(result_data),
             )
     else:
         # Multiple children - aggregate results
         results_parts = []
-        for child_id, result, failed, error in children:
+        for child_id, result_dict, failed, error in children:
             if failed:
                 status = "failed"
                 content = error or "Unknown error"
             else:
                 status = "completed"
-                content = result or "(No result available)"
+                # Extract structured result
+                result_text = "(No result available)"
+                result_data_section = ""
+                if result_dict:
+                    result_text = result_dict.get("result_text") or "(No result available)"
+                    result_data = result_dict.get("result_data")
+                    result_data_section = _format_result_data_section(result_data)
+                content = result_text + result_data_section
 
             results_parts.append(f"### Child: {child_id} (status: {status})\n\n{content}")
 
