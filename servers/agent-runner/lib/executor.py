@@ -55,19 +55,26 @@ class ExecutorProfile:
         type: Executor type (e.g., "claude-code") - for coordinator visibility
         command: Relative path to executor script from agent-runner dir
         config: Executor-specific configuration (passed as-is to executor)
+        agents_dir: Optional path to agents directory (runner-local, NOT sent to coordinator)
     """
 
     name: str
     type: str
     command: str
     config: dict[str, Any]
+    agents_dir: Optional[str] = None  # Path to agents directory (relative to runner dir)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for registration payload."""
+        """Convert to dictionary for registration payload.
+
+        Note: agents_dir is intentionally excluded - it's runner-local.
+        Loaded agents are sent separately in registration.
+        """
         return {
             "type": self.type,
             "command": self.command,
             "config": self.config,
+            # agents_dir NOT included - runner-local property
         }
 
 
@@ -133,7 +140,35 @@ def load_profile(name: str) -> ExecutorProfile:
         type=profile["type"],
         command=profile["command"],
         config=profile.get("config", {}),
+        agents_dir=profile.get("agents_dir"),
     )
+
+
+def load_agents_from_profile(profile: ExecutorProfile) -> list[dict]:
+    """Load agents from profile's agents_dir if specified.
+
+    Args:
+        profile: Executor profile with optional agents_dir
+
+    Returns:
+        List of agent dicts (name, description, command, parameters_schema)
+    """
+    if not profile.agents_dir:
+        return []
+
+    # Resolve path relative to agent-runner directory
+    agents_dir = Path(profile.agents_dir)
+    if not agents_dir.is_absolute():
+        agents_dir = get_runner_dir() / agents_dir
+
+    agents = []
+    if agents_dir.exists():
+        for path in agents_dir.glob("*.json"):
+            with open(path) as f:
+                agent = json.load(f)
+                agents.append(agent)
+
+    return agents
 
 
 class RunExecutor:
@@ -222,6 +257,10 @@ class RunExecutor:
             project_dir = run.project_dir or self.default_project_dir
             payload["project_dir"] = project_dir
 
+        # Add agent_name if present (for procedural executors)
+        if run.agent_name:
+            payload["agent_name"] = run.agent_name
+
         # Add executor_config from profile if present
         if self.executor_config:
             payload["executor_config"] = self.executor_config
@@ -282,10 +321,16 @@ class RunExecutor:
         else:
             logger.info(f"Resuming session: {run.session_id}")
 
-        logger.debug(
-            f"Executing ao-*-exec: mode={mode} session={run.session_id} "
-            f"prompt_len={len(run.prompt)}"
-        )
+        if run.prompt:
+            logger.debug(
+                f"Executing ao-*-exec: mode={mode} session={run.session_id} "
+                f"prompt_len={len(run.prompt)}"
+            )
+        else:
+            logger.debug(
+                f"Executing ao-*-exec: mode={mode} session={run.session_id} "
+                f"parameters={list(run.parameters.keys()) if run.parameters else []}"
+            )
 
         # Spawn subprocess with stdin pipe
         # encoding='utf-8' required for Windows (defaults to CP1252 which can't handle emojis)

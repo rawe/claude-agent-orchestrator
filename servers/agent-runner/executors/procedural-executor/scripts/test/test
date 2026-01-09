@@ -1,0 +1,76 @@
+#!/bin/bash
+# Test script for procedural executor - produces configurable output
+#
+# This script is used to test the fallback result handling when
+# stdout is not valid JSON.
+#
+# Parameters:
+#   --stdout "text"    - Write text to stdout (default: empty)
+#   --stderr "text"    - Write text to stderr (default: empty)
+#   --exit-code N      - Exit with code N (default: 0)
+#   --json             - Output stdout as JSON object {"output": "..."}
+#
+# Examples:
+#   ./test --stdout "Hello" --exit-code 0
+#   # stdout: Hello
+#   # exit: 0
+#   # result_data: {"return_code": 0, "stdout": "Hello", "stderr": ""}
+#
+#   ./test --stdout "partial" --stderr "Error occurred" --exit-code 1
+#   # stdout: partial
+#   # stderr: Error occurred
+#   # exit: 1
+#   # result_data: {"return_code": 1, "stdout": "partial", "stderr": "Error occurred"}
+#
+#   ./test --stdout "success" --json
+#   # stdout: {"output": "success"}
+#   # exit: 0
+#   # result_data: {"output": "success"}
+
+stdout_text=""
+stderr_text=""
+exit_code=0
+as_json=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --stdout)
+      stdout_text="$2"
+      shift 2
+      ;;
+    --stderr)
+      stderr_text="$2"
+      shift 2
+      ;;
+    --exit-code)
+      exit_code="$2"
+      shift 2
+      ;;
+    --json)
+      as_json=true
+      shift
+      ;;
+    *)
+      echo "Error: Unknown parameter: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Write to stderr if specified
+if [[ -n "$stderr_text" ]]; then
+  echo "$stderr_text" >&2
+fi
+
+# Write to stdout
+if [[ "$as_json" == "true" ]]; then
+  # Output as JSON
+  echo "{\"output\": \"$stdout_text\"}"
+else
+  # Output as plain text
+  if [[ -n "$stdout_text" ]]; then
+    echo "$stdout_text"
+  fi
+fi
+
+exit $exit_code

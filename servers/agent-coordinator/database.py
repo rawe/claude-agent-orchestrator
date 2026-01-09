@@ -118,6 +118,7 @@ def init_db():
         ON events(session_id, timestamp DESC)
     """)
 
+
     conn.commit()
     conn.close()
     print("Database initialized successfully")
@@ -912,3 +913,5 @@ def recover_all_active_runs() -> dict:
     conn.commit()
     conn.close()
     return results
+
+

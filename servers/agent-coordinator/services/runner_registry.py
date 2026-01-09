@@ -77,10 +77,11 @@ class RunnerInfo(BaseModel):
 
 
 class RunnerRegistry:
-    """Thread-safe registry for tracking runners."""
+    """Thread-safe registry for tracking runners and their agents."""
 
     def __init__(self, heartbeat_timeout_seconds: int = 120):
         self._runners: dict[str, RunnerInfo] = {}
+        self._runner_agents: dict[str, list[dict]] = {}  # runner_id -> list of agent dicts
         self._deregistered: set[str] = set()  # IDs pending deregistration signal
         self._lock = threading.Lock()
         self._heartbeat_timeout = heartbeat_timeout_seconds
@@ -207,14 +208,23 @@ class RunnerRegistry:
         with self._lock:
             return list(self._runners.values())
 
+    def _remove_runner_agents_unlocked(self, runner_id: str) -> int:
+        """Internal helper to remove runner agents without acquiring lock.
+
+        Must be called while holding self._lock.
+        """
+        agents = self._runner_agents.pop(runner_id, [])
+        return len(agents)
+
     def remove_runner(self, runner_id: str) -> bool:
-        """Remove a runner from the registry.
+        """Remove a runner and its agents from the registry.
 
         Returns True if runner was removed, False if not found.
         """
         with self._lock:
             if runner_id in self._runners:
                 del self._runners[runner_id]
+                self._remove_runner_agents_unlocked(runner_id)
                 return True
             return False
 
@@ -236,7 +246,7 @@ class RunnerRegistry:
             return runner_id in self._deregistered
 
     def confirm_deregistered(self, runner_id: str) -> bool:
-        """Confirm deregistration and remove runner from registry.
+        """Confirm deregistration and remove runner and its agents from registry.
 
         Called after runner has been notified of deregistration.
         Returns True if runner was removed, False if not found.
@@ -245,6 +255,7 @@ class RunnerRegistry:
             self._deregistered.discard(runner_id)
             if runner_id in self._runners:
                 del self._runners[runner_id]
+                self._remove_runner_agents_unlocked(runner_id)
                 return True
             return False
 
@@ -284,12 +295,86 @@ class RunnerRegistry:
                         runner.status = RunnerStatus.STALE
                         stale_ids.append(runner_id)
 
-            # Remove old runners
+            # Remove old runners and their agents
             for runner_id in remove_ids:
                 del self._runners[runner_id]
+                self._remove_runner_agents_unlocked(runner_id)
                 self._deregistered.discard(runner_id)
 
         return stale_ids, remove_ids
+
+    # =========================================================================
+    # Runner Agents (in-memory storage)
+    # =========================================================================
+
+    def store_runner_agents(self, runner_id: str, agents: list[dict]) -> None:
+        """Store agents registered by a runner.
+
+        Replaces any existing agents for this runner.
+
+        Args:
+            runner_id: The runner that owns these agents
+            agents: List of agent dicts with name, description, command, parameters_schema
+        """
+        with self._lock:
+            self._runner_agents[runner_id] = agents
+
+    def get_runner_agents(self, runner_id: str) -> list[dict]:
+        """Get all agents registered by a runner.
+
+        Args:
+            runner_id: The runner ID to query
+
+        Returns:
+            List of agent dicts (empty list if runner has no agents)
+        """
+        with self._lock:
+            return list(self._runner_agents.get(runner_id, []))
+
+    def delete_runner_agents(self, runner_id: str) -> int:
+        """Delete all agents registered by a runner.
+
+        Args:
+            runner_id: The runner ID
+
+        Returns:
+            Number of agents deleted
+        """
+        with self._lock:
+            return self._remove_runner_agents_unlocked(runner_id)
+
+    def get_runner_agent_by_name(self, name: str) -> tuple[dict, str] | None:
+        """Get a runner-owned agent by name.
+
+        If multiple runners have an agent with the same name, returns the first one found.
+
+        Args:
+            name: The agent name to look up
+
+        Returns:
+            Tuple of (agent_dict, runner_id) or None if not found
+        """
+        with self._lock:
+            for runner_id, agents in self._runner_agents.items():
+                for agent in agents:
+                    if agent.get("name") == name:
+                        return (agent, runner_id)
+            return None
+
+    def get_all_runner_agents(self) -> list[dict]:
+        """Get all runner-owned agents.
+
+        Returns:
+            List of agent dicts with runner_id included
+        """
+        with self._lock:
+            result = []
+            for runner_id, agents in self._runner_agents.items():
+                for agent in agents:
+                    # Include runner_id in each agent dict
+                    agent_with_runner = {**agent, "runner_id": runner_id}
+                    result.append(agent_with_runner)
+            return result
 
 
 # Module-level singleton

@@ -1,0 +1,16 @@
+{
+  "name": "echo",
+  "description": "Simple echo agent that returns the input message as JSON",
+  "command": "scripts/echo/echo",
+  "parameters_schema": {
+    "type": "object",
+    "required": ["message"],
+    "properties": {
+      "message": {
+        "type": "string",
+        "description": "The message to echo back"
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -130,6 +130,7 @@ class CoordinatorAPIClient:
         executor: dict,
         tags: Optional[list[str]] = None,
         require_matching_tags: bool = False,
+        agents: Optional[list[dict]] = None,
     ) -> RegistrationResponse:
         """Register this runner with Agent Coordinator.
 
@@ -143,6 +144,7 @@ class CoordinatorAPIClient:
             executor: Executor details dict with type, command, and config
             tags: Optional list of capability tags this runner offers (ADR-011)
             require_matching_tags: If True, only accept runs with matching tags
+            agents: Optional list of runner-owned agent definitions (Phase 4)
 
         Returns:
             Registration info including runner_id derived from properties
@@ -157,6 +159,8 @@ class CoordinatorAPIClient:
             payload["tags"] = tags
         if require_matching_tags:
             payload["require_matching_tags"] = require_matching_tags
+        if agents:
+            payload["agents"] = agents
 
         response = self._client.post(
             f"{self.base_url}/runner/register",

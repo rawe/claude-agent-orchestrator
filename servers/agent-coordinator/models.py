@@ -140,6 +140,9 @@ class Agent(AgentBase):
     status: Literal["active", "inactive"] = "active"
     created_at: str
     modified_at: str
+    # Runner-owned agent fields (Phase 4 - Procedural Executor)
+    command: Optional[str] = None  # CLI command for procedural agents
+    runner_id: Optional[str] = None  # Runner that owns this agent (None = file-based)
 
 
 class AgentStatusUpdate(BaseModel):
@@ -344,3 +347,19 @@ class SessionResult(BaseModel):
     """
     result_text: Optional[str] = None
     result_data: Optional[dict] = None
+
+
+# ==============================================================================
+# Runner Agent Models (Phase 4 - Procedural Executor)
+# ==============================================================================
+
+class RunnerAgent(BaseModel):
+    """Agent registered by a runner.
+
+    Runner-owned agents are procedural agents bundled with the runner.
+    They are deleted when the runner deregisters.
+    """
+    name: str
+    description: Optional[str] = None
+    command: str  # CLI command to execute (e.g., "scripts/echo/echo")
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation

@@ -15,14 +15,15 @@ from database import (
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
-    SessionAlreadyExistsError
+    SessionAlreadyExistsError,
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
     ExecutionMode, StreamEventType, SessionEventType, SessionResult,
-    Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary
+    Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary,
+    RunnerAgent,
 )
 from openapi_config import (
     API_TITLE, API_DESCRIPTION, API_VERSION, API_CONTACT, API_LICENSE,
@@ -674,6 +675,29 @@ def health_check():
     return {"status": "healthy"}
 
 
+# TODO: Refactor to factory pattern - agent_from_runner_data() should be in agent_storage.py
+# or a dedicated agent_factory.py to avoid duplication. Used in list_agents() and get_agent().
+def _agent_from_runner_data(ra: dict) -> Agent:
+    """Convert runner agent dict to Agent model.
+
+    FIXME: This conversion is duplicated. Consider a factory pattern in agent_storage.py
+    to create Agent instances from different sources (file-based, runner-owned).
+    """
+    return Agent(
+        name=ra["name"],
+        description=ra.get("description") or "",
+        type="procedural",  # Runner agents are always procedural
+        parameters_schema=ra.get("parameters_schema"),
+        command=ra.get("command"),
+        runner_id=ra.get("runner_id"),
+        tags=[],  # Runner agents don't have tags currently
+        capabilities=[],
+        status="active",  # Runner agents are active while runner is connected
+        created_at=ra.get("created_at", ""),
+        modified_at=ra.get("created_at", ""),  # Same as created for runner agents
+    )
+
+
 @app.get("/agents", tags=["Agents"], response_model=list[Agent], response_model_exclude_none=True)
 def list_agents(
     tags: Optional[str] = Query(
@@ -684,11 +708,20 @@ def list_agents(
     """
     List all agents, optionally filtered by tags.
 
+    Returns both file-based agents and runner-owned agents.
+    Runner-owned agents have `runner_id` set and `type: "procedural"`.
+
     - No tags parameter: Returns all agents (for management UI)
     - tags=foo: Returns agents with tag "foo"
     - tags=foo,bar: Returns agents with BOTH "foo" AND "bar" tags
     """
+    # Get file-based agents
     agents = agent_storage.list_agents()
+
+    # Get runner-owned agents and convert to Agent format
+    runner_agents_data = runner_registry.get_all_runner_agents()
+    for ra in runner_agents_data:
+        agents.append(_agent_from_runner_data(ra))
 
     if tags:
         # Parse comma-separated tags into a set
@@ -705,9 +738,11 @@ def get_agent(name: str, raw: bool = Query(False, description="Return raw agent 
     """
     Get agent by name.
 
+    Checks file-based agents first, then runner-owned agents.
     By default, capabilities are resolved and merged into system_prompt and mcp_servers.
     Use `?raw=true` to get the unresolved agent configuration (for editing).
     """
+    # Check file-based agents first
     try:
         agent = agent_storage.get_agent(name, resolve=not raw)
     except MissingCapabilityError as e:
@@ -721,9 +756,16 @@ def get_agent(name: str, raw: bool = Query(False, description="Return raw agent 
             detail=f"MCP server name conflict: '{e.server_name}' defined in {', '.join(e.sources)}"
         )
 
-    if not agent:
-        raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
-    return agent
+    if agent:
+        return agent
+
+    # Check runner-owned agents (uses _agent_from_runner_data helper)
+    runner_agent_result = runner_registry.get_runner_agent_by_name(name)
+    if runner_agent_result:
+        ra, _runner_id = runner_agent_result
+        return _agent_from_runner_data(ra)
+
+    raise HTTPException(status_code=404, detail=f"Agent not found: {name}")
 
 
 @app.post("/agents", tags=["Agents"], response_model=Agent, status_code=201, response_model_exclude_none=True)
@@ -872,6 +914,9 @@ class RunnerRegisterRequest(BaseModel):
     tags: Optional[list[str]] = None
     # If true, only accept runs with at least one matching tag
     require_matching_tags: bool = False
+    # Runner-owned agents (Phase 4 - Procedural Executor)
+    # List of agent definitions loaded from profile's agents_dir
+    agents: Optional[list[RunnerAgent]] = None
 
 
 class RunnerRegisterResponse(BaseModel):
@@ -941,6 +986,14 @@ async def register_runner(request: RunnerRegisterRequest):
     # Register with stop command queue for immediate wake-up on stop requests
     stop_command_queue.register_runner(runner.runner_id)
 
+    # Store runner-owned agents (Phase 4 - Procedural Executor)
+    # Replaces existing agents for this runner on re-registration
+    if request.agents:
+        agents_data = [agent.model_dump() for agent in request.agents]
+        runner_registry.store_runner_agents(runner.runner_id, agents_data)
+        if DEBUG:
+            print(f"[DEBUG]   agents: {[a.name for a in request.agents]}", flush=True)
+
     if DEBUG:
         print(f"[DEBUG] Registered runner: {runner.runner_id}", flush=True)
         print(f"[DEBUG]   hostname: {request.hostname}", flush=True)
@@ -982,6 +1035,8 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
         # Confirm deregistration and remove from registry
         runner_registry.confirm_deregistered(runner_id)
         stop_command_queue.unregister_runner(runner_id)
+        # Delete runner-owned agents (Phase 4)
+        runner_registry.delete_runner_agents(runner_id)
         if DEBUG:
             print(f"[DEBUG] Runner {runner_id} deregistered, signaling shutdown", flush=True)
         return {"deregistered": True}
@@ -1010,6 +1065,8 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
         if runner_registry.is_deregistered(runner_id):
             runner_registry.confirm_deregistered(runner_id)
             stop_command_queue.unregister_runner(runner_id)
+            # Delete runner-owned agents (Phase 4)
+            runner_registry.delete_runner_agents(runner_id)
             if DEBUG:
                 print(f"[DEBUG] Runner {runner_id} deregistered during poll, signaling shutdown", flush=True)
             return {"deregistered": True}
@@ -1320,6 +1377,8 @@ async def deregister_runner(
         # Runner is shutting down gracefully - remove immediately
         runner_registry.remove_runner(runner_id)
         stop_command_queue.unregister_runner(runner_id)
+        # Delete runner-owned agents (Phase 4)
+        runner_registry.delete_runner_agents(runner_id)
         if DEBUG:
             print(f"[DEBUG] Runner {runner_id} self-deregistered (graceful shutdown)", flush=True)
         return {"ok": True, "message": "Runner deregistered", "initiated_by": "self"}
@@ -1358,6 +1417,22 @@ async def create_run(run_create: RunCreate):
     agent = None
     if run_create.agent_name:
         agent = agent_storage.get_agent(run_create.agent_name)
+        # Check runner-owned agents if not found in file-based
+        if not agent:
+            runner_agent_result = runner_registry.get_runner_agent_by_name(run_create.agent_name)
+            if runner_agent_result:
+                agent = _agent_from_runner_data(runner_agent_result[0])
+
+    # Phase 4: Reject resume_session for procedural agents (stateless)
+    if run_create.type == RunType.RESUME_SESSION and agent and agent.type == "procedural":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "procedural_agent_no_resume",
+                "message": "Procedural agents are stateless and cannot be resumed",
+                "agent_name": run_create.agent_name,
+            }
+        )
 
     try:
         if agent:
@@ -1429,6 +1504,7 @@ async def create_run(run_create: RunCreate):
     affinity_demands = RunnerDemands()  # Empty defaults - populated for resume runs
     blueprint_demands = RunnerDemands()  # Empty defaults
     additional_demands = RunnerDemands()  # Empty defaults
+    runner_owner_demands = RunnerDemands()  # Empty defaults - for runner-owned agents
 
     # For RESUME_SESSION, look up session affinity and enforce it (ADR-010)
     # This ensures resume runs go to the same runner that owns the session
@@ -1444,6 +1520,24 @@ async def create_run(run_create: RunCreate):
                 print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
                       f"hostname={affinity.get('hostname')}, executor_profile={affinity.get('executor_profile')}", flush=True)
 
+    # Phase 4: For runner-owned agents, route to the owning runner
+    if agent and agent.runner_id:
+        runner = runner_registry.get_runner(agent.runner_id)
+        if runner:
+            runner_owner_demands = RunnerDemands(
+                hostname=runner.hostname,
+                project_dir=runner.project_dir,
+                executor_profile=runner.executor_profile,
+            )
+            if DEBUG:
+                print(f"[DEBUG] Run {run.run_id}: routing to runner {agent.runner_id} "
+                      f"(procedural agent '{agent.name}')", flush=True)
+        else:
+            # Runner is offline - run will fail after timeout
+            if DEBUG:
+                print(f"[DEBUG] Run {run.run_id}: runner {agent.runner_id} not online "
+                      f"(procedural agent '{agent.name}')", flush=True)
+
     # Load blueprint demands from agent (already loaded for validation)
     if agent and agent.demands:
         blueprint_demands = agent.demands
@@ -1452,10 +1546,14 @@ async def create_run(run_create: RunCreate):
     if run_create.additional_demands:
         additional_demands = RunnerDemands(**run_create.additional_demands)
 
-    # Merge demands: affinity (mandatory for resume) + blueprint + additional
+    # Merge demands: runner_owner (highest priority) + affinity + blueprint + additional
+    # Runner owner demands take precedence for procedural agents
     # Affinity takes precedence for resume runs
     merged_demands = RunnerDemands.merge(
-        RunnerDemands.merge(affinity_demands, blueprint_demands),
+        RunnerDemands.merge(
+            RunnerDemands.merge(runner_owner_demands, affinity_demands),
+            blueprint_demands
+        ),
         additional_demands
     )
 

@@ -8,10 +8,10 @@ import {
   createColumnHelper,
   SortingState,
 } from '@tanstack/react-table';
-import { Agent } from '@/types';
+import { Agent, isRunnerOwned } from '@/types';
 import { Badge, StatusBadge, EmptyState, SkeletonLine } from '@/components/common';
 import { truncate } from '@/utils/formatters';
-import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag, X } from 'lucide-react';
+import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag, X, Server } from 'lucide-react';
 
 // Tag filter component
 function TagFilter({
@@ -193,26 +193,49 @@ export function AgentTable({
     () => [
       columnHelper.accessor('name', {
         header: 'Name',
-        cell: (info) => (
-          <button
-            onClick={() => onEditAgent(info.row.original)}
-            className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
-          >
-            {info.getValue()}
-          </button>
-        ),
+        cell: (info) => {
+          const agent = info.row.original;
+          const runnerOwned = isRunnerOwned(agent);
+
+          // Runner-owned agents are not clickable
+          if (runnerOwned) {
+            return (
+              <span className="font-medium text-gray-700">
+                {info.getValue()}
+              </span>
+            );
+          }
+
+          return (
+            <button
+              onClick={() => onEditAgent(agent)}
+              className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              {info.getValue()}
+            </button>
+          );
+        },
       }),
       columnHelper.accessor('type', {
         header: 'Type',
         cell: (info) => {
+          const agent = info.row.original;
           const agentType = info.getValue() || 'autonomous';
+          const runnerOwned = isRunnerOwned(agent);
           return (
-            <Badge
-              size="sm"
-              variant={agentType === 'autonomous' ? 'info' : 'warning'}
-            >
-              {agentType}
-            </Badge>
+            <div className="flex items-center gap-1">
+              <Badge
+                size="sm"
+                variant={agentType === 'autonomous' ? 'info' : 'warning'}
+              >
+                {agentType}
+              </Badge>
+              {runnerOwned && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs text-gray-500 bg-gray-100 rounded" title={`Runner: ${agent.runner_id}`}>
+                  <Server className="w-3 h-3" />
+                </span>
+              )}
+            </div>
           );
         },
       }),
@@ -263,6 +286,15 @@ export function AgentTable({
         id: 'actions',
         cell: (info) => {
           const agent = info.row.original;
+          const runnerOwned = isRunnerOwned(agent);
+
+          // Runner-owned agents are read-only
+          if (runnerOwned) {
+            return (
+              <span className="text-xs text-gray-400 italic">Runner-managed</span>
+            );
+          }
+
           return (
             <div className="flex items-center gap-1">
               <button

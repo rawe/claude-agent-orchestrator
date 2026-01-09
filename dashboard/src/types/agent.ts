@@ -41,6 +41,14 @@ export interface Agent {
   status: AgentStatus;
   created_at: string;
   modified_at: string;
+  // Runner-owned agent fields (Phase 4 - Procedural Executor)
+  command?: string | null;      // CLI command for procedural agents
+  runner_id?: string | null;    // Runner that owns this agent (null = file-based)
+}
+
+// Helper to check if agent is runner-owned (read-only in UI)
+export function isRunnerOwned(agent: Agent): boolean {
+  return agent.runner_id != null;
 }
 
 export interface AgentCreate {

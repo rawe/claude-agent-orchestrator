@@ -54,6 +54,7 @@ from executor import (
     RunExecutor,
     list_profiles,
     load_profile,
+    load_agents_from_profile,
     ExecutorProfile,
     DEFAULT_EXECUTOR_PATH,
     DEFAULT_EXECUTOR_TYPE,
@@ -211,6 +212,13 @@ class Runner:
                 "config": {},
             }
 
+        # Load runner-owned agents from profile (Phase 4 - Procedural Executor)
+        agents = None
+        if self.config.profile:
+            agents = load_agents_from_profile(self.config.profile)
+            if agents:
+                logger.info(f"Loaded {len(agents)} agents from profile")
+
         try:
             response = self.api_client.register(
                 hostname=self._hostname,
@@ -219,6 +227,7 @@ class Runner:
                 executor=executor,
                 tags=self.config.tags if self.config.tags else None,
                 require_matching_tags=self.config.require_matching_tags,
+                agents=agents,
             )
             self.runner_id = response.runner_id
             logger.info(f"Registered as {self.runner_id}")
@@ -232,6 +241,8 @@ class Runner:
                 logger.info(f"  Tags: {self.config.tags}")
             if self.config.require_matching_tags:
                 logger.info(f"  Require matching tags: {self.config.require_matching_tags}")
+            if agents:
+                logger.info(f"  Agents: {[a['name'] for a in agents]}")
         except AuthenticationError as e:
             logger.error(f"Authentication failed: {e}")
             raise SystemExit(1)

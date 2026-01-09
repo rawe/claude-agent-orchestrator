@@ -52,7 +52,17 @@ cd servers/agent-coordinator && AUTH_ENABLED=false DOCS_ENABLED=true CORS_ORIGIN
 cd dashboard && VITE_AUTH0_DOMAIN= VITE_AUTH0_CLIENT_ID= VITE_AUTH0_AUDIENCE= npm run dev
 ```
 
-**Agent Runner**:
+**Agent Runner** (default profile):
 ```bash
 mkdir -p .agent-orchestrator/runner-project && PROJECT_DIR=.agent-orchestrator/runner-project ./servers/agent-runner/agent-runner
+```
+
+**Agent Runner** (echo profile - procedural executor):
+```bash
+mkdir -p .agent-orchestrator/runner-echo && PROJECT_DIR=.agent-orchestrator/runner-echo ./servers/agent-runner/agent-runner -x echo
+```
+
+**Agent Runner** (test-procedural profile - for testing fallback handling):
+```bash
+mkdir -p .agent-orchestrator/runner-test-procedural && PROJECT_DIR=.agent-orchestrator/runner-test-procedural ./servers/agent-runner/agent-runner -x test-procedural
 ```

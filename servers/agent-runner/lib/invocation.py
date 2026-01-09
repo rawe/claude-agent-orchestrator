@@ -109,6 +109,7 @@ class ExecutorInvocation:
         session_id: Coordinator-generated session identifier (ADR-010)
         parameters: Input parameters dict - for AI agents: {"prompt": "..."}
         project_dir: Working directory path (start mode only)
+        agent_name: Agent name (for procedural executors to look up command)
         agent_blueprint: Fully resolved agent blueprint
         executor_config: Executor-specific configuration (schema depends on executor type)
         metadata: Extensible key-value map for future use
@@ -119,6 +120,7 @@ class ExecutorInvocation:
     session_id: str
     parameters: dict[str, Any]
     project_dir: Optional[str] = None
+    agent_name: Optional[str] = None
     agent_blueprint: Optional[dict[str, Any]] = None
     executor_config: Optional[dict[str, Any]] = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -199,6 +201,7 @@ class ExecutorInvocation:
             "session_id",
             "parameters",
             "project_dir",
+            "agent_name",
             "agent_blueprint",
             "executor_config",
             "metadata",
@@ -213,6 +216,7 @@ class ExecutorInvocation:
             session_id=data["session_id"],
             parameters=data["parameters"],
             project_dir=data.get("project_dir"),
+            agent_name=data.get("agent_name"),
             agent_blueprint=data.get("agent_blueprint"),
             executor_config=data.get("executor_config"),
             metadata=data.get("metadata", {}),
@@ -226,10 +230,12 @@ class ExecutorInvocation:
             "session_id": self.session_id,
             "parameters": self.parameters,
         }
-        if self.agent_blueprint:
-            d["agent_blueprint"] = self.agent_blueprint
         if self.project_dir:
             d["project_dir"] = self.project_dir
+        if self.agent_name:
+            d["agent_name"] = self.agent_name
+        if self.agent_blueprint:
+            d["agent_blueprint"] = self.agent_blueprint
         if self.executor_config:
             d["executor_config"] = self.executor_config
         if self.metadata:

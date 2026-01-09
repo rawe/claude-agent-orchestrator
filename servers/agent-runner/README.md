@@ -61,7 +61,17 @@ See [Profiles Documentation](profiles/PROFILES.md) for the naming convention and
 ./agent-runner --profile full-access-project-best
 ```
 
-**Profile format** (`profiles/full-access-project-best.json`):
+**Profile schema**:
+```json
+{
+  "type": "string",           // Executor type (e.g., "claude-code", "procedural")
+  "command": "string",        // Path to executor script (relative to agent-runner dir)
+  "config": {},               // Executor-specific configuration
+  "agents_dir": "string"      // Optional: Path to agent definitions directory
+}
+```
+
+**Example** (`profiles/full-access-project-best.json`):
 ```json
 {
   "type": "claude-code",
@@ -75,6 +85,42 @@ See [Profiles Documentation](profiles/PROFILES.md) for the naming convention and
 ```
 
 Without `--profile`, the runner uses the default executor with no config.
+
+### Runner-Owned Agents
+
+Profiles can specify an `agents_dir` to load agent definitions that are bundled with the runner. These agents are registered with the Agent Coordinator when the runner starts and removed when the runner stops.
+
+**Example** (`profiles/echo.json`):
+```json
+{
+  "type": "procedural",
+  "command": "executors/procedural-executor/ao-procedural-exec",
+  "agents_dir": "executors/procedural-executor/scripts/echo/agents",
+  "config": {}
+}
+```
+
+Agent definitions are JSON files in the `agents_dir`:
+```json
+{
+  "name": "echo",
+  "description": "Simple echo agent that returns the input message",
+  "command": "scripts/echo/echo",
+  "parameters_schema": {
+    "type": "object",
+    "required": ["message"],
+    "properties": {
+      "message": { "type": "string" }
+    }
+  }
+}
+```
+
+Runner-owned agents:
+- Are registered with the coordinator on runner startup
+- Appear in `/agents` endpoint with `type: "procedural"` and `runner_id` set
+- Are automatically removed when the runner deregisters
+- Cannot be edited via the dashboard (read-only)
 
 ### CLI Options
 
@@ -110,13 +156,117 @@ servers/agent-runner/
 ├── docs/                    # Documentation
 │   └── runner-gateway-api.md
 ├── executors/               # Executor implementations
-│   ├── claude-code/         # Claude SDK executor
+│   ├── claude-code/         # Claude SDK executor (autonomous)
 │   │   ├── ao-claude-code-exec
 │   │   └── lib/claude_client.py
-│   └── test-executor/       # Test/dummy executor
-│       └── ao-test-exec
+│   ├── test-executor/       # Test/dummy executor (autonomous)
+│   │   └── ao-test-exec
+│   └── procedural-executor/ # CLI command executor (procedural)
+│       ├── ao-procedural-exec
+│       └── scripts/         # Bundled agent scripts
+│           └── echo/
+│               ├── echo     # Echo script
+│               └── agents/
+│                   └── echo.json
 └── tests/                   # Unit tests
 ```
+
+## Executor Types
+
+The runner supports different executor types for different agent behaviors:
+
+### Autonomous Executors
+
+Autonomous executors run AI agents that interpret intent and can be resumed:
+
+| Executor | Type | Description |
+|----------|------|-------------|
+| `claude-code` | autonomous | Claude SDK with full coding capabilities |
+| `test-executor` | autonomous | Simple echo executor for testing |
+
+Autonomous agents:
+- Interpret natural language prompts
+- Maintain conversation state (can be resumed)
+- Produce `result_text` only (no structured data)
+
+### Procedural Executor
+
+The procedural executor runs CLI commands with structured parameters:
+
+| Executor | Type | Description |
+|----------|------|-------------|
+| `procedural` | procedural | Executes CLI scripts with `--key value` arguments |
+
+Procedural agents:
+- Execute a single CLI command per invocation
+- Are stateless (cannot be resumed)
+- Receive parameters as CLI arguments (`--key value` style)
+- Produce `result_data` only (`result_text` is always null)
+
+**How it works:**
+1. Runner receives run with `agent_name` pointing to a procedural agent
+2. Executor looks up the agent's `command` from the coordinator
+3. Executor builds CLI arguments from parameters (`--key value` style)
+4. Executor runs the command with arguments
+5. Executor parses stdout and sends `result` event with `result_data`
+
+**Parameter mapping (input):**
+| Parameter Type | CLI Argument |
+|---------------|--------------|
+| `"key": "value"` | `--key value` |
+| `"flag": true` | `--flag` |
+| `"flag": false` | (omitted) |
+| `"items": [1,2,3]` | `--items 1,2,3` |
+
+**Result handling (output):**
+
+The executor always returns `result_data` (never `result_text`). The logic is:
+
+| Script stdout | `result_data` |
+|---------------|---------------|
+| Valid JSON | Passed through as-is |
+| Not valid JSON | Fallback structure (see below) |
+
+If stdout is **not valid JSON**, the executor returns a fallback structure:
+```json
+{
+  "return_code": <exit_code>,
+  "stdout": "<raw stdout>",
+  "stderr": "<raw stderr>"
+}
+```
+
+**Examples:**
+
+```bash
+# Script outputs valid JSON
+./echo --message "Hello"
+# stdout: {"message": "Hello"}
+# result_data: {"message": "Hello"}
+
+# Script outputs plain text (not JSON)
+./legacy-script --arg value
+# stdout: "Success: processed 5 items"
+# result_data: {"return_code": 0, "stdout": "Success: processed 5 items", "stderr": ""}
+
+# Script fails with error
+./failing-script --arg value
+# stdout: ""
+# stderr: "Error: file not found"
+# exit code: 1
+# result_data: {"return_code": 1, "stdout": "", "stderr": "Error: file not found"}
+
+# Script returns structured error (recommended)
+./smart-script --arg value
+# stdout: {"error": "file not found", "code": "ENOENT"}
+# exit code: 1
+# result_data: {"error": "file not found", "code": "ENOENT"}
+```
+
+**Best practice for scripts:**
+- Always output valid JSON to stdout
+- For errors, output JSON with an `error` field: `{"error": "message", ...}`
+- Use stderr for debug/progress logging (not included in result unless fallback)
 
 ## Architecture
 

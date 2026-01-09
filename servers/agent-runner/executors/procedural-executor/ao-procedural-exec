@@ -1,0 +1,224 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx",
+# ]
+# ///
+"""
+Procedural Executor - Executes CLI commands for procedural agents.
+
+Procedural agents are stateless and execute a single CLI command per invocation.
+The command is specified in the agent definition and parameters are passed as
+CLI arguments (--key value style).
+
+Communicates with Agent Coordinator via the Runner Gateway, which
+enriches requests with runner-owned data (hostname, executor_profile).
+
+Uses session_id (coordinator-generated) per ADR-010.
+
+Usage:
+    echo '{"schema_version":"1.0","mode":"start","session_id":"ses_abc123","agent_name":"echo","parameters":{"message":"hello"}}' | uv run ao-procedural-exec
+"""
+
+import json
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+from datetime import datetime, UTC
+
+# Configure UTF-8 encoding for Windows (CP1252 default can't handle emojis)
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
+# Add runner lib to path for shared modules
+runner_lib = Path(__file__).parent.parent.parent / "lib"
+sys.path.insert(0, str(runner_lib))
+
+from invocation import ExecutorInvocation
+from session_client import SessionClient, SessionClientError
+from executor_config import get_api_url
+
+
+def get_agent_command(agent_name: str) -> str | None:
+    """Get the command for an agent from the coordinator.
+
+    Args:
+        agent_name: Name of the agent to look up
+
+    Returns:
+        Command string or None if agent not found or has no command
+    """
+    import httpx
+    api_url = get_api_url()
+
+    try:
+        response = httpx.get(f"{api_url}/agents/{agent_name}")
+        if response.status_code == 200:
+            agent = response.json()
+            return agent.get("command")
+        elif response.status_code == 404:
+            return None
+        else:
+            print(f"Error fetching agent: {response.status_code}", file=sys.stderr)
+            return None
+    except Exception as e:
+        print(f"Error fetching agent: {e}", file=sys.stderr)
+        return None
+
+
+def build_cli_args(command: str, parameters: dict) -> list[str]:
+    """Build CLI arguments from command and parameters.
+
+    Converts parameters dict to --key value style CLI arguments.
+
+    Args:
+        command: Command string (may contain spaces, e.g., "python -m module")
+        parameters: Parameters dict to convert to CLI args
+
+    Returns:
+        List of command and arguments ready for subprocess
+    """
+    # Use shlex.split to properly handle quoted strings in command
+    args = shlex.split(command)
+
+    for key, value in parameters.items():
+        if isinstance(value, bool):
+            # Boolean true → --flag (flag present)
+            # Boolean false → flag absent (skip)
+            if value:
+                args.append(f"--{key}")
+        elif isinstance(value, list):
+            # List → --key item1,item2,item3
+            args.extend([f"--{key}", ",".join(str(v) for v in value)])
+        else:
+            # String/number → --key value
+            args.extend([f"--{key}", str(value)])
+
+    return args
+
+
+def execute_command(command: str, parameters: dict) -> tuple[str, str, int]:
+    """Execute a CLI command with parameters as CLI arguments.
+
+    Args:
+        command: Command to execute (relative to executor directory)
+        parameters: Parameters to convert to --key value CLI args
+
+    Returns:
+        Tuple of (stdout, stderr, return_code)
+    """
+    # Resolve command path relative to executor directory
+    executor_dir = Path(__file__).parent
+
+    # Build CLI args from parameters
+    args = build_cli_args(command, parameters)
+
+    # Resolve the command path (first element) relative to executor directory
+    command_path = executor_dir / args[0]
+    if not command_path.exists():
+        return "", f"Command not found: {command_path}", 1
+    args[0] = str(command_path)
+
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout
+        )
+        return result.stdout, result.stderr, result.returncode
+    except subprocess.TimeoutExpired:
+        return "", "Command timed out after 5 minutes", 124
+    except Exception as e:
+        return "", str(e), 1
+
+
+def run_procedural(inv: ExecutorInvocation) -> None:
+    """Execute a procedural agent.
+
+    Procedural agents are stateless - they don't support resume.
+    """
+    api_url = get_api_url()
+    client = SessionClient(api_url)
+    session_id = inv.session_id
+
+    # Get agent command from coordinator
+    if not inv.agent_name:
+        print("Error: agent_name is required for procedural executor", file=sys.stderr)
+        sys.exit(1)
+
+    command = get_agent_command(inv.agent_name)
+    if not command:
+        print(f"Error: Agent '{inv.agent_name}' not found or has no command", file=sys.stderr)
+        sys.exit(1)
+
+    # Bind session (procedural agents still need to bind for tracking)
+    try:
+        client.bind(
+            session_id=session_id,
+            executor_session_id=f"proc_{session_id}",  # Simple ID for procedural
+        )
+    except SessionClientError as e:
+        print(f"Warning: Could not bind session: {e}", file=sys.stderr)
+
+    # Execute the command with parameters
+    stdout, stderr, return_code = execute_command(command, inv.parameters)
+
+    if stderr:
+        print(stderr, file=sys.stderr)
+
+    # Build result_data (procedural agents only use result_data, not result_text)
+    # If stdout is valid JSON, pass it through as-is
+    # Otherwise, return structured fallback with return_code, stdout, stderr
+    try:
+        result_data = json.loads(stdout)
+    except (json.JSONDecodeError, ValueError):
+        # Fallback: capture everything in structured format
+        result_data = {
+            "return_code": return_code,
+            "stdout": stdout.strip(),
+            "stderr": stderr.strip(),
+        }
+
+    # Send result event (result_text is null for procedural agents)
+    try:
+        client.add_event(session_id, {
+            "event_type": "result",
+            "session_id": session_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "result_text": None,
+            "result_data": result_data,
+        })
+    except SessionClientError as e:
+        print(f"Warning: Could not send result event: {e}", file=sys.stderr)
+
+    # Print result to stdout (JSON for programmatic consumption)
+    print(json.dumps(result_data))
+
+    # Exit with command's return code
+    if return_code != 0:
+        sys.exit(return_code)
+
+
+def main() -> None:
+    """Main entry point."""
+    # Parse invocation from stdin
+    try:
+        inv = ExecutorInvocation.from_stdin()
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Procedural agents only support start (no resume)
+    if inv.mode != "start":
+        print(f"Error: Procedural agents only support 'start' mode, got '{inv.mode}'", file=sys.stderr)
+        sys.exit(1)
+
+    run_procedural(inv)
+
+
+if __name__ == "__main__":
+    main()

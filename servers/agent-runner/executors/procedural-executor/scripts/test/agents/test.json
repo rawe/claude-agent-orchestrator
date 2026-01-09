@@ -1,0 +1,27 @@
+{
+  "name": "test",
+  "description": "Test agent for procedural executor - produces configurable output for testing fallback handling",
+  "command": "scripts/test/test",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "stdout": {
+        "type": "string",
+        "description": "Text to write to stdout"
+      },
+      "stderr": {
+        "type": "string",
+        "description": "Text to write to stderr"
+      },
+      "exit-code": {
+        "type": "integer",
+        "description": "Exit code (0 = success, non-zero = error)"
+      },
+      "json": {
+        "type": "boolean",
+        "description": "If true, output stdout as JSON object"
+      }
+    },
+    "additionalProperties": false
+  }
+}
