@@ -1,7 +1,8 @@
 # ADR-015: Autonomous Agent Input Schema Handling
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-01-10
+**Implemented:** 2026-01-10
 **Decision Makers:** Architecture Review
 
 ## Context
@@ -107,6 +108,63 @@ prompt: Focus on recent developments
 </inputs>
 ```
 
+### Resume Behavior: Prompt-Only
+
+**Custom schemas apply only to `start_session`. Resume sessions always accept prompt-only input.**
+
+| Run Type | Agent Has Custom Schema | Validation Schema |
+|----------|------------------------|-------------------|
+| `start_session` | No | `{prompt: string}` (implicit) |
+| `start_session` | Yes | Full custom schema |
+| `resume_session` | No | `{prompt: string}` (implicit) |
+| `resume_session` | Yes | `{prompt: string}` (implicit) |
+
+**Rationale: Configure vs. Converse**
+
+Starting and resuming serve fundamentally different purposes:
+
+- **Start** = Configure agent context and constraints
+  - Like hiring a specialist with a brief: "Write about AI ethics, bullet points, max 100 words"
+  - The custom schema defines this initial configuration
+
+- **Resume** = Continue conversation within established context
+  - Like talking to that specialist afterward: "Can you expand on the privacy point?"
+  - Free-form prompts are natural here; reconfiguring would be confusing
+
+**Why this makes sense:**
+
+1. **Initial parameters establish context**: The custom schema (`topic`, `format`, `max_words`) sets up the agent's working constraints at session start
+
+2. **Resume is conversational**: Follow-up interactions are naturally free-form - users ask clarifying questions, request changes, or continue the dialogue
+
+3. **Avoid reconfiguration confusion**: If resume required the original schema, you'd essentially be restarting the agent with new parameters. The previous output would be awkward to reconcile.
+
+4. **Client simplicity**: All clients (dashboard, MCP, run client) send `{prompt: "..."}` on resume. This matches user expectations for chat-like interactions.
+
+**Example Flow:**
+
+```
+# Start: Structured configuration
+POST /runs
+{
+  "type": "start_session",
+  "agent_name": "content-writer",
+  "parameters": {"topic": "AI Safety", "format": "essay", "max_words": 500}
+}
+→ Validated against custom schema ✓
+→ Agent receives: <inputs>topic: AI Safety...</inputs>
+
+# Resume: Conversational follow-up
+POST /runs
+{
+  "type": "resume_session",
+  "session_id": "ses_abc123",
+  "parameters": {"prompt": "Now focus more on the regulatory aspects"}
+}
+→ Validated against implicit schema {prompt: string} ✓
+→ Agent receives: "Now focus more on the regulatory aspects"
+```
+
 ## Rationale
 
 ### Why NOT automatically require `prompt`?
@@ -144,6 +202,7 @@ prompt: Focus on recent developments
 - **Flexibility**: Agent designers choose their input contract
 - **Consistent Formatting**: All custom schema fields handled identically
 - **Clear Contract**: Orchestrating agents see requirements without hidden surprises
+- **Natural Resume UX**: Resume is always conversational (prompt-only), matching user expectations
 
 ### Negative
 
@@ -154,7 +213,8 @@ prompt: Focus on recent developments
 
 - **Backward Compatibility**: Agents without `parameters_schema` work identically
 - **Documentation**: System prompts should explain how `<inputs>` block works
+- **Resume Simplicity**: Custom schema is only for initial configuration, not follow-ups
 
 ## References
 
-- [Autonomous Agent Input Schema Implementation](../implementation/autonomous-agent-input-schema.md)
+- JSON Schema specification: https://json-schema.org/

@@ -155,11 +155,15 @@ Returns:
         @self._mcp.tool(
             description="""Resume an existing agent session.
 
+Resume ALWAYS uses prompt-only input: {"prompt": "your follow-up message"}
+The agent's custom parameters_schema only applies to start_agent_session.
+Resume is conversational - you're continuing a dialogue, not reconfiguring.
+
+Note: Procedural agents cannot be resumed (they are stateless).
+
 Args:
     session_id: ID of the session to resume
-    parameters: Input parameters dict matching the agent's parameters_schema.
-        - If no schema (null): use {"prompt": "your message"}
-        - If schema defined: match the schema exactly (include "prompt" only if schema requires it)
+    parameters: Always {"prompt": "your message"} - prompt-only regardless of agent's schema
     mode: Execution mode - "sync", "async_poll", or "async_callback"
 
 Returns:

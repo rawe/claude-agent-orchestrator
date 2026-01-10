@@ -79,8 +79,8 @@ def on_child_completed(
     Returns:
         True if callback was delivered immediately, False if queued
 
-    Note: agent_name and project_dir are automatically enriched by run_queue.add_run()
-    from the existing session when creating the resume run.
+    Note: agent_name and project_dir are automatically enriched via enrich_resume_run_create()
+    when add_run() creates the resume run.
     """
     if not parent_session:
         logger.warning(f"Skipping callback: parent session not found for child {child_session_id}")
@@ -141,8 +141,8 @@ def on_session_stopped(session_id: str) -> int:
     Returns:
         Number of pending callbacks that were flushed
 
-    Note: agent_name and project_dir are automatically enriched by run_queue.add_run()
-    from the existing session.
+    Note: agent_name and project_dir are automatically enriched via enrich_resume_run_create()
+    when add_run() creates the resume run.
     """
     pending = None
     should_create_run = False
@@ -220,8 +220,8 @@ def _create_resume_run(
     Returns:
         Run ID if created successfully, None on error
 
-    Note: agent_name and project_dir are automatically enriched by run_queue.add_run()
-    from the existing session, so we don't need to pass them here.
+    Note: agent_name and project_dir are automatically enriched via enrich_resume_run_create()
+    when add_run() creates the resume run, so we don't need to pass them here.
     """
     from services.run_queue import run_queue, RunCreate, RunType
 

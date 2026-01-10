@@ -266,21 +266,24 @@ class AgentOrchestratorTools:
 
         Continues a previously started session with new input.
 
-        Parameter Requirements (same as start_agent_session, ADR-015):
-        - The schema shown is exactly what's validated - no hidden requirements
+        Parameter Requirements (ADR-015 - Resume Behavior):
+        Resume ALWAYS uses prompt-only input, regardless of the agent's custom schema.
 
-        For autonomous agents (type="autonomous"):
-          - If parameters_schema is null: use {"prompt": "your message"}
-          - If parameters_schema is set: match the schema exactly
-            - Include "prompt" only if it's defined in the schema
+        - parameters: {"prompt": "your follow-up message"}
+        - The agent's parameters_schema only applies to start_session
+        - Resume is conversational - you're continuing a dialogue, not reconfiguring
 
-        For procedural agents (type="procedural"):
-          - Match the agent's parameters_schema exactly
+        Why prompt-only for resume?
+        - Start = Configure agent with structured input (topic, format, etc.)
+        - Resume = Continue the conversation with free-form follow-ups
+        - The agent already has context from the initial structured input
+
+        Note: Procedural agents cannot be resumed (they are stateless).
 
         Args:
             ctx: Request context with parent session ID for callbacks
             session_id: ID of the session to resume
-            parameters: Input parameters - validated against agent's schema
+            parameters: Must be {"prompt": "your message"} - always prompt-only
             mode: Execution mode - "sync", "async_poll", or "async_callback"
 
         Returns:
@@ -288,7 +291,7 @@ class AgentOrchestratorTools:
             For async modes: {"session_id": "...", "status": "pending"}
 
         Raises:
-            ToolError: If session doesn't exist or resume fails
+            ToolError: If session doesn't exist, is a procedural agent, or resume fails
         """
         import json as _json
         # Validate parameters size (use JSON length as proxy)
@@ -298,9 +301,9 @@ class AgentOrchestratorTools:
                 f"Parameters too large: {params_len} characters (max {MAX_PROMPT_LENGTH})"
             )
 
-        # Parameter validation is now handled by the Coordinator (Phase 3: Schema Validation)
-        # The Coordinator validates parameters against the agent's parameters_schema
-        # or implicit schema for autonomous agents. See run_queue.py for details.
+        # Parameter validation is handled by the Coordinator (ADR-015)
+        # For resume: always validates against implicit schema {prompt: string}
+        # The agent's custom schema only applies to start_session
 
         # Parse execution mode
         try:

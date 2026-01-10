@@ -111,6 +111,46 @@ def validate_parameters(parameters: dict, agent: Agent) -> None:
         raise ParameterValidationError(agent.name, errors, schema)
 
 
+# ==============================================================================
+# Resume Run Enrichment
+# ==============================================================================
+
+def enrich_resume_run_create(run_create: "RunCreate") -> "RunCreate":
+    """Enrich a resume run with data from its existing session.
+
+    For RESUME_SESSION runs, looks up the session and populates
+    agent_name and project_dir if not already provided in the request.
+
+    This is THE centralized place where resume run enrichment happens.
+    Called from add_run() to ensure all resume runs are properly enriched.
+
+    Args:
+        run_create: The run creation request to enrich
+
+    Returns:
+        The enriched run_create (modified in place, also returned for convenience)
+    """
+    # Only enrich resume runs
+    if run_create.type != RunType.RESUME_SESSION:
+        return run_create
+
+    if not run_create.session_id:
+        return run_create
+
+    # Look up existing session
+    existing_session = get_session_by_id(run_create.session_id)
+    if not existing_session:
+        return run_create
+
+    # Enrich with session data (only if not already provided)
+    if not run_create.agent_name:
+        run_create.agent_name = existing_session.get("agent_name")
+    if not run_create.project_dir:
+        run_create.project_dir = existing_session.get("project_dir")
+
+    return run_create
+
+
 class RunType(str, Enum):
     START_SESSION = "start_session"
     RESUME_SESSION = "resume_session"
@@ -343,22 +383,16 @@ class RunQueue:
         """Create a new run. Persists to database, then updates cache.
 
         If session_id is not provided, generates one per ADR-010.
-        For resume runs, enriches with agent_name/project_dir from existing session.
+        For resume runs, enriches with agent_name/project_dir via enrich_resume_run_create().
         """
+        # Enrich resume runs with session data (centralized enrichment)
+        enrich_resume_run_create(run_create)
+
         with self._lock:
             # Generate IDs
             run_id = f"run_{uuid.uuid4().hex[:12]}"
             session_id = run_create.session_id or generate_session_id()
             created_at = datetime.now(timezone.utc).isoformat()
-
-            # For RESUME_SESSION, enrich from existing session
-            agent_name = run_create.agent_name
-            project_dir = run_create.project_dir
-            if run_create.type == RunType.RESUME_SESSION and session_id:
-                existing_session = get_session_by_id(session_id)
-                if existing_session:
-                    agent_name = agent_name or existing_session.get("agent_name")
-                    project_dir = project_dir or existing_session.get("project_dir")
 
             # Write to database first
             db_create_run(
@@ -367,8 +401,8 @@ class RunQueue:
                 run_type=run_create.type.value,
                 parameters=json.dumps(run_create.parameters),
                 created_at=created_at,
-                agent_name=agent_name,
-                project_dir=project_dir,
+                agent_name=run_create.agent_name,
+                project_dir=run_create.project_dir,
                 parent_session_id=run_create.parent_session_id,
                 execution_mode=run_create.execution_mode.value,
                 status=RunStatus.PENDING.value,
@@ -379,9 +413,9 @@ class RunQueue:
                 run_id=run_id,
                 session_id=session_id,
                 type=run_create.type,
-                agent_name=agent_name,
+                agent_name=run_create.agent_name,
                 parameters=run_create.parameters,
-                project_dir=project_dir,
+                project_dir=run_create.project_dir,
                 parent_session_id=run_create.parent_session_id,
                 execution_mode=run_create.execution_mode,
                 status=RunStatus.PENDING,

@@ -1468,35 +1468,64 @@ async def create_run(run_create: RunCreate):
     if run_create.type == RunType.RESUME_SESSION and not run_create.session_id:
         raise HTTPException(status_code=400, detail="session_id is required for resume_session")
 
-    # Parameter validation (Phase 3: Schema Discovery & Validation)
-    # Validate parameters against agent's schema or implicit autonomous schema
+    # For RESUME: look up existing session early to get context (agent_name, affinity, etc.)
+    # This consolidates session lookups and enables proper validation/routing
+    existing_session = None
+    if run_create.type == RunType.RESUME_SESSION:
+        existing_session = get_session_by_id(run_create.session_id)
+        if not existing_session:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session '{run_create.session_id}' not found"
+            )
+
+    # Determine agent_name: from request (START) or from session (RESUME)
+    # For RESUME, the session knows which agent was used; client doesn't need to resend it
+    agent_name = run_create.agent_name
+    if run_create.type == RunType.RESUME_SESSION and existing_session:
+        agent_name = existing_session.get("agent_name") or run_create.agent_name
+
+    # Look up agent by name (file-based or runner-owned)
     agent = None
-    if run_create.agent_name:
-        agent = agent_storage.get_agent(run_create.agent_name)
+    if agent_name:
+        agent = agent_storage.get_agent(agent_name)
         # Check runner-owned agents if not found in file-based
         if not agent:
-            runner_agent_result = runner_registry.get_runner_agent_by_name(run_create.agent_name)
+            runner_agent_result = runner_registry.get_runner_agent_by_name(agent_name)
             if runner_agent_result:
                 agent = _agent_from_runner_data(runner_agent_result[0])
 
-    # Phase 4: Reject resume_session for procedural agents (stateless)
+    # Reject resume_session for procedural agents (stateless)
     if run_create.type == RunType.RESUME_SESSION and agent and agent.type == "procedural":
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "procedural_agent_no_resume",
                 "message": "Procedural agents are stateless and cannot be resumed",
-                "agent_name": run_create.agent_name,
+                "agent_name": agent_name,
             }
         )
 
+    # Parameter validation with explicit schema choice:
+    # - RESUME: Always use implicit schema (prompt-only) - Option A from ADR-015
+    #   Rationale: Resume is conversational continuation, not reconfiguration
+    # - START with agent: Use agent's custom schema (if defined)
+    # - START without agent: Use implicit schema
     try:
-        if agent:
-            # Validate against agent's schema (or implicit schema if none defined)
+        from jsonschema import Draft7Validator
+
+        if run_create.type == RunType.RESUME_SESSION:
+            # Option A: Resume always accepts prompt-only, regardless of agent's schema
+            # The agent's custom schema only applies to initial configuration (start)
+            validator = Draft7Validator(IMPLICIT_AUTONOMOUS_SCHEMA)
+            errors = list(validator.iter_errors(run_create.parameters))
+            if errors:
+                raise ParameterValidationError(agent_name or "(no agent)", errors, IMPLICIT_AUTONOMOUS_SCHEMA)
+        elif agent:
+            # START with agent: validate against agent's schema
             validate_parameters(run_create.parameters, agent)
         else:
-            # No agent specified - use implicit autonomous schema
-            from jsonschema import Draft7Validator
+            # START without agent: use implicit autonomous schema
             validator = Draft7Validator(IMPLICIT_AUTONOMOUS_SCHEMA)
             errors = list(validator.iter_errors(run_create.parameters))
             if errors:
@@ -1562,19 +1591,17 @@ async def create_run(run_create: RunCreate):
     additional_demands = RunnerDemands()  # Empty defaults
     runner_owner_demands = RunnerDemands()  # Empty defaults - for runner-owned agents
 
-    # For RESUME_SESSION, look up session affinity and enforce it (ADR-010)
+    # For RESUME_SESSION, use affinity from existing_session (looked up earlier)
     # This ensures resume runs go to the same runner that owns the session
-    if run_create.type == RunType.RESUME_SESSION:
-        affinity = get_session_affinity(run_create.session_id)
-        if affinity:
-            # Create demands from affinity - hostname and executor_profile are required
-            affinity_demands = RunnerDemands(
-                hostname=affinity.get('hostname'),
-                executor_profile=affinity.get('executor_profile'),
-            )
-            if DEBUG:
-                print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
-                      f"hostname={affinity.get('hostname')}, executor_profile={affinity.get('executor_profile')}", flush=True)
+    if run_create.type == RunType.RESUME_SESSION and existing_session:
+        # Use existing_session instead of separate get_session_affinity() call
+        affinity_demands = RunnerDemands(
+            hostname=existing_session.get('hostname'),
+            executor_profile=existing_session.get('executor_profile'),
+        )
+        if DEBUG:
+            print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
+                  f"hostname={existing_session.get('hostname')}, executor_profile={existing_session.get('executor_profile')}", flush=True)
 
     # Phase 4: For runner-owned agents, route to the owning runner
     if agent and agent.runner_id:

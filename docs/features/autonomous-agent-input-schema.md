@@ -297,6 +297,24 @@ If parameters don't match the schema:
 }
 ```
 
+### Resuming Sessions
+
+Resume always uses `{prompt: "..."}` regardless of the agent's custom schema. The custom schema only applies to `start_session`.
+
+```bash
+curl -X POST http://localhost:8765/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "resume_session",
+    "session_id": "ses_abc123",
+    "parameters": {
+      "prompt": "Can you expand on the security section?"
+    }
+  }'
+```
+
+See [ADR-015: Resume Behavior](../adr/ADR-015-autonomous-agent-input-schema.md#resume-behavior-prompt-only) for the rationale.
+
 ## Dashboard Usage
 
 1. Navigate to **Agents** and select an agent to edit
