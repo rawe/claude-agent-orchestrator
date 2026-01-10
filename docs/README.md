@@ -27,6 +27,9 @@ Documentation for implemented features including Executor Profiles, Runner Gatew
 ### [setup/](./setup/)
 Deployment and configuration guides for external services and infrastructure dependencies.
 
+### [reference/](./reference/)
+Quick-reference documentation for schemas, formats, and specifications used across the system.
+
 ## Component Documentation
 
 ### [components/](./components/)

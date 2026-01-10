@@ -1,11 +1,27 @@
 {
   "name": "confluence-researcher",
-  "description": "Conducts iterative Confluence research to answer questions, generates concise answers with documented JSON sources. Should be run in async/background mode as it could be a long-running research task. Input: working_folder (optional, auto-generates research-results/[yyyy-mm-dd]-[topic] if not provided), question (research query)",
+  "description": "Researches Confluence to answer questions. Performs iterative search and analysis, then produces a concise answer with documented JSON sources. Long-running task - use callback mode for production.",
   "type": "autonomous",
   "tags": [
     "internal",
     "research",
     "atlassian",
     "confluence"
-  ]
+  ],
+  "parameters_schema": {
+    "type": "object",
+    "required": ["question"],
+    "properties": {
+      "question": {
+        "type": "string",
+        "minLength": 10,
+        "description": "The research question. Be specific - include project names, technical terms, or relevant context."
+      },
+      "working_folder": {
+        "type": "string",
+        "description": "Folder path for results. Auto-generated if omitted."
+      }
+    },
+    "additionalProperties": false
+  }
 }

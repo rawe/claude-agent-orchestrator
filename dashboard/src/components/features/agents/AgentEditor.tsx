@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
-import { Agent, AgentCreate, AgentDemands, AgentType, MCPServerConfig, SKILLS } from '@/types';
+import { InputSchemaEditor } from './InputSchemaEditor';
+import { Agent, AgentCreate, AgentDemands, MCPServerConfig } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { Eye, Code, X, AlertCircle, Info, Package } from 'lucide-react';
+import { Eye, Code, X, AlertCircle, Info, Package, FileInput, ScrollText, Server, Target } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -20,7 +21,8 @@ interface AgentEditorProps {
 interface FormData {
   name: string;
   description: string;
-  type: AgentType;
+  parameters_schema_enabled: boolean;
+  parameters_schema: Record<string, unknown> | null;
   system_prompt: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
@@ -58,7 +60,8 @@ export function AgentEditor({
     defaultValues: {
       name: '',
       description: '',
-      type: 'autonomous',
+      parameters_schema_enabled: false,
+      parameters_schema: null,
       system_prompt: '',
       mcp_servers: null,
       skills: [],
@@ -69,18 +72,21 @@ export function AgentEditor({
   });
 
   const watchedName = watch('name');
+  const watchedSchemaEnabled = watch('parameters_schema_enabled');
   const watchedPrompt = watch('system_prompt');
   const watchedMcpServers = watch('mcp_servers');
-  const watchedSkills = watch('skills');
   const watchedCapabilities = watch('capabilities');
 
   // Load agent data when editing
   useEffect(() => {
     if (agent) {
+      // parameters_schema_enabled is true if the agent has a non-null schema
+      const hasSchema = agent.parameters_schema != null;
       reset({
         name: agent.name,
         description: agent.description,
-        type: agent.type || 'autonomous',
+        parameters_schema_enabled: hasSchema,
+        parameters_schema: agent.parameters_schema,
         system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
@@ -92,7 +98,8 @@ export function AgentEditor({
       reset({
         name: '',
         description: '',
-        type: 'autonomous',
+        parameters_schema_enabled: false,
+        parameters_schema: null,
         system_prompt: '',
         mcp_servers: null,
         skills: [],
@@ -131,17 +138,7 @@ export function AgentEditor({
     setValue('mcp_servers', updated);
   };
 
-  const toggleSkill = (name: string) => {
-    const current = watchedSkills || [];
-    if (current.includes(name)) {
-      setValue(
-        'skills',
-        current.filter((s) => s !== name)
-      );
-    } else {
-      setValue('skills', [...current, name]);
-    }
-  };
+  // Note: toggleSkill removed - Skills UI hidden but data kept for API compatibility
 
   const onSubmit = async (data: FormData) => {
     setSaving(true);
@@ -164,10 +161,19 @@ export function AgentEditor({
         }
       }
 
+      // Handle parameters_schema: enabled toggle determines if schema is set
+      // If disabled or null, schema is null (use default behavior)
+      // If enabled and has value, use that value
+      const parametersSchema = data.parameters_schema_enabled && data.parameters_schema
+        ? data.parameters_schema
+        : null;
+
+      // UI-created agents are always autonomous (procedural agents are runner-owned)
       const createData: AgentCreate = {
         name: data.name,
         description: data.description,
-        type: data.type,
+        type: 'autonomous',
+        parameters_schema: parametersSchema,
         system_prompt: data.system_prompt || undefined,
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
@@ -185,7 +191,6 @@ export function AgentEditor({
   };
 
   const hasMcpServers = watchedMcpServers && Object.keys(watchedMcpServers).length > 0;
-  const hasSkills = watchedSkills && watchedSkills.length > 0;
   const hasCapabilities = watchedCapabilities && watchedCapabilities.length > 0;
 
   // Toggle capability selection
@@ -263,52 +268,6 @@ export function AgentEditor({
               )}
             </div>
 
-            {/* Agent Type */}
-            <div>
-              <label className="label">Agent Type</label>
-              <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="autonomous"
-                        checked={field.value === 'autonomous'}
-                        onChange={() => field.onChange('autonomous')}
-                        className="w-4 h-4 text-primary-600"
-                      />
-                      <span className="text-sm font-medium">Autonomous</span>
-                      <span className="text-xs text-gray-500">(interprets intent)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="procedural"
-                        checked={field.value === 'procedural'}
-                        onChange={() => field.onChange('procedural')}
-                        className="w-4 h-4 text-primary-600"
-                      />
-                      <span className="text-sm font-medium">Procedural</span>
-                      <span className="text-xs text-gray-500">(follows defined procedure)</span>
-                    </label>
-                  </div>
-                )}
-              />
-              <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p>
-                    <strong>Autonomous:</strong> AI agents that interpret user intent. Requires {`{"prompt": "..."}`} parameters.
-                  </p>
-                  <p className="mt-1">
-                    <strong>Procedural:</strong> Agents that follow a defined procedure with specific parameters.
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* Tags */}
             <div>
               <label className="label">Tags</label>
@@ -336,12 +295,79 @@ export function AgentEditor({
                 </div>
               </div>
             </div>
+
+            {/* Custom Input Schema */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="label mb-0">
+                  <span className="flex items-center gap-1.5">
+                    <FileInput className="w-4 h-4" />
+                    Custom Input Schema
+                  </span>
+                </label>
+                <Controller
+                  name="parameters_schema_enabled"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={(e) => {
+                          field.onChange(e.target.checked);
+                          // When disabling, clear the schema
+                          if (!e.target.checked) {
+                            setValue('parameters_schema', null);
+                          }
+                        }}
+                        className="w-4 h-4 text-primary-600 rounded"
+                      />
+                      <span className="text-sm font-medium">
+                        {field.value ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                  )}
+                />
+              </div>
+              <div className="flex items-start gap-2 text-xs text-gray-500 mb-3">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p>
+                    {watchedSchemaEnabled
+                      ? 'Define additional input parameters beyond the default prompt. These parameters are formatted and prepended to the prompt when the agent starts.'
+                      : 'When disabled, the agent uses the default schema that only accepts {"prompt": "..."}.'}
+                  </p>
+                  {watchedSchemaEnabled && (
+                    <p className="mt-1 text-amber-600">
+                      Note: The "prompt" field is always required for autonomous agents and will be added automatically.
+                    </p>
+                  )}
+                </div>
+              </div>
+              {watchedSchemaEnabled && (
+                <Controller
+                  name="parameters_schema"
+                  control={control}
+                  render={({ field }) => (
+                    <InputSchemaEditor
+                      value={field.value ?? null}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              )}
+            </div>
           </div>
 
           {/* System Prompt */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="label mb-0">System Prompt</label>
+              <label className="label mb-0">
+                <span className="flex items-center gap-1.5">
+                  <ScrollText className="w-4 h-4" />
+                  System Prompt
+                </span>
+              </label>
               <div className="flex rounded-md border border-gray-300 overflow-hidden">
                 <button
                   type="button"
@@ -392,13 +418,16 @@ export function AgentEditor({
             )}
           </div>
 
-          {/* Capabilities */}
+          {/* Capabilities Section */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900">Capabilities</h3>
-
             {/* MCP Servers - JSON Editor */}
             <div>
-              <label className="label">MCP Servers</label>
+              <label className="label">
+                <span className="flex items-center gap-1.5">
+                  <Server className="w-4 h-4" />
+                  MCP Servers
+                </span>
+              </label>
 
               {/* Template Quick Add Buttons */}
               <div className="flex flex-wrap gap-2 mb-3">
@@ -428,45 +457,7 @@ export function AgentEditor({
               />
             </div>
 
-            {/* Skills */}
-            <div>
-              <label className="label">Skills <span className="text-xs text-gray-400 font-normal">(coming soon)</span></label>
-              <div className="flex flex-wrap gap-2">
-                {SKILLS.map((skill) => (
-                  <button
-                    key={skill.name}
-                    type="button"
-                    onClick={() => !skill.disabled && toggleSkill(skill.name)}
-                    disabled={skill.disabled}
-                    className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                      skill.disabled
-                        ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                        : watchedSkills?.includes(skill.name)
-                        ? 'bg-primary-50 border-primary-300 text-primary-700'
-                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {skill.label}
-                  </button>
-                ))}
-              </div>
-              {hasSkills && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {watchedSkills.map((name) => (
-                    <Badge key={name} size="sm" variant="info">
-                      {name}
-                      <button
-                        type="button"
-                        onClick={() => toggleSkill(name)}
-                        className="ml-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Skills UI removed - data kept for API compatibility */}
 
             {/* Capabilities */}
             <div>
@@ -536,7 +527,7 @@ export function AgentEditor({
               )}
             </div>
 
-            {!hasMcpServers && !hasSkills && !hasCapabilities && (
+            {!hasMcpServers && !hasCapabilities && (
               <div className="flex items-center gap-2 text-yellow-600 text-sm">
                 <AlertCircle className="w-4 h-4" />
                 <span>Consider adding at least one capability for the agent</span>
@@ -546,7 +537,12 @@ export function AgentEditor({
 
           {/* Runner Demands (ADR-011) */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900">Runner Demands</h3>
+            <h3 className="text-sm font-medium text-gray-900">
+              <span className="flex items-center gap-1.5">
+                <Target className="w-4 h-4" />
+                Runner Demands
+              </span>
+            </h3>
             <div className="flex items-start gap-2 text-xs text-gray-500 mb-3">
               <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <p>

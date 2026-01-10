@@ -182,10 +182,14 @@ def run_start(inv: ExecutorInvocation):
     Executor binds to session after Claude SDK starts.
 
     Schema 2.0: Uses agent_blueprint directly (Runner handles fetching/resolution).
+
+    For autonomous agents with custom parameters_schema:
+    - Additional parameters (beyond 'prompt') are formatted into an inputs block
+    - The inputs block is prepended to the user's prompt
     """
     from executor_config import load_config
     from claude_client import run_session_sync
-    from utils import debug_log
+    from utils import debug_log, format_autonomous_inputs
 
     # 1. Load configuration
     config = load_config(
@@ -209,6 +213,11 @@ def run_start(inv: ExecutorInvocation):
             "has_mcp_servers": mcp_servers is not None,
         })
 
+    # 3. Format prompt with additional inputs (for autonomous agents with custom schema)
+    # If the agent has additional parameters beyond 'prompt', they are formatted
+    # into an <inputs> block and prepended to the prompt
+    formatted_prompt = format_autonomous_inputs(inv.parameters)
+
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_start", {
         "session_id": inv.session_id,
@@ -216,14 +225,15 @@ def run_start(inv: ExecutorInvocation):
         "agent_name": agent_name or "None",
         "has_system_prompt": system_prompt is not None,
         "has_mcp_servers": mcp_servers is not None,
-        "prompt_length": len(inv.prompt),
+        "prompt_length": len(formatted_prompt),
+        "has_additional_inputs": formatted_prompt != inv.prompt,
         "schema_version": inv.schema_version,
     })
 
-    # 3. Run Claude session (binds to coordinator session automatically)
+    # 4. Run Claude session (binds to coordinator session automatically)
     # Auth is handled by Agent Coordinator Proxy
     executor_session_id, result = run_session_sync(
-        prompt=inv.prompt,
+        prompt=formatted_prompt,
         project_dir=config.project_dir,
         session_id=inv.session_id,
         mcp_servers=mcp_servers,
@@ -244,11 +254,15 @@ def run_resume(inv: ExecutorInvocation):
     Fetches session affinity to get executor_session_id for Claude SDK resume.
 
     Schema 2.0: Uses agent_blueprint for MCP servers (Runner handles fetching/resolution).
+
+    For autonomous agents with custom parameters_schema:
+    - Additional parameters (beyond 'prompt') are formatted into an inputs block
+    - The inputs block is prepended to the user's prompt
     """
     from executor_config import get_api_url
     from session_client import SessionClient, SessionClientError, SessionNotFoundError
     from claude_client import run_session_sync
-    from utils import debug_log
+    from utils import debug_log, format_autonomous_inputs
 
     # 1. Get API URL (auth handled by Agent Coordinator Proxy)
     api_url = get_api_url()
@@ -305,6 +319,11 @@ def run_resume(inv: ExecutorInvocation):
             "has_mcp_servers": mcp_servers is not None,
         })
 
+    # 4. Format prompt with additional inputs (for autonomous agents with custom schema)
+    # If the agent has additional parameters beyond 'prompt', they are formatted
+    # into an <inputs> block and prepended to the prompt
+    formatted_prompt = format_autonomous_inputs(inv.parameters)
+
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_resume", {
         "session_id": inv.session_id,
@@ -312,14 +331,16 @@ def run_resume(inv: ExecutorInvocation):
         "project_dir": str(session_project_dir),
         "agent_name": agent_name or "None",
         "has_mcp_servers": mcp_servers is not None,
+        "prompt_length": len(formatted_prompt),
+        "has_additional_inputs": formatted_prompt != inv.prompt,
         "schema_version": inv.schema_version,
     })
 
-    # 4. Run Claude session with resume (uses executor_session_id for SDK resume)
+    # 5. Run Claude session with resume (uses executor_session_id for SDK resume)
     # Auth is handled by Agent Coordinator Proxy
     # NOTE: system_prompt is not passed for resume - only for new sessions
     new_executor_session_id, result = run_session_sync(
-        prompt=inv.prompt,
+        prompt=formatted_prompt,
         project_dir=session_project_dir,
         session_id=inv.session_id,
         mcp_servers=mcp_servers,
