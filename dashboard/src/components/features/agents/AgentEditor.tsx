@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
+import { InputSchemaEditor } from './InputSchemaEditor';
 import { Agent, AgentCreate, AgentDemands, AgentType, MCPServerConfig, SKILLS } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { Eye, Code, X, AlertCircle, Info, Package } from 'lucide-react';
+import { Eye, Code, X, AlertCircle, Info, Package, FileInput } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -21,6 +22,8 @@ interface FormData {
   name: string;
   description: string;
   type: AgentType;
+  parameters_schema_enabled: boolean;
+  parameters_schema: Record<string, unknown> | null;
   system_prompt: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
@@ -59,6 +62,8 @@ export function AgentEditor({
       name: '',
       description: '',
       type: 'autonomous',
+      parameters_schema_enabled: false,
+      parameters_schema: null,
       system_prompt: '',
       mcp_servers: null,
       skills: [],
@@ -69,6 +74,8 @@ export function AgentEditor({
   });
 
   const watchedName = watch('name');
+  const watchedType = watch('type');
+  const watchedSchemaEnabled = watch('parameters_schema_enabled');
   const watchedPrompt = watch('system_prompt');
   const watchedMcpServers = watch('mcp_servers');
   const watchedSkills = watch('skills');
@@ -77,10 +84,14 @@ export function AgentEditor({
   // Load agent data when editing
   useEffect(() => {
     if (agent) {
+      // parameters_schema_enabled is true if the agent has a non-null schema
+      const hasSchema = agent.parameters_schema != null;
       reset({
         name: agent.name,
         description: agent.description,
         type: agent.type || 'autonomous',
+        parameters_schema_enabled: hasSchema,
+        parameters_schema: agent.parameters_schema,
         system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
@@ -93,6 +104,8 @@ export function AgentEditor({
         name: '',
         description: '',
         type: 'autonomous',
+        parameters_schema_enabled: false,
+        parameters_schema: null,
         system_prompt: '',
         mcp_servers: null,
         skills: [],
@@ -164,10 +177,18 @@ export function AgentEditor({
         }
       }
 
+      // Handle parameters_schema: enabled toggle determines if schema is set
+      // If disabled or null, schema is null (use default behavior)
+      // If enabled and has value, use that value
+      const parametersSchema = data.parameters_schema_enabled && data.parameters_schema
+        ? data.parameters_schema
+        : null;
+
       const createData: AgentCreate = {
         name: data.name,
         description: data.description,
         type: data.type,
+        parameters_schema: parametersSchema,
         system_prompt: data.system_prompt || undefined,
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
@@ -308,6 +329,70 @@ export function AgentEditor({
                 </div>
               </div>
             </div>
+
+            {/* Input Schema - Only for autonomous agents */}
+            {watchedType === 'autonomous' && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label mb-0">
+                    <span className="flex items-center gap-1.5">
+                      <FileInput className="w-4 h-4" />
+                      Custom Input Schema
+                    </span>
+                  </label>
+                  <Controller
+                    name="parameters_schema_enabled"
+                    control={control}
+                    render={({ field }) => (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={(e) => {
+                            field.onChange(e.target.checked);
+                            // When disabling, clear the schema
+                            if (!e.target.checked) {
+                              setValue('parameters_schema', null);
+                            }
+                          }}
+                          className="w-4 h-4 text-primary-600 rounded"
+                        />
+                        <span className="text-sm font-medium">
+                          {field.value ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </label>
+                    )}
+                  />
+                </div>
+                <div className="flex items-start gap-2 text-xs text-gray-500 mb-3">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p>
+                      {watchedSchemaEnabled
+                        ? 'Define additional input parameters beyond the default prompt. These parameters are formatted and prepended to the prompt when the agent starts.'
+                        : 'When disabled, the agent uses the default schema that only accepts {"prompt": "..."}.'}
+                    </p>
+                    {watchedSchemaEnabled && (
+                      <p className="mt-1 text-amber-600">
+                        Note: The "prompt" field is always required for autonomous agents and will be added automatically.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {watchedSchemaEnabled && (
+                  <Controller
+                    name="parameters_schema"
+                    control={control}
+                    render={({ field }) => (
+                      <InputSchemaEditor
+                        value={field.value ?? null}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Tags */}
             <div>

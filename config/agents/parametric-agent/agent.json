@@ -1,0 +1,32 @@
+{
+  "name": "parametric-agent",
+  "description": "An autonomous agent with custom input parameters for structured content generation",
+  "type": "autonomous",
+  "tags": ["internal", "example"],
+  "parameters_schema": {
+    "type": "object",
+    "required": ["topic", "format"],
+    "properties": {
+      "topic": {
+        "type": "string",
+        "description": "The main topic or subject to write about"
+      },
+      "format": {
+        "type": "string",
+        "enum": ["summary", "bullet_points", "essay", "outline"],
+        "description": "The output format for the content"
+      },
+      "max_words": {
+        "type": "integer",
+        "minimum": 50,
+        "maximum": 2000,
+        "description": "Maximum word count for the output"
+      },
+      "audience": {
+        "type": "string",
+        "description": "Target audience for the content (e.g., 'technical', 'general', 'executive')"
+      }
+    },
+    "additionalProperties": false
+  }
+}

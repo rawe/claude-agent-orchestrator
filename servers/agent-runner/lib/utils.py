@@ -178,3 +178,79 @@ def ensure_directory_exists(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+# ==============================================================================
+# Autonomous Agent Input Formatting
+# ==============================================================================
+
+
+def format_autonomous_inputs(parameters: dict) -> str:
+    """
+    Format parameters for autonomous agents into a prompt string.
+
+    For autonomous agents with custom parameters_schema, this function:
+    1. Extracts the 'prompt' from parameters (required)
+    2. Extracts additional parameters (those not 'prompt')
+    3. Formats additional parameters as an inputs block
+    4. Returns formatted prompt with inputs prepended
+
+    If there are no additional parameters (just prompt), returns the prompt as-is.
+
+    Args:
+        parameters: Dict containing 'prompt' and optionally other parameters
+
+    Returns:
+        Formatted prompt string with inputs prepended (if any)
+
+    Raises:
+        ValueError: If 'prompt' is missing from parameters
+
+    Example:
+        >>> params = {"prompt": "Summarize this", "topic": "AI", "max_words": 100}
+        >>> format_autonomous_inputs(params)
+        '<inputs>
+        topic: AI
+        max_words: 100
+        </inputs>
+
+        Summarize this'
+    """
+    if "prompt" not in parameters:
+        raise ValueError("Missing required 'prompt' in parameters for autonomous agent")
+
+    prompt = parameters["prompt"]
+
+    # Get additional parameters (exclude 'prompt')
+    additional_params = {k: v for k, v in parameters.items() if k != "prompt"}
+
+    # If no additional params, return prompt as-is
+    if not additional_params:
+        return prompt
+
+    # Format additional parameters as inputs block
+    lines = ["<inputs>"]
+    for key, value in additional_params.items():
+        # Handle different value types
+        if isinstance(value, str):
+            # Multi-line strings get special formatting
+            if "\n" in value:
+                lines.append(f"{key}:")
+                for line in value.split("\n"):
+                    lines.append(f"  {line}")
+            else:
+                lines.append(f"{key}: {value}")
+        elif isinstance(value, (list, dict)):
+            # JSON-like structures
+            import json
+            lines.append(f"{key}: {json.dumps(value)}")
+        elif value is None:
+            lines.append(f"{key}: null")
+        else:
+            lines.append(f"{key}: {value}")
+    lines.append("</inputs>")
+    lines.append("")  # Empty line before prompt
+
+    # Combine inputs block with prompt
+    inputs_block = "\n".join(lines)
+    return f"{inputs_block}\n{prompt}"
+
+

@@ -64,10 +64,19 @@ class AgentOrchestratorTools:
         - description: Human-readable description
         - type: "autonomous" (interprets intent) or "procedural" (follows defined procedure)
         - tags: List of tags for filtering
-        - parameters_schema: JSON Schema for parameter validation (null for autonomous agents)
+        - parameters_schema: JSON Schema for parameter validation
 
-        Autonomous agents require {"prompt": string} parameters.
-        Procedural agents require parameters matching their parameters_schema.
+        Parameter Requirements by Agent Type:
+        - Autonomous agents (type="autonomous"):
+          - Always require {"prompt": string} at minimum
+          - If parameters_schema is null: accepts only {"prompt": "..."}
+          - If parameters_schema is set: accepts additional custom parameters
+            (prompt is still required and will be added automatically if not in schema)
+          - Additional parameters are formatted and prepended to the prompt
+
+        - Procedural agents (type="procedural"):
+          - Use parameters_schema directly (no implicit prompt requirement)
+          - Parameters are converted to CLI arguments
 
         Args:
             ctx: Request context with tags filter
@@ -133,15 +142,25 @@ class AgentOrchestratorTools:
 
         Creates a new session and executes it via an available runner.
 
+        Parameter Requirements:
+        - For autonomous agents without custom schema: {"prompt": "user message"}
+        - For autonomous agents with custom schema: Include all required fields
+          from the agent's parameters_schema, plus "prompt" (always required)
+        - For procedural agents: Match the agent's parameters_schema exactly
+
+        To check an agent's schema, use list_agent_blueprints() and examine
+        the parameters_schema field. If null for autonomous agents, use
+        the default {"prompt": "..."} format.
+
         Args:
             ctx: Request context with parent session ID for callbacks
-            parameters: Input parameters - for AI agents: {"prompt": "..."}
+            parameters: Input parameters - validated against agent's schema
             agent_name: Agent blueprint name (optional)
             project_dir: Optional project directory path
             mode: Execution mode - "sync", "async_poll", or "async_callback"
 
         Returns:
-            For sync mode: {"session_id": "...", "result": "..."}
+            For sync mode: {"session_id": "...", "result_text": "...", "result_data": ...}
             For async modes: {"session_id": "...", "status": "pending"}
 
         Raises:
@@ -244,14 +263,20 @@ class AgentOrchestratorTools:
 
         Continues a previously started session with new input.
 
+        Parameter Requirements (same as start_agent_session):
+        - For autonomous agents without custom schema: {"prompt": "user message"}
+        - For autonomous agents with custom schema: Include all required fields
+          from the agent's parameters_schema, plus "prompt" (always required)
+        - For procedural agents: Match the agent's parameters_schema exactly
+
         Args:
             ctx: Request context with parent session ID for callbacks
             session_id: ID of the session to resume
-            parameters: Input parameters - for AI agents: {"prompt": "..."}
+            parameters: Input parameters - validated against agent's schema
             mode: Execution mode - "sync", "async_poll", or "async_callback"
 
         Returns:
-            For sync mode: {"session_id": "...", "result": "..."}
+            For sync mode: {"session_id": "...", "result_text": "...", "result_data": ...}
             For async modes: {"session_id": "...", "status": "pending"}
 
         Raises:
