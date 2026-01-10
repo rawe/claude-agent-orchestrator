@@ -179,56 +179,67 @@ def ensure_directory_exists(path: Path) -> None:
 
 
 # ==============================================================================
-# Autonomous Agent Input Formatting
+# Autonomous Agent Input Formatting (ADR-015)
 # ==============================================================================
 
 
-def format_autonomous_inputs(parameters: dict) -> str:
+def format_autonomous_inputs(parameters: dict, has_custom_schema: bool) -> str:
     """
     Format parameters for autonomous agents into a prompt string.
 
-    For autonomous agents with custom parameters_schema, this function:
-    1. Extracts the 'prompt' from parameters (required)
-    2. Extracts additional parameters (those not 'prompt')
-    3. Formats additional parameters as an inputs block
-    4. Returns formatted prompt with inputs prepended
+    Two modes based on whether the agent has a custom parameters_schema (ADR-015):
 
-    If there are no additional parameters (just prompt), returns the prompt as-is.
+    Mode A (no custom schema - has_custom_schema=False):
+        - Returns the 'prompt' parameter directly as a string
+        - No XML wrapper, just the raw prompt
+
+    Mode B (custom schema - has_custom_schema=True):
+        - Formats ALL parameters as an <inputs> XML block
+        - All fields (including 'prompt' if present) are formatted identically
+        - This provides consistent structured input to the agent
 
     Args:
-        parameters: Dict containing 'prompt' and optionally other parameters
+        parameters: Dict containing input parameters
+        has_custom_schema: True if agent has a custom parameters_schema defined
 
     Returns:
-        Formatted prompt string with inputs prepended (if any)
+        Formatted prompt string for the agent
 
     Raises:
-        ValueError: If 'prompt' is missing from parameters
+        ValueError: If 'prompt' is missing when has_custom_schema=False
 
-    Example:
-        >>> params = {"prompt": "Summarize this", "topic": "AI", "max_words": 100}
-        >>> format_autonomous_inputs(params)
+    Examples:
+        Mode A (no schema):
+        >>> format_autonomous_inputs({"prompt": "Help me debug"}, has_custom_schema=False)
+        'Help me debug'
+
+        Mode B (custom schema):
+        >>> format_autonomous_inputs({"topic": "AI", "prompt": "Focus on safety"}, has_custom_schema=True)
         '<inputs>
         topic: AI
-        max_words: 100
-        </inputs>
+        prompt: Focus on safety
+        </inputs>'
 
-        Summarize this'
+        Mode B (custom schema, no prompt field):
+        >>> format_autonomous_inputs({"repo_url": "...", "branch": "main"}, has_custom_schema=True)
+        '<inputs>
+        repo_url: ...
+        branch: main
+        </inputs>'
     """
-    if "prompt" not in parameters:
-        raise ValueError("Missing required 'prompt' in parameters for autonomous agent")
+    if not has_custom_schema:
+        # Mode A: No custom schema - return prompt directly
+        if "prompt" not in parameters:
+            raise ValueError("Missing required 'prompt' in parameters for autonomous agent without custom schema")
+        return parameters["prompt"]
 
-    prompt = parameters["prompt"]
+    # Mode B: Custom schema - format ALL fields as <inputs> block
+    if not parameters:
+        # Edge case: empty parameters with custom schema
+        return "<inputs>\n</inputs>"
 
-    # Get additional parameters (exclude 'prompt')
-    additional_params = {k: v for k, v in parameters.items() if k != "prompt"}
-
-    # If no additional params, return prompt as-is
-    if not additional_params:
-        return prompt
-
-    # Format additional parameters as inputs block
     lines = ["<inputs>"]
-    for key, value in additional_params.items():
+    for key, value in parameters.items():
         # Handle different value types
         if isinstance(value, str):
             # Multi-line strings get special formatting
@@ -247,10 +258,7 @@ def format_autonomous_inputs(parameters: dict) -> str:
         else:
             lines.append(f"{key}: {value}")
     lines.append("</inputs>")
-    lines.append("")  # Empty line before prompt
 
-    # Combine inputs block with prompt
-    inputs_block = "\n".join(lines)
-    return f"{inputs_block}\n{prompt}"
+    return "\n".join(lines)
 
 

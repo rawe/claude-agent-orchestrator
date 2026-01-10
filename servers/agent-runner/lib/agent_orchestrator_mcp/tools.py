@@ -62,20 +62,21 @@ class AgentOrchestratorTools:
         Each blueprint includes:
         - name: Agent identifier
         - description: Human-readable description
-        - type: "autonomous" (interprets intent) or "procedural" (follows defined procedure)
+        - type: "autonomous" (AI-powered) or "procedural" (script-based)
         - tags: List of tags for filtering
-        - parameters_schema: JSON Schema for parameter validation
+        - parameters_schema: JSON Schema for parameter validation (what you see is what's validated)
 
-        Parameter Requirements by Agent Type:
-        - Autonomous agents (type="autonomous"):
-          - Always require {"prompt": string} at minimum
-          - If parameters_schema is null: accepts only {"prompt": "..."}
-          - If parameters_schema is set: accepts additional custom parameters
-            (prompt is still required and will be added automatically if not in schema)
-          - Additional parameters are formatted and prepended to the prompt
+        Parameter Requirements by Agent Type (ADR-015):
 
-        - Procedural agents (type="procedural"):
-          - Use parameters_schema directly (no implicit prompt requirement)
+        Autonomous agents (type="autonomous"):
+          - If parameters_schema is null: requires {"prompt": "your message"}
+          - If parameters_schema is set: use the schema exactly as shown
+            - The schema is authoritative - no hidden requirements
+            - If the agent needs free-form input, "prompt" will be in its schema
+            - If "prompt" is not in the schema, don't include it
+
+        Procedural agents (type="procedural"):
+          - Use parameters_schema directly
           - Parameters are converted to CLI arguments
 
         Args:
@@ -142,15 +143,17 @@ class AgentOrchestratorTools:
 
         Creates a new session and executes it via an available runner.
 
-        Parameter Requirements:
-        - For autonomous agents without custom schema: {"prompt": "user message"}
-        - For autonomous agents with custom schema: Include all required fields
-          from the agent's parameters_schema, plus "prompt" (always required)
-        - For procedural agents: Match the agent's parameters_schema exactly
+        Parameter Requirements (ADR-015):
+        - Check the agent's parameters_schema via list_agent_blueprints()
+        - The schema shown is exactly what's validated - no hidden requirements
 
-        To check an agent's schema, use list_agent_blueprints() and examine
-        the parameters_schema field. If null for autonomous agents, use
-        the default {"prompt": "..."} format.
+        For autonomous agents (type="autonomous"):
+          - If parameters_schema is null: use {"prompt": "your message"}
+          - If parameters_schema is set: match the schema exactly
+            - Include "prompt" only if it's defined in the schema
+
+        For procedural agents (type="procedural"):
+          - Match the agent's parameters_schema exactly
 
         Args:
             ctx: Request context with parent session ID for callbacks
@@ -263,11 +266,16 @@ class AgentOrchestratorTools:
 
         Continues a previously started session with new input.
 
-        Parameter Requirements (same as start_agent_session):
-        - For autonomous agents without custom schema: {"prompt": "user message"}
-        - For autonomous agents with custom schema: Include all required fields
-          from the agent's parameters_schema, plus "prompt" (always required)
-        - For procedural agents: Match the agent's parameters_schema exactly
+        Parameter Requirements (same as start_agent_session, ADR-015):
+        - The schema shown is exactly what's validated - no hidden requirements
+
+        For autonomous agents (type="autonomous"):
+          - If parameters_schema is null: use {"prompt": "your message"}
+          - If parameters_schema is set: match the schema exactly
+            - Include "prompt" only if it's defined in the schema
+
+        For procedural agents (type="procedural"):
+          - Match the agent's parameters_schema exactly
 
         Args:
             ctx: Request context with parent session ID for callbacks

@@ -22,6 +22,9 @@ Callback-driven orchestration where child agents notify parents upon completion.
 ### [Session Stop Command](./session-stop-command.md)
 Immediate termination of running agent sessions with SIGTERM/SIGKILL escalation. Propagated from Coordinator to Runner via event signaling.
 
+### [Autonomous Agent Input Schema](./autonomous-agent-input-schema.md)
+Custom input parameters for autonomous agents with JSON Schema validation. Enables structured inputs beyond the default prompt-only model.
+
 ## Work in Progress
 
 ### [Unified Session-Run View](./unified-session-run-view.md)

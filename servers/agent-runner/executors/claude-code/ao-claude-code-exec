@@ -152,7 +152,8 @@ def main(
         "session_id": invocation.session_id,
         "has_agent_blueprint": invocation.agent_blueprint is not None,
         "project_dir": invocation.project_dir or "None",
-        "prompt_length": len(invocation.prompt),
+        "prompt_length": len(invocation.prompt) if invocation.prompt else 0,
+        "parameters_keys": list(invocation.parameters.keys()) if invocation.parameters else [],
     })
 
     # Route by mode
@@ -183,9 +184,9 @@ def run_start(inv: ExecutorInvocation):
 
     Schema 2.0: Uses agent_blueprint directly (Runner handles fetching/resolution).
 
-    For autonomous agents with custom parameters_schema:
-    - Additional parameters (beyond 'prompt') are formatted into an inputs block
-    - The inputs block is prepended to the user's prompt
+    For autonomous agents (ADR-015):
+    - Without custom schema: prompt is passed directly to the agent
+    - With custom schema: ALL parameters formatted as <inputs> block
     """
     from executor_config import load_config
     from claude_client import run_session_sync
@@ -200,23 +201,27 @@ def run_start(inv: ExecutorInvocation):
     mcp_servers = None
     agent_name = None
     system_prompt = None
+    has_custom_schema = False
 
     if inv.agent_blueprint:
         # Schema 2.0: Use resolved blueprint directly (no API call needed)
         agent_name = inv.agent_blueprint.get("name")
         system_prompt = inv.agent_blueprint.get("system_prompt")
         mcp_servers = inv.agent_blueprint.get("mcp_servers")
+        # ADR-015: Check if agent has custom parameters_schema
+        has_custom_schema = inv.agent_blueprint.get("parameters_schema") is not None
 
         debug_log("ao-claude-code-exec using agent_blueprint", {
             "agent_name": agent_name or "unnamed",
             "has_system_prompt": system_prompt is not None,
             "has_mcp_servers": mcp_servers is not None,
+            "has_custom_schema": has_custom_schema,
         })
 
-    # 3. Format prompt with additional inputs (for autonomous agents with custom schema)
-    # If the agent has additional parameters beyond 'prompt', they are formatted
-    # into an <inputs> block and prepended to the prompt
-    formatted_prompt = format_autonomous_inputs(inv.parameters)
+    # 3. Format inputs based on schema presence (ADR-015)
+    # - No schema: return prompt directly
+    # - Custom schema: format ALL parameters as <inputs> block
+    formatted_prompt = format_autonomous_inputs(inv.parameters, has_custom_schema)
 
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_start", {
@@ -225,8 +230,8 @@ def run_start(inv: ExecutorInvocation):
         "agent_name": agent_name or "None",
         "has_system_prompt": system_prompt is not None,
         "has_mcp_servers": mcp_servers is not None,
+        "has_custom_schema": has_custom_schema,
         "prompt_length": len(formatted_prompt),
-        "has_additional_inputs": formatted_prompt != inv.prompt,
         "schema_version": inv.schema_version,
     })
 
@@ -255,9 +260,9 @@ def run_resume(inv: ExecutorInvocation):
 
     Schema 2.0: Uses agent_blueprint for MCP servers (Runner handles fetching/resolution).
 
-    For autonomous agents with custom parameters_schema:
-    - Additional parameters (beyond 'prompt') are formatted into an inputs block
-    - The inputs block is prepended to the user's prompt
+    For autonomous agents (ADR-015):
+    - Without custom schema: prompt is passed directly to the agent
+    - With custom schema: ALL parameters formatted as <inputs> block
     """
     from executor_config import get_api_url
     from session_client import SessionClient, SessionClientError, SessionNotFoundError
@@ -307,22 +312,26 @@ def run_resume(inv: ExecutorInvocation):
     # NOTE: system_prompt is only passed for new sessions, not resume
     mcp_servers = None
     agent_name = session_agent
+    has_custom_schema = False
 
     if inv.agent_blueprint:
         # Schema 2.0: Use resolved blueprint directly (no API call needed)
         mcp_servers = inv.agent_blueprint.get("mcp_servers")
         # Use agent name from blueprint if available, otherwise from session
         agent_name = inv.agent_blueprint.get("name") or session_agent
+        # ADR-015: Check if agent has custom parameters_schema
+        has_custom_schema = inv.agent_blueprint.get("parameters_schema") is not None
 
         debug_log("ao-claude-code-exec resume using agent_blueprint", {
             "agent_name": agent_name or "None",
             "has_mcp_servers": mcp_servers is not None,
+            "has_custom_schema": has_custom_schema,
         })
 
-    # 4. Format prompt with additional inputs (for autonomous agents with custom schema)
-    # If the agent has additional parameters beyond 'prompt', they are formatted
-    # into an <inputs> block and prepended to the prompt
-    formatted_prompt = format_autonomous_inputs(inv.parameters)
+    # 4. Format inputs based on schema presence (ADR-015)
+    # - No schema: return prompt directly
+    # - Custom schema: format ALL parameters as <inputs> block
+    formatted_prompt = format_autonomous_inputs(inv.parameters, has_custom_schema)
 
     # DEBUG LOGGING
     debug_log("ao-claude-code-exec run_resume", {
@@ -331,8 +340,8 @@ def run_resume(inv: ExecutorInvocation):
         "project_dir": str(session_project_dir),
         "agent_name": agent_name or "None",
         "has_mcp_servers": mcp_servers is not None,
+        "has_custom_schema": has_custom_schema,
         "prompt_length": len(formatted_prompt),
-        "has_additional_inputs": formatted_prompt != inv.prompt,
         "schema_version": inv.schema_version,
     })
 

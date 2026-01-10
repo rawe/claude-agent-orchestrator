@@ -74,54 +74,18 @@ class ParameterValidationError(Exception):
         super().__init__(f"Parameter validation failed for agent '{agent_name}'")
 
 
-def _merge_autonomous_schema_with_prompt(custom_schema: dict) -> dict:
-    """
-    Merge custom parameters_schema with prompt requirement for autonomous agents.
-
-    Ensures that 'prompt' is always required for autonomous agents, even when
-    they have a custom parameters_schema with additional properties.
-
-    Args:
-        custom_schema: The agent's custom parameters_schema
-
-    Returns:
-        Merged schema that includes both custom properties and prompt requirement
-    """
-    import copy
-    merged = copy.deepcopy(custom_schema)
-
-    # Ensure type is object
-    if merged.get("type") != "object":
-        merged["type"] = "object"
-
-    # Ensure properties dict exists
-    if "properties" not in merged:
-        merged["properties"] = {}
-
-    # Add prompt property if not present
-    if "prompt" not in merged["properties"]:
-        merged["properties"]["prompt"] = {"type": "string", "minLength": 1}
-
-    # Ensure prompt is in required list
-    required = merged.get("required", [])
-    if "prompt" not in required:
-        required = list(required) + ["prompt"]
-        merged["required"] = required
-
-    return merged
-
-
 def validate_parameters(parameters: dict, agent: Agent) -> None:
     """
     Validate parameters against agent's schema.
 
-    For autonomous agents:
+    For autonomous agents (ADR-015):
     - Without explicit parameters_schema: uses IMPLICIT_AUTONOMOUS_SCHEMA (prompt only)
-    - With explicit parameters_schema: merges with prompt requirement to ensure
-      prompt is always required for autonomous agents
+    - With explicit parameters_schema: uses custom schema as-is (no implicit prompt)
+      The custom schema is authoritative - if prompt is needed, the agent designer
+      must include it in their schema.
 
     For procedural agents:
-    - Uses the agent's parameters_schema directly (no prompt requirement)
+    - Uses the agent's parameters_schema directly
 
     Args:
         parameters: The parameters dict to validate
@@ -131,11 +95,12 @@ def validate_parameters(parameters: dict, agent: Agent) -> None:
         ParameterValidationError: If parameters don't match schema
     """
     if agent.type == "procedural":
-        # Procedural agents use their schema directly (no implicit prompt requirement)
+        # Procedural agents use their schema directly
         schema = agent.parameters_schema or {"type": "object", "additionalProperties": True}
     elif agent.parameters_schema:
-        # Autonomous agent with custom schema - merge with prompt requirement
-        schema = _merge_autonomous_schema_with_prompt(agent.parameters_schema)
+        # Autonomous agent with custom schema - use as-is (ADR-015)
+        # The custom schema is authoritative, no implicit prompt requirement
+        schema = agent.parameters_schema
     else:
         # Autonomous agent without custom schema - use implicit schema
         schema = IMPLICIT_AUTONOMOUS_SCHEMA

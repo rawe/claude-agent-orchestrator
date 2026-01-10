@@ -95,7 +95,7 @@ class MCPServer:
         """Register MCP tools with the FastMCP server."""
 
         @self._mcp.tool(
-            description="List available agent blueprints. Blueprints are filtered by the X-Agent-Tags header if present."
+            description="List available agent blueprints. Returns name, type, tags, and parameters_schema for each agent. The parameters_schema shows exactly what parameters are required - use it as-is with no hidden requirements."
         )
         async def list_agent_blueprints(ctx: Context) -> list[dict]:
             """List available agent blueprints."""
@@ -120,13 +120,15 @@ class MCPServer:
             description="""Start a new agent session.
 
 Args:
-    parameters: Input parameters dict - for AI agents: {"prompt": "your prompt here"}
+    parameters: Input parameters dict matching the agent's parameters_schema.
+        - If no schema (null): use {"prompt": "your message"}
+        - If schema defined: match the schema exactly (include "prompt" only if schema requires it)
     agent_name: Agent blueprint name (optional)
     project_dir: Optional project directory path
     mode: Execution mode - "sync" (wait for result), "async_poll" (return immediately, poll status), or "async_callback" (return immediately, receive callback)
 
 Returns:
-    For sync: {"session_id": "...", "result": "..."}
+    For sync: {"session_id": "...", "result_text": "...", "result_data": ...}
     For async: {"session_id": "...", "status": "pending"}
 """
         )
@@ -155,11 +157,13 @@ Returns:
 
 Args:
     session_id: ID of the session to resume
-    parameters: Input parameters dict - for AI agents: {"prompt": "continuation prompt"}
+    parameters: Input parameters dict matching the agent's parameters_schema.
+        - If no schema (null): use {"prompt": "your message"}
+        - If schema defined: match the schema exactly (include "prompt" only if schema requires it)
     mode: Execution mode - "sync", "async_poll", or "async_callback"
 
 Returns:
-    For sync: {"session_id": "...", "result": "..."}
+    For sync: {"session_id": "...", "result_text": "...", "result_data": ...}
     For async: {"session_id": "...", "status": "pending"}
 """
         )

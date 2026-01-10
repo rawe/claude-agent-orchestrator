@@ -334,12 +334,12 @@ export function AgentEditor({
                 <div>
                   <p>
                     {watchedSchemaEnabled
-                      ? 'Define additional input parameters beyond the default prompt. These parameters are formatted and prepended to the prompt when the agent starts.'
+                      ? 'Define the input parameters for this agent. All parameters will be formatted as an <inputs> block when the agent starts.'
                       : 'When disabled, the agent uses the default schema that only accepts {"prompt": "..."}.'}
                   </p>
                   {watchedSchemaEnabled && (
                     <p className="mt-1 text-amber-600">
-                      Note: The "prompt" field is always required for autonomous agents and will be added automatically.
+                      Note: If you need free-form user input, add a "prompt" field to your schema explicitly.
                     </p>
                   )}
                 </div>
