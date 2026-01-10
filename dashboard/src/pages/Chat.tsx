@@ -3,10 +3,10 @@ import { chatService } from '@/services/chatService';
 import type { Agent, Session } from '@/types';
 import { isParameterValidationError } from '@/types/run';
 import { useNotification, useSSE, useChat, useSessions } from '@/contexts';
-import { Button, Spinner, Dropdown } from '@/components/common';
-import type { DropdownOption } from '@/components/common';
+import { Button, Spinner, Dropdown, JsonSchemaForm } from '@/components/common';
+import type { DropdownOption, RJSFSchema } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
-import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ToolCall } from '@/contexts/ChatContext';
@@ -14,31 +14,6 @@ import type { ToolCall } from '@/contexts/ChatContext';
 // Helper to check if an agent requires custom input (has parameters_schema)
 function hasCustomInputSchema(agent: Agent | undefined): boolean {
   return agent?.parameters_schema != null;
-}
-
-// Helper to extract required fields from a JSON Schema
-function getSchemaRequiredFields(schema: Record<string, unknown> | null): string[] {
-  if (!schema) return [];
-  const required = schema.required;
-  if (Array.isArray(required)) {
-    return required.filter((r): r is string => typeof r === 'string');
-  }
-  return [];
-}
-
-// Helper to get property descriptions from schema
-function getSchemaPropertyInfo(schema: Record<string, unknown> | null): Array<{name: string, type: string, description?: string, required: boolean}> {
-  if (!schema) return [];
-  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
-  const required = getSchemaRequiredFields(schema);
-  if (!properties) return [];
-
-  return Object.entries(properties).map(([name, prop]) => ({
-    name,
-    type: (prop.type as string) || 'unknown',
-    description: prop.description as string | undefined,
-    required: required.includes(name),
-  }));
 }
 
 // Use ToolCall type from context (imported as ToolCall)
@@ -261,9 +236,6 @@ export function Chat() {
 
   // Check if selected agent has a custom input schema (not prompt-based)
   const requiresCustomInput = hasCustomInputSchema(selectedBlueprintObj);
-  const customSchemaInfo = requiresCustomInput
-    ? getSchemaPropertyInfo(selectedBlueprintObj?.parameters_schema ?? null)
-    : [];
 
   // Load blueprints on mount
   useEffect(() => {
@@ -362,6 +334,76 @@ export function Chat() {
       }
 
       // Update assistant message with error
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: `Error: ${errorMessage}`, status: 'error' }
+            : msg
+        )
+      );
+      showError(isParameterValidationError(err) ? 'Parameter validation failed' : errorMessage);
+      setAgentStatus('error');
+      setIsLoading(false);
+      setPendingMessageId(null);
+    }
+  };
+
+  // Handler for custom schema form submission
+  const handleCustomSchemaSubmit = async (parameters: Record<string, unknown>) => {
+    if (state.isLoading) return;
+
+    // Create a summary of the parameters for the user message
+    const paramSummary = Object.entries(parameters)
+      .map(([key, value]) => `**${key}:** ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+      .join('\n');
+
+    // Add user message showing the parameters
+    const userMessage = {
+      id: generateMessageId(),
+      role: 'user' as const,
+      content: `Starting agent with parameters:\n\n${paramSummary}`,
+      timestamp: new Date(),
+      status: 'complete' as const,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    // Add pending assistant message
+    const assistantMessageId = generateMessageId();
+    const assistantMessage = {
+      id: assistantMessageId,
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date(),
+      status: 'pending' as const,
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
+    setPendingMessageId(assistantMessageId);
+
+    try {
+      // Start new session with custom parameters
+      const request = {
+        parameters,
+        async_mode: true,
+        ...(state.selectedBlueprint && { agent_blueprint_name: state.selectedBlueprint }),
+      };
+
+      const response = await chatService.startSession(request);
+      setSessionId(response.session_id);
+      setAgentStatus('starting');
+
+    } catch (err) {
+      let errorMessage: string;
+
+      if (isParameterValidationError(err)) {
+        const validationDetails = err.validation_errors
+          .map((e) => `- ${e.path}: ${e.message}`)
+          .join('\n');
+        errorMessage = `Parameter validation failed:\n${validationDetails}`;
+      } else {
+        errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      }
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMessageId
@@ -605,92 +647,65 @@ export function Chat() {
           />
         </div>
 
-        {/* Custom Schema Warning Banner */}
-        {requiresCustomInput && state.mode === 'new' && (
-          <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-amber-800">
-                  This agent requires structured input
-                </h4>
-                <p className="text-sm text-amber-700 mt-1">
-                  <strong>{selectedBlueprintObj?.name}</strong> cannot be started from the chat interface
-                  because it requires specific parameters instead of a text prompt.
+        {/* Custom Schema Form */}
+        {requiresCustomInput && state.mode === 'new' && selectedBlueprintObj?.parameters_schema && (
+          <div className="mx-4 mt-4 p-4 bg-white border border-gray-200 rounded-lg">
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900">
+                {selectedBlueprintObj.name}
+              </h4>
+              {selectedBlueprintObj.description && (
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedBlueprintObj.description}
                 </p>
-                {customSchemaInfo.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-amber-800 uppercase tracking-wide mb-2">
-                      Required Parameters:
-                    </p>
-                    <ul className="space-y-1">
-                      {customSchemaInfo.map((field) => (
-                        <li key={field.name} className="text-sm text-amber-700 flex items-baseline gap-2">
-                          <code className="px-1.5 py-0.5 bg-amber-100 rounded text-xs font-mono">
-                            {field.name}
-                          </code>
-                          <span className="text-xs text-amber-600">({field.type})</span>
-                          {field.required && (
-                            <span className="text-xs text-red-600 font-medium">required</span>
-                          )}
-                          {field.description && (
-                            <span className="text-xs text-amber-600">— {field.description}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <p className="text-xs text-amber-600 mt-3">
-                  Use the API directly to start this agent with the required parameters.
-                </p>
-              </div>
+              )}
             </div>
+            <JsonSchemaForm
+              schema={selectedBlueprintObj.parameters_schema as RJSFSchema}
+              onSubmit={handleCustomSchemaSubmit}
+              isLoading={state.isLoading}
+              disabled={!connected}
+              submitText="Start Agent"
+            />
           </div>
         )}
 
-        {/* Input Area */}
-        <div className="p-4">
-          <div className={`relative border rounded-xl transition-all ${
-            requiresCustomInput && state.mode === 'new'
-              ? 'border-gray-200 bg-gray-50'
-              : 'border-gray-300 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent'
-          }`}>
-            <textarea
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                requiresCustomInput && state.mode === 'new'
-                  ? 'Select a different agent or use the API for this agent...'
-                  : 'Type your message... (Press Enter to send, Shift+Enter for new line)'
-              }
-              disabled={state.isLoading || (requiresCustomInput && state.mode === 'new')}
-              rows={3}
-              className="w-full px-4 py-3 pr-14 text-sm rounded-xl resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
-            />
-            {canStop ? (
-              <button
-                onClick={handleStopSession}
-                disabled={isStopping}
-                className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
-                title="Stop agent"
-              >
-                {isStopping ? <Spinner size="sm" /> : <Square className="w-4 h-4 fill-current" />}
-              </button>
-            ) : (
-              <button
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim() || state.isLoading || !connected || (requiresCustomInput && state.mode === 'new')}
-                className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
-                title={requiresCustomInput && state.mode === 'new' ? 'This agent requires structured input' : 'Send message'}
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            )}
+        {/* Input Area - hide when showing custom schema form */}
+        {!(requiresCustomInput && state.mode === 'new') && (
+          <div className="p-4">
+            <div className="relative border rounded-xl transition-all border-gray-300 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent">
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+                disabled={state.isLoading}
+                rows={3}
+                className="w-full px-4 py-3 pr-14 text-sm rounded-xl resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
+              />
+              {canStop ? (
+                <button
+                  onClick={handleStopSession}
+                  disabled={isStopping}
+                  className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                  title="Stop agent"
+                >
+                  {isStopping ? <Spinner size="sm" /> : <Square className="w-4 h-4 fill-current" />}
+                </button>
+              ) : (
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!inputValue.trim() || state.isLoading || !connected}
+                  className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                  title="Send message"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

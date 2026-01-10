@@ -12,6 +12,9 @@
   "dependencies": {
     "@auth0/auth0-react": "^2.11.0",
     "@headlessui/react": "^2.2.0",
+    "@rjsf/core": "^6.1.2",
+    "@rjsf/utils": "^6.1.2",
+    "@rjsf/validator-ajv8": "^6.1.2",
     "@tanstack/react-table": "^8.21.0",
     "@uiw/react-json-view": "^2.0.0-alpha.39",
     "axios": "^1.7.9",
