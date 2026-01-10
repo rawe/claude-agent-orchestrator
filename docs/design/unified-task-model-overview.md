@@ -1,7 +1,19 @@
 # Unified Task Model: Architectural Overview
 
-**Status:** Design Proposal
+**Status:** Partially Implemented
 **Date:** 2025-01-05
+**Updated:** 2025-01-10
+
+---
+
+## Implementation Status
+
+| Component | Status | Reference |
+|-----------|--------|-----------|
+| Agent Types (autonomous/procedural) | **Implemented** | [architecture/agent-types.md](../architecture/agent-types.md) |
+| Unified Parameters Model | **Implemented** | [architecture/agent-types.md](../architecture/agent-types.md) |
+| Input Schema Validation | **Implemented** | [architecture/agent-types.md](../architecture/agent-types.md) |
+| Output Schema Enforcement | Design | [structured-output-schema-enforcement.md](./structured-output-schema-enforcement.md) |
 
 ---
 
@@ -11,11 +23,11 @@ The Agent Orchestrator framework needs to support **deterministic task execution
 
 Three core challenges:
 
-| Challenge | Description |
-|-----------|-------------|
-| **Structured Output** | Callers need guaranteed JSON Schema-compliant responses from agents |
-| **Task Type Asymmetry** | AI agents and deterministic tasks have different invocation models |
-| **Type-Safe Orchestration** | Orchestrating agents need predictable interfaces to chain tasks |
+| Challenge | Description | Status |
+|-----------|-------------|--------|
+| **Task Type Asymmetry** | AI agents and deterministic tasks have different invocation models | **Solved** |
+| **Structured Output** | Callers need guaranteed JSON Schema-compliant responses from agents | Design |
+| **Type-Safe Orchestration** | Orchestrating agents need predictable interfaces to chain tasks | Partial |
 
 ---
 
@@ -27,11 +39,15 @@ Three core challenges:
 
 ```
 Every task:  parameters_schema → invoke() → output_schema
+             ─────────────────────────────   ─────────────
+                    IMPLEMENTED                 DESIGN
 ```
 
 Whether AI, deterministic, or hybrid - the caller sees the same interface.
 
 ### Key Insight: Prompt Is Just a Parameter
+
+**Status: Implemented** - See [agent-types.md](../architecture/agent-types.md)
 
 AI agents aren't "unstructured" - they're structured with a simple schema:
 
@@ -66,6 +82,7 @@ Every task defines both input and output contracts:
 ┌────────────────────┐                     ┌────────────────────┐
 │  parameters_schema │ ──── invoke() ────► │   output_schema    │
 │   (INPUT contract) │                     │  (OUTPUT contract) │
+│    IMPLEMENTED     │                     │      DESIGN        │
 └────────────────────┘                     └────────────────────┘
 ```
 
@@ -73,8 +90,8 @@ Every task defines both input and output contracts:
 
 | Task Type | Input Validation | Output Validation | On Failure |
 |-----------|-----------------|-------------------|------------|
-| AI Agent | Validate parameters | Validate result | **Retry with feedback** |
-| Deterministic | Validate parameters | Validate result | **Fail immediately** |
+| AI Agent | **Implemented** | Design | **Retry with feedback** |
+| Procedural | **Implemented** | Design | **Fail immediately** |
 
 AI agents get a retry loop; deterministic tasks fail fast (bugs don't fix themselves).
 
@@ -85,7 +102,7 @@ Minimal                          Moderate                         Full
    │                                │                               │
    ▼                                ▼                               ▼
 ┌──────────┐                 ┌─────────────┐                ┌─────────────┐
-│ AI Agent │                 │  AI Agent + │                │Deterministic│
+│ AI Agent │                 │  AI Agent + │                │ Procedural  │
 │ (prompt) │                 │   Context   │                │    Task     │
 └──────────┘                 └─────────────┘                └─────────────┘
 params:                      params:                         params:
@@ -100,7 +117,7 @@ Tasks exist anywhere on this spectrum. The framework treats them uniformly.
 
 ## Enforcement Mechanism
 
-### For AI Agents: Validation Loop
+### For AI Agents: Validation Loop (Design)
 
 ```
 1. Inject schema requirements into prompt
@@ -111,13 +128,13 @@ Tasks exist anywhere on this spectrum. The framework treats them uniformly.
 6. If valid → Return structured result
 ```
 
-### For Deterministic Tasks: Validate-or-Fail
+### For Procedural Tasks: Validate-or-Fail
 
 ```
-1. Validate parameters against parameters_schema
-2. Execute task
-3. Parse stdout as JSON
-4. Validate against output_schema
+1. Validate parameters against parameters_schema  ← IMPLEMENTED
+2. Execute task                                    ← IMPLEMENTED
+3. Parse stdout as JSON                            ← IMPLEMENTED
+4. Validate against output_schema                  ← DESIGN
 5. If invalid → Fail (it's a bug)
 6. If valid → Return structured result
 ```
@@ -126,18 +143,18 @@ Tasks exist anywhere on this spectrum. The framework treats them uniformly.
 
 ## API Design
 
-### Unified Invocation
+### Unified Invocation (Implemented)
 
 ```python
-# Single signature for all task types
+# Single signature for ALL task types
 result = start_agent_session(
     agent_name="any-task",
     parameters={...}  # Validated against parameters_schema
 )
-# result validated against output_schema
+# result validated against output_schema  ← DESIGN
 ```
 
-### Schema Discovery
+### Schema Discovery (Design)
 
 ```
 GET /agents/{name}/schema
@@ -147,7 +164,7 @@ GET /agents/{name}/schema
   }
 ```
 
-### Caller-Provided Output Schema
+### Caller-Provided Output Schema (Design)
 
 ```python
 # Override or specify output schema per-run
@@ -164,19 +181,19 @@ result = start_agent_session(
 
 | Aspect | Before | After |
 |--------|--------|-------|
-| **Invocation** | Different APIs for AI vs deterministic | Unified `parameters` interface |
-| **AI inputs** | Just a prompt string | Structured with optional context |
-| **Outputs** | Unstructured text | Schema-validated JSON |
-| **Orchestration** | Parse and hope | Type-safe chaining |
-| **Pipeline composition** | Manual validation | Framework-verified compatibility |
+| **Invocation** | Different APIs for AI vs deterministic | Unified `parameters` interface (**Implemented**) |
+| **AI inputs** | Just a prompt string | Structured with optional context (**Implemented**) |
+| **Outputs** | Unstructured text | Schema-validated JSON (Design) |
+| **Orchestration** | Parse and hope | Type-safe chaining (Partial) |
+| **Pipeline composition** | Manual validation | Framework-verified compatibility (Design) |
 
 ---
 
 ## Implementation Phases
 
-1. **Structured Output Enforcement** - Add `output_schema` to runs, validation loop for AI
-2. **Deterministic Output Schemas** - Extend deterministic blueprints with `output_schema`
-3. **Unified Parameters Model** - Migrate AI agents to `parameters` with implicit schema
+1. ~~**Unified Parameters Model** - Migrate AI agents to `parameters` with implicit schema~~ **Done**
+2. ~~**Input Schema Validation** - Validate parameters at run creation~~ **Done**
+3. **Structured Output Enforcement** - Add `output_schema` to runs, validation loop for AI
 4. **Rich AI Inputs** - Enable `parameters_schema` for AI agents beyond just prompt
 
 ---
@@ -185,16 +202,15 @@ result = start_agent_session(
 
 | Topic | Document |
 |-------|----------|
+| Agent types architecture | [../architecture/agent-types.md](../architecture/agent-types.md) |
 | Structured output enforcement mechanism | [structured-output-schema-enforcement.md](./structured-output-schema-enforcement.md) |
-| Deterministic task execution design | [deterministic-task-execution.md](./deterministic-task-execution.md) |
-| Synergy analysis and unified model details | [notes-structured-output-deterministic-synergy.md](./notes-structured-output-deterministic-synergy.md) |
 
 ---
 
 ## Key Takeaways
 
 1. **Everything is structured** - AI agents just have simpler schemas
-2. **Schemas are bidirectional** - Both input AND output are typed
-3. **Enforcement differs by task type** - AI retries, deterministic fails fast
-4. **Caller controls output schema** - Not baked into blueprints
-5. **Executor type is hidden** - Callers don't care if task is AI or deterministic
+2. **Input schemas are enforced** - Parameter validation at run creation (**Implemented**)
+3. **Output schemas are planned** - Retry loop for AI, fail-fast for procedural (Design)
+4. **Caller controls output schema** - Not baked into blueprints (Design)
+5. **Executor type is hidden** - Callers don't care if task is AI or procedural (**Implemented**)

@@ -668,5 +668,5 @@ class JSONExtractor:
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview
 - [agent-callback-architecture.md](../features/agent-callback-architecture.md) - Resume mechanism
-- [deterministic-task-execution.md](./deterministic-task-execution.md) - Related: structured parameters
+- [agent-types.md](../architecture/agent-types.md) - Agent types and parameter validation
 - [RUNS_API.md](../components/agent-coordinator/RUNS_API.md) - Run API reference

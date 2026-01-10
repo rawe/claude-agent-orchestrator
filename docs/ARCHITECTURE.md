@@ -15,6 +15,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 | **Agent Runner** | Standalone process that polls for agent runs, processes them via executors, and reports status. |
 | **Agent Coordinator Proxy** | Local HTTP proxy started by Agent Runner that forwards executor requests to Agent Coordinator with authentication. |
 | **Executor** | Framework-specific code that spawns the actual agent process (e.g., Claude Code via Agent SDK). Communicates with Agent Coordinator via the proxy. |
+| **Agent Type** | Classification of agents: **autonomous** (AI-powered, supports resumption) or **procedural** (deterministic CLI execution, stateless). See [agent-types.md](architecture/agent-types.md). |
 | **Context Store** | Backend server (port 8766) for document storage and sharing context between agents. |
 
 ### Conceptual Hierarchy
@@ -342,3 +343,13 @@ The architecture supports multiple agent frameworks:
 - **Future**: LangChain, AutoGen, or other frameworks can add executors
 
 Only the executor directory is framework-specific. The Runner core, Agent Coordinator, Agent Runs API, and all ao-* CLI commands are framework-agnostic.
+
+## Related Architecture Documents
+
+| Document | Description |
+|----------|-------------|
+| [Agent Types](architecture/agent-types.md) | Autonomous vs procedural agents, unified invocation model, parameter validation |
+| [MCP Runner Integration](architecture/mcp-runner-integration.md) | Embedded MCP server in Agent Runner |
+| [SSE Sessions](architecture/sse-sessions.md) | Server-sent events for real-time updates |
+| [Auth OIDC](architecture/auth-oidc.md) | Authentication with Auth0 |
+| [Auth Coordinator](architecture/auth-coordinator.md) | Coordinator authentication architecture |

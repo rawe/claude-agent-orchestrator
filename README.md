@@ -184,7 +184,8 @@ See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE
 | Term | Definition |
 |------|------------|
 | **Agent Blueprint** | Reusable agent configuration (system prompt, MCP config, metadata) that gets instantiated into sessions. |
-| **Session** | Named, persistent Claude Code conversation with state and history. Can have multiple runs. |
+| **Agent Type** | Classification: **autonomous** (AI-powered, supports resumption) or **procedural** (deterministic CLI, stateless). |
+| **Session** | Named, persistent agent conversation with state and history. Can have multiple runs. |
 | **Agent Run** | Single execution of a session (start, resume, or stop). Transient work unit queued for a runner. |
 | **Agent Coordinator** | Backend server (port 8765) managing sessions, runs, runners, blueprints, and callbacks. |
 | **Agent Runner** | Standalone process that polls for runs and executes them. Must run in your project directory. |
