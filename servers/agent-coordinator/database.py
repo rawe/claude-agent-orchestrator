@@ -771,6 +771,54 @@ def delete_old_runs(older_than: str) -> int:
     return deleted_count
 
 
+def fail_runs_on_runner_disconnect(runner_id: str, current_time: str) -> list[dict]:
+    """
+    Mark all active runs for a disconnected runner as failed.
+
+    Called when a runner is removed due to heartbeat timeout.
+    Marks runs in 'running' or 'claimed' status as 'failed'.
+
+    Args:
+        runner_id: The runner that disconnected
+        current_time: ISO timestamp for completed_at
+
+    Returns:
+        List of run dicts that were failed (for callback processing)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # First, get the runs that will be failed (need full data for callbacks)
+    cursor.execute(
+        """
+        SELECT * FROM runs
+        WHERE runner_id = ?
+        AND status IN ('running', 'claimed')
+        """,
+        (runner_id,)
+    )
+    rows = cursor.fetchall()
+    failed_runs = [_row_to_run_dict(row, cursor.description) for row in rows]
+
+    if failed_runs:
+        # Update them all
+        cursor.execute(
+            """
+            UPDATE runs
+            SET status = 'failed',
+                error = 'Runner disconnected during execution',
+                completed_at = ?
+            WHERE runner_id = ?
+            AND status IN ('running', 'claimed')
+            """,
+            (current_time, runner_id)
+        )
+        conn.commit()
+
+    conn.close()
+    return failed_runs
+
+
 # ============================================================================
 # Recovery Functions (Phase 5)
 # ============================================================================

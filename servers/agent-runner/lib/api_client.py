@@ -37,6 +37,15 @@ class DuplicateRunnerError(Exception):
         super().__init__(message)
 
 
+class AgentNameCollisionError(Exception):
+    """Raised when trying to register an agent name that's already registered by another runner."""
+
+    def __init__(self, agent_name: str, existing_runner_id: str, message: str):
+        self.agent_name = agent_name
+        self.existing_runner_id = existing_runner_id
+        super().__init__(message)
+
+
 @dataclass
 class RegistrationResponse:
     """Response from runner registration."""
@@ -174,17 +183,27 @@ class CoordinatorAPIClient:
         if response.status_code == 403:
             raise AuthenticationError(403, "Credentials rejected. Check Auth0 M2M configuration.")
 
-        # Handle duplicate runner error (409 Conflict)
+        # Handle 409 Conflict errors (duplicate runner or agent name collision)
         if response.status_code == 409:
             data = response.json()
             detail = data.get("detail", {})
-            raise DuplicateRunnerError(
-                runner_id=detail.get("runner_id", "unknown"),
-                hostname=detail.get("hostname", hostname),
-                project_dir=detail.get("project_dir", project_dir),
-                executor_profile=detail.get("executor_profile", executor_profile),
-                message=detail.get("message", "A runner with this identity is already online"),
-            )
+            error_type = detail.get("error", "")
+
+            if error_type == "agent_name_collision":
+                raise AgentNameCollisionError(
+                    agent_name=detail.get("agent_name", "unknown"),
+                    existing_runner_id=detail.get("existing_runner_id", "unknown"),
+                    message=detail.get("message", "Agent name already registered by another runner"),
+                )
+            else:
+                # Default to duplicate runner error
+                raise DuplicateRunnerError(
+                    runner_id=detail.get("runner_id", "unknown"),
+                    hostname=detail.get("hostname", hostname),
+                    project_dir=detail.get("project_dir", project_dir),
+                    executor_profile=detail.get("executor_profile", executor_profile),
+                    message=detail.get("message", "A runner with this identity is already online"),
+                )
 
         response.raise_for_status()
         data = response.json()

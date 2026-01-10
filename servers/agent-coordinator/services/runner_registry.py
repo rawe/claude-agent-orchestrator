@@ -27,6 +27,18 @@ class DuplicateRunnerError(Exception):
         )
 
 
+class AgentNameCollisionError(Exception):
+    """Raised when a runner tries to register an agent name that's already registered by another runner."""
+
+    def __init__(self, agent_name: str, existing_runner_id: str, new_runner_id: str):
+        self.agent_name = agent_name
+        self.existing_runner_id = existing_runner_id
+        self.new_runner_id = new_runner_id
+        super().__init__(
+            f"Agent '{agent_name}' is already registered by runner '{existing_runner_id}'"
+        )
+
+
 def derive_runner_id(hostname: str, project_dir: str, executor_profile: str, executor_command: str) -> str:
     """
     Deterministically derive runner_id from identifying properties.
@@ -315,12 +327,37 @@ class RunnerRegistry:
         """Store agents registered by a runner.
 
         Replaces any existing agents for this runner.
+        Raises AgentNameCollisionError if any agent name is already registered
+        by a different runner.
 
         Args:
             runner_id: The runner that owns these agents
             agents: List of agent dicts with name, description, command, parameters_schema
+
+        Raises:
+            AgentNameCollisionError: If an agent name is already registered by another runner
         """
         with self._lock:
+            # Check for name collisions with other runners
+            for agent in agents:
+                agent_name = agent.get("name")
+                if not agent_name:
+                    continue
+
+                # Check all other runners for this agent name
+                for other_runner_id, other_agents in self._runner_agents.items():
+                    if other_runner_id == runner_id:
+                        continue  # Skip self (re-registration is allowed)
+
+                    for other_agent in other_agents:
+                        if other_agent.get("name") == agent_name:
+                            raise AgentNameCollisionError(
+                                agent_name=agent_name,
+                                existing_runner_id=other_runner_id,
+                                new_runner_id=runner_id,
+                            )
+
+            # No collisions, store the agents
             self._runner_agents[runner_id] = agents
 
     def get_runner_agents(self, runner_id: str) -> list[dict]:

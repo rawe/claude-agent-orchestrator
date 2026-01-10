@@ -15,7 +15,7 @@ from database import (
     update_session_status, update_session_metadata, delete_session,
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
-    SessionAlreadyExistsError,
+    SessionAlreadyExistsError, fail_runs_on_runner_disconnect,
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -50,7 +50,7 @@ from services.run_queue import (
     ParameterValidationError, validate_parameters, IMPLICIT_AUTONOMOUS_SCHEMA
 )
 # Import runner registry and other services
-from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError
+from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError, AgentNameCollisionError
 from services.stop_command_queue import stop_command_queue
 from services.sse_manager import sse_manager, SSEConnection
 from services import callback_processor
@@ -110,6 +110,7 @@ async def runner_lifecycle_task():
     """Background task to update runner lifecycle states.
 
     Runs periodically to mark stale runners and remove old ones.
+    When a runner is removed, orphaned runs are failed and callbacks triggered.
     """
     while True:
         await asyncio.sleep(RUNNER_LIFECYCLE_INTERVAL)
@@ -118,14 +119,54 @@ async def runner_lifecycle_task():
                 stale_threshold_seconds=RUNNER_STALE_THRESHOLD,
                 remove_threshold_seconds=RUNNER_REMOVE_THRESHOLD,
             )
-            if DEBUG:
-                if stale_ids:
-                    print(f"[DEBUG] Runners marked stale: {stale_ids}", flush=True)
-                if removed_ids:
-                    print(f"[DEBUG] Runners removed: {removed_ids}", flush=True)
-                    # Cleanup stop command queue for removed runners
-                    for runner_id in removed_ids:
-                        stop_command_queue.unregister_runner(runner_id)
+            if DEBUG and stale_ids:
+                print(f"[DEBUG] Runners marked stale: {stale_ids}", flush=True)
+
+            # Handle removed runners
+            for runner_id in removed_ids:
+                if DEBUG:
+                    print(f"[DEBUG] Runner removed: {runner_id}", flush=True)
+
+                # Cleanup stop command queue
+                stop_command_queue.unregister_runner(runner_id)
+
+                # Fail orphaned runs and handle callbacks
+                now = datetime.now(timezone.utc).isoformat()
+                orphaned_runs = fail_runs_on_runner_disconnect(runner_id, now)
+
+                for run in orphaned_runs:
+                    run_id = run["run_id"]
+                    session_id = run["session_id"]
+                    error = run.get("error", "Runner disconnected during execution")
+
+                    if DEBUG:
+                        print(f"[DEBUG] Orphaned run {run_id} (session={session_id}) marked as failed", flush=True)
+
+                    # Update session status to failed
+                    update_session_status(session_id, "failed")
+
+                    # Broadcast run failure via SSE
+                    await sse_manager.broadcast(
+                        StreamEventType.RUN_FAILED,
+                        {"run_id": run_id, "error": error, "session_id": session_id},
+                        session_id=session_id,
+                    )
+
+                    # Trigger callback for async_callback mode
+                    if run.get("execution_mode") == "async_callback":
+                        parent_session_id = run.get("parent_session_id")
+                        if parent_session_id:
+                            parent_session = get_session_by_id(parent_session_id)
+                            callback_processor.on_child_completed(
+                                child_session_id=session_id,
+                                parent_session=parent_session,
+                                child_result=None,
+                                child_failed=True,
+                                child_error=error,
+                            )
+                            if DEBUG:
+                                print(f"[DEBUG] Triggered failure callback for orphaned session {session_id} -> parent {parent_session_id}", flush=True)
+
         except Exception as e:
             print(f"[ERROR] Runner lifecycle task error: {e}", flush=True)
 
@@ -988,9 +1029,24 @@ async def register_runner(request: RunnerRegisterRequest):
 
     # Store runner-owned agents (Phase 4 - Procedural Executor)
     # Replaces existing agents for this runner on re-registration
+    # Rejects registration if any agent name collides with another runner's agent
     if request.agents:
         agents_data = [agent.model_dump() for agent in request.agents]
-        runner_registry.store_runner_agents(runner.runner_id, agents_data)
+        try:
+            runner_registry.store_runner_agents(runner.runner_id, agents_data)
+        except AgentNameCollisionError as e:
+            # Rollback: remove the runner we just registered
+            runner_registry.remove_runner(runner.runner_id)
+            stop_command_queue.unregister_runner(runner.runner_id)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "agent_name_collision",
+                    "message": str(e),
+                    "agent_name": e.agent_name,
+                    "existing_runner_id": e.existing_runner_id,
+                }
+            )
         if DEBUG:
             print(f"[DEBUG]   agents: {[a.name for a in request.agents]}", flush=True)
 

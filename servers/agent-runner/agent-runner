@@ -48,7 +48,7 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 import typer
 from config import RunnerConfig
-from api_client import CoordinatorAPIClient, DuplicateRunnerError, AuthenticationError
+from api_client import CoordinatorAPIClient, DuplicateRunnerError, AgentNameCollisionError, AuthenticationError
 from auth0_client import Auth0M2MClient
 from registry import RunningRunsRegistry
 from executor import (
@@ -470,6 +470,22 @@ def main(
         logger.error("  1. Use a different --project-dir for the second runner")
         logger.error("  2. Stop the existing runner first")
         logger.error("  3. Deregister the existing runner from the dashboard")
+        logger.error("=" * 60)
+        sys.exit(1)
+    except AgentNameCollisionError as e:
+        logger.error("=" * 60)
+        logger.error("AGENT NAME COLLISION ERROR")
+        logger.error("=" * 60)
+        logger.error(f"Cannot register agent - name already taken by another runner:")
+        logger.error(f"  Agent Name:         {e.agent_name}")
+        logger.error(f"  Existing Runner ID: {e.existing_runner_id}")
+        logger.error("")
+        logger.error("Each agent name can only be registered by one runner at a time.")
+        logger.error("")
+        logger.error("Options:")
+        logger.error("  1. Rename your agent to avoid the collision")
+        logger.error("  2. Stop the runner that owns the existing agent")
+        logger.error("  3. Wait for the existing runner to disconnect")
         logger.error("=" * 60)
         sys.exit(1)
     except KeyboardInterrupt:

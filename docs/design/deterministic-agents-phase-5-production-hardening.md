@@ -1,6 +1,6 @@
 # Phase 5: Production Hardening
 
-**Status:** Implementation Ready
+**Status:** Implemented
 **Depends on:** Phase 4 (Deterministic Executor)
 **Design Reference:** [deterministic-agents-implementation.md](./deterministic-agents-implementation.md) - Section 11
 
@@ -16,63 +16,60 @@ Handle edge cases and failure scenarios for production reliability: runner disco
 
 ## Key Components
 
-### 1. Runner Disconnect Detection
+### 1. Runner Disconnect Detection ✅
+
+**Status:** Implemented
 
 **File:** `servers/agent-coordinator/services/runner_registry.py`
 
 Existing heartbeat mechanism (per ADR-006):
 - Runner sends heartbeat every 30s
-- Coordinator marks runner "stale" after 90s
-- Coordinator marks runner "offline" after 180s
+- Coordinator marks runner "stale" after 120s (configurable)
+- Coordinator removes runner after 600s (configurable)
 
-**Extend for blueprint cleanup:**
-- When runner goes offline: Delete bound blueprints
-- Emit event for blueprint removal (SSE broadcast)
+When runner is removed:
+- Delete bound blueprints (in-memory agent list)
+- Fail orphaned runs
+- Trigger failure callbacks
 
-### 2. Blueprint Cleanup on Disconnect
+### 2. Blueprint Cleanup on Disconnect ✅
 
-**File:** `servers/agent-coordinator/database.py`
-
-Add cleanup function:
-```python
-def delete_runner_blueprints(runner_id: str) -> int:
-    """Delete all blueprints bound to a runner. Returns count deleted."""
-```
+**Status:** Implemented
 
 **File:** `servers/agent-coordinator/services/runner_registry.py`
 
-On runner offline transition:
-1. Mark runner offline
-2. Call `delete_runner_blueprints(runner_id)`
-3. Broadcast blueprint removal events
+Blueprint cleanup handled by `_remove_runner_agents_unlocked()` called from `update_lifecycle()`.
 
-### 3. Session Orphan Handling
+On runner removal:
+1. Remove runner from registry
+2. Call `_remove_runner_agents_unlocked(runner_id)` - clears in-memory agent list
 
-**File:** `servers/agent-coordinator/services/runner_registry.py`
+### 3. Session Orphan Handling ✅
 
-When runner goes offline with running sessions:
+**Status:** Implemented
 
-1. Query sessions with `runner_id` and `status='running'`
-2. Mark each session as `status='failed'`
+**Files:**
+- `servers/agent-coordinator/database.py` - `fail_runs_on_runner_disconnect()`
+- `servers/agent-coordinator/main.py` - `runner_lifecycle_task()`
+
+When runner is removed with active runs:
+1. Query runs with `runner_id` and `status IN ('running', 'claimed')`
+2. Mark each run as `status='failed'`
 3. Set error: `"Runner disconnected during execution"`
-4. Trigger callbacks for `async_callback` mode sessions
+4. Update session status to `'failed'`
+5. Broadcast `RUN_FAILED` event via SSE
+6. Trigger callbacks for `async_callback` mode runs
 
-**Failure event:**
-```json
-{
-  "session_id": "ses_abc123",
-  "status": "failed",
-  "error": "Runner disconnected during execution",
-  "result_text": null
-}
-```
+### 4. Callback on Orphan ✅
 
-### 4. Callback on Orphan
+**Status:** Implemented
 
-**File:** `servers/agent-coordinator/services/callback_processor.py`
+**Files:**
+- `servers/agent-coordinator/main.py` - `runner_lifecycle_task()`
+- `servers/agent-coordinator/services/callback_processor.py`
 
 Orphaned sessions trigger failure callbacks:
-- Use `CALLBACK_FAILED_PROMPT_TEMPLATE` (lines 47-53)
+- Uses `CALLBACK_FAILED_PROMPT_TEMPLATE`
 - Parent agent receives failure notification
 - Parent can decide whether to retry
 
@@ -81,38 +78,52 @@ Orphaned sessions trigger failure callbacks:
 - Idempotency is application-specific
 - Orchestrator should decide retry strategy
 
-### 5. Blueprint Name Collision Handling
+### 5. Blueprint Name Collision Handling ✅
 
-**File:** `servers/agent-coordinator/main.py` or `database.py`
+**Status:** Implemented (rejection approach)
 
-When multiple runners register blueprints with the same name:
+**Files:**
+- `servers/agent-coordinator/services/runner_registry.py` - `AgentNameCollisionError`, `store_runner_agents()`
+- `servers/agent-coordinator/main.py` - Error handling in `register_runner()` endpoint
 
-| Registration Order | Stored Name |
-|--------------------|-------------|
-| First `web-crawler` | `web-crawler` |
-| Second `web-crawler` (runner `lnch_abc123`) | `web-crawler@lnch_abc123` |
+**Approach:** Reject registration on collision (first runner wins)
 
-**Implementation:**
-1. On blueprint insert, check if name exists
-2. If exists and different runner: Append `@{runner_id}` suffix
-3. Store both original name and stored name
-4. Runner is unaware of suffix (uses original name internally)
+When a runner tries to register an agent name that's already registered by another runner:
+1. Registration is rejected with HTTP 409 Conflict
+2. Error includes: agent name, existing runner ID
+3. The runner that registered first keeps the name
 
-**Lookup logic:**
-- First try exact match
-- Then try `{name}@{runner_id}` for the requesting runner
-- Error if ambiguous (same name from multiple runners, no qualifier)
+**Why rejection instead of @suffix:**
+- External clients always get predictable behavior (no hidden renaming)
+- No ambiguity in routing - each agent name maps to exactly one runner
+- Runner and coordinator agree on the name
+- Simpler implementation, no complex lookup logic
+- Forces users to resolve naming conflicts upfront
 
-### 6. Run Failure on Missing Blueprint
+**Error response:**
+```json
+{
+  "error": "agent_name_collision",
+  "message": "Agent 'web-crawler' is already registered by runner 'lnch_abc123'",
+  "agent_name": "web-crawler",
+  "existing_runner_id": "lnch_abc123"
+}
+```
+
+**Note:** Re-registration of the same runner with the same agents is allowed (replaces existing agents).
+
+### 6. Run Failure on Missing Blueprint ✅
+
+**Status:** Implemented (via timeout mechanism)
 
 **File:** `servers/agent-coordinator/services/run_queue.py`
 
 If a run is created for a blueprint that becomes unavailable:
 1. Run remains pending (no runner can claim)
-2. After timeout: Mark run as failed
-3. Error: `"No runner available for blueprint: {name}"`
+2. After timeout: Mark run as failed via `run_timeout_task()` in main.py
+3. Error: `"No matching runner available within timeout"`
 
-Consider: Fail-fast if blueprint doesn't exist at run creation time.
+Note: Fail-fast at run creation time is not implemented (would require checking blueprint existence).
 
 ---
 
@@ -122,10 +133,9 @@ Consider: Fail-fast if blueprint doesn't exist at run creation time.
 t=0      Runner registers, blueprints stored
 t=30s    Heartbeat received ✓
 t=60s    Heartbeat received ✓
-t=90s    No heartbeat → mark "stale" (warning)
-t=120s   No heartbeat
-t=150s   No heartbeat
-t=180s   No heartbeat → mark "offline"
+t=120s   No heartbeat → mark "stale" (warning)
+...
+t=600s   No heartbeat → runner removed
          → Delete blueprints
          → Fail running sessions
          → Trigger failure callbacks
@@ -133,14 +143,13 @@ t=180s   No heartbeat → mark "offline"
 
 ---
 
-## Files to Modify
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `servers/agent-coordinator/database.py` | `delete_runner_blueprints()`, orphan session query |
-| `servers/agent-coordinator/services/runner_registry.py` | Blueprint cleanup, session orphan handling |
-| `servers/agent-coordinator/services/callback_processor.py` | Handle orphan failure callbacks |
-| `servers/agent-coordinator/main.py` | Name collision handling on registration |
+| `servers/agent-coordinator/database.py` | `fail_runs_on_runner_disconnect()` |
+| `servers/agent-coordinator/services/runner_registry.py` | `AgentNameCollisionError`, collision check in `store_runner_agents()`, blueprint cleanup via `_remove_runner_agents_unlocked()` |
+| `servers/agent-coordinator/main.py` | `runner_lifecycle_task()` handles orphan runs and callbacks, `register_runner()` handles agent name collisions |
 
 ---
 
@@ -148,38 +157,32 @@ t=180s   No heartbeat → mark "offline"
 
 ### Runner Disconnect
 
-1. **Blueprints removed:**
+1. ✅ **Blueprints removed:**
    - Runner goes offline
    - Blueprints no longer appear in agent list
-   - Runs for those blueprints fail with "blueprint unavailable"
+   - Runs for those blueprints timeout with "No matching runner available within timeout"
 
-2. **Sessions failed:**
+2. ✅ **Sessions failed:**
    - Running session on disconnected runner → status='failed'
-   - Error message indicates runner disconnect
+   - Error message: "Runner disconnected during execution"
 
-3. **Callbacks triggered:**
-   - Parent agent receives failure callback
+3. ✅ **Callbacks triggered:**
+   - Parent agent receives failure callback for `async_callback` mode sessions
    - Callback includes error details
 
 ### Name Collisions
 
-4. **First registration wins:**
+4. ✅ **First registration wins (rejection approach):**
    - First runner registers `web-crawler` → stored as `web-crawler`
-   - Second runner registers `web-crawler` → stored as `web-crawler@runner_id`
+   - Second runner registers `web-crawler` → HTTP 409 rejection with error details
 
-5. **Qualified name works:**
-   ```bash
-   curl -X POST /runs -d '{"agent_name": "web-crawler@lnch_abc123", ...}'
-   # Routes to specific runner
-   ```
-
-6. **Unqualified name routes correctly:**
-   - If only one `web-crawler` exists → routes to it
-   - If multiple exist → error "ambiguous blueprint name"
+5. ✅ **No ambiguity:**
+   - Each agent name maps to exactly one runner
+   - External clients always get predictable behavior
 
 ### Retry Behavior
 
-7. **No auto-retry:**
+6. ✅ **No auto-retry:**
    - Orphaned session stays failed
    - Parent orchestrator can manually retry if desired
 
@@ -197,11 +200,11 @@ t=180s   No heartbeat → mark "offline"
    - Wait for timeout
    - Verify same cleanup as disconnect
 
-3. **Name collision:**
-   - Register runner A with `web-crawler`
-   - Register runner B with `web-crawler`
-   - Verify: Both stored with different names
-   - Verify: Lookup by qualified name works
+3. **Name collision (rejection):**
+   - Register runner A with `web-crawler` → Success
+   - Register runner B with `web-crawler` → HTTP 409 rejection
+   - Verify: Error includes agent name and existing runner ID
+   - Verify: Runner A's `web-crawler` still works
 
 4. **Orphan callback:**
    - Create async_callback session on runner
