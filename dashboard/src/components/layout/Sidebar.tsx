@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home, Zap, GitMerge, Puzzle, FlaskConical } from 'lucide-react';
+import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home, Zap, GitMerge, Puzzle, FlaskConical, Sliders } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Blueprints' },
   { to: '/capabilities', icon: <Puzzle className="w-5 h-5" />, label: 'Capabilities' },
   { to: '/runners', icon: <Server className="w-5 h-5" />, label: 'Agent Runners' },
+  { to: '/settings', icon: <Sliders className="w-5 h-5" />, label: 'Settings' },
 ];
 
 const experimentalItems: NavItem[] = [

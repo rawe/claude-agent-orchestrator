@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from '@/components/layout';
-import { Home, AgentSessions, Documents, AgentManager, Capabilities, Runners, Chat, Runs, UnifiedView } from '@/pages';
+import { Home, AgentSessions, Documents, AgentManager, Capabilities, Runners, Chat, Runs, UnifiedView, Settings } from '@/pages';
 
 export const router = createBrowserRouter([
   {
@@ -42,6 +42,10 @@ export const router = createBrowserRouter([
       {
         path: 'unified',
         element: <UnifiedView />,
+      },
+      {
+        path: 'settings',
+        element: <Settings />,
       },
     ],
   },

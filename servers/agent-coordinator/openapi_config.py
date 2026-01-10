@@ -104,6 +104,10 @@ OPENAPI_TAGS = [
         "description": "Service health checks.",
     },
     {
+        "name": "Config",
+        "description": "Configuration management - export and import agent blueprints and capabilities.",
+    },
+    {
         "name": "Events (Legacy)",
         "description": "Legacy event reception endpoint. Prefer using `/sessions/{session_id}/events` for new integrations.",
     },
@@ -299,3 +303,16 @@ class RunnerPollResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Health check response."""
     status: str = Field(default="healthy", description="Service health status")
+
+
+# ==============================================================================
+# Config Response Models
+# ==============================================================================
+
+class ConfigImportResponse(BaseModel):
+    """Response after importing configuration."""
+    message: str = Field(..., description="Success message")
+    agents_imported: int = Field(..., description="Number of agents imported")
+    capabilities_imported: int = Field(..., description="Number of capabilities imported")
+    agents_replaced: int = Field(..., description="Number of agents that were replaced")
+    capabilities_replaced: int = Field(..., description="Number of capabilities that were replaced")

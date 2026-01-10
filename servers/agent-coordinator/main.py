@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Query, Header, Request, Depends
+from fastapi import FastAPI, HTTPException, Query, Header, Request, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -9,6 +9,11 @@ import json
 import os
 import asyncio
 import uuid as uuid_module
+import tarfile
+import tempfile
+import shutil
+from io import BytesIO
+from pathlib import Path
 
 from database import (
     init_db, insert_event, get_sessions, get_events,
@@ -33,7 +38,7 @@ from openapi_config import (
     SessionStatusResponse, SessionDeleteResponse, EventListResponse,
     RunResponse, RunCreateResponse, RunListResponse,
     RunnerRegisterResponse, RunnerInfoResponse, RunnerListResponse, RunnerPollResponse,
-    HealthResponse
+    HealthResponse, ConfigImportResponse
 )
 import agent_storage
 from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError
@@ -1712,6 +1717,195 @@ async def stop_run(run_id: str):
         raise HTTPException(status_code=404, detail="Run not found")
 
     return await _stop_run(run)
+
+
+# ==============================================================================
+# Configuration Management Routes
+# ==============================================================================
+
+def _get_config_dir() -> Path:
+    """Get the parent config directory containing agents and capabilities."""
+    agents_dir = agent_storage.get_agents_dir()
+    return agents_dir.parent
+
+
+@app.get(
+    "/config/export",
+    tags=["Config"],
+    summary="Export configuration archive",
+    responses={
+        200: {
+            "description": "Configuration archive (tar.gz)",
+            "content": {"application/gzip": {}}
+        }
+    }
+)
+async def export_config():
+    """Export current configuration as a compressed tar.gz archive.
+
+    Downloads the complete configuration including all agent blueprints
+    and capabilities. The archive preserves the directory structure:
+    - agents/ - Agent blueprint directories
+    - capabilities/ - Capability directories
+
+    Use the /config/import endpoint to restore this configuration.
+    """
+    config_dir = _get_config_dir()
+    agents_dir = config_dir / "agents"
+    capabilities_dir = config_dir / "capabilities"
+
+    # Create tar.gz in memory
+    buffer = BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        # Add agents directory if it exists
+        if agents_dir.exists():
+            for item in agents_dir.iterdir():
+                if item.is_dir():
+                    tar.add(item, arcname=f"agents/{item.name}")
+
+        # Add capabilities directory if it exists
+        if capabilities_dir.exists():
+            for item in capabilities_dir.iterdir():
+                if item.is_dir():
+                    tar.add(item, arcname=f"capabilities/{item.name}")
+
+    buffer.seek(0)
+
+    # Generate filename with timestamp
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    filename = f"config-{timestamp}.tar.gz"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
+@app.post(
+    "/config/import",
+    tags=["Config"],
+    summary="Import configuration archive",
+    response_model=ConfigImportResponse
+)
+async def import_config(file: UploadFile = File(..., description="Configuration archive (tar.gz)")):
+    """Import configuration from a tar.gz archive.
+
+    WARNING: This operation REPLACES all existing agents and capabilities.
+    The current configuration will be completely overwritten.
+
+    The archive must contain:
+    - agents/ directory with agent blueprint subdirectories
+    - capabilities/ directory with capability subdirectories (optional)
+
+    Each agent directory must contain at minimum an agent.json file.
+    Each capability directory must contain at minimum a capability.json file.
+    """
+    # Validate file type
+    if not file.filename or not (file.filename.endswith('.tar.gz') or file.filename.endswith('.tgz')):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a .tar.gz or .tgz file."
+        )
+
+    config_dir = _get_config_dir()
+    agents_dir = config_dir / "agents"
+    capabilities_dir = config_dir / "capabilities"
+
+    # Count existing items before replacement
+    agents_replaced = len([d for d in agents_dir.iterdir() if d.is_dir()]) if agents_dir.exists() else 0
+    capabilities_replaced = len([d for d in capabilities_dir.iterdir() if d.is_dir()]) if capabilities_dir.exists() else 0
+
+    # Read uploaded file
+    contents = await file.read()
+
+    # Create temp directory for extraction and validation
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Extract to temp directory
+        try:
+            with tarfile.open(fileobj=BytesIO(contents), mode="r:gz") as tar:
+                # Security check: prevent path traversal
+                for member in tar.getmembers():
+                    if member.name.startswith('/') or '..' in member.name:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Invalid archive: contains unsafe paths"
+                        )
+                tar.extractall(temp_path)
+        except tarfile.TarError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid tar.gz file: {str(e)}"
+            )
+
+        # Validate structure
+        temp_agents_dir = temp_path / "agents"
+        temp_capabilities_dir = temp_path / "capabilities"
+
+        if not temp_agents_dir.exists() and not temp_capabilities_dir.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid archive: must contain 'agents/' and/or 'capabilities/' directory"
+            )
+
+        # Count items to import
+        agents_imported = 0
+        capabilities_imported = 0
+
+        if temp_agents_dir.exists():
+            for item in temp_agents_dir.iterdir():
+                if item.is_dir() and (item / "agent.json").exists():
+                    agents_imported += 1
+
+        if temp_capabilities_dir.exists():
+            for item in temp_capabilities_dir.iterdir():
+                if item.is_dir() and (item / "capability.json").exists():
+                    capabilities_imported += 1
+
+        if agents_imported == 0 and capabilities_imported == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid archive: no valid agents or capabilities found"
+            )
+
+        # Clear existing directories and copy new content
+        if temp_agents_dir.exists():
+            # Clear existing agents
+            if agents_dir.exists():
+                for item in agents_dir.iterdir():
+                    if item.is_dir():
+                        shutil.rmtree(item)
+
+            # Copy new agents
+            agents_dir.mkdir(parents=True, exist_ok=True)
+            for item in temp_agents_dir.iterdir():
+                if item.is_dir():
+                    shutil.copytree(item, agents_dir / item.name)
+
+        if temp_capabilities_dir.exists():
+            # Clear existing capabilities
+            if capabilities_dir.exists():
+                for item in capabilities_dir.iterdir():
+                    if item.is_dir():
+                        shutil.rmtree(item)
+
+            # Copy new capabilities
+            capabilities_dir.mkdir(parents=True, exist_ok=True)
+            for item in temp_capabilities_dir.iterdir():
+                if item.is_dir():
+                    shutil.copytree(item, capabilities_dir / item.name)
+
+    return ConfigImportResponse(
+        message="Configuration imported successfully",
+        agents_imported=agents_imported,
+        capabilities_imported=capabilities_imported,
+        agents_replaced=agents_replaced,
+        capabilities_replaced=capabilities_replaced
+    )
 
 
 if __name__ == "__main__":

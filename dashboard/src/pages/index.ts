@@ -7,3 +7,4 @@ export { Chat } from './Chat';
 export { Runners } from './Runners';
 export { Runs } from './Runs';
 export { UnifiedView } from './UnifiedView';
+export { Settings } from './Settings';
