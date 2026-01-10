@@ -59,7 +59,7 @@ function RunnerCard({ runner, isDeregistering, onDeregister }: RunnerCardProps) 
   const projectFolder = runner.project_dir ? getLastPathSegment(runner.project_dir) : null;
   const statusConfig = getStatusConfig(runner.status, isDeregistering);
   const StatusIcon = statusConfig.icon;
-  const hasExecutorDetails = runner.executor && (runner.executor.command || runner.executor.config);
+  const hasExecutorDetails = runner.executor && (runner.executor.command || runner.executor.config || runner.executor.agents_dir);
 
   return (
     <div
@@ -139,11 +139,19 @@ function RunnerCard({ runner, isDeregistering, onDeregister }: RunnerCardProps) 
                   </div>
                 )}
                 {runner.executor.config && Object.keys(runner.executor.config).length > 0 && (
-                  <div>
+                  <div className="mb-2">
                     <span className="text-gray-500 font-medium">Config:</span>
                     <pre className="mt-1 p-2 bg-gray-900 text-gray-100 rounded overflow-x-auto text-[10px] leading-relaxed">
                       {JSON.stringify(runner.executor.config, null, 2)}
                     </pre>
+                  </div>
+                )}
+                {runner.executor.agents_dir && (
+                  <div>
+                    <span className="text-gray-500 font-medium">Agents Dir:</span>
+                    <code className="ml-1 text-gray-700 bg-gray-100 px-1 py-0.5 rounded break-all">
+                      {runner.executor.agents_dir}
+                    </code>
                   </div>
                 )}
               </div>

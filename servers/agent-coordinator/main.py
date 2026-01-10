@@ -1318,7 +1318,7 @@ class RunnerWithStatus(BaseModel):
     hostname: str
     project_dir: str
     executor_profile: str
-    executor: dict = {}  # Executor details (type, command, config)
+    executor: dict = {}  # Executor details (type, command, config, agents_dir)
     tags: list[str] = []  # Capability tags (ADR-011)
     require_matching_tags: bool = False  # If true, only accept runs with matching tags
     status: str  # "online" or "stale"
@@ -1546,13 +1546,28 @@ async def create_run(run_create: RunCreate):
     if run_create.additional_demands:
         additional_demands = RunnerDemands(**run_create.additional_demands)
 
-    # Merge demands: runner_owner (highest priority) + affinity + blueprint + additional
+    # Determine required executor type based on agent type
+    # This ensures procedural runners only claim procedural agent runs
+    # and autonomous runners only claim autonomous agent runs (or runs without agent_name)
+    if agent:
+        required_executor_type = agent.type  # "autonomous" or "procedural"
+    else:
+        # No agent specified - default to autonomous (AI agents)
+        required_executor_type = "autonomous"
+
+    # Create executor_type demand
+    executor_type_demands = RunnerDemands(executor_type=required_executor_type)
+
+    # Merge demands: runner_owner (highest priority) + affinity + blueprint + executor_type + additional
     # Runner owner demands take precedence for procedural agents
     # Affinity takes precedence for resume runs
     merged_demands = RunnerDemands.merge(
         RunnerDemands.merge(
-            RunnerDemands.merge(runner_owner_demands, affinity_demands),
-            blueprint_demands
+            RunnerDemands.merge(
+                RunnerDemands.merge(runner_owner_demands, affinity_demands),
+                blueprint_demands
+            ),
+            executor_type_demands
         ),
         additional_demands
     )

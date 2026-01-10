@@ -175,6 +175,7 @@ class DemandFields:
     HOSTNAME = "hostname"
     PROJECT_DIR = "project_dir"
     EXECUTOR_PROFILE = "executor_profile"
+    EXECUTOR_TYPE = "executor_type"  # Must match agent type: "autonomous" | "procedural"
     TAGS = "tags"
 
 
@@ -216,6 +217,14 @@ def capabilities_satisfy_demands(
     demanded_executor_profile = demands.get(DemandFields.EXECUTOR_PROFILE)
     if demanded_executor_profile and runner.executor_profile != demanded_executor_profile:
         return False
+
+    # Executor type demand - must match runner's executor type (autonomous/procedural)
+    # This ensures procedural runners only claim procedural agent runs
+    demanded_executor_type = demands.get(DemandFields.EXECUTOR_TYPE)
+    if demanded_executor_type:
+        runner_executor_type = runner.executor.get("type") if runner.executor else None
+        if runner_executor_type != demanded_executor_type:
+            return False
 
     # Tag demands - runner must have ALL demanded tags
     demanded_tags = demands.get(DemandFields.TAGS, [])

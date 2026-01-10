@@ -34,6 +34,7 @@ import socket
 import time
 import threading
 import logging
+from dataclasses import asdict
 from pathlib import Path
 
 # Configure UTF-8 encoding for Windows console (handles emojis in subprocess output)
@@ -202,8 +203,9 @@ class Runner:
         logger.info(f"Connecting to Agent Coordinator at {self.config.agent_coordinator_url}")
 
         # Determine executor info for registration
+        # Use asdict() to serialize all profile fields except 'name' (sent as executor_profile)
         if self.config.profile:
-            executor = self.config.profile.to_dict()
+            executor = {k: v for k, v in asdict(self.config.profile).items() if k != "name"}
         else:
             # Default: no profile specified
             executor = {

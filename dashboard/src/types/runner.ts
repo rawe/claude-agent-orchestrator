@@ -7,6 +7,7 @@ export interface ExecutorDetails {
   args?: string[];
   working_dir?: string;
   config?: Record<string, unknown>;  // Arbitrary executor-specific configuration
+  agents_dir?: string | null;        // Path to agents directory (for procedural executors)
 }
 
 export interface Runner {

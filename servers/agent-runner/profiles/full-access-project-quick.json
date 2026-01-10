@@ -1,5 +1,5 @@
 {
-  "type": "claude-code",
+  "type": "autonomous",
   "command": "executors/claude-code/ao-claude-code-exec",
   "config": {
     "permission_mode": "bypassPermissions",

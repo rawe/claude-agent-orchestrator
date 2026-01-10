@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Default executor path and type (used when no profile is specified)
 DEFAULT_EXECUTOR_PATH = "executors/claude-code/ao-claude-code-exec"
-DEFAULT_EXECUTOR_TYPE = "claude-code"
+DEFAULT_EXECUTOR_TYPE = "autonomous"
 
 
 def get_runner_dir() -> Path:
@@ -52,10 +52,10 @@ class ExecutorProfile:
 
     Attributes:
         name: Profile name (e.g., "coding") - derived from filename
-        type: Executor type (e.g., "claude-code") - for coordinator visibility
+        type: Executor type (e.g., "autonomous" or "procedural") - for coordinator visibility
         command: Relative path to executor script from agent-runner dir
         config: Executor-specific configuration (passed as-is to executor)
-        agents_dir: Optional path to agents directory (runner-local, NOT sent to coordinator)
+        agents_dir: Optional path to agents directory (relative to runner dir)
     """
 
     name: str
@@ -63,19 +63,6 @@ class ExecutorProfile:
     command: str
     config: dict[str, Any]
     agents_dir: Optional[str] = None  # Path to agents directory (relative to runner dir)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for registration payload.
-
-        Note: agents_dir is intentionally excluded - it's runner-local.
-        Loaded agents are sent separately in registration.
-        """
-        return {
-            "type": self.type,
-            "command": self.command,
-            "config": self.config,
-            # agents_dir NOT included - runner-local property
-        }
 
 
 def get_profiles_dir() -> Path:

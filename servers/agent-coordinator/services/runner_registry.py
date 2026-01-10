@@ -27,7 +27,7 @@ class DuplicateRunnerError(Exception):
         )
 
 
-def derive_runner_id(hostname: str, project_dir: str, executor_profile: str) -> str:
+def derive_runner_id(hostname: str, project_dir: str, executor_profile: str, executor_command: str) -> str:
     """
     Deterministically derive runner_id from identifying properties.
 
@@ -38,12 +38,13 @@ def derive_runner_id(hostname: str, project_dir: str, executor_profile: str) -> 
         hostname: The machine hostname where the runner is running
         project_dir: The default project directory for this runner
         executor_profile: The executor profile name (e.g., 'coding', 'research')
+        executor_command: The executor command path (ensures uniqueness across profiles)
 
     Returns:
         Runner ID in format: lnch_{sha256_hash[:12]}
     """
-    # Normalize inputs
-    key = f"{hostname}:{project_dir}:{executor_profile}"
+    # Normalize inputs - include command to ensure uniqueness even with same executor type
+    key = f"{hostname}:{project_dir}:{executor_profile}:{executor_command}"
 
     # Generate deterministic hash
     hash_hex = hashlib.sha256(key.encode()).hexdigest()
@@ -68,7 +69,7 @@ class RunnerInfo(BaseModel):
     project_dir: str
     executor_profile: str
     # Executor details
-    executor: dict = {}  # {type, command, config}
+    executor: dict = {}  # {type, command, config, agents_dir}
     # Capabilities (features the runner offers)
     tags: list[str] = []
     require_matching_tags: bool = False  # If true, only accept runs with matching tags
@@ -117,8 +118,11 @@ class RunnerRegistry:
         Raises:
             DuplicateRunnerError: If an online runner with the same identity already exists
         """
-        # Derive deterministic runner_id from properties
-        runner_id = derive_runner_id(hostname, project_dir, executor_profile)
+        # Extract executor command for runner ID derivation
+        executor_command = executor.get("command", "") if executor else ""
+
+        # Derive deterministic runner_id from properties (including command for uniqueness)
+        runner_id = derive_runner_id(hostname, project_dir, executor_profile, executor_command)
         now = datetime.now(timezone.utc).isoformat()
 
         with self._lock:

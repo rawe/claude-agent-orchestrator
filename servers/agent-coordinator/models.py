@@ -213,6 +213,7 @@ class RunnerDemands(BaseModel):
     hostname: Optional[str] = None
     project_dir: Optional[str] = None
     executor_profile: Optional[str] = None
+    executor_type: Optional[str] = None  # Must match: "autonomous" | "procedural"
     # Capability demands (must have ALL)
     tags: List[str] = []
 
@@ -222,6 +223,7 @@ class RunnerDemands(BaseModel):
             self.hostname is None
             and self.project_dir is None
             and self.executor_profile is None
+            and self.executor_type is None
             and len(self.tags) == 0
         )
 
@@ -242,6 +244,7 @@ class RunnerDemands(BaseModel):
             hostname=blueprint.hostname or additional.hostname,
             project_dir=blueprint.project_dir or additional.project_dir,
             executor_profile=blueprint.executor_profile or additional.executor_profile,
+            executor_type=blueprint.executor_type or additional.executor_type,
             # Tags are always additive (union)
             tags=list(set(blueprint.tags) | set(additional.tags)),
         )
