@@ -6,10 +6,40 @@ import { useNotification, useSSE, useChat, useSessions } from '@/contexts';
 import { Button, Spinner, Dropdown } from '@/components/common';
 import type { DropdownOption } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
-import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square } from 'lucide-react';
+import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ToolCall } from '@/contexts/ChatContext';
+
+// Helper to check if an agent requires custom input (has parameters_schema)
+function hasCustomInputSchema(agent: Agent | undefined): boolean {
+  return agent?.parameters_schema != null;
+}
+
+// Helper to extract required fields from a JSON Schema
+function getSchemaRequiredFields(schema: Record<string, unknown> | null): string[] {
+  if (!schema) return [];
+  const required = schema.required;
+  if (Array.isArray(required)) {
+    return required.filter((r): r is string => typeof r === 'string');
+  }
+  return [];
+}
+
+// Helper to get property descriptions from schema
+function getSchemaPropertyInfo(schema: Record<string, unknown> | null): Array<{name: string, type: string, description?: string, required: boolean}> {
+  if (!schema) return [];
+  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  const required = getSchemaRequiredFields(schema);
+  if (!properties) return [];
+
+  return Object.entries(properties).map(([name, prop]) => ({
+    name,
+    type: (prop.type as string) || 'unknown',
+    description: prop.description as string | undefined,
+    required: required.includes(name),
+  }));
+}
 
 // Use ToolCall type from context (imported as ToolCall)
 
@@ -225,6 +255,15 @@ export function Chat() {
   const [isStopping, setIsStopping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Get the selected blueprint object (not just the name)
+  const selectedBlueprintObj = blueprints.find(bp => bp.name === state.selectedBlueprint);
+
+  // Check if selected agent has a custom input schema (not prompt-based)
+  const requiresCustomInput = hasCustomInputSchema(selectedBlueprintObj);
+  const customSchemaInfo = requiresCustomInput
+    ? getSchemaPropertyInfo(selectedBlueprintObj?.parameters_schema ?? null)
+    : [];
 
   // Load blueprints on mount
   useEffect(() => {
@@ -566,16 +605,68 @@ export function Chat() {
           />
         </div>
 
+        {/* Custom Schema Warning Banner */}
+        {requiresCustomInput && state.mode === 'new' && (
+          <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-medium text-amber-800">
+                  This agent requires structured input
+                </h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  <strong>{selectedBlueprintObj?.name}</strong> cannot be started from the chat interface
+                  because it requires specific parameters instead of a text prompt.
+                </p>
+                {customSchemaInfo.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-amber-800 uppercase tracking-wide mb-2">
+                      Required Parameters:
+                    </p>
+                    <ul className="space-y-1">
+                      {customSchemaInfo.map((field) => (
+                        <li key={field.name} className="text-sm text-amber-700 flex items-baseline gap-2">
+                          <code className="px-1.5 py-0.5 bg-amber-100 rounded text-xs font-mono">
+                            {field.name}
+                          </code>
+                          <span className="text-xs text-amber-600">({field.type})</span>
+                          {field.required && (
+                            <span className="text-xs text-red-600 font-medium">required</span>
+                          )}
+                          {field.description && (
+                            <span className="text-xs text-amber-600">— {field.description}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-xs text-amber-600 mt-3">
+                  Use the API directly to start this agent with the required parameters.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Input Area */}
         <div className="p-4">
-          <div className="relative border border-gray-300 rounded-xl focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent transition-all">
+          <div className={`relative border rounded-xl transition-all ${
+            requiresCustomInput && state.mode === 'new'
+              ? 'border-gray-200 bg-gray-50'
+              : 'border-gray-300 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent'
+          }`}>
             <textarea
               ref={inputRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
-              disabled={state.isLoading}
+              placeholder={
+                requiresCustomInput && state.mode === 'new'
+                  ? 'Select a different agent or use the API for this agent...'
+                  : 'Type your message... (Press Enter to send, Shift+Enter for new line)'
+              }
+              disabled={state.isLoading || (requiresCustomInput && state.mode === 'new')}
               rows={3}
               className="w-full px-4 py-3 pr-14 text-sm rounded-xl resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
             />
@@ -591,9 +682,9 @@ export function Chat() {
             ) : (
               <button
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim() || state.isLoading || !connected}
+                disabled={!inputValue.trim() || state.isLoading || !connected || (requiresCustomInput && state.mode === 'new')}
                 className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
-                title="Send message"
+                title={requiresCustomInput && state.mode === 'new' ? 'This agent requires structured input' : 'Send message'}
               >
                 <Send className="w-5 h-5" />
               </button>
