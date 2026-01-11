@@ -10,8 +10,8 @@ The central coordination server (port 8765) that manages sessions, runs, bluepri
 ### Agent Runner
 Execution bridge that polls for runs and spawns agent processes. See [ARCHITECTURE.md](../ARCHITECTURE.md#agent-runner-architecture) for architecture details and the main [servers/agent-runner/README.md](../../servers/agent-runner/README.md) for usage.
 
-### Context Store
-Document synchronization server (port 8766) for sharing context between agents. See [servers/context-store/README.md](../../servers/context-store/README.md).
+### [context-store/](./context-store/README.md)
+Document management system (port 8766) for persistent context sharing between agent sessions. Includes server architecture, CLI commands reference, and MCP server integration.
 
 ## Client Components
 
