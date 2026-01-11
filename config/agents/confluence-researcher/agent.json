@@ -1,13 +1,9 @@
 {
   "name": "confluence-researcher",
-  "description": "Researches Confluence to answer questions. Performs iterative search and analysis, then produces a concise answer with documented JSON sources. Long-running task - use callback mode for production.",
+  "description": "Researches Confluence to answer questions. Performs iterative search and analysis, produces concise answer with documented sources.",
   "type": "autonomous",
-  "tags": [
-    "internal",
-    "research",
-    "atlassian",
-    "confluence"
-  ],
+  "tags": ["internal", "research", "atlassian", "confluence"],
+  "capabilities": ["atlassian", "context-store"],
   "parameters_schema": {
     "type": "object",
     "required": ["question"],
@@ -19,7 +15,7 @@
       },
       "working_folder": {
         "type": "string",
-        "description": "Folder path for results. Auto-generated if omitted."
+        "description": "Folder path for results. Auto-generated as research-results/[date]-[topic] if omitted."
       }
     },
     "additionalProperties": false

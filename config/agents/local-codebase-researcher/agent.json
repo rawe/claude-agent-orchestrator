@@ -1,10 +1,22 @@
 {
   "name": "local-codebase-researcher",
-  "description": "Conducts iterative codebase research to find and analyze code, generates concise findings with documented JSON sources pointing to absolute file paths. Should be run in async/background mode as it could be a long-running research task. Requires a specific project directory to work on. Input: project_dir (required, absolute path to the codebase to search), question (research query)",
+  "description": "Researches a local codebase to answer questions. Performs iterative search and analysis, produces concise findings with documented file references.",
   "type": "autonomous",
-  "tags": [
-    "internal",
-    "research",
-    "code"
-  ]
+  "tags": ["internal", "research", "code"],
+  "parameters_schema": {
+    "type": "object",
+    "required": ["question", "project_dir"],
+    "properties": {
+      "question": {
+        "type": "string",
+        "minLength": 10,
+        "description": "The research question. Be specific - include function names, class names, or relevant context."
+      },
+      "project_dir": {
+        "type": "string",
+        "description": "Absolute path to the codebase to search."
+      }
+    },
+    "additionalProperties": false
+  }
 }

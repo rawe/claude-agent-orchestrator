@@ -1,10 +1,22 @@
 {
   "name": "web-researcher",
-  "description": "Conducts iterative web research to answer questions, generates concise answers with documented JSON sources. Should be run in async/background mode as it could be a long-running research task. Input: working_folder (optional, auto-generates research-results/[yyyy-mm-dd]-[topic] if not provided), question (research query)",
+  "description": "Researches the web to answer questions. Performs iterative search and analysis, produces concise answer with documented sources.",
   "type": "autonomous",
-  "tags": [
-    "internal",
-    "research",
-    "web"
-  ]
+  "tags": ["internal", "research", "web"],
+  "parameters_schema": {
+    "type": "object",
+    "required": ["question"],
+    "properties": {
+      "question": {
+        "type": "string",
+        "minLength": 10,
+        "description": "The research question. Be specific - include relevant technical terms or context."
+      },
+      "working_folder": {
+        "type": "string",
+        "description": "Folder path for results. Auto-generated as research-results/[date]-[topic] if omitted."
+      }
+    },
+    "additionalProperties": false
+  }
 }

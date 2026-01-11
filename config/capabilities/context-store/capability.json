@@ -1,0 +1,4 @@
+{
+  "name": "context-store",
+  "description": "Provides access to shared context storage for research results and artifacts"
+}

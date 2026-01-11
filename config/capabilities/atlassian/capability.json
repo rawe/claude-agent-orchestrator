@@ -1,0 +1,4 @@
+{
+  "name": "atlassian",
+  "description": "Provides access to Atlassian suite (Confluence, Jira) via MCP server"
+}

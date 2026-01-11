@@ -1,11 +1,23 @@
 {
   "name": "jira-researcher",
-  "description": "Conducts iterative Jira research to answer questions using JQL queries, generates concise answers with documented JSON sources. Should be run in async/background mode as it could be a long-running research task. Input: working_folder (optional, auto-generates research-results/[yyyy-mm-dd]-[topic] if not provided), question (research query)",
+  "description": "Researches Jira to answer questions. Performs iterative JQL-based search and analysis, produces concise answer with documented sources.",
   "type": "autonomous",
-  "tags": [
-    "internal",
-    "research",
-    "atlassian",
-    "jira"
-  ]
+  "tags": ["internal", "research", "atlassian", "jira"],
+  "capabilities": ["atlassian", "context-store"],
+  "parameters_schema": {
+    "type": "object",
+    "required": ["question"],
+    "properties": {
+      "question": {
+        "type": "string",
+        "minLength": 10,
+        "description": "The research question. Be specific - include project keys, issue types, or relevant context."
+      },
+      "working_folder": {
+        "type": "string",
+        "description": "Folder path for results. Auto-generated as research-results/[date]-[topic] if omitted."
+      }
+    },
+    "additionalProperties": false
+  }
 }

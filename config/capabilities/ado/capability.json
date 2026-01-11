@@ -1,0 +1,4 @@
+{
+  "name": "ado",
+  "description": "Provides access to Azure DevOps via MCP server"
+}
