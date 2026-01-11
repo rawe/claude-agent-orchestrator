@@ -322,7 +322,7 @@ ALTER TABLE sessions ADD COLUMN output_schema TEXT;     -- Schema used (for refe
 
 **Minimal changes required.** The schema enforcement happens at the coordinator level, after the executor reports completion. The executor continues to:
 1. Run the session with the (enriched) prompt
-2. Report result via `session_stop` event
+2. Report result via `run_completed` event
 3. Coordinator handles validation and retry
 
 **Optional executor awareness:** Executors could receive schema hints for native support:

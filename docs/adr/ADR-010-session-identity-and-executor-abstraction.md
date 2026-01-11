@@ -1,6 +1,6 @@
 # ADR-010: Session Identity and Executor Abstraction
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-12-18
 **Decision Makers:** Architecture Review
 **Supersedes:** Portions of ADR-001 (session_name as linking key)

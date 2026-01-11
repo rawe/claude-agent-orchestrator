@@ -228,7 +228,7 @@ For callbacks to work, child agents must know their parent's identity. This requ
    → ao-start reads AGENT_SESSION_NAME=orchestrator
    → Child session created with parent_session_name=orchestrator
 
-4. Child completes (session_stop event)
+4. Child completes (run_completed event)
    → Callback Processor checks: does child have parent_session_name?
    → Yes: parent_session_name=orchestrator
    → Create resume run for "orchestrator"
@@ -727,7 +727,7 @@ The Agent Runner enables the following callback flow:
    └─► ao-start reads AGENT_SESSION_NAME from env
    └─► Child session created with parent_session_name=orchestrator
 
-3. Child agent completes (session_stop event)
+3. Child agent completes (run_completed event)
    └─► Callback Processor detects completion
    └─► Checks: does child have parent_session_name? → Yes
 
@@ -781,7 +781,7 @@ All callback triggers are now unified in the Runner API endpoints, providing a c
 - The agent runner's supervisor monitors executor processes
 - When a process exits, the appropriate endpoint is called (completed/failed/stopped)
 - The coordinator updates run and session status, then triggers callbacks if applicable
-- Executors no longer send lifecycle events (session_start, session_stop) - this is handled by the runner
+- Executors no longer send lifecycle events (run_start, run_completed) - this is handled by the runner
 
 ## Implementation Plan
 
@@ -892,16 +892,16 @@ All callback triggers are now unified in the Runner API endpoints, providing a c
 **Files to modify:** `servers/agent-coordinator/`
 
 1. **Implement Callback Processor**
-   - Called directly from Sessions API when `session_stop` event is received (synchronous function call)
+   - Called directly from Sessions API when `run_completed` event is received (synchronous function call)
    - Maintains in-memory notification queue (dict keyed by parent session name)
    - Check if session has `parent_session_name`
    - Check parent session status (must be `finished` = idle)
    - If parent is idle: create resume_session run immediately
    - If parent is still running: add to notification queue
-   - When parent's own `session_stop` event arrives: check queue and create aggregated resume run
+   - When parent's own `run_completed` event arrives: check queue and create aggregated resume run
 
 2. **Wire into session events**
-   - Sessions API calls Callback Processor directly on `session_stop` events
+   - Sessions API calls Callback Processor directly on `run_completed` events
    - Generate resume message: "Child session X completed..."
 
 ## File Structure (Proposed)

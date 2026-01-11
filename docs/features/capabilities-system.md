@@ -685,29 +685,12 @@ When the schema changes, update the capability once - all agents get the change 
 - All MCP configuration should come from capabilities
 - Agent-level `agent.mcp.json` becomes deprecated
 
-## Implementation Checklist
+## Implementation
 
-### Backend (Agent Coordinator)
+This feature is **implemented**. For detailed implementation breakdown, see [Work Packages](./capabilities-system/README.md).
 
-- [x] Capability storage module (`capability_storage.py`)
-- [x] Capability models and validation
-- [x] Capability CRUD API endpoints
-- [x] Agent model update (add `capabilities` field)
-- [x] Capability resolution and merging logic
-- [x] Conflict detection (MCP server name collisions)
-- [x] Error handling for missing capabilities
-
-### Dashboard
-
-- [x] Capabilities service (`capabilityService.ts`)
-- [x] Capability TypeScript types
-- [x] Capabilities list page
-- [x] Capability create/edit form
-- [x] Agent edit form: capabilities multi-select
-- [ ] Preview panel for merged result (optional enhancement)
-
-### Documentation
+### Remaining Tasks
 
 - [ ] Update ARCHITECTURE.md with capabilities concept
-- [x] API documentation for /capabilities endpoints
 - [ ] Migration guide for existing agents
+- [ ] Preview panel for merged result (optional enhancement)

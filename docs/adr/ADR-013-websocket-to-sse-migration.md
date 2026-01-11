@@ -1,6 +1,6 @@
 # ADR-013: WebSocket to Server-Sent Events Migration
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-12-21
 **Decision Makers:** Architecture Review
 **Related:** [SSE Architecture](../architecture/sse-sessions.md)

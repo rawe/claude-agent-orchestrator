@@ -1,6 +1,6 @@
 # ADR-012: Runner Identity and Registration
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-12-18
 **Decision Makers:** Architecture Review
 **Related:** [ADR-011: Runner Capabilities and Run Demands](./ADR-011-runner-capabilities-and-run-demands.md)

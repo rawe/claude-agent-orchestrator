@@ -10,7 +10,7 @@ An ADR captures an important architectural decision along with its context and c
 
 Each ADR follows this structure:
 
-- **Status:** Proposed | Accepted | Deprecated | Superseded
+- **Status:** Proposed | Accepted | Partially Superseded | Deprecated | Superseded
 - **Date:** When the decision was made
 - **Context:** What prompted the decision
 - **Decision:** What was decided
@@ -19,23 +19,30 @@ Each ADR follows this structure:
 
 ## Index
 
-| ADR | Title | Status | Date |
-|-----|-------|--------|------|
-| [ADR-001](./ADR-001-run-session-separation.md) | Run and Session Separation | Accepted (Partially Superseded) | 2025-12-12 |
-| [ADR-002](./ADR-002-agent-runner-architecture.md) | Agent Runner Architecture | Accepted | 2025-12-12 |
-| [ADR-003](./ADR-003-callback-based-async.md) | Callback-Based Async for Agent Orchestration | Accepted | 2025-12-12 |
-| [ADR-004](./ADR-004-session-stop-command.md) | Session Stop Command with Event Signaling | Accepted | 2025-12-12 |
-| [ADR-005](./ADR-005-parent-session-context-propagation.md) | Parent Session Context Propagation | Accepted | 2025-12-12 |
-| [ADR-006](./ADR-006-runner-registration-health-monitoring.md) | Runner Registration with Health Monitoring | Superseded by ADR-012 | 2025-12-12 |
-| [ADR-007](./ADR-007-hybrid-hook-configuration.md) | Hybrid Hook Configuration | Accepted | 2025-12-12 |
-| [ADR-008](./ADR-008-concurrent-run-execution.md) | Concurrent Run Execution in Agent Runner | Accepted | 2025-12-12 |
-| [ADR-009](./ADR-009-agent-filtering-at-discovery.md) | Agent Filtering at Discovery Time | Accepted | 2025-12-12 |
-| [ADR-010](./ADR-010-session-identity-and-executor-abstraction.md) | Session Identity and Executor Abstraction | Proposed | 2025-12-18 |
-| [ADR-011](./ADR-011-runner-capabilities-and-run-demands.md) | Runner Capabilities and Run Demands | Proposed | 2025-12-18 |
-| [ADR-012](./ADR-012-runner-identity-and-registration.md) | Runner Identity and Registration | Proposed | 2025-12-18 |
-| [ADR-013](./ADR-013-websocket-to-sse-migration.md) | WebSocket to SSE Migration | Proposed | 2025-12-21 |
-| [ADR-014](./ADR-014-callback-message-format.md) | Callback Message Format with XML Tags | Proposed | 2026-01-06 |
-| [ADR-015](./ADR-015-autonomous-agent-input-schema.md) | Autonomous Agent Input Schema Handling | Proposed | 2026-01-10 |
+### Accepted
+
+| ADR | Title | Date | Notes |
+|-----|-------|------|-------|
+| [ADR-001](./ADR-001-run-session-separation.md) | Run and Session Separation | 2025-12-12 | Partially superseded by ADR-010 |
+| [ADR-002](./ADR-002-agent-runner-architecture.md) | Agent Runner Architecture | 2025-12-12 | |
+| [ADR-003](./ADR-003-callback-based-async.md) | Callback-Based Async for Agent Orchestration | 2025-12-12 | |
+| [ADR-004](./ADR-004-session-stop-command.md) | Session Stop Command with Event Signaling | 2025-12-12 | |
+| [ADR-005](./ADR-005-parent-session-context-propagation.md) | Parent Session Context Propagation | 2025-12-12 | |
+| [ADR-007](./ADR-007-hybrid-hook-configuration.md) | Hybrid Hook Configuration | 2025-12-12 | |
+| [ADR-008](./ADR-008-concurrent-run-execution.md) | Concurrent Run Execution in Agent Runner | 2025-12-12 | |
+| [ADR-009](./ADR-009-agent-filtering-at-discovery.md) | Agent Filtering at Discovery Time | 2025-12-12 | |
+| [ADR-010](./ADR-010-session-identity-and-executor-abstraction.md) | Session Identity and Executor Abstraction | 2025-12-18 | |
+| [ADR-011](./ADR-011-runner-capabilities-and-run-demands.md) | Runner Capabilities and Run Demands | 2025-12-18 | |
+| [ADR-012](./ADR-012-runner-identity-and-registration.md) | Runner Identity and Registration | 2025-12-18 | |
+| [ADR-013](./ADR-013-websocket-to-sse-migration.md) | WebSocket to SSE Migration | 2025-12-21 | |
+| [ADR-014](./ADR-014-callback-message-format.md) | Callback Message Format with XML Tags | 2026-01-06 | |
+| [ADR-015](./ADR-015-autonomous-agent-input-schema.md) | Autonomous Agent Input Schema Handling | 2026-01-10 | |
+
+### Superseded
+
+| ADR | Title | Superseded By | Date |
+|-----|-------|---------------|------|
+| [ADR-006](./ADR-006-runner-registration-health-monitoring.md) | Runner Registration with Health Monitoring | ADR-012 | 2025-12-12 |
 
 ## Creating a New ADR
 

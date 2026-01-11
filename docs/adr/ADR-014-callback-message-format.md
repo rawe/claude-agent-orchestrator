@@ -1,6 +1,6 @@
 # ADR-014: Callback Message Format with XML Tags
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-01-06
 **Decision Makers:** Architecture Review
 

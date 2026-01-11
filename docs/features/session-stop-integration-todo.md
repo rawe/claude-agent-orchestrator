@@ -229,7 +229,7 @@ When the runner terminates a process and reports `POST /runner/runs/{run_id}/sto
 In `report_run_stopped()` endpoint:
 1. Update session status to 'stopped'
 2. Broadcast `session_updated` SSE message
-3. Consider creating a `session_stop` event
+3. Consider creating a `run_stopped` event
 
 ```python
 @app.post("/runner/runs/{run_id}/stopped")

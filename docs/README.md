@@ -2,35 +2,41 @@
 
 This folder contains all project documentation organized by purpose and audience.
 
-## Getting Started
+## Start Here
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System overview, core terminology, and component structure. Start here to understand how the Agent Orchestrator works.
-- **[GETTING_STARTED.md](./GETTING_STARTED.md)** - Prerequisites, setup instructions, and quick start guide for local development.
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System overview, terminology, and component structure |
+| [GETTING_STARTED.md](./GETTING_STARTED.md) | Prerequisites and setup guide for local development |
 
-## Sections
+## Documentation Map
 
-### [adr/](./adr/README.md)
-Architecture Decision Records documenting significant technical decisions with context, rationale, and consequences. Consult these to understand *why* the system is designed the way it is and what alternatives were considered.
+### For Understanding the System
 
-### [architecture/](./architecture/)
-In-depth documentation for cross-cutting architectural concerns like authentication, real-time event streaming, and integration patterns between components.
+| Section | Purpose | When to Read |
+|---------|---------|--------------|
+| [architecture/](./architecture/) | Cross-cutting concerns (auth, SSE, MCP integration) | Understanding how components interact |
+| [adr/](./adr/README.md) | Why decisions were made | Understanding design rationale |
 
-### [refactoring/](./refactoring/README.md)
-Refactoring proposals, consistency fixes, and technical improvements. These are tracked tasks that improve code and documentation quality without adding new features.
+### For Using Features
 
-### [design/](./design/README.md)
-Feature specifications and detailed designs for planned capabilities. Documents here represent work in planning or early development stages.
+| Section | Purpose | When to Read |
+|---------|---------|--------------|
+| [features/](./features/README.md) | Implemented feature documentation | Learning what the system does |
+| [components/](./components/) | API docs, schemas, data models | Building integrations |
+| [setup/](./setup/) | Deployment guides | Configuring external services |
+| [reference/](./reference/) | Quick-reference specs | Looking up schemas/formats |
 
-### [features/](./features/README.md)
-Documentation for implemented features including Executor Profiles, Runner Gateway, Capabilities System, and Agent Management. Each document explains what a feature does, why it exists, and how it works.
+### For Contributors
 
-### [setup/](./setup/)
-Deployment and configuration guides for external services and infrastructure dependencies.
+| Section | Purpose | When to Read |
+|---------|---------|--------------|
+| [design/](./design/README.md) | Planned feature specifications | Before implementing new features |
+| [refactoring/](./refactoring/README.md) | Technical debt and improvements | Finding improvement opportunities |
 
-### [reference/](./reference/)
-Quick-reference documentation for schemas, formats, and specifications used across the system.
+## Quick Links
 
-## Component Documentation
-
-### [components/](./components/)
-Technical reference documentation for individual services and applications. Each component has its own folder with API docs, data models, and implementation details.
+- **Sessions & Runs**: [ARCHITECTURE.md](./ARCHITECTURE.md) → [features/](./features/)
+- **Authentication**: [architecture/auth-oidc.md](./architecture/auth-oidc.md)
+- **MCP Integration**: [architecture/mcp-runner-integration.md](./architecture/mcp-runner-integration.md)
+- **Capabilities System**: [features/capabilities-system.md](./features/capabilities-system.md)

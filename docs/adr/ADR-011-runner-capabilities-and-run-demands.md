@@ -1,6 +1,6 @@
 # ADR-011: Runner Capabilities and Run Demands
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-12-18
 **Decision Makers:** Architecture Review
 

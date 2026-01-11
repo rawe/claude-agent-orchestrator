@@ -29,7 +29,7 @@ class ExecutionMode(str, Enum):
 ### Key Mechanism
 
 1. Orchestrator spawns child with `mode=async_callback`
-2. Child completes, triggers `session_stop` event
+2. Child completes, triggers `run_completed` event
 3. Agent Coordinator checks `execution_mode` and parent idle status:
    - **If mode is ASYNC_CALLBACK and parent idle**: Resumes immediately with callback
    - **If mode is ASYNC_CALLBACK and parent busy**: Queues notification for later delivery

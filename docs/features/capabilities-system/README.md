@@ -1,6 +1,8 @@
 # Capabilities System - Work Packages
 
-**Parent Feature:** [Capabilities System](../capabilities-system.md)
+> **Note:** This folder contains implementation work packages. For the feature overview, see [Capabilities System](../capabilities-system.md).
+
+**Status:** All work packages complete
 
 ## Implementation Order
 
