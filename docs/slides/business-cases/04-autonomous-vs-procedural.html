@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autonomous vs Procedural - Agent Orchestrator</title>
+  <link rel="stylesheet" href="business-case-slides.css">
+  <style>
+    .comparison-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    .panel {
+      border-radius: 20px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.03;
+      background-size: 30px 30px;
+    }
+
+    .panel-autonomous {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+      border: 2px solid var(--color-executor);
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.15);
+    }
+
+    .panel-procedural {
+      background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%);
+      border: 2px solid var(--color-procedural);
+      box-shadow: 0 0 40px rgba(249, 115, 22, 0.15);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .panel-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .panel-autonomous .panel-icon {
+      background: rgba(139, 92, 246, 0.2);
+      color: var(--color-executor);
+    }
+
+    .panel-procedural .panel-icon {
+      background: rgba(249, 115, 22, 0.2);
+      color: var(--color-procedural);
+    }
+
+    .panel-title-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-text-bright);
+    }
+
+    .panel-subtitle {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Example task bubble */
+    .example-task {
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      font-size: 0.9rem;
+      color: var(--color-text);
+      font-style: italic;
+      position: relative;
+    }
+
+    .example-task::before {
+      content: '"';
+      font-size: 2rem;
+      position: absolute;
+      top: 0.25rem;
+      left: 0.75rem;
+      color: var(--color-text-muted);
+      opacity: 0.5;
+    }
+
+    .example-task span {
+      display: block;
+      padding-left: 1rem;
+    }
+
+    /* Traits */
+    .traits {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .trait {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+    }
+
+    .panel-autonomous .trait {
+      background: rgba(139, 92, 246, 0.2);
+      color: var(--color-executor);
+    }
+
+    .panel-procedural .trait {
+      background: rgba(249, 115, 22, 0.2);
+      color: var(--color-procedural);
+    }
+
+    /* Best for list */
+    .best-for {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .best-for-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+    }
+
+    .best-for-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .best-for-item {
+      font-size: 0.85rem;
+      color: var(--color-text);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .best-for-item::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .panel-autonomous .best-for-item::before {
+      background: var(--color-executor);
+    }
+
+    .panel-procedural .best-for-item::before {
+      background: var(--color-procedural);
+    }
+
+    /* Swap indicator */
+    .swap-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+    }
+
+    .swap-track {
+      flex: 1;
+      height: 8px;
+      background: linear-gradient(90deg, var(--color-executor), var(--color-procedural));
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .swap-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      background: var(--color-text-bright);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .swap-knob svg {
+      width: 14px;
+      height: 14px;
+      color: var(--color-bg);
+    }
+
+    .swap-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    .swap-label.autonomous {
+      color: var(--color-executor);
+    }
+
+    .swap-label.procedural {
+      color: var(--color-procedural);
+    }
+
+    .callout {
+      bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header fade-in fade-in-1">
+      <h1>AI for Thinking. Code for Doing.</h1>
+      <p class="subtitle">Use the right tool for each job - and switch anytime</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="comparison-container">
+        <div class="panels">
+          <!-- Autonomous Panel -->
+          <div class="panel panel-autonomous fade-in fade-in-2">
+            <div class="panel-header">
+              <div class="panel-icon">
+                <svg class="icon icon-xl" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                  <line x1="9" y1="9" x2="9.01" y2="9"/>
+                  <line x1="15" y1="9" x2="15.01" y2="9"/>
+                </svg>
+              </div>
+              <div class="panel-title-group">
+                <span class="panel-title">Autonomous</span>
+                <span class="panel-subtitle">Thinks and decides</span>
+              </div>
+            </div>
+
+            <div class="example-task">
+              <span>Analyze this document and suggest improvements...</span>
+            </div>
+
+            <div class="traits">
+              <span class="trait">Creative</span>
+              <span class="trait">Contextual</span>
+              <span class="trait">Adaptive</span>
+            </div>
+
+            <div class="best-for">
+              <span class="best-for-label">Best for</span>
+              <div class="best-for-list">
+                <span class="best-for-item">Research</span>
+                <span class="best-for-item">Analysis</span>
+                <span class="best-for-item">Writing</span>
+                <span class="best-for-item">Problem-solving</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Procedural Panel -->
+          <div class="panel panel-procedural fade-in fade-in-3">
+            <div class="panel-header">
+              <div class="panel-icon">
+                <svg class="icon icon-xl" viewBox="0 0 24 24">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+              </div>
+              <div class="panel-title-group">
+                <span class="panel-title">Procedural</span>
+                <span class="panel-subtitle">Follows instructions</span>
+              </div>
+            </div>
+
+            <div class="example-task">
+              <span>Get file X, transform it, save to Y</span>
+            </div>
+
+            <div class="traits">
+              <span class="trait">Fast</span>
+              <span class="trait">Predictable</span>
+              <span class="trait">Cheap</span>
+            </div>
+
+            <div class="best-for">
+              <span class="best-for-label">Best for</span>
+              <div class="best-for-list">
+                <span class="best-for-item">Data transforms</span>
+                <span class="best-for-item">File operations</span>
+                <span class="best-for-item">API calls</span>
+                <span class="best-for-item">Scheduled tasks</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Swap indicator -->
+        <div class="swap-indicator fade-in fade-in-4">
+          <span class="swap-label autonomous">Autonomous</span>
+          <div class="swap-track">
+            <div class="swap-knob">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <path d="M5 12h14"/>
+                <path d="M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </div>
+          <span class="swap-label procedural">Procedural</span>
+        </div>
+      </div>
+
+      <div class="callout fade-in fade-in-5">
+        Start with AI. <strong>Replace with code when patterns emerge.</strong>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="03-progressive-refinement.html" class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </a>
+      <div class="nav-indicator">
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot active"></span>
+        <span class="nav-dot"></span>
+      </div>
+      <a href="05-customer-integration.html" class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </a>
+    </nav>
+  </div>
+</body>
+</html>

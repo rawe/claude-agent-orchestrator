@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Progressive Refinement - Agent Orchestrator</title>
+  <link rel="stylesheet" href="business-case-slides.css">
+  <style>
+    .phases-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    /* Progress arrow */
+    .progress-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 3rem;
+      position: relative;
+    }
+
+    .progress-bar::before {
+      content: '';
+      position: absolute;
+      left: 3rem;
+      right: 3rem;
+      height: 4px;
+      background: linear-gradient(90deg,
+        var(--color-executor) 0%,
+        var(--color-executor) 50%,
+        var(--color-procedural) 100%);
+      border-radius: 2px;
+      z-index: 0;
+    }
+
+    .progress-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      z-index: 1;
+      background: var(--color-bg);
+      padding: 0 0.5rem;
+    }
+
+    .progress-arrow {
+      color: var(--color-text-muted);
+      font-size: 1.5rem;
+    }
+
+    /* Phases row */
+    .phases-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .phase {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .phase-header {
+      text-align: center;
+    }
+
+    .phase-number {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.25rem;
+    }
+
+    .phase-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-text-bright);
+    }
+
+    .phase-subtitle {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Agent diagram boxes */
+    .agent-diagram {
+      width: 200px;
+      height: 180px;
+      position: relative;
+    }
+
+    /* Outer interface box - same across all phases */
+    .interface-box {
+      position: absolute;
+      inset: 0;
+      border: 3px solid var(--color-coordinator);
+      border-radius: 16px;
+      background: transparent;
+    }
+
+    .interface-label {
+      position: absolute;
+      top: -0.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-coordinator);
+      background: var(--color-bg);
+      padding: 0 0.5rem;
+    }
+
+    /* Phase 1: Single blob */
+    .phase-1 .inner-agent {
+      position: absolute;
+      inset: 20px;
+      background: linear-gradient(135deg, var(--color-executor) 0%, #7c3aed 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.4);
+    }
+
+    .phase-1 .inner-agent span {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    /* Phase 2: Three sub-agents */
+    .phase-2 .sub-agents {
+      position: absolute;
+      inset: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .sub-agent {
+      background: var(--color-executor);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: white;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+    }
+
+    /* Phase 3: Mixed agents */
+    .phase-3 .sub-agents {
+      position: absolute;
+      inset: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .sub-agent.procedural {
+      background: var(--color-procedural);
+      box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
+    }
+
+    /* Metrics bar */
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .metric-column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .metric-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .metric-icon {
+      width: 20px;
+      text-align: center;
+    }
+
+    .metric-value {
+      color: var(--color-text);
+      font-weight: 600;
+    }
+
+    .metric-value.good {
+      color: var(--color-coordinator);
+    }
+
+    .metric-value.better {
+      color: #22c55e;
+    }
+
+    /* Timeline labels */
+    .timeline-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.75rem;
+      background: var(--color-bg-elevated);
+      border-radius: 4px;
+    }
+
+    .callout {
+      bottom: 1rem;
+      background: var(--color-coordinator);
+      border-color: var(--color-coordinator);
+      color: white;
+    }
+
+    .callout strong {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header fade-in fade-in-1">
+      <h1>Start Fast. Optimize Later.</h1>
+      <p class="subtitle">Same interface throughout. Only the internals improve.</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="phases-container">
+        <!-- Progress indicator -->
+        <div class="progress-bar fade-in fade-in-1">
+          <span class="progress-label">Quick Win</span>
+          <span class="progress-arrow">&rarr;</span>
+          <span class="progress-label">Specialize</span>
+          <span class="progress-arrow">&rarr;</span>
+          <span class="progress-label">Optimize</span>
+        </div>
+
+        <!-- Three phases -->
+        <div class="phases-row">
+          <!-- Phase 1 -->
+          <div class="phase fade-in fade-in-2">
+            <div class="phase-header">
+              <div class="phase-number">Phase 1</div>
+              <div class="phase-title">POC</div>
+              <div class="phase-subtitle">One AI does everything</div>
+            </div>
+            <div class="agent-diagram phase-1">
+              <div class="interface-box">
+                <span class="interface-label">Interface</span>
+              </div>
+              <div class="inner-agent">
+                <span>AI Agent</span>
+              </div>
+            </div>
+            <span class="timeline-label">Days</span>
+          </div>
+
+          <!-- Phase 2 -->
+          <div class="phase fade-in fade-in-3">
+            <div class="phase-header">
+              <div class="phase-number">Phase 2</div>
+              <div class="phase-title">Sub-Agents</div>
+              <div class="phase-subtitle">Break into specialists</div>
+            </div>
+            <div class="agent-diagram phase-2">
+              <div class="interface-box">
+                <span class="interface-label">Interface</span>
+              </div>
+              <div class="sub-agents">
+                <div class="sub-agent">A</div>
+                <div class="sub-agent">B</div>
+                <div class="sub-agent">C</div>
+              </div>
+            </div>
+            <span class="timeline-label">Weeks</span>
+          </div>
+
+          <!-- Phase 3 -->
+          <div class="phase fade-in fade-in-4">
+            <div class="phase-header">
+              <div class="phase-number">Phase 3</div>
+              <div class="phase-title">Hybrid</div>
+              <div class="phase-subtitle">Replace AI with code</div>
+            </div>
+            <div class="agent-diagram phase-3">
+              <div class="interface-box">
+                <span class="interface-label">Interface</span>
+              </div>
+              <div class="sub-agents">
+                <div class="sub-agent procedural">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"/>
+                    <polyline points="8 6 2 12 8 18"/>
+                  </svg>
+                </div>
+                <div class="sub-agent">B</div>
+                <div class="sub-agent">C</div>
+              </div>
+            </div>
+            <span class="timeline-label">Months</span>
+          </div>
+        </div>
+
+        <!-- Metrics comparison -->
+        <div class="metrics-bar fade-in fade-in-5">
+          <div class="metric-column">
+            <div class="metric-row">
+              <span class="metric-icon">$</span>
+              <span class="metric-value">$$$</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+              </span>
+              <span class="metric-value">Slow</span>
+            </div>
+          </div>
+          <div class="metric-column">
+            <div class="metric-row">
+              <span class="metric-icon">$</span>
+              <span class="metric-value good">$$</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+              </span>
+              <span class="metric-value good">Medium</span>
+            </div>
+          </div>
+          <div class="metric-column">
+            <div class="metric-row">
+              <span class="metric-icon">$</span>
+              <span class="metric-value better">$</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+              </span>
+              <span class="metric-value better">Fast</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout fade-in fade-in-6">
+        <strong>Same interface.</strong> Customer never notices the change.
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="02-extension-points.html" class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </a>
+      <div class="nav-indicator">
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot active"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+      </div>
+      <a href="04-autonomous-vs-procedural.html" class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </a>
+    </nav>
+  </div>
+</body>
+</html>

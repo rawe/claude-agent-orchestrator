@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Integration - Agent Orchestrator</title>
+  <link rel="stylesheet" href="business-case-slides.css">
+  <style>
+    .integration-container {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      width: 100%;
+      max-width: 1000px;
+      height: 400px;
+    }
+
+    /* Customer side */
+    .customer-world {
+      flex: 1;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(6, 182, 212, 0.05) 100%);
+      border: 2px solid var(--color-app);
+      border-right: none;
+      border-radius: 20px 0 0 20px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .customer-world::before {
+      content: 'VISIBLE';
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--color-app);
+      opacity: 0.6;
+    }
+
+    .world-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      margin-bottom: 1rem;
+    }
+
+    /* Mockup app */
+    .app-mockup {
+      flex: 1;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-titlebar {
+      height: 32px;
+      background: var(--color-bg-elevated);
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      gap: 0.5rem;
+    }
+
+    .app-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .app-dot.red { background: #ef4444; }
+    .app-dot.yellow { background: #eab308; }
+    .app-dot.green { background: #22c55e; }
+
+    .app-content {
+      flex: 1;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--color-app);
+    }
+
+    .app-logo-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--color-app);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .app-placeholder {
+      background: var(--color-bg-elevated);
+      border-radius: 8px;
+      height: 20px;
+    }
+
+    .app-placeholder.short { width: 60%; }
+    .app-placeholder.medium { width: 80%; }
+    .app-placeholder.full { width: 100%; }
+
+    .customer-features {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .feature-tag {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feature-tag::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--color-app);
+      border-radius: 50%;
+    }
+
+    /* API bridge */
+    .api-bridge {
+      width: 80px;
+      background: linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-card) 100%);
+      border-top: 2px solid var(--color-text-muted);
+      border-bottom: 2px solid var(--color-text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      position: relative;
+    }
+
+    .api-label {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--color-text-bright);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: 0.2em;
+    }
+
+    .api-arrows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      color: var(--color-text-muted);
+    }
+
+    .api-arrows svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Platform side */
+    .platform-world {
+      flex: 1;
+      background: linear-gradient(135deg, rgba(100, 116, 139, 0.1) 0%, rgba(71, 85, 105, 0.05) 100%);
+      border: 2px solid var(--color-border);
+      border-left: none;
+      border-radius: 0 20px 20px 0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      position: relative;
+    }
+
+    .platform-world::before {
+      content: 'HIDDEN';
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--color-text-muted);
+      opacity: 0.4;
+    }
+
+    /* Platform components */
+    .platform-component {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .platform-component .icon-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .platform-component.coordinator .icon-box {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--color-coordinator);
+    }
+
+    .platform-component .name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    /* Agents row */
+    .agents-row {
+      display: flex;
+      gap: 0.5rem;
+      padding-left: 2.5rem;
+    }
+
+    .mini-agent {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid var(--color-executor);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--color-executor);
+    }
+
+    /* MCP connections */
+    .mcp-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .mcp-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-left: 0.25rem;
+    }
+
+    .mcp-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .mcp-chip {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--color-mcp);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .callout {
+      bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header fade-in fade-in-1">
+      <h1>Your Brand. Our Brains.</h1>
+      <p class="subtitle">Customers see their application, not our infrastructure</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="integration-container">
+        <!-- Customer World -->
+        <div class="customer-world fade-in fade-in-2">
+          <span class="world-label">Customer's World</span>
+
+          <div class="app-mockup">
+            <div class="app-titlebar">
+              <span class="app-dot red"></span>
+              <span class="app-dot yellow"></span>
+              <span class="app-dot green"></span>
+            </div>
+            <div class="app-content">
+              <div class="app-logo">
+                <span class="app-logo-icon">A</span>
+                <span>ACME Corp</span>
+              </div>
+              <div class="app-placeholder short"></div>
+              <div class="app-placeholder full"></div>
+              <div class="app-placeholder medium"></div>
+              <div class="app-placeholder short"></div>
+            </div>
+          </div>
+
+          <div class="customer-features">
+            <span class="feature-tag">Their brand</span>
+            <span class="feature-tag">Their workflow</span>
+            <span class="feature-tag">Their users</span>
+          </div>
+        </div>
+
+        <!-- API Bridge -->
+        <div class="api-bridge fade-in fade-in-3">
+          <div class="api-arrows">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14"/>
+              <path d="M12 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <span class="api-label">API</span>
+          <div class="api-arrows">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5"/>
+              <path d="M12 19l-7-7 7-7"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Platform World -->
+        <div class="platform-world fade-in fade-in-4">
+          <span class="world-label">Our Platform</span>
+
+          <div class="platform-component coordinator">
+            <div class="icon-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+              </svg>
+            </div>
+            <span class="name">Coordinator</span>
+          </div>
+
+          <div class="agents-row">
+            <div class="mini-agent">A</div>
+            <div class="mini-agent">B</div>
+            <div class="mini-agent">C</div>
+          </div>
+
+          <div class="mcp-section">
+            <span class="mcp-label">Connections</span>
+            <div class="mcp-row">
+              <span class="mcp-chip">Jira</span>
+              <span class="mcp-chip">Slack</span>
+              <span class="mcp-chip">Neo4j</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout fade-in fade-in-5">
+        We control complexity. <strong>They get value.</strong>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <a href="04-autonomous-vs-procedural.html" class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </a>
+      <div class="nav-indicator">
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot active"></span>
+      </div>
+      <span class="nav-btn disabled">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </span>
+    </nav>
+  </div>
+</body>
+</html>
