@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why Orchestration - Agent Orchestrator</title>
+  <link rel="stylesheet" href="business-case-slides.css">
+  <style>
+    .transformation-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3rem;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    /* Before/After panels */
+    .scenario {
+      flex: 1;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .scenario-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+    }
+
+    .scenario-before .scenario-label {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .scenario-after .scenario-label {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--color-coordinator);
+    }
+
+    /* Before: Chaos visualization */
+    .chaos-box {
+      width: 280px;
+      height: 280px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .solo-agent {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, var(--color-executor), #7c3aed);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.4);
+    }
+
+    .solo-agent svg {
+      width: 40px;
+      height: 40px;
+      color: white;
+    }
+
+    /* Floating task bubbles - chaotic */
+    .task-bubble {
+      position: absolute;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.65rem;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .task-bubble:nth-child(2) { top: 10%; left: 5%; animation-delay: 0s; }
+    .task-bubble:nth-child(3) { top: 5%; right: 10%; animation-delay: 0.5s; }
+    .task-bubble:nth-child(4) { top: 25%; right: 0%; animation-delay: 1s; }
+    .task-bubble:nth-child(5) { bottom: 25%; right: 5%; animation-delay: 1.5s; }
+    .task-bubble:nth-child(6) { bottom: 10%; right: 20%; animation-delay: 2s; }
+    .task-bubble:nth-child(7) { bottom: 5%; left: 15%; animation-delay: 2.5s; }
+    .task-bubble:nth-child(8) { bottom: 20%; left: 0%; animation-delay: 0.3s; }
+    .task-bubble:nth-child(9) { top: 20%; left: 0%; animation-delay: 0.8s; }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.7; }
+      50% { transform: translateY(-8px) rotate(2deg); opacity: 1; }
+    }
+
+    /* Stress indicator */
+    .stress-indicator {
+      position: absolute;
+      top: -15px;
+      right: -15px;
+      width: 36px;
+      height: 36px;
+      background: #ef4444;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse-stress 1s ease-in-out infinite;
+      z-index: 3;
+    }
+
+    .stress-indicator svg {
+      width: 20px;
+      height: 20px;
+      color: white;
+    }
+
+    @keyframes pulse-stress {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    /* Arrow transformation */
+    .transform-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--color-text-muted);
+    }
+
+    .transform-arrow svg {
+      width: 48px;
+      height: 48px;
+      color: var(--color-coordinator);
+      animation: arrow-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes arrow-pulse {
+      0%, 100% { transform: translateX(0); opacity: 0.7; }
+      50% { transform: translateX(5px); opacity: 1; }
+    }
+
+    .transform-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-coordinator);
+    }
+
+    /* After: Harmony visualization */
+    .harmony-box {
+      width: 280px;
+      height: 280px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Orchestrator in center */
+    .orchestrator {
+      width: 70px;
+      height: 70px;
+      background: var(--color-coordinator);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
+    }
+
+    .orchestrator svg {
+      width: 32px;
+      height: 32px;
+      color: white;
+    }
+
+    /* Specialist agents orbiting */
+    .specialist {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      background: var(--color-bg-card);
+      border: 2px solid;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.15rem;
+    }
+
+    .specialist svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .specialist span {
+      font-size: 0.5rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .specialist-1 {
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: var(--color-app);
+      color: var(--color-app);
+    }
+
+    .specialist-2 {
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      border-color: var(--color-executor);
+      color: var(--color-executor);
+    }
+
+    .specialist-3 {
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: var(--color-mcp);
+      color: var(--color-mcp);
+    }
+
+    .specialist-4 {
+      top: 50%;
+      left: 10px;
+      transform: translateY(-50%);
+      border-color: var(--color-runner);
+      color: var(--color-runner);
+    }
+
+    /* Connection lines */
+    .harmony-box::before {
+      content: '';
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      border: 2px dashed var(--color-border);
+      border-radius: 50%;
+      opacity: 0.5;
+    }
+
+    /* Metrics comparison */
+    .metrics-row {
+      display: flex;
+      gap: 2rem;
+      margin-top: 0.5rem;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .metric-icon {
+      font-size: 1.25rem;
+    }
+
+    .metric-value {
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .scenario-before .metric-value {
+      color: #ef4444;
+    }
+
+    .scenario-after .metric-value {
+      color: var(--color-coordinator);
+    }
+
+    .metric-label {
+      font-size: 0.65rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Bottom insight */
+    .insight-box {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+      border: 1px solid var(--color-coordinator);
+      border-radius: 12px;
+      padding: 1rem 2rem;
+      text-align: center;
+      max-width: 500px;
+    }
+
+    .insight-box p {
+      font-size: 1rem;
+      color: var(--color-text);
+      margin: 0;
+    }
+
+    .insight-box strong {
+      color: var(--color-coordinator);
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header fade-in fade-in-1">
+      <h1>One AI is Good. A Team is Better.</h1>
+      <p class="subtitle">What if your AI assistant could delegate?</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="transformation-container">
+        <!-- Before: Chaos -->
+        <div class="scenario scenario-before fade-in fade-in-2">
+          <span class="scenario-label">Without Orchestration</span>
+
+          <div class="chaos-box">
+            <div class="solo-agent">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                <line x1="9" y1="9" x2="9.01" y2="9"/>
+                <line x1="15" y1="9" x2="15.01" y2="9"/>
+              </svg>
+              <div class="stress-indicator">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 9v4"/>
+                  <path d="M12 17h.01"/>
+                </svg>
+              </div>
+            </div>
+            <div class="task-bubble">Research</div>
+            <div class="task-bubble">Write docs</div>
+            <div class="task-bubble">Review code</div>
+            <div class="task-bubble">Test</div>
+            <div class="task-bubble">Deploy</div>
+            <div class="task-bubble">Analyze</div>
+            <div class="task-bubble">Report</div>
+            <div class="task-bubble">Plan</div>
+          </div>
+
+          <div class="metrics-row">
+            <div class="metric">
+              <span class="metric-icon">🐢</span>
+              <span class="metric-value">Sequential</span>
+              <span class="metric-label">Execution</span>
+            </div>
+            <div class="metric">
+              <span class="metric-icon">😵</span>
+              <span class="metric-value">Overloaded</span>
+              <span class="metric-label">Context</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="transform-arrow fade-in fade-in-3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14"/>
+            <path d="M12 5l7 7-7 7"/>
+          </svg>
+          <span class="transform-label">Orchestrate</span>
+        </div>
+
+        <!-- After: Harmony -->
+        <div class="scenario scenario-after fade-in fade-in-4">
+          <span class="scenario-label">With Orchestration</span>
+
+          <div class="harmony-box">
+            <div class="orchestrator">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v4"/>
+                <path d="M12 18v4"/>
+                <path d="M4.93 4.93l2.83 2.83"/>
+                <path d="M16.24 16.24l2.83 2.83"/>
+                <path d="M2 12h4"/>
+                <path d="M18 12h4"/>
+              </svg>
+            </div>
+
+            <div class="specialist specialist-1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <span>Research</span>
+            </div>
+
+            <div class="specialist specialist-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+              <span>Code</span>
+            </div>
+
+            <div class="specialist specialist-3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <span>Docs</span>
+            </div>
+
+            <div class="specialist specialist-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span>Test</span>
+            </div>
+          </div>
+
+          <div class="metrics-row">
+            <div class="metric">
+              <span class="metric-icon">⚡</span>
+              <span class="metric-value">Parallel</span>
+              <span class="metric-label">Execution</span>
+            </div>
+            <div class="metric">
+              <span class="metric-icon">🎯</span>
+              <span class="metric-value">Focused</span>
+              <span class="metric-label">Specialists</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="insight-box fade-in fade-in-5">
+        <p>The same tasks. <strong>Done in parallel. By specialists. Under control.</strong></p>
+      </div>
+    </main>
+
+    <nav class="slide-nav">
+      <span class="nav-btn disabled">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </span>
+      <div class="nav-indicator">
+        <span class="nav-dot active"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+        <span class="nav-dot"></span>
+      </div>
+      <a href="01-core-architecture.html" class="nav-btn">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </a>
+    </nav>
+  </div>
+</body>
+</html>
