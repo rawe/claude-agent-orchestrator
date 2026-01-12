@@ -6,6 +6,24 @@ Once implemented, features are documented in [features/](../features/README.md) 
 
 ## Planned
 
+### Context Store Scoping
+
+Namespace and scope-based isolation for document visibility.
+
+| Document | Description |
+|----------|-------------|
+| [Context Store Scoping](./context-store-scoping/context-store-scoping.md) | Namespace and scope_filters design (Approach 1: Explicit API) |
+
+### External Service Auth
+
+Token-based server-to-server authentication with scoping. Generic pattern applicable to Context Store, Knowledge Graph, and future services.
+
+| Document | Description |
+|----------|-------------|
+| [External Service Auth](./external-service-auth/README.md) | Overview and reading guide for token-based authentication and scoping |
+
+### Other
+
 | Document | Description |
 |----------|-------------|
 | [Structured Output Schema Enforcement](./structured-output-schema-enforcement.md) | Enforcing JSON Schema compliance on agent outputs |
