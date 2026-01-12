@@ -1,35 +1,55 @@
 ---
 id: architecture
 title: "Architecture Overview"
-subtitle: "How the four components work together"
+subtitle: "The core components and their communication"
 ---
 
-## The Four Components
+## The Core Components
 
 ### Agent Coordinator (Port 8765)
 
-The **central server** that manages everything:
-- Sessions
-- Runs
-- Blueprints
+The **central server** and **trust anchor**:
+- Manages Sessions, Runs, Blueprints
+- Issues **scope badges** (signed tokens) for external service access
+- Determines what data each run can access
 
 ### Agent Runner
 
 The **work executor** that:
 - Polls the Coordinator for pending work
+- Receives scope badges with each run assignment
 - Reports progress and results back
 
-### Context Store (Port 8766)
+### Executor (e.g. Claude Code)
 
-**Shared documents** storage that agents can store to and retrieve from.
+The **AI agent process** that:
+- Executes tasks using the Claude Agent SDK
+- Accesses external services with scoped permissions
+- Cannot manipulate scope - it's embedded in the badge
+
+### External Services (via MCP)
+
+**Scoped data access** through MCP servers:
+- **Context Store** (Port 8766) - Shared documents
+- + other MCP services (extensible pattern)
 
 ### Dashboard (Port 3000)
 
 **Real-time UI** for monitoring and interaction.
 
+## Scoped Access Pattern
+
+1. Coordinator generates **scope badge** (signed token) when run is created
+2. Badge contains: namespace, filters, permissions
+3. Badge travels: Coordinator → Runner → Claude Code → MCP → External Services
+4. **External Services trust Coordinator** - validate badge signature
+5. Services return only data permitted by the badge scope
+6. **LLM cannot escape scope** - embedded in badge, not in tool parameters
+
 ## Communication Flow
 
-1. **Dashboard** communicates with Coordinator via HTTP, receives updates via SSE (Server-Sent Events)
-2. **Runner** polls Coordinator for work, Coordinator dispatches runs to Runner
-3. **Runner** spawns Claude Code as a subprocess using the Agent SDK
-4. **Claude Code** stores and retrieves documents from Context Store
+1. **Dashboard** ↔ Coordinator via HTTP/SSE
+2. **Runner** polls Coordinator, receives runs **with scope badge**
+3. **Runner** spawns Executor (e.g. Claude Code), passes badge
+4. **Executor** accesses external services via MCP, presenting badge
+5. **External Services** validate badge, filter data by scope

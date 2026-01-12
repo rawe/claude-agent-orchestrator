@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Architecture Overview - Agent Orchestrator</title>
+  <title>Architecture Overview - Agent Orchestrator (Trust Anchor)</title>
   <style>
     :root {
       --color-bg: #0a0f1a;
@@ -163,7 +163,7 @@
   <div class="slide">
     <header class="slide-header">
       <h1>Architecture Overview</h1>
-      <p class="subtitle">How the four components work together</p>
+      <p class="subtitle">The core components and their communication</p>
     </header>
 
     <main class="slide-content">
@@ -184,107 +184,151 @@
           <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
             <polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6" />
           </marker>
+          <!-- Shield/Badge symbol -->
+          <symbol id="badge" viewBox="0 0 24 24">
+            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"
+                  fill="#3b82f6" stroke="#60a5fa" stroke-width="1"/>
+            <path d="M10 12l2 2 4-4" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </symbol>
         </defs>
 
-        <!-- Dashboard -->
-        <g transform="translate(50, 30)">
-          <rect class="component-box component-dashboard" x="0" y="0" width="200" height="100" rx="12"/>
-          <text x="100" y="40" text-anchor="middle" class="component-title">📊 Dashboard</text>
-          <text x="100" y="60" text-anchor="middle" class="component-subtitle">Real-time UI</text>
-          <text x="100" y="80" text-anchor="middle" class="component-subtitle">Port 3000</text>
+        <!-- ======================= -->
+        <!-- LAYOUT                  -->
+        <!-- Top: Dashboard (full)   -->
+        <!-- Mid-Left: Coordinator   -->
+        <!-- Mid-Right: Ext Services -->
+        <!-- Bot-Left: Runner        -->
+        <!-- Bot-Right: Executor     -->
+        <!-- ======================= -->
+
+        <!-- Dashboard (full width across both columns) -->
+        <g transform="translate(70, 10)">
+          <rect class="component-box component-dashboard" x="0" y="0" width="760" height="65" rx="10"/>
+          <text x="380" y="28" text-anchor="middle" class="component-title" font-size="13">📊 Dashboard</text>
+          <text x="380" y="46" text-anchor="middle" class="component-subtitle">Real-time UI  •  Port 3000</text>
         </g>
 
-        <!-- Agent Coordinator (Center) -->
-        <g transform="translate(350, 150)">
-          <rect class="component-box component-coordinator" x="0" y="0" width="200" height="140" rx="12"/>
-          <text x="100" y="35" text-anchor="middle" class="component-title">🧠 Agent Coordinator</text>
-          <text x="100" y="55" text-anchor="middle" class="component-subtitle">Central Server</text>
-          <text x="100" y="75" text-anchor="middle" class="component-subtitle">Port 8765</text>
-          <line x1="20" y1="95" x2="180" y2="95" stroke="#1e293b" stroke-width="1"/>
-          <text x="100" y="115" text-anchor="middle" class="component-subtitle">Sessions • Runs • Blueprints</text>
+        <!-- MID-LEFT: Agent Coordinator - Trust Anchor -->
+        <g transform="translate(70, 110)">
+          <rect class="component-box component-coordinator" x="0" y="0" width="240" height="140" rx="12"/>
+          <text x="120" y="28" text-anchor="middle" class="component-title">🧠 Agent Coordinator</text>
+          <text x="120" y="46" text-anchor="middle" class="component-subtitle" fill="#60a5fa">Trust Anchor</text>
+          <text x="120" y="64" text-anchor="middle" class="component-subtitle">Port 8765</text>
+          <line x1="20" y1="80" x2="220" y2="80" stroke="#1e293b" stroke-width="1"/>
+          <text x="120" y="98" text-anchor="middle" class="component-subtitle">Sessions • Runs • Blueprints</text>
+          <!-- Badge indicator row -->
+          <g transform="translate(50, 108)">
+            <use href="#badge" x="0" y="0" width="16" height="16"/>
+            <text x="22" y="12" fill="#60a5fa" font-size="10">Issues Scope Tokens</text>
+          </g>
         </g>
 
-        <!-- Agent Runner -->
-        <g transform="translate(350, 360)">
-          <rect class="component-box component-runner" x="0" y="0" width="200" height="100" rx="12"/>
-          <text x="100" y="40" text-anchor="middle" class="component-title">⚡ Agent Runner</text>
-          <text x="100" y="60" text-anchor="middle" class="component-subtitle">Work Executor</text>
-          <text x="100" y="80" text-anchor="middle" class="component-subtitle">Polls & Reports</text>
+        <!-- MID-RIGHT: External Services Group -->
+        <g transform="translate(550, 110)">
+          <!-- Outer container -->
+          <rect x="0" y="0" width="280" height="140" rx="12" fill="#0d1420" stroke="#334155" stroke-width="1.5"/>
+          <text x="140" y="22" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="500">External Services (via MCP)</text>
+
+          <!-- Context Store - Primary -->
+          <g transform="translate(20, 32)">
+            <rect class="component-box component-context" x="0" y="0" width="240" height="70" rx="10"/>
+            <text x="120" y="26" text-anchor="middle" class="component-title" font-size="13">📄 Context Store</text>
+            <text x="120" y="44" text-anchor="middle" class="component-subtitle">Shared Documents</text>
+            <text x="120" y="60" text-anchor="middle" class="component-subtitle">Port 8766</text>
+          </g>
+
+          <!-- Extensibility hint -->
+          <text x="140" y="125" text-anchor="middle" fill="#475569" font-size="10">+ other MCP services</text>
         </g>
 
-        <!-- Executor -->
-        <g transform="translate(650, 360)">
-          <rect class="component-box component-executor" x="0" y="0" width="200" height="100" rx="12"/>
-          <text x="100" y="40" text-anchor="middle" class="component-title">🤖 Claude Code</text>
-          <text x="100" y="60" text-anchor="middle" class="component-subtitle">AI Agent Process</text>
-          <text x="100" y="80" text-anchor="middle" class="component-subtitle">Agent SDK</text>
+        <!-- BOT-LEFT: Agent Runner -->
+        <g transform="translate(70, 315)">
+          <rect class="component-box component-runner" x="0" y="0" width="240" height="100" rx="12"/>
+          <text x="120" y="32" text-anchor="middle" class="component-title">⚡ Agent Runner</text>
+          <text x="120" y="52" text-anchor="middle" class="component-subtitle">Work Executor</text>
+          <text x="120" y="72" text-anchor="middle" class="component-subtitle">Polls & Reports</text>
         </g>
 
-        <!-- Context Store -->
-        <g transform="translate(650, 150)">
-          <rect class="component-box component-context" x="0" y="0" width="200" height="100" rx="12"/>
-          <text x="100" y="40" text-anchor="middle" class="component-title">📄 Context Store</text>
-          <text x="100" y="60" text-anchor="middle" class="component-subtitle">Shared Documents</text>
-          <text x="100" y="80" text-anchor="middle" class="component-subtitle">Port 8766</text>
+        <!-- BOT-RIGHT: Executor -->
+        <g transform="translate(550, 315)">
+          <rect class="component-box component-executor" x="0" y="0" width="280" height="100" rx="12"/>
+          <text x="140" y="32" text-anchor="middle" class="component-title">🤖 Executor</text>
+          <text x="140" y="52" text-anchor="middle" class="component-subtitle">e.g. Claude Code</text>
+          <text x="140" y="72" text-anchor="middle" class="component-subtitle">Claude Agent SDK</text>
         </g>
 
-        <!-- Arrow: Dashboard -> Coordinator (HTTP) -->
-        <path d="M 250 100 L 350 180" class="arrow-line arrow-animated" marker-end="url(#arrow-blue)" stroke="#f59e0b"/>
-        <rect x="270" y="120" width="40" height="16" class="arrow-label-bg"/>
-        <text x="290" y="132" text-anchor="middle" class="arrow-label">HTTP</text>
+        <!-- ======================= -->
+        <!-- ARROWS (H/V only)       -->
+        <!-- ======================= -->
 
-        <!-- Arrow: Coordinator -> Dashboard (SSE) -->
-        <path d="M 350 200 L 250 120" class="arrow-line arrow-animated" marker-end="url(#arrow-amber)" stroke="#3b82f6"/>
-        <rect x="260" y="155" width="30" height="16" class="arrow-label-bg"/>
-        <text x="275" y="167" text-anchor="middle" class="arrow-label">SSE</text>
+        <!-- Arrow: Dashboard -> Coordinator (HTTP) - Vertical -->
+        <path d="M 150 75 L 150 110" class="arrow-line arrow-animated" marker-end="url(#arrow-blue)" stroke="#f59e0b"/>
+        <rect x="115" y="83" width="28" height="14" class="arrow-label-bg"/>
+        <text x="129" y="93" text-anchor="middle" class="arrow-label">HTTP</text>
 
-        <!-- Arrow: Runner -> Coordinator (Poll) -->
-        <path d="M 400 360 L 400 295" class="arrow-line arrow-animated" marker-end="url(#arrow-blue)" stroke="#10b981"/>
-        <rect x="405" y="315" width="35" height="16" class="arrow-label-bg"/>
-        <text x="422" y="327" text-anchor="middle" class="arrow-label">Poll</text>
+        <!-- Arrow: Coordinator -> Dashboard (SSE) - Vertical -->
+        <path d="M 230 110 L 230 75" class="arrow-line arrow-animated" marker-end="url(#arrow-amber)" stroke="#3b82f6"/>
+        <rect x="238" y="83" width="28" height="14" class="arrow-label-bg"/>
+        <text x="252" y="93" text-anchor="middle" class="arrow-label">SSE</text>
 
-        <!-- Arrow: Coordinator -> Runner (Dispatch) -->
-        <path d="M 500 295 L 500 360" class="arrow-line arrow-animated" marker-end="url(#arrow-green)" stroke="#3b82f6"/>
-        <rect x="505" y="315" width="50" height="16" class="arrow-label-bg"/>
-        <text x="530" y="327" text-anchor="middle" class="arrow-label">Dispatch</text>
+        <!-- Arrow: Dashboard -> External Services (HTTP) - Vertical -->
+        <path d="M 690 75 L 690 110" class="arrow-line arrow-animated" marker-end="url(#arrow-purple)" stroke="#f59e0b"/>
+        <rect x="698" y="83" width="28" height="14" class="arrow-label-bg"/>
+        <text x="712" y="93" text-anchor="middle" class="arrow-label">HTTP</text>
 
-        <!-- Arrow: Runner -> Executor (Subprocess) -->
-        <path d="M 550 410 L 650 410" class="arrow-line arrow-animated" marker-end="url(#arrow)" stroke="#10b981"/>
-        <rect x="570" y="390" width="60" height="16" class="arrow-label-bg"/>
-        <text x="600" y="402" text-anchor="middle" class="arrow-label">Subprocess</text>
+        <!-- Arrow: Coordinator -> Runner (Dispatch) - Vertical -->
+        <path d="M 230 250 L 230 315" class="arrow-line arrow-animated" marker-end="url(#arrow-green)" stroke="#3b82f6"/>
+        <g transform="translate(240, 265)">
+          <rect x="0" y="0" width="70" height="32" rx="4" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+          <text x="35" y="13" text-anchor="middle" class="arrow-label">Dispatch</text>
+          <use href="#badge" x="12" y="15" width="14" height="14"/>
+          <text x="46" y="27" text-anchor="middle" fill="#60a5fa" font-size="9">Token</text>
+        </g>
 
-        <!-- Arrow: Executor -> Context Store -->
-        <path d="M 750 360 L 750 255" class="arrow-line arrow-animated" marker-end="url(#arrow-purple)" stroke="#8b5cf6"/>
-        <rect x="755" y="295" width="55" height="16" class="arrow-label-bg"/>
-        <text x="782" y="307" text-anchor="middle" class="arrow-label">Store/Get</text>
+        <!-- Arrow: Runner -> Coordinator (Poll) - Vertical -->
+        <path d="M 150 315 L 150 250" class="arrow-line arrow-animated" marker-end="url(#arrow-blue)" stroke="#10b981"/>
+        <rect x="108" y="275" width="32" height="14" class="arrow-label-bg"/>
+        <text x="124" y="285" text-anchor="middle" class="arrow-label">Poll</text>
 
-        <!-- Legend -->
-        <g transform="translate(50, 150)">
-          <rect x="0" y="0" width="150" height="110" rx="8" fill="#141b2d" stroke="#1e293b"/>
-          <text x="75" y="20" text-anchor="middle" fill="#f1f5f9" font-size="11" font-weight="600">Components</text>
-          <circle cx="20" cy="40" r="5" fill="#3b82f6"/>
-          <text x="32" y="44" fill="#3b82f6" font-size="9">Coordinator</text>
-          <circle cx="20" cy="58" r="5" fill="#10b981"/>
-          <text x="32" y="62" fill="#10b981" font-size="9">Runner</text>
-          <circle cx="20" cy="76" r="5" fill="#8b5cf6"/>
-          <text x="32" y="80" fill="#8b5cf6" font-size="9">Context Store</text>
-          <circle cx="20" cy="94" r="5" fill="#f59e0b"/>
-          <text x="32" y="98" fill="#f59e0b" font-size="9">Dashboard</text>
+        <!-- Arrow: Runner -> Executor (Spawn + passes token) - Horizontal -->
+        <path d="M 310 365 L 550 365" class="arrow-line arrow-animated" marker-end="url(#arrow)" stroke="#10b981"/>
+        <g transform="translate(395, 343)">
+          <rect x="0" y="0" width="70" height="32" rx="4" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+          <text x="35" y="13" text-anchor="middle" class="arrow-label">Spawn</text>
+          <use href="#badge" x="12" y="15" width="14" height="14"/>
+          <text x="46" y="27" text-anchor="middle" fill="#60a5fa" font-size="9">Token</text>
+        </g>
+
+        <!-- Arrow: Executor -> External Services (Scoped) - Vertical -->
+        <path d="M 690 315 L 690 250" class="arrow-line arrow-animated" marker-end="url(#arrow-purple)" stroke="#8b5cf6"/>
+        <g transform="translate(700, 267)">
+          <rect x="0" y="0" width="70" height="26" rx="4" fill="#1e1b4b" stroke="#8b5cf6" stroke-width="1"/>
+          <use href="#badge" x="10" y="4" width="16" height="16"/>
+          <text x="45" y="17" text-anchor="middle" fill="#a5b4fc" font-size="10">Token</text>
+        </g>
+
+        <!-- Trust Line: External Services -> Coordinator (services trust coordinator) - Horizontal -->
+        <path d="M 550 180 L 310 180"
+              fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="8 4" opacity="0.7"
+              marker-end="url(#arrow-blue)"/>
+        <g transform="translate(405, 162)">
+          <rect x="0" y="0" width="60" height="18" rx="3" fill="#0f172a"/>
+          <text x="30" y="13" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="500">🔑 trusts</text>
         </g>
 
         <!-- Flow numbers -->
-        <g font-size="16" font-weight="bold">
-          <circle cx="290" cy="80" r="14" fill="#3b82f6"/>
-          <text x="290" y="85" text-anchor="middle" fill="white">1</text>
+        <g font-size="13" font-weight="bold">
+          <circle cx="95" cy="92" r="11" fill="#f59e0b"/>
+          <text x="95" y="96" text-anchor="middle" fill="white">1</text>
 
-          <circle cx="370" cy="330" r="14" fill="#10b981"/>
-          <text x="370" y="335" text-anchor="middle" fill="white">2</text>
+          <circle cx="190" cy="295" r="11" fill="#10b981"/>
+          <text x="190" y="299" text-anchor="middle" fill="white">2</text>
 
-          <circle cx="600" cy="380" r="14" fill="#ec4899"/>
-          <text x="600" y="385" text-anchor="middle" fill="white">3</text>
+          <circle cx="430" cy="395" r="11" fill="#ec4899"/>
+          <text x="430" y="399" text-anchor="middle" fill="white">3</text>
 
-          <circle cx="780" cy="280" r="14" fill="#8b5cf6"/>
-          <text x="780" y="285" text-anchor="middle" fill="white">4</text>
+          <circle cx="670" cy="290" r="11" fill="#8b5cf6"/>
+          <text x="670" y="294" text-anchor="middle" fill="white">4</text>
         </g>
       </svg>
     </main>
