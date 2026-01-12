@@ -125,7 +125,7 @@
     .section-orchestration .section-number { background: var(--color-session); }
     .section-modes .section-number { background: var(--color-executor); }
     .section-config .section-number { background: var(--color-dashboard); }
-    .section-deepdives .section-number { background: var(--color-text-muted); color: var(--color-bg); font-size: 0.75rem; }
+    .section-motivation .section-number { background: var(--color-executor); }
     .section-summary .section-number { background: linear-gradient(135deg, var(--color-coordinator), var(--color-runner)); }
 
     /* Slide Cards */
@@ -182,23 +182,33 @@
     .section-orchestration .slide-card:hover { border-color: var(--color-session); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.2); }
     .section-modes .slide-card:hover { border-color: var(--color-executor); box-shadow: 0 10px 30px rgba(236, 72, 153, 0.2); }
     .section-config .slide-card:hover { border-color: var(--color-dashboard); box-shadow: 0 10px 30px rgba(245, 158, 11, 0.2); }
-    .section-deepdives .slide-card:hover { border-color: var(--color-border-light); }
+    .section-motivation .slide-card:hover { border-color: var(--color-executor); box-shadow: 0 10px 30px rgba(236, 72, 153, 0.2); }
     .section-summary .slide-card:hover { border-color: var(--color-coordinator); }
 
-    /* Deep dive cards - smaller/subtle styling */
-    .section-deepdives .slide-card {
+    /* Deep dive container - groups deep dives in a subtle box */
+    .deep-dive-container {
+      grid-column: 1 / -1;
+      background: rgba(30, 41, 59, 0.3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
       padding: var(--space-md);
-      background: rgba(20, 27, 45, 0.5);
+      margin-top: calc(var(--space-md) * -0.5);
     }
-    .section-deepdives .slide-card-icon {
-      font-size: 1.25rem;
-      margin-bottom: var(--space-sm);
+
+    .deep-dive-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-md);
+      padding-left: var(--space-sm);
     }
-    .section-deepdives .slide-card-number {
-      font-size: 0.625rem;
-    }
-    .section-deepdives .slide-card-title {
-      font-size: 0.875rem;
+
+    .deep-dive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-md);
     }
 
     /* Start button */
@@ -312,35 +322,32 @@
           startButton.href = slides.mainFlow[0].file;
         }
 
-        // Group slides by section
+        // Group slides by section with deep dives attached to their parent
         const slidesBySection = {};
-        const deepDives = [];
 
         slides.mainFlow.forEach((slide, index) => {
           const sectionId = slide.section;
           if (!slidesBySection[sectionId]) {
             slidesBySection[sectionId] = [];
           }
-          slidesBySection[sectionId].push({ ...slide, slideNumber: index + 1 });
-
-          // Collect deep dives
-          if (slide.deepDives) {
-            slide.deepDives.forEach((dd, ddIndex) => {
-              deepDives.push({
-                ...dd,
-                parentId: slide.id,
-                parentSlideNumber: index + 1,
-                letter: String.fromCharCode(97 + ddIndex) // a, b, c...
-              });
-            });
-          }
+          // Add the main slide with its deep dives
+          const slideData = {
+            ...slide,
+            slideNumber: index + 1,
+            deepDives: slide.deepDives ? slide.deepDives.map((dd, ddIndex) => ({
+              ...dd,
+              parentSlideNumber: index + 1,
+              letter: String.fromCharCode(97 + ddIndex) // a, b, c...
+            })) : []
+          };
+          slidesBySection[sectionId].push(slideData);
         });
 
         // Generate sections HTML
         const container = document.getElementById('sections-container');
         let html = '';
 
-        // Regular sections
+        // Render all sections with slides and their deep dives in containers
         for (const section of slides.sections) {
           const sectionSlides = slidesBySection[section.id] || [];
           if (sectionSlides.length === 0) continue;
@@ -352,34 +359,34 @@
                 <h2 class="section-title">${section.title}</h2>
               </div>
               <div class="slides-grid">
-                ${sectionSlides.map(slide => `
+                ${sectionSlides.map(slide => {
+                  // Main slide card
+                  let slideHtml = `
                   <a href="${slide.file}" class="slide-card">
                     <div class="slide-card-icon">${slide.icon}</div>
                     <div class="slide-card-number">Slide ${String(slide.slideNumber).padStart(2, '0')}</div>
                     <div class="slide-card-title">${slide.title}</div>
-                  </a>
-                `).join('')}
-              </div>
-            </section>
-          `;
-        }
+                  </a>`;
 
-        // Deep dives section
-        if (deepDives.length > 0) {
-          html += `
-            <section class="section section-deepdives">
-              <div class="section-header">
-                <div class="section-number">+</div>
-                <h2 class="section-title">Deep Dives</h2>
-              </div>
-              <div class="slides-grid">
-                ${deepDives.map(dd => `
-                  <a href="${dd.file}" class="slide-card">
-                    <div class="slide-card-icon">${dd.icon}</div>
-                    <div class="slide-card-number">Slide ${String(dd.parentSlideNumber).padStart(2, '0')}${dd.letter}</div>
-                    <div class="slide-card-title">${dd.title}</div>
-                  </a>
-                `).join('')}
+                  // Deep dives container (if any)
+                  if (slide.deepDives && slide.deepDives.length > 0) {
+                    slideHtml += `
+                    <div class="deep-dive-container">
+                      <div class="deep-dive-label">Deep Dives</div>
+                      <div class="deep-dive-grid">
+                        ${slide.deepDives.map(dd => `
+                          <a href="${dd.file}" class="slide-card">
+                            <div class="slide-card-icon">${dd.icon}</div>
+                            <div class="slide-card-number">Slide ${String(dd.parentSlideNumber).padStart(2, '0')}${dd.letter}</div>
+                            <div class="slide-card-title">${dd.title}</div>
+                          </a>
+                        `).join('')}
+                      </div>
+                    </div>`;
+                  }
+
+                  return slideHtml;
+                }).join('')}
               </div>
             </section>
           `;
