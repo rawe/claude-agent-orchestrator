@@ -274,8 +274,8 @@ html, body {
 /* Navigation - Container */
 .slide-nav {
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
+  top: 2rem;
+  left: 2rem;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -427,7 +427,7 @@ html, body {
 @media (max-width: 768px) {
   .slide { padding: 1.5rem 2rem; }
   .slide-header h1 { font-size: 1.75rem; }
-  .slide-nav { bottom: 1rem; }
+  .slide-nav { top: 1rem; left: 1rem; }
   .nav-btn { width: 40px; height: 40px; }
 }
 
