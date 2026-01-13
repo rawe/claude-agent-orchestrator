@@ -22,6 +22,12 @@ Token-based server-to-server authentication with scoping. Generic pattern applic
 |----------|-------------|
 | [External Service Auth](./external-service-auth/README.md) | Overview and reading guide for token-based authentication and scoping |
 
+### Agent Runner
+
+| Document | Description |
+|----------|-------------|
+| [Optional External MCP Server](./optional-external-mcp-server.md) | CLI option to disable embedded MCP server and use external URL |
+
 ### Other
 
 | Document | Description |

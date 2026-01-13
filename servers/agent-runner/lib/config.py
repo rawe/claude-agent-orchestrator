@@ -49,6 +49,7 @@ class RunnerConfig:
     project_dir: str
     tags: list[str]  # Capability tags (ADR-011)
     mcp_port: int | None  # Optional fixed port for embedded MCP server (CLI-only)
+    external_mcp_url: str | None  # Optional external MCP server URL (disables embedded)
 
     # Executor profile (CLI-only)
     profile: "ExecutorProfile | None"  # Loaded executor profile
@@ -82,6 +83,7 @@ class RunnerConfig:
             project_dir=os.environ.get(ENV_PROJECT_DIR, os.getcwd()),
             tags=_parse_tags(os.environ.get(ENV_RUNNER_TAGS, "")),
             mcp_port=None,  # CLI-only, no env var
+            external_mcp_url=None,  # CLI-only, no env var
             profile=None,  # CLI-only, no env var
             require_matching_tags=False,  # CLI-only, no env var
             # Auth0 M2M

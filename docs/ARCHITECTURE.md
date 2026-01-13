@@ -72,7 +72,8 @@ Claude Code / AI Framework
 **Agent Runner** (`servers/agent-runner/`)
 - Polls Agent Coordinator for pending agent runs and stop commands
 - Starts Agent Coordinator Proxy for executor communication (see below)
-- Hosts embedded Agent Orchestrator MCP server (use `--mcp-port` for external clients)
+- Hosts embedded Agent Orchestrator MCP server (use `--mcp-port` for fixed port)
+- Optionally uses external MCP server (`--external-mcp-url`) for multi-runner setups
 - Processes agent runs via framework-specific executors
 - Supports concurrent agent run processing
 - Reports agent run status (started, completed, failed, stopped)
