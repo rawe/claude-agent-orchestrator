@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capabilities - Connect - Executive Summary</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Deep dive specific styles */
+    .deep-dive-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .back-link {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s ease;
+    }
+
+    .back-link:hover {
+      color: var(--color-secondary);
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .pillar-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #10b981;
+    }
+
+    .deep-dive-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* SVG Illustration */
+    .illustration {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .illustration svg {
+      width: 100%;
+      max-width: 450px;
+      height: auto;
+    }
+
+    /* Content section */
+    .content-section {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .metaphor {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid #10b981;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .metaphor-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #10b981;
+      margin-bottom: 0.75rem;
+    }
+
+    .metaphor p {
+      color: var(--color-text);
+      line-height: 1.6;
+      font-size: 1rem;
+    }
+
+    .key-points {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .key-point {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .key-point:hover {
+      border-color: rgba(16, 185, 129, 0.5);
+      background: var(--color-bg-elevated);
+    }
+
+    .key-point-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(16, 185, 129, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .key-point-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: #10b981;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .key-point-text {
+      flex: 1;
+    }
+
+    .key-point-title {
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .key-point-desc {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    /* Animation for SVG */
+    .svg-fade-in {
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+    }
+
+    .svg-fade-1 { animation-delay: 0.2s; }
+    .svg-fade-2 { animation-delay: 0.4s; }
+    .svg-fade-3 { animation-delay: 0.6s; }
+    .svg-fade-4 { animation-delay: 0.8s; }
+    .svg-fade-5 { animation-delay: 1s; }
+
+    /* Pulse animation for connections */
+    @keyframes pulseConnection {
+      0%, 100% { stroke-opacity: 0.3; }
+      50% { stroke-opacity: 1; }
+    }
+
+    .connection-pulse {
+      animation: pulseConnection 2s ease-in-out infinite;
+    }
+
+    .connection-pulse-1 { animation-delay: 0s; }
+    .connection-pulse-2 { animation-delay: 0.5s; }
+    .connection-pulse-3 { animation-delay: 1s; }
+    .connection-pulse-4 { animation-delay: 1.5s; }
+
+    /* Flow dots animation */
+    @keyframes flowDot {
+      0% { offset-distance: 0%; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { offset-distance: 100%; opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="deep-dive-header">
+      <a href="00-what-it-covers.html" class="back-link">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Overview
+      </a>
+      <span class="pillar-badge">Connect</span>
+      <h1>Capabilities</h1>
+      <p class="subtitle">Plug agents into your existing systems</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="deep-dive-content">
+        <!-- SVG Illustration: Central agent hub with plug connections -->
+        <div class="illustration">
+          <svg viewBox="0 0 450 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="hubGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b"/>
+                <stop offset="100%" stop-color="#0f172a"/>
+              </linearGradient>
+              <filter id="glowGreen">
+                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Connection lines with pulse effect -->
+            <g class="svg-fade-in svg-fade-2">
+              <!-- Top connection -->
+              <path d="M225 100 L225 55" stroke="#10b981" stroke-width="3" stroke-linecap="round" class="connection-pulse connection-pulse-1"/>
+              <!-- Top-right connection -->
+              <path d="M280 130 L350 85" stroke="#10b981" stroke-width="3" stroke-linecap="round" class="connection-pulse connection-pulse-2"/>
+              <!-- Bottom-right connection -->
+              <path d="M280 190 L350 235" stroke="#10b981" stroke-width="3" stroke-linecap="round" class="connection-pulse connection-pulse-3"/>
+              <!-- Bottom connection -->
+              <path d="M225 220 L225 265" stroke="#10b981" stroke-width="3" stroke-linecap="round" class="connection-pulse connection-pulse-4"/>
+              <!-- Bottom-left connection -->
+              <path d="M170 190 L100 235" stroke="#10b981" stroke-width="3" stroke-linecap="round" class="connection-pulse connection-pulse-1"/>
+              <!-- Top-left connection -->
+              <path d="M170 130 L100 85" stroke="#10b981" stroke-width="3" stroke-linecap="round" class="connection-pulse connection-pulse-2"/>
+            </g>
+
+            <!-- Central Agent Hub -->
+            <g class="svg-fade-in svg-fade-1">
+              <!-- Outer glow ring -->
+              <circle cx="225" cy="160" r="65" fill="none" stroke="#10b981" stroke-width="1" opacity="0.3"/>
+              <!-- Hub background -->
+              <circle cx="225" cy="160" r="55" fill="url(#hubGradient)" stroke="#10b981" stroke-width="2"/>
+              <!-- Agent icon in center -->
+              <circle cx="225" cy="150" r="20" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+              <circle cx="218" cy="147" r="3" fill="#10b981"/>
+              <circle cx="232" cy="147" r="3" fill="#10b981"/>
+              <path d="M215 158 Q225 165 235 158" stroke="#10b981" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <text x="225" y="190" font-family="system-ui" font-size="10" fill="#10b981" text-anchor="middle" font-weight="600">AGENT</text>
+            </g>
+
+            <!-- External Systems -->
+            <!-- Jira (Top) -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(185, 10)">
+              <rect width="80" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+              <text x="40" y="25" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Jira</text>
+            </g>
+
+            <!-- Slack (Top-right) -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(350, 55)">
+              <rect width="80" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+              <text x="40" y="25" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Slack</text>
+            </g>
+
+            <!-- Database (Bottom-right) -->
+            <g class="svg-fade-in svg-fade-4" transform="translate(350, 215)">
+              <rect width="80" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+              <text x="40" y="25" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Database</text>
+            </g>
+
+            <!-- APIs (Bottom) -->
+            <g class="svg-fade-in svg-fade-4" transform="translate(185, 270)">
+              <rect width="80" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+              <text x="40" y="25" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">APIs</text>
+            </g>
+
+            <!-- Knowledge Base (Bottom-left) -->
+            <g class="svg-fade-in svg-fade-5" transform="translate(20, 215)">
+              <rect width="80" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+              <text x="40" y="18" font-family="system-ui" font-size="10" fill="#f1f5f9" text-anchor="middle" font-weight="500">Knowledge</text>
+              <text x="40" y="32" font-family="system-ui" font-size="10" fill="#f1f5f9" text-anchor="middle" font-weight="500">Base</text>
+            </g>
+
+            <!-- Email (Top-left) -->
+            <g class="svg-fade-in svg-fade-5" transform="translate(20, 55)">
+              <rect width="80" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+              <text x="40" y="25" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Email</text>
+            </g>
+
+            <!-- Plug connectors on the connection lines -->
+            <g class="svg-fade-in svg-fade-3">
+              <circle cx="225" cy="75" r="6" fill="#10b981" opacity="0.8"/>
+              <circle cx="315" cy="105" r="6" fill="#10b981" opacity="0.8"/>
+              <circle cx="315" cy="215" r="6" fill="#10b981" opacity="0.8"/>
+              <circle cx="225" cy="245" r="6" fill="#10b981" opacity="0.8"/>
+              <circle cx="135" cy="215" r="6" fill="#10b981" opacity="0.8"/>
+              <circle cx="135" cy="105" r="6" fill="#10b981" opacity="0.8"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Content -->
+        <div class="content-section">
+          <div class="metaphor">
+            <div class="metaphor-title">The Metaphor: Universal Adapter</div>
+            <p>Think of USB-C: one port connects to monitors, drives, chargers, phones - anything. <strong>Capabilities work the same way.</strong> They're adapters that let agents talk to your systems. The agent doesn't need to know how Jira works. The capability handles the translation.</p>
+          </div>
+
+          <div class="key-points">
+            <div class="key-point fade-in fade-in-1">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Pre-built connectors</div>
+                <div class="key-point-desc">Common tools already supported out of the box</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-2">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Add without changing agents</div>
+                <div class="key-point-desc">New capability = new power, same agent definition</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-3">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Your data stays yours</div>
+                <div class="key-point-desc">Agents access systems, don't copy everything</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-4">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Extend as needed</div>
+                <div class="key-point-desc">Build custom capabilities for proprietary systems</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

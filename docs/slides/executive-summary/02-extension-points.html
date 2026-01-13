@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Extension Points - Agent Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .compass-container {
+      position: relative;
+      width: 700px;
+      height: 500px;
+    }
+
+    /* Center core */
+    .core-hub {
+      position: absolute;
+      left: 350px;
+      top: 250px;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: var(--color-bg-card);
+      border: 3px solid var(--color-coordinator);
+      box-shadow: 0 0 60px rgba(16, 185, 129, 0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .core-hub .icon-wrapper {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-coordinator);
+      margin-bottom: 0.25rem;
+    }
+
+    .core-hub .label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--color-coordinator);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Extension cards */
+    .extension-card {
+      position: absolute;
+      width: 200px;
+      padding: 1.25rem;
+      background: var(--color-bg-card);
+      border: 2px solid;
+      border-radius: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .extension-card:hover {
+      transform: scale(1.05);
+    }
+
+    .extension-card .header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .extension-card .icon-wrapper {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .extension-card .title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--color-text-bright);
+    }
+
+    .extension-card .tagline {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .extension-card .who {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+      display: inline-block;
+    }
+
+    /* Positions */
+    .ext-definitions {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: var(--color-app);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.15);
+    }
+    .ext-definitions .icon-wrapper {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--color-app);
+    }
+    .ext-definitions .who {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--color-app);
+    }
+
+    .ext-executors {
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      border-color: var(--color-executor);
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
+    }
+    .ext-executors .icon-wrapper {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--color-executor);
+    }
+    .ext-executors .who {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--color-executor);
+    }
+
+    .ext-mcp {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: var(--color-mcp);
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.15);
+    }
+    .ext-mcp .icon-wrapper {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--color-mcp);
+    }
+    .ext-mcp .who {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--color-mcp);
+    }
+
+    .ext-apps {
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      border-color: var(--color-runner);
+      box-shadow: 0 0 30px rgba(249, 158, 11, 0.15);
+    }
+    .ext-apps .icon-wrapper {
+      background: rgba(249, 158, 11, 0.15);
+      color: var(--color-runner);
+    }
+    .ext-apps .who {
+      background: rgba(249, 158, 11, 0.15);
+      color: var(--color-runner);
+    }
+
+    /* Connecting lines (SVG overlay) */
+    .connections-svg {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .connection-line {
+      stroke: var(--color-border);
+      stroke-width: 2;
+      stroke-dasharray: 6 4;
+      fill: none;
+    }
+
+    .callout {
+      bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header fade-in fade-in-1">
+      <h1>4 Ways to Extend</h1>
+      <p class="subtitle">Core stays stable. Extensions grow independently.</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="compass-container">
+        <!-- SVG Connections -->
+        <svg class="connections-svg fade-in fade-in-2" viewBox="0 0 700 500" preserveAspectRatio="xMidYMid meet">
+          <!-- Top connection -->
+          <line class="connection-line" x1="350" y1="190" x2="350" y2="148"/>
+          <!-- Right connection -->
+          <line class="connection-line" x1="410" y1="250" x2="500" y2="250"/>
+          <!-- Bottom connection -->
+          <line class="connection-line" x1="350" y1="310" x2="350" y2="352"/>
+          <!-- Left connection -->
+          <line class="connection-line" x1="290" y1="250" x2="200" y2="250"/>
+        </svg>
+
+        <!-- Center Core -->
+        <div class="core-hub fade-in fade-in-2">
+          <div class="icon-wrapper">
+            <svg class="icon" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 2v4"/>
+              <path d="M12 18v4"/>
+              <path d="M4.93 4.93l2.83 2.83"/>
+              <path d="M16.24 16.24l2.83 2.83"/>
+              <path d="M2 12h4"/>
+              <path d="M18 12h4"/>
+            </svg>
+          </div>
+          <span class="label">Core</span>
+        </div>
+
+        <!-- Top: Agent Definitions -->
+        <div class="extension-card ext-definitions fade-in fade-in-3">
+          <div class="header">
+            <div class="icon-wrapper">
+              <svg class="icon" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <span class="title">Agent Definitions</span>
+          </div>
+          <p class="tagline">What agents do</p>
+          <span class="who">PMs & Concept</span>
+        </div>
+
+        <!-- Right: Executors -->
+        <div class="extension-card ext-executors fade-in fade-in-4">
+          <div class="header">
+            <div class="icon-wrapper">
+              <svg class="icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </div>
+            <span class="title">Executors</span>
+          </div>
+          <p class="tagline">How agents work</p>
+          <span class="who">Developers</span>
+        </div>
+
+        <!-- Bottom: MCP Servers -->
+        <div class="extension-card ext-mcp fade-in fade-in-5">
+          <div class="header">
+            <div class="icon-wrapper">
+              <svg class="icon" viewBox="0 0 24 24">
+                <path d="M12 2v6"/>
+                <path d="M12 16v6"/>
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M4.93 4.93l4.24 4.24"/>
+                <path d="M14.83 14.83l4.24 4.24"/>
+                <path d="M2 12h6"/>
+                <path d="M16 12h6"/>
+              </svg>
+            </div>
+            <span class="title">MCP Servers</span>
+          </div>
+          <p class="tagline">What agents connect to</p>
+          <span class="who">Integrators</span>
+        </div>
+
+        <!-- Left: Custom Apps -->
+        <div class="extension-card ext-apps fade-in fade-in-6">
+          <div class="header">
+            <div class="icon-wrapper">
+              <svg class="icon" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 9h18"/>
+                <path d="M9 21V9"/>
+              </svg>
+            </div>
+            <span class="title">Custom Apps</span>
+          </div>
+          <p class="tagline">What users see</p>
+          <span class="who">UI/UX Team</span>
+        </div>
+      </div>
+
+      <div class="callout fade-in fade-in-6">
+        Pick what you need. <strong>Each extension point grows independently.</strong>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

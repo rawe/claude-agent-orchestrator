@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visibility - Monitor - Executive Summary</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Deep dive specific styles */
+    .deep-dive-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .back-link {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s ease;
+    }
+
+    .back-link:hover {
+      color: #f59e0b;
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .pillar-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #f59e0b;
+    }
+
+    .deep-dive-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* SVG Illustration */
+    .illustration {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .illustration svg {
+      width: 100%;
+      max-width: 480px;
+      height: auto;
+    }
+
+    /* Content section */
+    .content-section {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .metaphor {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .metaphor-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #f59e0b;
+      margin-bottom: 0.75rem;
+    }
+
+    .metaphor p {
+      color: var(--color-text);
+      line-height: 1.6;
+      font-size: 1rem;
+    }
+
+    .key-points {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .key-point {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .key-point:hover {
+      border-color: rgba(245, 158, 11, 0.5);
+      background: var(--color-bg-elevated);
+    }
+
+    .key-point-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(245, 158, 11, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .key-point-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: #f59e0b;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .key-point-text {
+      flex: 1;
+    }
+
+    .key-point-title {
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .key-point-desc {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    /* Animation for SVG */
+    .svg-fade-in {
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+    }
+
+    .svg-fade-1 { animation-delay: 0.2s; }
+    .svg-fade-2 { animation-delay: 0.4s; }
+    .svg-fade-3 { animation-delay: 0.6s; }
+    .svg-fade-4 { animation-delay: 0.8s; }
+    .svg-fade-5 { animation-delay: 1s; }
+
+    /* Progress bar animation */
+    @keyframes progressFill {
+      from { width: 0; }
+      to { width: 75%; }
+    }
+
+    .progress-fill {
+      animation: progressFill 2s ease forwards;
+      animation-delay: 0.8s;
+    }
+
+    /* Blinking status indicator */
+    @keyframes statusBlink {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    .status-active {
+      animation: statusBlink 1.5s ease-in-out infinite;
+    }
+
+    /* Activity feed scroll */
+    @keyframes feedScroll {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="deep-dive-header">
+      <a href="00-what-it-covers.html" class="back-link">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Overview
+      </a>
+      <span class="pillar-badge">Monitor</span>
+      <h1>Real-Time Visibility</h1>
+      <p class="subtitle">See what every agent is doing - right now</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="deep-dive-content">
+        <!-- SVG Illustration: Dashboard/Control Room -->
+        <div class="illustration">
+          <svg viewBox="0 0 480 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="dashGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b"/>
+                <stop offset="100%" stop-color="#0f172a"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Main Dashboard Frame -->
+            <g class="svg-fade-in svg-fade-1">
+              <!-- Outer frame -->
+              <rect x="20" y="20" width="440" height="300" rx="16" fill="#0a0f1a" stroke="#334155" stroke-width="2"/>
+              <!-- Inner bezel -->
+              <rect x="30" y="30" width="420" height="280" rx="12" fill="url(#dashGradient)"/>
+              <!-- Title bar -->
+              <rect x="30" y="30" width="420" height="35" rx="12" fill="#1e293b"/>
+              <rect x="30" y="55" width="420" height="10" fill="url(#dashGradient)"/>
+              <text x="240" y="52" font-family="system-ui" font-size="12" fill="#f59e0b" text-anchor="middle" font-weight="600">CONTROL ROOM</text>
+              <!-- Window controls -->
+              <circle cx="55" cy="47" r="5" fill="#ef4444"/>
+              <circle cx="75" cy="47" r="5" fill="#f59e0b"/>
+              <circle cx="95" cy="47" r="5" fill="#10b981"/>
+            </g>
+
+            <!-- Agent Status Panel (Left) -->
+            <g class="svg-fade-in svg-fade-2" transform="translate(45, 80)">
+              <rect width="130" height="110" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+              <text x="65" y="20" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle" font-weight="600">AGENT STATUS</text>
+
+              <!-- Status items -->
+              <g transform="translate(15, 35)">
+                <!-- Agent 1 - Running -->
+                <circle cx="8" cy="8" r="5" fill="#10b981" class="status-active"/>
+                <text x="22" y="12" font-family="system-ui" font-size="9" fill="#f1f5f9">Agent A</text>
+                <text x="95" y="12" font-family="system-ui" font-size="8" fill="#10b981" text-anchor="end">Running</text>
+              </g>
+              <g transform="translate(15, 55)">
+                <!-- Agent 2 - Running -->
+                <circle cx="8" cy="8" r="5" fill="#10b981" class="status-active"/>
+                <text x="22" y="12" font-family="system-ui" font-size="9" fill="#f1f5f9">Agent B</text>
+                <text x="95" y="12" font-family="system-ui" font-size="8" fill="#10b981" text-anchor="end">Running</text>
+              </g>
+              <g transform="translate(15, 75)">
+                <!-- Agent 3 - Idle -->
+                <circle cx="8" cy="8" r="5" fill="#334155" stroke="#64748b" stroke-width="1"/>
+                <text x="22" y="12" font-family="system-ui" font-size="9" fill="#f1f5f9">Agent C</text>
+                <text x="95" y="12" font-family="system-ui" font-size="8" fill="#64748b" text-anchor="end">Idle</text>
+              </g>
+            </g>
+
+            <!-- Live Activity Panel (Right) -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(190, 80)">
+              <rect width="245" height="110" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+              <text x="122" y="20" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle" font-weight="600">LIVE ACTIVITY</text>
+
+              <!-- Activity feed -->
+              <g transform="translate(15, 35)">
+                <text x="0" y="0" font-family="system-ui" font-size="9" fill="#64748b">&gt;</text>
+                <text x="12" y="0" font-family="system-ui" font-size="9" fill="#3b82f6">Agent A:</text>
+                <text x="62" y="0" font-family="system-ui" font-size="9" fill="#f1f5f9">analyzing data...</text>
+              </g>
+              <g transform="translate(15, 52)">
+                <text x="0" y="0" font-family="system-ui" font-size="9" fill="#64748b">&gt;</text>
+                <text x="12" y="0" font-family="system-ui" font-size="9" fill="#10b981">Agent B:</text>
+                <text x="62" y="0" font-family="system-ui" font-size="9" fill="#f1f5f9">complete</text>
+                <text x="105" y="0" font-family="system-ui" font-size="9" fill="#10b981">&#10003;</text>
+              </g>
+              <g transform="translate(15, 69)">
+                <text x="0" y="0" font-family="system-ui" font-size="9" fill="#64748b">&gt;</text>
+                <text x="12" y="0" font-family="system-ui" font-size="9" fill="#8b5cf6">Agent C:</text>
+                <text x="62" y="0" font-family="system-ui" font-size="9" fill="#f1f5f9">starting task...</text>
+              </g>
+              <g transform="translate(15, 86)">
+                <text x="0" y="0" font-family="system-ui" font-size="9" fill="#64748b">&gt;</text>
+                <text x="12" y="0" font-family="system-ui" font-size="9" fill="#3b82f6">Agent A:</text>
+                <text x="62" y="0" font-family="system-ui" font-size="9" fill="#f1f5f9">processing results...</text>
+              </g>
+
+              <!-- Cursor blink -->
+              <rect x="170" y="82" width="6" height="10" fill="#f59e0b">
+                <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+              </rect>
+            </g>
+
+            <!-- Progress Bar Panel (Bottom) -->
+            <g class="svg-fade-in svg-fade-4" transform="translate(45, 205)">
+              <rect width="390" height="55" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+              <text x="195" y="18" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle" font-weight="600">OVERALL PROGRESS</text>
+
+              <!-- Progress bar background -->
+              <rect x="20" y="28" width="350" height="16" rx="4" fill="#0f172a"/>
+
+              <!-- Progress bar fill -->
+              <rect x="20" y="28" width="0" height="16" rx="4" fill="#f59e0b" class="progress-fill">
+                <animate attributeName="width" from="0" to="262" dur="2s" fill="freeze" begin="0.8s"/>
+              </rect>
+
+              <!-- Progress percentage -->
+              <text x="300" y="40" font-family="system-ui" font-size="10" fill="#f59e0b" font-weight="600">75%</text>
+
+              <!-- Progress markers -->
+              <line x1="107" y1="44" x2="107" y2="48" stroke="#334155" stroke-width="1"/>
+              <line x1="195" y1="44" x2="195" y2="48" stroke="#334155" stroke-width="1"/>
+              <line x1="282" y1="44" x2="282" y2="48" stroke="#334155" stroke-width="1"/>
+            </g>
+
+            <!-- Alert indicator -->
+            <g class="svg-fade-in svg-fade-5" transform="translate(400, 35)">
+              <circle cx="15" cy="12" r="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+              <text x="15" y="15" font-family="system-ui" font-size="8" fill="#10b981" text-anchor="middle" font-weight="600">OK</text>
+            </g>
+
+            <!-- Decorative screen reflection -->
+            <rect x="30" y="30" width="420" height="280" rx="12" fill="url(#dashGradient)" opacity="0.05"/>
+          </svg>
+        </div>
+
+        <!-- Content -->
+        <div class="content-section">
+          <div class="metaphor">
+            <div class="metaphor-title">The Metaphor: Control Room</div>
+            <p>Think of an air traffic control room: every flight visible on screen, real-time position updates, alerts for issues, full situational awareness. <strong>The dashboard works the same way.</strong> You see all agents, all activity, all progress - live.</p>
+          </div>
+
+          <div class="key-points">
+            <div class="key-point fade-in fade-in-1">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Real-time updates</div>
+                <div class="key-point-desc">See progress as it happens, not after</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-2">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">No black boxes</div>
+                <div class="key-point-desc">Full transparency into agent work</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-3">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Early issue detection</div>
+                <div class="key-point-desc">Catch problems before they compound</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-4">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Stakeholder confidence</div>
+                <div class="key-point-desc">Show progress to non-technical stakeholders</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

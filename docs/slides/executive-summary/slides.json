@@ -1,0 +1,71 @@
+{
+  "title": "Agent Orchestrator",
+  "subtitle": "Executive Summary - A framework for intelligent automation",
+  "totalSlides": 7,
+  "sections": [
+    { "id": "intro", "number": "1", "title": "Introduction", "colorClass": "section-intro" },
+    { "id": "pillars", "number": "2", "title": "The Six Pillars", "colorClass": "section-pillars" },
+    { "id": "architecture", "number": "3", "title": "Architecture", "colorClass": "section-architecture" },
+    { "id": "execution", "number": "4", "title": "Execution Model", "colorClass": "section-execution" },
+    { "id": "growth", "number": "5", "title": "Growth Path", "colorClass": "section-growth" }
+  ],
+  "mainFlow": [
+    {
+      "id": "why-orchestration",
+      "file": "00-why-orchestration.html",
+      "title": "Why Orchestration?",
+      "icon": "🎯",
+      "section": "intro"
+    },
+    {
+      "id": "what-it-covers",
+      "file": "00-what-it-covers.html",
+      "title": "Six Pillars",
+      "icon": "🏛️",
+      "section": "pillars",
+      "deepDives": [
+        { "id": "define", "file": "00a-define.html", "title": "Agent Blueprints", "icon": "📝", "backLabel": "Back to Overview" },
+        { "id": "connect", "file": "00b-connect.html", "title": "Capabilities", "icon": "🔌", "backLabel": "Back to Overview" },
+        { "id": "coordinate", "file": "00c-coordinate.html", "title": "Agent Orchestration", "icon": "🤝", "backLabel": "Back to Overview" },
+        { "id": "share", "file": "00d-share.html", "title": "Context Store", "icon": "📂", "backLabel": "Back to Overview" },
+        { "id": "monitor", "file": "00e-monitor.html", "title": "Visibility", "icon": "👁️", "backLabel": "Back to Overview" },
+        { "id": "choose", "file": "00f-choose.html", "title": "Provider Independence", "icon": "🔄", "backLabel": "Back to Overview" }
+      ]
+    },
+    {
+      "id": "core-architecture",
+      "file": "01-core-architecture.html",
+      "title": "Core Architecture",
+      "icon": "🏗️",
+      "section": "architecture"
+    },
+    {
+      "id": "extension-points",
+      "file": "02-extension-points.html",
+      "title": "Extension Points",
+      "icon": "🔧",
+      "section": "architecture"
+    },
+    {
+      "id": "autonomous-vs-procedural",
+      "file": "04-autonomous-vs-procedural.html",
+      "title": "AI vs Code",
+      "icon": "🧠",
+      "section": "execution"
+    },
+    {
+      "id": "start-fast",
+      "file": "02-start-fast-get-efficient.html",
+      "title": "Start Fast, Get Efficient",
+      "icon": "⚡",
+      "section": "execution"
+    },
+    {
+      "id": "laptop-to-customer",
+      "file": "03-from-laptop-to-customer.html",
+      "title": "From Laptop to Customer",
+      "icon": "📈",
+      "section": "growth"
+    }
+  ]
+}

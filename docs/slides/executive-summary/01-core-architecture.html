@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Core Architecture - Agent Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .architecture-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .layer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .layer-box {
+      width: 100%;
+      max-width: 500px;
+      padding: 1.5rem 2rem;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      background: var(--color-bg-card);
+      border: 2px solid;
+      position: relative;
+    }
+
+    .layer-box .icon-wrapper {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .layer-box .content {
+      flex: 1;
+    }
+
+    .layer-box .title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+    }
+
+    .layer-box .desc {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Color variations */
+    .layer-app .layer-box {
+      border-color: var(--color-app);
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+    }
+    .layer-app .icon-wrapper {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--color-app);
+    }
+
+    .layer-coordinator .layer-box {
+      border-color: var(--color-coordinator);
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.2);
+    }
+    .layer-coordinator .icon-wrapper {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--color-coordinator);
+    }
+
+    .layer-runner .layer-box {
+      border-color: var(--color-runner);
+      box-shadow: 0 0 40px rgba(249, 158, 11, 0.2);
+    }
+    .layer-runner .icon-wrapper {
+      background: rgba(249, 158, 11, 0.15);
+      color: var(--color-runner);
+    }
+
+    /* Connector between layers */
+    .connector-vertical {
+      height: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .connector-line {
+      width: 2px;
+      height: 100%;
+      background: linear-gradient(to bottom, var(--color-border), var(--color-text-muted));
+    }
+
+    .connector-label {
+      position: absolute;
+      right: -60px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      background: var(--color-bg);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+    }
+
+    /* Executors row */
+    .executors-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .executor-card {
+      width: 140px;
+      padding: 1rem;
+      border-radius: 12px;
+      background: var(--color-bg-card);
+      border: 2px solid;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .executor-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .executor-card.ai {
+      border-color: var(--color-executor);
+      box-shadow: 0 0 25px rgba(139, 92, 246, 0.15);
+    }
+    .executor-card.ai .icon-circle {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--color-executor);
+    }
+
+    .executor-card.script {
+      border-color: var(--color-procedural);
+      box-shadow: 0 0 25px rgba(249, 115, 22, 0.15);
+    }
+    .executor-card.script .icon-circle {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--color-procedural);
+    }
+
+    .icon-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .executor-card .label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .executor-card .type {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Forking connector */
+    .fork-connector {
+      width: 300px;
+      height: 30px;
+      position: relative;
+    }
+
+    .fork-connector svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .callout {
+      bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header fade-in fade-in-1">
+      <h1>4 Building Blocks, Infinite Possibilities</h1>
+      <p class="subtitle">A simple architecture that scales with your needs</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="architecture-diagram">
+        <!-- Your App Layer -->
+        <div class="layer layer-app fade-in fade-in-2">
+          <div class="layer-box">
+            <div class="icon-wrapper">
+              <svg class="icon icon-lg" viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <path d="M8 21h8"/>
+                <path d="M12 17v4"/>
+              </svg>
+            </div>
+            <div class="content">
+              <div class="title">Your Application</div>
+              <div class="desc">Custom UI or existing system</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connector -->
+        <div class="connector-vertical fade-in fade-in-2">
+          <div class="connector-line"></div>
+          <span class="connector-label">API</span>
+        </div>
+
+        <!-- Coordinator Layer -->
+        <div class="layer layer-coordinator fade-in fade-in-3">
+          <div class="layer-box">
+            <div class="icon-wrapper">
+              <svg class="icon icon-lg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v4"/>
+                <path d="M12 18v4"/>
+                <path d="M4.93 4.93l2.83 2.83"/>
+                <path d="M16.24 16.24l2.83 2.83"/>
+                <path d="M2 12h4"/>
+                <path d="M18 12h4"/>
+                <path d="M4.93 19.07l2.83-2.83"/>
+                <path d="M16.24 7.76l2.83-2.83"/>
+              </svg>
+            </div>
+            <div class="content">
+              <div class="title">Coordinator</div>
+              <div class="desc">Manages sessions & orchestration</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connector -->
+        <div class="connector-vertical fade-in fade-in-3">
+          <div class="connector-line"></div>
+        </div>
+
+        <!-- Runner Layer -->
+        <div class="layer layer-runner fade-in fade-in-4">
+          <div class="layer-box">
+            <div class="icon-wrapper">
+              <svg class="icon icon-lg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <polygon points="10 8 16 12 10 16 10 8"/>
+              </svg>
+            </div>
+            <div class="content">
+              <div class="title">Runner</div>
+              <div class="desc">Picks up and delegates work</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fork Connector -->
+        <div class="fork-connector fade-in fade-in-4">
+          <svg viewBox="0 0 300 30" preserveAspectRatio="none">
+            <path d="M 150 0 L 150 10 M 50 30 L 50 20 Q 50 10 60 10 L 150 10 M 150 30 L 150 10 M 250 30 L 250 20 Q 250 10 240 10 L 150 10"
+                  stroke="currentColor" stroke-width="2" fill="none" class="text-muted" style="color: var(--color-border)"/>
+          </svg>
+        </div>
+
+        <!-- Executors Row -->
+        <div class="executors-row fade-in fade-in-5">
+          <div class="executor-card ai">
+            <div class="icon-circle">
+              <svg class="icon" viewBox="0 0 24 24">
+                <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+                <path d="M16 14a4 4 0 0 1 4 4v2H4v-2a4 4 0 0 1 4-4h8z"/>
+              </svg>
+            </div>
+            <span class="label">Claude</span>
+            <span class="type">AI Agent</span>
+          </div>
+
+          <div class="executor-card ai">
+            <div class="icon-circle">
+              <svg class="icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <span class="label">OpenAI</span>
+            <span class="type">AI Agent</span>
+          </div>
+
+          <div class="executor-card script">
+            <div class="icon-circle">
+              <svg class="icon" viewBox="0 0 24 24">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+            </div>
+            <span class="label">Scripts</span>
+            <span class="type">Procedural</span>
+          </div>
+        </div>
+
+        <!-- Executors Label -->
+        <div class="fade-in fade-in-6" style="margin-top: 1rem;">
+          <span class="label label-executor">Executors</span>
+          <span style="margin-left: 0.5rem; font-size: 0.85rem; color: var(--color-text-muted)">Pluggable</span>
+        </div>
+      </div>
+
+      <div class="callout fade-in fade-in-6">
+        Like an org chart: <strong>CEO</strong> gives direction, <strong>Manager</strong> organizes, <strong>Workers</strong> execute
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

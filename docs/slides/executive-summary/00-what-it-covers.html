@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Six Pillars of Intelligent Automation - Executive Summary</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Hexagonal Layout */
+    .pillars-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: 600px;
+      margin: 0 auto;
+    }
+
+    /* Center element */
+    .center-hub {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-bg-elevated), var(--color-bg-card));
+      border: 2px solid var(--color-primary);
+      box-shadow: 0 0 60px rgba(59, 130, 246, 0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .center-hub .framework-line {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-bright);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .center-hub .framework-line.highlight {
+      font-size: 0.75rem;
+      color: var(--color-primary);
+    }
+
+    /* Pillar cards */
+    .pillar {
+      position: absolute;
+      width: 180px;
+      padding: 1.25rem;
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-border);
+      border-radius: 16px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .pillar:hover {
+      transform: scale(1.05);
+      border-color: var(--accent-color, var(--color-primary));
+      box-shadow: 0 0 40px rgba(var(--accent-rgb, 59, 130, 246), 0.3);
+    }
+
+    .pillar .icon-wrapper {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 0.75rem;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pillar .word {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--accent-color, var(--color-primary));
+      margin-bottom: 0.25rem;
+    }
+
+    .pillar .title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+    }
+
+    .pillar .description {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+    }
+
+    /* Pillar positions - hexagonal arrangement */
+    .pillar-define {
+      --accent-color: #3b82f6;
+      --accent-rgb: 59, 130, 246;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .pillar-define:hover { transform: translateX(-50%) scale(1.05); }
+
+    .pillar-connect {
+      --accent-color: #10b981;
+      --accent-rgb: 16, 185, 129;
+      top: 15%;
+      right: 5%;
+    }
+
+    .pillar-coordinate {
+      --accent-color: #8b5cf6;
+      --accent-rgb: 139, 92, 246;
+      bottom: 15%;
+      right: 5%;
+    }
+
+    .pillar-share {
+      --accent-color: #06b6d4;
+      --accent-rgb: 6, 182, 212;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .pillar-share:hover { transform: translateX(-50%) scale(1.05); }
+
+    .pillar-monitor {
+      --accent-color: #f59e0b;
+      --accent-rgb: 245, 158, 11;
+      bottom: 15%;
+      left: 5%;
+    }
+
+    .pillar-choose {
+      --accent-color: #f97316;
+      --accent-rgb: 249, 115, 22;
+      top: 15%;
+      left: 5%;
+    }
+
+    /* Icon backgrounds */
+    .icon-define { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .icon-connect { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .icon-coordinate { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+    .icon-share { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+    .icon-monitor { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .icon-choose { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+
+    /* Connection lines */
+    .connections {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .connection-line {
+      stroke: var(--color-border);
+      stroke-width: 1;
+      fill: none;
+      opacity: 0.5;
+    }
+
+    /* Fade-in animations */
+    .pillar-define { animation: fadeIn 0.5s ease forwards; animation-delay: 0.1s; opacity: 0; }
+    .pillar-connect { animation: fadeIn 0.5s ease forwards; animation-delay: 0.2s; opacity: 0; }
+    .pillar-coordinate { animation: fadeIn 0.5s ease forwards; animation-delay: 0.3s; opacity: 0; }
+    .pillar-share { animation: fadeIn 0.5s ease forwards; animation-delay: 0.4s; opacity: 0; }
+    .pillar-monitor { animation: fadeIn 0.5s ease forwards; animation-delay: 0.5s; opacity: 0; }
+    .pillar-choose { animation: fadeIn 0.5s ease forwards; animation-delay: 0.6s; opacity: 0; }
+    .center-hub { animation: scaleIn 0.6s ease forwards; animation-delay: 0.3s; opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+
+    @keyframes scaleIn {
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    /* Icon SVG styling */
+    .pillar-icon {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    /* Footer callout */
+    .footer-callout {
+      text-align: center;
+      margin-top: 1rem;
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer-callout strong {
+      color: var(--color-text);
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="slide-header">
+      <h1>Six Pillars of Intelligent Automation</h1>
+      <p class="subtitle">Everything you need to build, run, and scale AI-powered solutions</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="pillars-container">
+        <!-- Connection lines SVG - lines stop at borders -->
+        <svg class="connections" viewBox="0 0 900 600" preserveAspectRatio="xMidYMid meet">
+          <!-- Lines from hub edge to pillar edge -->
+          <!-- Define (top): hub to pillar bottom edge -->
+          <line class="connection-line" x1="450" y1="225" x2="450" y2="200" />
+          <!-- Connect (top-right): hub to pillar left edge -->
+          <line class="connection-line" x1="520" y1="270" x2="680" y2="185" />
+          <!-- Coordinate (bottom-right): hub to pillar left edge -->
+          <line class="connection-line" x1="520" y1="330" x2="680" y2="415" />
+          <!-- Share (bottom): hub to pillar top edge -->
+          <line class="connection-line" x1="450" y1="375" x2="450" y2="400" />
+          <!-- Monitor (bottom-left): hub to pillar right edge -->
+          <line class="connection-line" x1="380" y1="330" x2="220" y2="415" />
+          <!-- Choose (top-left): hub to pillar right edge -->
+          <line class="connection-line" x1="380" y1="270" x2="220" y2="185" />
+        </svg>
+
+        <!-- Center Hub -->
+        <div class="center-hub">
+          <span class="framework-line">Agent</span>
+          <span class="framework-line highlight">Orchestrator</span>
+          <span class="framework-line">Framework</span>
+        </div>
+
+        <!-- DEFINE Pillar -->
+        <a href="00a-define.html" class="pillar pillar-define">
+          <div class="icon-wrapper icon-define">
+            <svg class="pillar-icon" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div class="word">Define</div>
+          <div class="title">Agent Blueprints</div>
+          <div class="description">Describe agents in plain language</div>
+        </a>
+
+        <!-- CONNECT Pillar -->
+        <a href="00b-connect.html" class="pillar pillar-connect">
+          <div class="icon-wrapper icon-connect">
+            <svg class="pillar-icon" viewBox="0 0 24 24">
+              <path d="M12 2v4"/>
+              <path d="M12 18v4"/>
+              <path d="M4.93 4.93l2.83 2.83"/>
+              <path d="M16.24 16.24l2.83 2.83"/>
+              <path d="M2 12h4"/>
+              <path d="M18 12h4"/>
+              <path d="M4.93 19.07l2.83-2.83"/>
+              <path d="M16.24 7.76l2.83-2.83"/>
+              <circle cx="12" cy="12" r="4"/>
+            </svg>
+          </div>
+          <div class="word">Connect</div>
+          <div class="title">Capabilities</div>
+          <div class="description">Plug into your existing systems</div>
+        </a>
+
+        <!-- COORDINATE Pillar -->
+        <a href="00c-coordinate.html" class="pillar pillar-coordinate">
+          <div class="icon-wrapper icon-coordinate">
+            <svg class="pillar-icon" viewBox="0 0 24 24">
+              <circle cx="12" cy="5" r="3"/>
+              <circle cx="5" cy="19" r="3"/>
+              <circle cx="19" cy="19" r="3"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="12" x2="5" y2="16"/>
+              <line x1="12" y1="12" x2="19" y2="16"/>
+            </svg>
+          </div>
+          <div class="word">Coordinate</div>
+          <div class="title">Agent Orchestration</div>
+          <div class="description">Sub-agents, delegation, resume</div>
+        </a>
+
+        <!-- SHARE Pillar -->
+        <a href="00d-share.html" class="pillar pillar-share">
+          <div class="icon-wrapper icon-share">
+            <svg class="pillar-icon" viewBox="0 0 24 24">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              <path d="M8 7h8"/>
+              <path d="M8 11h8"/>
+              <path d="M8 15h4"/>
+            </svg>
+          </div>
+          <div class="word">Share</div>
+          <div class="title">Context Store</div>
+          <div class="description">Efficient knowledge handover</div>
+        </a>
+
+        <!-- MONITOR Pillar -->
+        <a href="00e-monitor.html" class="pillar pillar-monitor">
+          <div class="icon-wrapper icon-monitor">
+            <svg class="pillar-icon" viewBox="0 0 24 24">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+              <path d="M6 10h.01"/>
+              <path d="M10 10h.01"/>
+              <path d="M14 10h4"/>
+            </svg>
+          </div>
+          <div class="word">Monitor</div>
+          <div class="title">Visibility</div>
+          <div class="description">Real-time progress and results</div>
+        </a>
+
+        <!-- CHOOSE Pillar -->
+        <a href="00f-choose.html" class="pillar pillar-choose">
+          <div class="icon-wrapper icon-choose">
+            <svg class="pillar-icon" viewBox="0 0 24 24">
+              <path d="M16 3h5v5"/>
+              <path d="M8 3H3v5"/>
+              <path d="M21 3l-7 7"/>
+              <path d="M3 3l7 7"/>
+              <path d="M16 21h5v-5"/>
+              <path d="M8 21H3v-5"/>
+              <path d="M21 21l-7-7"/>
+              <path d="M3 21l7-7"/>
+            </svg>
+          </div>
+          <div class="word">Choose</div>
+          <div class="title">Provider Independence</div>
+          <div class="description">Switch providers, protect investment</div>
+        </a>
+      </div>
+    </main>
+
+    <div class="footer-callout">
+      <strong>One framework.</strong> Six integrated capabilities. <strong>Focus on value, not infrastructure.</strong>
+    </div>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

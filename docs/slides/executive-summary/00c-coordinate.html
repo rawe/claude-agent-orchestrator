@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Orchestration - Coordinate - Executive Summary</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Deep dive specific styles */
+    .deep-dive-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .back-link {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s ease;
+    }
+
+    .back-link:hover {
+      color: #8b5cf6;
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .pillar-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8b5cf6;
+    }
+
+    .deep-dive-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* SVG Illustration */
+    .illustration {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .illustration svg {
+      width: 100%;
+      max-width: 450px;
+      height: auto;
+    }
+
+    /* Content section */
+    .content-section {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .metaphor {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid #8b5cf6;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .metaphor-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8b5cf6;
+      margin-bottom: 0.75rem;
+    }
+
+    .metaphor p {
+      color: var(--color-text);
+      line-height: 1.6;
+      font-size: 1rem;
+    }
+
+    .key-points {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .key-point {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .key-point:hover {
+      border-color: rgba(139, 92, 246, 0.5);
+      background: var(--color-bg-elevated);
+    }
+
+    .key-point-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(139, 92, 246, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .key-point-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: #8b5cf6;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .key-point-text {
+      flex: 1;
+    }
+
+    .key-point-title {
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .key-point-desc {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    /* Animation for SVG */
+    .svg-fade-in {
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+    }
+
+    .svg-fade-1 { animation-delay: 0.2s; }
+    .svg-fade-2 { animation-delay: 0.4s; }
+    .svg-fade-3 { animation-delay: 0.6s; }
+    .svg-fade-4 { animation-delay: 0.8s; }
+    .svg-fade-5 { animation-delay: 1s; }
+
+    /* Flow animation for arrows */
+    @keyframes flowArrow {
+      to { stroke-dashoffset: -20; }
+    }
+
+    .flow-arrow {
+      stroke-dasharray: 8 4;
+      animation: flowArrow 1s linear infinite;
+    }
+
+    /* Pulse animation for coordinator */
+    @keyframes coordinatorPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+      50% { box-shadow: 0 0 20px 10px rgba(139, 92, 246, 0.2); }
+    }
+
+    /* Resume icon pulse */
+    @keyframes resumePulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    .resume-indicator {
+      animation: resumePulse 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="deep-dive-header">
+      <a href="00-what-it-covers.html" class="back-link">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Overview
+      </a>
+      <span class="pillar-badge">Coordinate</span>
+      <h1>Agent Orchestration</h1>
+      <p class="subtitle">Agents delegate, coordinate, and resume automatically</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="deep-dive-content">
+        <!-- SVG Illustration: Hierarchy tree with coordinator and workers -->
+        <div class="illustration">
+          <svg viewBox="-20 0 470 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="coordGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b"/>
+                <stop offset="100%" stop-color="#0f172a"/>
+              </linearGradient>
+              <filter id="glowPurple">
+                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Connection lines from coordinator to workers -->
+            <g class="svg-fade-in svg-fade-2">
+              <!-- To Research Agent -->
+              <path d="M225 95 L225 130 L90 130 L90 165" stroke="#8b5cf6" stroke-width="2" class="flow-arrow"/>
+              <!-- To Analyze Agent -->
+              <path d="M225 95 L225 165" stroke="#8b5cf6" stroke-width="2" class="flow-arrow"/>
+              <!-- To Write Agent -->
+              <path d="M225 95 L225 130 L360 130 L360 165" stroke="#8b5cf6" stroke-width="2" class="flow-arrow"/>
+            </g>
+
+            <!-- Return lines from workers to results -->
+            <g class="svg-fade-in svg-fade-4">
+              <!-- From Research -->
+              <path d="M90 240 L90 270 L225 270" stroke="#10b981" stroke-width="2" class="flow-arrow"/>
+              <!-- From Analyze -->
+              <path d="M225 240 L225 270" stroke="#10b981" stroke-width="2" class="flow-arrow"/>
+              <!-- From Write -->
+              <path d="M360 240 L360 270 L225 270" stroke="#10b981" stroke-width="2" class="flow-arrow"/>
+            </g>
+
+            <!-- Coordinator Agent (Top) -->
+            <g class="svg-fade-in svg-fade-1" transform="translate(155, 20)">
+              <!-- Glow effect -->
+              <rect x="-5" y="-5" width="150" height="80" rx="14" fill="none" stroke="#8b5cf6" stroke-width="1" opacity="0.3"/>
+              <!-- Main box -->
+              <rect width="140" height="70" rx="12" fill="url(#coordGradient)" stroke="#8b5cf6" stroke-width="2"/>
+              <!-- Icon -->
+              <circle cx="35" cy="35" r="18" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
+              <circle cx="30" cy="32" r="2.5" fill="#8b5cf6"/>
+              <circle cx="40" cy="32" r="2.5" fill="#8b5cf6"/>
+              <path d="M28 40 Q35 46 42 40" stroke="#8b5cf6" stroke-width="1.5" fill="none"/>
+              <!-- Crown/coordinator symbol -->
+              <path d="M28 22 L35 18 L42 22" stroke="#8b5cf6" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <!-- Text -->
+              <text x="95" y="30" font-family="system-ui" font-size="9" fill="#8b5cf6" text-anchor="middle" font-weight="600">COORDINATOR</text>
+              <text x="95" y="45" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Agent</text>
+            </g>
+
+            <!-- Worker Agent 1: Research -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(25, 165)">
+              <rect width="130" height="75" rx="10" fill="url(#coordGradient)" stroke="#334155" stroke-width="1.5"/>
+              <!-- Agent icon -->
+              <circle cx="35" cy="30" r="15" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+              <circle cx="31" cy="28" r="2" fill="#64748b"/>
+              <circle cx="39" cy="28" r="2" fill="#64748b"/>
+              <path d="M30 35 Q35 39 40 35" stroke="#64748b" stroke-width="1" fill="none"/>
+              <!-- Text -->
+              <text x="90" y="28" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle" font-weight="500">RESEARCH</text>
+              <text x="90" y="42" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Agent</text>
+              <!-- Status indicator -->
+              <circle cx="115" cy="15" r="4" fill="#10b981">
+                <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+              </circle>
+            </g>
+
+            <!-- Worker Agent 2: Analyze -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(160, 165)">
+              <rect width="130" height="75" rx="10" fill="url(#coordGradient)" stroke="#334155" stroke-width="1.5"/>
+              <!-- Agent icon -->
+              <circle cx="35" cy="30" r="15" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+              <circle cx="31" cy="28" r="2" fill="#64748b"/>
+              <circle cx="39" cy="28" r="2" fill="#64748b"/>
+              <path d="M30 35 Q35 39 40 35" stroke="#64748b" stroke-width="1" fill="none"/>
+              <!-- Text -->
+              <text x="90" y="28" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle" font-weight="500">ANALYZE</text>
+              <text x="90" y="42" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Agent</text>
+              <!-- Status indicator -->
+              <circle cx="115" cy="15" r="4" fill="#10b981">
+                <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+              </circle>
+            </g>
+
+            <!-- Worker Agent 3: Write -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(295, 165)">
+              <rect width="130" height="75" rx="10" fill="url(#coordGradient)" stroke="#334155" stroke-width="1.5"/>
+              <!-- Agent icon -->
+              <circle cx="35" cy="30" r="15" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+              <circle cx="31" cy="28" r="2" fill="#64748b"/>
+              <circle cx="39" cy="28" r="2" fill="#64748b"/>
+              <path d="M30 35 Q35 39 40 35" stroke="#64748b" stroke-width="1" fill="none"/>
+              <!-- Text -->
+              <text x="90" y="28" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle" font-weight="500">WRITE</text>
+              <text x="90" y="42" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Agent</text>
+              <!-- Status indicator -->
+              <circle cx="115" cy="15" r="4" fill="#10b981">
+                <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" begin="1s"/>
+              </circle>
+            </g>
+
+            <!-- Results box -->
+            <g class="svg-fade-in svg-fade-5" transform="translate(155, 285)">
+              <rect width="140" height="45" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+              <text x="70" y="20" font-family="system-ui" font-size="9" fill="#10b981" text-anchor="middle" font-weight="600">COMBINED</text>
+              <text x="70" y="35" font-family="system-ui" font-size="11" fill="#f1f5f9" text-anchor="middle" font-weight="500">Results</text>
+            </g>
+
+            <!-- Resume/Pause indicator - positioned at Research agent (left) -->
+            <g class="svg-fade-in svg-fade-5 resume-indicator" transform="translate(-10, 125)">
+              <rect x="0" y="0" width="40" height="50" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
+              <!-- Pause icon -->
+              <rect x="12" y="10" width="4" height="14" rx="1" fill="#8b5cf6"/>
+              <rect x="24" y="10" width="4" height="14" rx="1" fill="#8b5cf6"/>
+              <!-- Play arrow -->
+              <path d="M14 32 L26 38 L14 44 Z" fill="#10b981"/>
+              <text x="20" y="58" font-family="system-ui" font-size="7" fill="#64748b" text-anchor="middle">RESUME</text>
+            </g>
+
+            <!-- Arrow labels -->
+            <text x="158" y="115" font-family="system-ui" font-size="8" fill="#8b5cf6">delegate</text>
+            <text x="265" y="115" font-family="system-ui" font-size="8" fill="#8b5cf6">delegate</text>
+            <text x="158" y="265" font-family="system-ui" font-size="8" fill="#10b981">return</text>
+            <text x="265" y="265" font-family="system-ui" font-size="8" fill="#10b981">return</text>
+          </svg>
+        </div>
+
+        <!-- Content -->
+        <div class="content-section">
+          <div class="metaphor">
+            <div class="metaphor-title">The Metaphor: Project Manager</div>
+            <p>A good project manager doesn't do everything themselves. They break big tasks into smaller ones, delegate to specialists, track progress, and handle handoffs. <strong>Agent Orchestration works the same way.</strong> One agent coordinates others, each doing what they're best at.</p>
+          </div>
+
+          <div class="key-points">
+            <div class="key-point fade-in fade-in-1">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Delegation</div>
+                <div class="key-point-desc">Complex tasks break into manageable parts handled by specialists</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-2">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Parallel execution</div>
+                <div class="key-point-desc">Sub-agents can work simultaneously for faster results</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-3">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Automatic coordination</div>
+                <div class="key-point-desc">Parent knows when children finish, no manual tracking</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-4">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Resumption</div>
+                <div class="key-point-desc">Interrupted work continues where it left off, no lost progress</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Provider Independence - Choose - Executive Summary</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Deep dive specific styles */
+    .deep-dive-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .back-link {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s ease;
+    }
+
+    .back-link:hover {
+      color: #f97316;
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .pillar-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(249, 115, 22, 0.15);
+      border: 1px solid rgba(249, 115, 22, 0.3);
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #f97316;
+    }
+
+    .deep-dive-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* SVG Illustration */
+    .illustration {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .illustration svg {
+      width: 100%;
+      max-width: 480px;
+      height: auto;
+    }
+
+    /* Content section */
+    .content-section {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .metaphor {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid #f97316;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .metaphor-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #f97316;
+      margin-bottom: 0.75rem;
+    }
+
+    .metaphor p {
+      color: var(--color-text);
+      line-height: 1.6;
+      font-size: 1rem;
+    }
+
+    .key-points {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .key-point {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .key-point:hover {
+      border-color: rgba(249, 115, 22, 0.5);
+      background: var(--color-bg-elevated);
+    }
+
+    .key-point-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(249, 115, 22, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .key-point-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: #f97316;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .key-point-text {
+      flex: 1;
+    }
+
+    .key-point-title {
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .key-point-desc {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    /* Animation for SVG */
+    .svg-fade-in {
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+    }
+
+    .svg-fade-1 { animation-delay: 0.2s; }
+    .svg-fade-2 { animation-delay: 0.4s; }
+    .svg-fade-3 { animation-delay: 0.6s; }
+    .svg-fade-4 { animation-delay: 0.8s; }
+    .svg-fade-5 { animation-delay: 1s; }
+
+    /* Switch animation */
+    @keyframes switchGlow {
+      0%, 100% { filter: drop-shadow(0 0 5px rgba(249, 115, 22, 0.3)); }
+      50% { filter: drop-shadow(0 0 15px rgba(249, 115, 22, 0.6)); }
+    }
+
+    .switch-active {
+      animation: switchGlow 2s ease-in-out infinite;
+    }
+
+    /* Provider highlight animation */
+    @keyframes providerHighlight {
+      0%, 100% { stroke-opacity: 0.3; }
+      50% { stroke-opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <header class="deep-dive-header">
+      <a href="00-what-it-covers.html" class="back-link">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Overview
+      </a>
+      <span class="pillar-badge">Choose</span>
+      <h1>Provider Independence</h1>
+      <p class="subtitle">Switch AI providers without rewriting</p>
+    </header>
+
+    <main class="slide-content">
+      <div class="deep-dive-content">
+        <!-- SVG Illustration: Agent with provider switch -->
+        <div class="illustration">
+          <svg viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="provGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b"/>
+                <stop offset="100%" stop-color="#0f172a"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Your Agents & Blueprints (Left Side) -->
+            <g class="svg-fade-in svg-fade-1" transform="translate(30, 85)">
+              <!-- Main container -->
+              <rect width="140" height="150" rx="12" fill="url(#provGradient)" stroke="#f97316" stroke-width="2"/>
+
+              <!-- Header -->
+              <rect width="140" height="30" rx="12" fill="#1e293b"/>
+              <rect y="22" width="140" height="8" fill="url(#provGradient)"/>
+              <text x="70" y="20" font-family="system-ui" font-size="9" fill="#f97316" text-anchor="middle" font-weight="600">YOUR AGENTS</text>
+
+              <!-- Agent icons stack -->
+              <g transform="translate(20, 45)">
+                <!-- Agent 1 -->
+                <g>
+                  <circle cx="20" cy="15" r="12" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+                  <circle cx="17" cy="13" r="2" fill="#64748b"/>
+                  <circle cx="23" cy="13" r="2" fill="#64748b"/>
+                  <path d="M16 19 Q20 22 24 19" stroke="#64748b" stroke-width="1" fill="none"/>
+                </g>
+                <!-- Agent 2 -->
+                <g transform="translate(40, 0)">
+                  <circle cx="20" cy="15" r="12" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+                  <circle cx="17" cy="13" r="2" fill="#64748b"/>
+                  <circle cx="23" cy="13" r="2" fill="#64748b"/>
+                  <path d="M16 19 Q20 22 24 19" stroke="#64748b" stroke-width="1" fill="none"/>
+                </g>
+              </g>
+
+              <!-- Blueprint docs -->
+              <g transform="translate(20, 85)">
+                <rect width="100" height="45" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+                <rect x="10" y="10" width="60" height="4" rx="2" fill="#334155"/>
+                <rect x="10" y="20" width="45" height="4" rx="2" fill="#334155"/>
+                <rect x="10" y="30" width="55" height="4" rx="2" fill="#334155"/>
+                <text x="50" y="54" font-family="system-ui" font-size="7" fill="#64748b" text-anchor="middle">Blueprints</text>
+              </g>
+            </g>
+
+            <!-- Labels under agents box -->
+            <text x="100" y="255" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle">Same agents,</text>
+            <text x="100" y="268" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle">same definitions</text>
+
+            <!-- Central Switch/Selector -->
+            <g class="svg-fade-in svg-fade-2 switch-active" transform="translate(195, 120)">
+              <!-- Switch body -->
+              <rect width="90" height="80" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+
+              <!-- Switch knob track -->
+              <rect x="15" y="20" width="60" height="40" rx="6" fill="#0f172a"/>
+
+              <!-- Connection lines from switch to providers -->
+              <line x1="75" y1="25" x2="90" y2="25" stroke="#f97316" stroke-width="2"/>
+              <line x1="75" y1="40" x2="90" y2="40" stroke="#334155" stroke-width="2"/>
+              <line x1="75" y1="55" x2="90" y2="55" stroke="#334155" stroke-width="2"/>
+
+              <!-- Switch knob (pointing to Provider B) -->
+              <rect x="20" y="30" width="50" height="20" rx="4" fill="#f97316"/>
+              <text x="45" y="44" font-family="system-ui" font-size="8" fill="#0f172a" text-anchor="middle" font-weight="600">SELECT</text>
+
+              <!-- Label -->
+              <text x="45" y="73" font-family="system-ui" font-size="8" fill="#f97316" text-anchor="middle" font-weight="600">SWITCH</text>
+            </g>
+
+            <!-- Arrow from Agents to Switch -->
+            <g class="svg-fade-in svg-fade-3">
+              <path d="M170 160 L195 160" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+              <path d="M185 155 L195 160 L185 165" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </g>
+
+            <!-- Provider Options (Right Side) -->
+            <!-- Provider A -->
+            <g class="svg-fade-in svg-fade-3" transform="translate(310, 65)">
+              <rect width="140" height="50" rx="8" fill="url(#provGradient)" stroke="#334155" stroke-width="1.5"/>
+              <text x="70" y="22" font-family="system-ui" font-size="10" fill="#64748b" text-anchor="middle" font-weight="500">Provider A</text>
+              <text x="70" y="38" font-family="system-ui" font-size="8" fill="#475569" text-anchor="middle">OpenAI</text>
+            </g>
+
+            <!-- Provider B (Selected) -->
+            <g class="svg-fade-in svg-fade-4" transform="translate(310, 130)">
+              <rect width="140" height="50" rx="8" fill="url(#provGradient)" stroke="#10b981" stroke-width="2"/>
+              <!-- Selected indicator -->
+              <circle cx="125" cy="25" r="8" fill="#10b981"/>
+              <path d="M121 25 L124 28 L130 22" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <text x="60" y="22" font-family="system-ui" font-size="10" fill="#f1f5f9" text-anchor="middle" font-weight="600">Provider B</text>
+              <text x="60" y="38" font-family="system-ui" font-size="8" fill="#10b981" text-anchor="middle">Anthropic</text>
+              <!-- Current label -->
+              <rect x="5" y="-8" width="50" height="16" rx="4" fill="#10b981"/>
+              <text x="30" y="3" font-family="system-ui" font-size="7" fill="#0f172a" text-anchor="middle" font-weight="600">CURRENT</text>
+            </g>
+
+            <!-- Provider C -->
+            <g class="svg-fade-in svg-fade-5" transform="translate(310, 195)">
+              <rect width="140" height="50" rx="8" fill="url(#provGradient)" stroke="#334155" stroke-width="1.5"/>
+              <text x="70" y="22" font-family="system-ui" font-size="10" fill="#64748b" text-anchor="middle" font-weight="500">Provider C</text>
+              <text x="70" y="38" font-family="system-ui" font-size="8" fill="#475569" text-anchor="middle">Google</text>
+            </g>
+
+            <!-- Labels under providers -->
+            <text x="380" y="268" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle">Choose your</text>
+            <text x="380" y="281" font-family="system-ui" font-size="9" fill="#64748b" text-anchor="middle">execution</text>
+
+            <!-- Connection dots on switch lines -->
+            <g class="svg-fade-in svg-fade-4">
+              <circle cx="295" cy="145" r="4" fill="#10b981"/>
+            </g>
+
+            <!-- Open door metaphor icon -->
+            <g class="svg-fade-in svg-fade-5" transform="translate(205, 45)">
+              <!-- Door frame -->
+              <rect width="35" height="45" rx="3" fill="none" stroke="#f97316" stroke-width="1.5" stroke-dasharray="3 2"/>
+              <!-- Open door -->
+              <path d="M35 0 L50 8 L50 45 L35 45" fill="#1e293b" stroke="#f97316" stroke-width="1"/>
+              <!-- Arrow through door -->
+              <path d="M15 22 L45 22" stroke="#10b981" stroke-width="1.5"/>
+              <path d="M40 18 L48 22 L40 26" stroke="#10b981" stroke-width="1.5" fill="none"/>
+              <text x="25" y="60" font-family="system-ui" font-size="7" fill="#64748b" text-anchor="middle">OPEN DOOR</text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Content -->
+        <div class="content-section">
+          <div class="metaphor">
+            <div class="metaphor-title">The Metaphor: Open Door</div>
+            <p>Imagine renting an office: locked into a 10-year lease means the landlord can raise prices. Month-to-month means you negotiate from strength. <strong>Provider Independence is the open door.</strong> You're never trapped. If a better option emerges, you walk through.</p>
+          </div>
+
+          <div class="key-points">
+            <div class="key-point fade-in fade-in-1">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">No lock-in</div>
+                <div class="key-point-desc">Not married to one vendor's pricing or roadmap</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-2">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Best tool for each job</div>
+                <div class="key-point-desc">Use different providers for different tasks</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-3">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Negotiating power</div>
+                <div class="key-point-desc">Credible alternatives improve your position</div>
+              </div>
+            </div>
+
+            <div class="key-point fade-in fade-in-4">
+              <div class="key-point-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="key-point-text">
+                <div class="key-point-title">Future-proof</div>
+                <div class="key-point-desc">New providers emerge, you can adopt them</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>
