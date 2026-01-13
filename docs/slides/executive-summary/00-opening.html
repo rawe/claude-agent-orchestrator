@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening - Agent Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .opening-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      width: 100%;
+      max-width: 900px;
+      text-align: center;
+    }
+
+    /* Image container - no border, natural size */
+    .hero-image-container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Soft edge fade using CSS mask - fades all edges smoothly */
+    .hero-image-container img {
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 8%,
+        black 92%,
+        transparent 100%
+      ),
+      linear-gradient(
+        to right,
+        transparent 0%,
+        black 5%,
+        black 95%,
+        transparent 100%
+      );
+      -webkit-mask-composite: source-in;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 8%,
+        black 92%,
+        transparent 100%
+      ),
+      linear-gradient(
+        to right,
+        transparent 0%,
+        black 5%,
+        black 95%,
+        transparent 100%
+      );
+      mask-composite: intersect;
+    }
+
+    /* Hero image */
+    .hero-image {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Title styling */
+    .opening-title {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 800;
+      color: var(--color-text-bright);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    .opening-title .highlight {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-ai));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Subtitle */
+    .opening-subtitle {
+      font-size: clamp(1.1rem, 2vw, 1.5rem);
+      color: var(--color-text-muted);
+      font-weight: 400;
+      max-width: 600px;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Decorative elements */
+    .opening-container::before {
+      content: '';
+      position: absolute;
+      top: 10%;
+      left: 5%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .opening-container::after {
+      content: '';
+      position: absolute;
+      bottom: 10%;
+      right: 5%;
+      width: 250px;
+      height: 250px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <main class="slide-content">
+      <div class="opening-container">
+
+        <!-- Hero Image -->
+        <div class="hero-image-container fade-in fade-in-1">
+          <img class="hero-image" src="images/agent_orchestration_challenge.png" alt="AI Agent Orchestration Challenge">
+        </div>
+
+        <!-- Title -->
+        <h1 class="opening-title fade-in fade-in-2">
+          <span class="highlight">One Agent is Good.</span><br>
+          A Team is Better.
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="opening-subtitle fade-in fade-in-3">
+          Why building an agent orchestration framework changes how we deliver AI solutions.
+        </p>
+
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

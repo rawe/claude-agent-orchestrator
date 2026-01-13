@@ -11,10 +11,10 @@
   ],
   "mainFlow": [
     {
-      "id": "why-orchestration",
-      "file": "01-why-orchestration.html",
-      "title": "Why Orchestration?",
-      "icon": "🎯",
+      "id": "opening",
+      "file": "00-opening.html",
+      "title": "Opening",
+      "icon": "🚀",
       "section": "intro"
     },
     {
