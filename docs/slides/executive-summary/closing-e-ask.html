@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Simple Ask - Agent Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Background image styling */
+    .slide {
+      position: relative;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url('images/closing_e.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.35;
+      z-index: 0;
+      -webkit-mask-image: radial-gradient(
+        ellipse 85% 80% at center,
+        black 40%,
+        transparent 100%
+      );
+      mask-image: radial-gradient(
+        ellipse 85% 80% at center,
+        black 40%,
+        transparent 100%
+      );
+    }
+
+    .slide-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .ask-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    /* Title section */
+    .ask-title {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .ask-title h1 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      color: var(--color-text-bright);
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .ask-title h1 span {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-ai));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .ask-title .subtitle {
+      font-size: 1.1rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Questions container */
+    .questions {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      width: 100%;
+    }
+
+    /* Individual question card */
+    .question-card {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      background: var(--color-bg-card);
+      border: 2px solid var(--color-border);
+      border-radius: 16px;
+      padding: 1.5rem 2rem;
+      position: relative;
+      transition: all 0.4s ease;
+    }
+
+    .question-card:hover {
+      transform: translateX(8px);
+      border-color: var(--color-border-light);
+    }
+
+    .question-card.q1 { border-left: 4px solid var(--color-primary); }
+    .question-card.q2 { border-left: 4px solid var(--color-secondary); }
+    .question-card.q3 { border-left: 4px solid var(--color-automation); }
+    .question-card.q4 { border-left: 4px solid var(--color-ai); }
+
+    .question-card.q1:hover { box-shadow: 0 0 30px rgba(59, 130, 246, 0.15); }
+    .question-card.q2:hover { box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); }
+    .question-card.q3:hover { box-shadow: 0 0 30px rgba(249, 115, 22, 0.15); }
+    .question-card.q4:hover { box-shadow: 0 0 30px rgba(139, 92, 246, 0.15); }
+
+    /* Question number/checkbox */
+    .question-number {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .q1 .question-number { background: rgba(59, 130, 246, 0.15); }
+    .q2 .question-number { background: rgba(16, 185, 129, 0.15); }
+    .q3 .question-number { background: rgba(249, 115, 22, 0.15); }
+    .q4 .question-number { background: rgba(139, 92, 246, 0.15); }
+
+    .question-number svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .q1 .question-number svg { stroke: var(--color-primary); }
+    .q2 .question-number svg { stroke: var(--color-secondary); }
+    .q3 .question-number svg { stroke: var(--color-automation); }
+    .q4 .question-number svg { stroke: var(--color-ai); }
+
+    /* Checkmark animation - triggered on click */
+    .checkmark-path {
+      stroke-dasharray: 24;
+      stroke-dashoffset: 24;
+      transition: stroke-dashoffset 0.4s ease;
+    }
+
+    .question-card.checked .checkmark-path {
+      stroke-dashoffset: 0;
+    }
+
+    @keyframes drawCheck {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* Question content */
+    .question-content {
+      flex: 1;
+    }
+
+    .question-text {
+      font-size: clamp(1rem, 1.8vw, 1.25rem);
+      font-weight: 600;
+      color: var(--color-text-bright);
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+    }
+
+    /* Implication - triggered on click */
+    .implication {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+      color: var(--color-text-muted);
+      opacity: 0;
+      transform: translateX(-10px);
+      transition: all 0.5s ease;
+    }
+
+    .question-card.checked .implication {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .implication .arrow {
+      font-size: 0.85rem;
+      opacity: 0.6;
+    }
+
+    .implication .result {
+      color: var(--color-text);
+      font-weight: 500;
+    }
+
+    .q1 .implication .result { color: var(--color-primary); }
+    .q2 .implication .result { color: var(--color-secondary); }
+    .q3 .implication .result { color: var(--color-automation); }
+    .q4 .implication .result { color: var(--color-ai); }
+
+    /* Yes badge - triggered on click */
+    .yes-badge {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 20px;
+      padding: 0.35rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.3s ease;
+    }
+
+    .question-card.checked .yes-badge {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    @keyframes popIn {
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Call to action - hidden until all checked */
+    .cta-container {
+      margin-top: 3.5rem;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.6s ease;
+      pointer-events: none;
+      /* Frosted glass backdrop */
+      background: rgba(10, 15, 26, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+      border-radius: 20px;
+      padding: 1.5rem 2.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .cta-container.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    @keyframes fadeUpCTA {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .cta-divider {
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--color-border-light), transparent);
+      margin: 0 auto 1.5rem;
+    }
+
+    .cta-text {
+      font-size: clamp(1.1rem, 2vw, 1.4rem);
+      color: var(--color-text-muted);
+      font-weight: 400;
+      line-height: 1.6;
+    }
+
+    .cta-text .highlight {
+      color: var(--color-text-bright);
+      font-weight: 600;
+    }
+
+    .cta-question {
+      font-size: clamp(1.5rem, 2.5vw, 2rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-ai));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-top: 0.75rem;
+      position: relative;
+      display: inline-block;
+    }
+
+    /* Text glow effect using pseudo-element */
+    .cta-question::before {
+      content: 'When do we start?';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-ai));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: blur(12px);
+      opacity: 0.7;
+      z-index: -1;
+    }
+
+    /* Connecting line animation */
+    .connector-svg {
+      position: absolute;
+      left: 72px;
+      top: 0;
+      height: 100%;
+      width: 4px;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .flow-line {
+      stroke: var(--color-border);
+      stroke-width: 2;
+      stroke-dasharray: 6 4;
+      animation: flowPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes flowPulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Decorative background elements */
+    .ask-container::before {
+      content: '';
+      position: absolute;
+      top: 5%;
+      right: 10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .ask-container::after {
+      content: '';
+      position: absolute;
+      bottom: 5%;
+      left: 10%;
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Staggered card animations */
+    .question-card {
+      opacity: 0;
+      transform: translateY(30px);
+      cursor: pointer;
+    }
+
+    .question-card.q1 { animation: slideUpCard 0.6s ease forwards; animation-delay: 0.3s; }
+    .question-card.q2 { animation: slideUpCard 0.6s ease forwards; animation-delay: 0.6s; }
+    .question-card.q3 { animation: slideUpCard 0.6s ease forwards; animation-delay: 0.9s; }
+    .question-card.q4 { animation: slideUpCard 0.6s ease forwards; animation-delay: 1.2s; }
+
+    @keyframes slideUpCard {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Clickable indicator */
+    .question-card:not(.checked):hover {
+      border-color: var(--color-text-muted);
+      transform: translateX(4px);
+    }
+
+    .question-card.checked {
+      cursor: default;
+    }
+
+    .question-card.checked.q1 { border-color: var(--color-primary); box-shadow: 0 0 30px rgba(59, 130, 246, 0.2); }
+    .question-card.checked.q2 { border-color: var(--color-secondary); box-shadow: 0 0 30px rgba(16, 185, 129, 0.2); }
+    .question-card.checked.q3 { border-color: var(--color-automation); box-shadow: 0 0 30px rgba(249, 115, 22, 0.2); }
+    .question-card.checked.q4 { border-color: var(--color-ai); box-shadow: 0 0 30px rgba(139, 92, 246, 0.2); }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .question-card {
+        padding: 1.25rem 1.5rem;
+        gap: 1rem;
+      }
+
+      .question-number {
+        width: 40px;
+        height: 40px;
+      }
+
+      .question-number svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .yes-badge {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <main class="slide-content">
+      <div class="ask-container">
+
+        <!-- Title -->
+        <div class="ask-title fade-in fade-in-1">
+          <h1><span>One Framework.</span> Four Questions.</h1>
+          <p class="subtitle">If the answers are yes, the decision is already made.</p>
+        </div>
+
+        <!-- Three Questions -->
+        <div class="questions">
+
+          <!-- Question 1 -->
+          <div class="question-card q1">
+            <div class="question-number">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path class="checkmark-path" d="M5 12l5 5L19 7"/>
+              </svg>
+            </div>
+            <div class="question-content">
+              <div class="question-text">Do we believe AI agents are our future?</div>
+              <div class="implication">
+                <span class="arrow">If yes</span>
+                <span class="result">We need orchestration</span>
+              </div>
+            </div>
+            <div class="yes-badge">Yes</div>
+          </div>
+
+          <!-- Question 2: Foundation -->
+          <div class="question-card q2">
+            <div class="question-number">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path class="checkmark-path" d="M5 12l5 5L19 7"/>
+              </svg>
+            </div>
+            <div class="question-content">
+              <div class="question-text">Do we want to stop rebuilding from scratch every time?</div>
+              <div class="implication">
+                <span class="arrow">If yes</span>
+                <span class="result">We need a foundation</span>
+              </div>
+            </div>
+            <div class="yes-badge">Yes</div>
+          </div>
+
+          <!-- Question 3: Methodology -->
+          <div class="question-card q3">
+            <div class="question-number">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path class="checkmark-path" d="M5 12l5 5L19 7"/>
+              </svg>
+            </div>
+            <div class="question-content">
+              <div class="question-text">Do we want to start simple and fast, then improve as we learn?</div>
+              <div class="implication">
+                <span class="arrow">If yes</span>
+                <span class="result">We need to learn and adapt</span>
+              </div>
+            </div>
+            <div class="yes-badge">Yes</div>
+          </div>
+
+          <!-- Question 4: Inclusion -->
+          <div class="question-card q4">
+            <div class="question-number">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path class="checkmark-path" d="M5 12l5 5L19 7"/>
+              </svg>
+            </div>
+            <div class="question-content">
+              <div class="question-text">Do we want everyone to contribute, not just developers?</div>
+              <div class="implication">
+                <span class="arrow">If yes</span>
+                <span class="result">We need to make AI approachable</span>
+              </div>
+            </div>
+            <div class="yes-badge">Yes</div>
+          </div>
+
+        </div>
+
+        <!-- Call to Action -->
+        <div class="cta-container">
+          <div class="cta-divider"></div>
+          <p class="cta-text">If the answer is <span class="highlight">yes</span>, the only question left is:</p>
+          <p class="cta-question">When do we start?</p>
+        </div>
+
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+  <script>
+    // Interactive question cards
+    document.addEventListener('DOMContentLoaded', () => {
+      const questionCards = document.querySelectorAll('.question-card');
+      const ctaContainer = document.querySelector('.cta-container');
+
+      questionCards.forEach(card => {
+        card.addEventListener('click', () => {
+          // Don't re-trigger if already checked
+          if (card.classList.contains('checked')) return;
+
+          // Add checked class to trigger animations
+          card.classList.add('checked');
+
+          // Check if all cards are now checked
+          const allChecked = [...questionCards].every(c => c.classList.contains('checked'));
+
+          // Show CTA when all questions are answered
+          if (allChecked) {
+            setTimeout(() => {
+              ctaContainer.classList.add('visible');
+            }, 400); // Small delay for dramatic effect
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>This Is What We Unlock - Agent Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Background image styling */
+    .slide {
+      position: relative;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url('images/closing_c.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.35;
+      z-index: 0;
+      /* Soft edge fade using mask */
+      -webkit-mask-image: radial-gradient(
+        ellipse 85% 80% at center,
+        black 40%,
+        transparent 100%
+      );
+      mask-image: radial-gradient(
+        ellipse 85% 80% at center,
+        black 40%,
+        transparent 100%
+      );
+    }
+
+    .slide-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .unlock-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3rem;
+      width: 100%;
+      max-width: 1200px;
+      text-align: center;
+      position: relative;
+    }
+
+    /* Title styling */
+    .unlock-title {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 800;
+      color: var(--color-text-bright);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    .unlock-title .highlight {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Central lock visual */
+    .lock-visual {
+      position: relative;
+      width: 500px;
+      height: 280px;
+    }
+
+    /* The lock SVG */
+    .lock-svg {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 100px;
+      height: 100px;
+      z-index: 10;
+    }
+
+    .lock-body {
+      fill: var(--color-bg-elevated);
+      stroke: var(--color-secondary);
+      stroke-width: 2;
+      filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.5));
+    }
+
+    .lock-shackle {
+      fill: none;
+      stroke: var(--color-secondary);
+      stroke-width: 4;
+      stroke-linecap: round;
+      transform-origin: 35px 45px;
+      animation: unlockShackle 2s ease-out forwards;
+      animation-delay: 0.5s;
+    }
+
+    @keyframes unlockShackle {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-35deg); }
+    }
+
+    .lock-keyhole {
+      fill: var(--color-secondary);
+      animation: glowKeyhole 2s ease-in-out infinite;
+    }
+
+    @keyframes glowKeyhole {
+      0%, 100% { filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.8)); }
+      50% { filter: drop-shadow(0 0 15px rgba(16, 185, 129, 1)); }
+    }
+
+    /* Opportunity streams flowing outward */
+    .opportunity-stream {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      background: var(--color-bg-card);
+      border-radius: 12px;
+      border: 1px solid;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--color-text);
+      white-space: nowrap;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .opportunity-stream:hover {
+      transform: scale(1.05);
+      z-index: 20;
+    }
+
+    .opportunity-stream .icon-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Stream positions - radiating outward */
+    .stream-1 {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: var(--color-primary);
+      animation: flowOut1 0.8s ease-out forwards;
+      animation-delay: 1s;
+    }
+    .stream-1 .icon-dot { background: var(--color-primary); box-shadow: 0 0 10px var(--color-primary); }
+    .stream-1:hover { box-shadow: 0 0 30px rgba(59, 130, 246, 0.4); }
+
+    .stream-2 {
+      top: 20%;
+      right: 0;
+      border-color: var(--color-secondary);
+      animation: flowOut2 0.8s ease-out forwards;
+      animation-delay: 1.2s;
+    }
+    .stream-2 .icon-dot { background: var(--color-secondary); box-shadow: 0 0 10px var(--color-secondary); }
+    .stream-2:hover { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
+
+    .stream-3 {
+      bottom: 20%;
+      right: 0;
+      border-color: var(--color-ai);
+      animation: flowOut3 0.8s ease-out forwards;
+      animation-delay: 1.4s;
+    }
+    .stream-3 .icon-dot { background: var(--color-ai); box-shadow: 0 0 10px var(--color-ai); }
+    .stream-3:hover { box-shadow: 0 0 30px rgba(139, 92, 246, 0.4); }
+
+    .stream-4 {
+      bottom: 20%;
+      left: 0;
+      border-color: var(--color-automation);
+      animation: flowOut4 0.8s ease-out forwards;
+      animation-delay: 1.6s;
+    }
+    .stream-4 .icon-dot { background: var(--color-automation); box-shadow: 0 0 10px var(--color-automation); }
+    .stream-4:hover { box-shadow: 0 0 30px rgba(249, 115, 22, 0.4); }
+
+    .stream-5 {
+      top: 20%;
+      left: 0;
+      border-color: var(--color-stream);
+      animation: flowOut5 0.8s ease-out forwards;
+      animation-delay: 1.8s;
+    }
+    .stream-5 .icon-dot { background: var(--color-stream); box-shadow: 0 0 10px var(--color-stream); }
+    .stream-5:hover { box-shadow: 0 0 30px rgba(6, 182, 212, 0.4); }
+
+    @keyframes flowOut1 {
+      0% { opacity: 0; top: 50%; }
+      100% { opacity: 1; top: 0; }
+    }
+
+    @keyframes flowOut2 {
+      0% { opacity: 0; right: 50%; top: 50%; }
+      100% { opacity: 1; right: 0; top: 20%; }
+    }
+
+    @keyframes flowOut3 {
+      0% { opacity: 0; right: 50%; bottom: 50%; }
+      100% { opacity: 1; right: 0; bottom: 20%; }
+    }
+
+    @keyframes flowOut4 {
+      0% { opacity: 0; left: 50%; bottom: 50%; }
+      100% { opacity: 1; left: 0; bottom: 20%; }
+    }
+
+    @keyframes flowOut5 {
+      0% { opacity: 0; left: 50%; top: 50%; }
+      100% { opacity: 1; left: 0; top: 20%; }
+    }
+
+    /* Connection lines from lock to opportunities */
+    .connection-lines {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .connection-line {
+      stroke: var(--color-border);
+      stroke-width: 1;
+      stroke-dasharray: 4 4;
+      fill: none;
+      opacity: 0;
+      animation: fadeInLine 0.5s ease-out forwards;
+    }
+
+    .line-1 { animation-delay: 1s; stroke: var(--color-primary); }
+    .line-2 { animation-delay: 1.2s; stroke: var(--color-secondary); }
+    .line-3 { animation-delay: 1.4s; stroke: var(--color-ai); }
+    .line-4 { animation-delay: 1.6s; stroke: var(--color-automation); }
+    .line-5 { animation-delay: 1.8s; stroke: var(--color-stream); }
+
+    @keyframes fadeInLine {
+      to { opacity: 0.4; }
+    }
+
+    /* Radial glow behind lock */
+    .lock-glow {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
+      border-radius: 50%;
+      animation: pulseGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+      50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    }
+
+    /* Call to action */
+    .cta-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .cta-text {
+      font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+      font-weight: 600;
+      color: var(--color-text);
+      letter-spacing: -0.01em;
+    }
+
+    .cta-text .emphasis {
+      color: var(--color-primary);
+    }
+
+    .cta-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-ai));
+      border: none;
+      border-radius: 12px;
+      color: var(--color-text-bright);
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      animation: ctaPulse 2s ease-in-out infinite;
+      animation-delay: 2.5s;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .cta-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 30px rgba(59, 130, 246, 0.6);
+    }
+
+    @keyframes ctaPulse {
+      0%, 100% { box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4); }
+      50% { box-shadow: 0 4px 40px rgba(59, 130, 246, 0.7); }
+    }
+
+    /* Button activated state */
+    .cta-button.activated {
+      background: linear-gradient(135deg, var(--color-secondary), #34d399);
+      animation: none;
+      transform: scale(1.1);
+    }
+
+    /* Pulse wave effect */
+    .pulse-wave {
+      position: fixed;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, transparent 70%);
+      pointer-events: none;
+      animation: pulseWaveExpand 1s ease-out forwards;
+    }
+
+    @keyframes pulseWaveExpand {
+      0% {
+        width: 0;
+        height: 0;
+        opacity: 1;
+      }
+      100% {
+        width: 200vmax;
+        height: 200vmax;
+        opacity: 0;
+      }
+    }
+
+    /* Celebration particles */
+    .celebration-particle {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: particleFloat 1.5s ease-out forwards;
+    }
+
+    @keyframes particleFloat {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-150px) scale(0);
+      }
+    }
+
+    /* Glow boost for streams when activated - no position change */
+    .opportunity-stream.glow-boost {
+      box-shadow: 0 0 40px currentColor;
+      filter: brightness(1.3);
+      transition: box-shadow 0.3s ease, filter 0.3s ease;
+    }
+
+    /* Lock glow boost */
+    .lock-svg.glow-boost .lock-body {
+      filter: drop-shadow(0 0 40px rgba(16, 185, 129, 0.9));
+    }
+
+    .lock-svg.glow-boost .lock-keyhole {
+      filter: drop-shadow(0 0 25px rgba(16, 185, 129, 1));
+    }
+
+    /* Decorative background particles */
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: float 4s ease-in-out infinite;
+    }
+
+    .particle-1 { top: 10%; left: 15%; background: var(--color-primary); animation-delay: 0s; }
+    .particle-2 { top: 20%; right: 20%; background: var(--color-secondary); animation-delay: 0.5s; }
+    .particle-3 { bottom: 30%; left: 10%; background: var(--color-ai); animation-delay: 1s; }
+    .particle-4 { bottom: 15%; right: 15%; background: var(--color-automation); animation-delay: 1.5s; }
+    .particle-5 { top: 40%; left: 5%; background: var(--color-stream); animation-delay: 2s; }
+    .particle-6 { top: 30%; right: 8%; background: var(--color-primary); animation-delay: 2.5s; }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
+      50% { transform: translateY(-10px) scale(1.5); opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <main class="slide-content">
+      <div class="unlock-container">
+
+        <!-- Floating particles -->
+        <div class="particle particle-1"></div>
+        <div class="particle particle-2"></div>
+        <div class="particle particle-3"></div>
+        <div class="particle particle-4"></div>
+        <div class="particle particle-5"></div>
+        <div class="particle particle-6"></div>
+
+        <!-- Title -->
+        <h1 class="unlock-title fade-in fade-in-1">
+          This Is What We <span class="highlight">Unlock</span>
+        </h1>
+
+        <!-- Central lock visual with radiating opportunities -->
+        <div class="lock-visual fade-in fade-in-2">
+
+          <!-- Radial glow -->
+          <div class="lock-glow"></div>
+
+          <!-- Connection lines SVG -->
+          <svg class="connection-lines" viewBox="0 0 500 280">
+            <path class="connection-line line-1" d="M250 140 L250 40" />
+            <path class="connection-line line-2" d="M250 140 L450 70" />
+            <path class="connection-line line-3" d="M250 140 L450 210" />
+            <path class="connection-line line-4" d="M250 140 L50 210" />
+            <path class="connection-line line-5" d="M250 140 L50 70" />
+          </svg>
+
+          <!-- The Lock -->
+          <svg class="lock-svg" viewBox="0 0 100 100">
+            <!-- Lock body -->
+            <rect class="lock-body" x="25" y="45" width="50" height="45" rx="8" />
+            <!-- Lock shackle (animated to open) -->
+            <path class="lock-shackle" d="M35 45 L35 30 C35 15, 65 15, 65 30 L65 45" />
+            <!-- Keyhole -->
+            <circle class="lock-keyhole" cx="50" cy="65" r="6" />
+            <rect class="lock-keyhole" x="47" y="65" width="6" height="15" rx="2" />
+          </svg>
+
+          <!-- Opportunity streams -->
+          <div class="opportunity-stream stream-1">
+            <span class="icon-dot"></span>
+            Faster POCs
+          </div>
+
+          <div class="opportunity-stream stream-2">
+            <span class="icon-dot"></span>
+            No Vendor Lock-in
+          </div>
+
+          <div class="opportunity-stream stream-3">
+            <span class="icon-dot"></span>
+            Hybrid Execution
+          </div>
+
+          <div class="opportunity-stream stream-4">
+            <span class="icon-dot"></span>
+            Team Collaboration
+          </div>
+
+          <div class="opportunity-stream stream-5">
+            <span class="icon-dot"></span>
+            Customer USP
+          </div>
+        </div>
+
+        <!-- Call to action -->
+        <div class="cta-container fade-in fade-in-3">
+          <p class="cta-text">
+            <span class="emphasis">One foundation.</span> Infinite possibilities.
+          </p>
+          <button class="cta-button">
+            Ready to Build?
+          </button>
+        </div>
+
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+  <script>
+    (function() {
+      const btn = document.querySelector('.cta-button');
+      let activated = false;
+
+      btn.addEventListener('click', function(e) {
+        if (activated) return;
+        activated = true;
+
+        // 1. Transform button
+        btn.classList.add('activated');
+        btn.textContent = "Let's Go!";
+
+        // 2. Create pulse wave from button center
+        const rect = btn.getBoundingClientRect();
+        const pulse = document.createElement('div');
+        pulse.className = 'pulse-wave';
+        pulse.style.left = (rect.left + rect.width / 2) + 'px';
+        pulse.style.top = (rect.top + rect.height / 2) + 'px';
+        pulse.style.transform = 'translate(-50%, -50%)';
+        document.body.appendChild(pulse);
+        setTimeout(() => pulse.remove(), 1000);
+
+        // 3. Boost glow on all opportunity streams
+        document.querySelectorAll('.opportunity-stream').forEach((stream, i) => {
+          setTimeout(() => {
+            stream.classList.add('glow-boost');
+          }, i * 80);
+        });
+
+        // 4. Boost lock glow
+        document.querySelector('.lock-svg').classList.add('glow-boost');
+
+        // 5. Create celebration particles
+        const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#06b6d4'];
+        for (let i = 0; i < 20; i++) {
+          setTimeout(() => {
+            const particle = document.createElement('div');
+            particle.className = 'celebration-particle';
+            particle.style.left = (rect.left + Math.random() * rect.width) + 'px';
+            particle.style.top = (rect.top) + 'px';
+            particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+            particle.style.animationDuration = (1 + Math.random() * 0.5) + 's';
+            particle.style.transform = `translateX(${(Math.random() - 0.5) * 100}px)`;
+            document.body.appendChild(particle);
+            setTimeout(() => particle.remove(), 1500);
+          }, i * 30);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

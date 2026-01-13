@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Competitive Edge - Agent Orchestrator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Background image styling */
+    .slide {
+      position: relative;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url('images/closing_d.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.35;
+      z-index: 0;
+      -webkit-mask-image: radial-gradient(
+        ellipse 85% 80% at center,
+        black 40%,
+        transparent 100%
+      );
+      mask-image: radial-gradient(
+        ellipse 85% 80% at center,
+        black 40%,
+        transparent 100%
+      );
+    }
+
+    .slide-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .closing-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1100px;
+      text-align: center;
+      position: relative;
+    }
+
+    /* Main title */
+    .closing-title {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 800;
+      color: var(--color-text-bright);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    .closing-title .highlight {
+      background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Racing visualization container */
+    .race-container {
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      gap: 3rem;
+      width: 100%;
+      margin: 1.5rem 0;
+    }
+
+    /* Individual race lanes */
+    .race-lane {
+      flex: 1;
+      max-width: 400px;
+      padding: 2rem;
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Competitor lane - stuck */
+    .lane-stuck {
+      background:
+        linear-gradient(180deg, rgba(249, 115, 22, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%),
+        rgba(10, 15, 26, 0.85);
+      border: 2px solid rgba(249, 115, 22, 0.3);
+    }
+
+    .lane-stuck::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at center, rgba(239, 68, 68, 0.1) 0%, transparent 50%);
+      animation: pulseStuck 3s ease-in-out infinite;
+    }
+
+    @keyframes pulseStuck {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.8; }
+    }
+
+    /* Your team lane - speeding ahead */
+    .lane-ahead {
+      background:
+        linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.12) 100%),
+        rgba(10, 15, 26, 0.85);
+      border: 2px solid rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 60px rgba(16, 185, 129, 0.15);
+    }
+
+    .lane-ahead::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at center, rgba(16, 185, 129, 0.15) 0%, transparent 50%);
+      animation: pulseAhead 2s ease-in-out infinite;
+    }
+
+    @keyframes pulseAhead {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+
+    /* Lane labels */
+    .lane-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .lane-stuck .lane-label {
+      color: rgba(249, 115, 22, 0.8);
+    }
+
+    .lane-ahead .lane-label {
+      color: var(--color-secondary);
+    }
+
+    /* SVG race visualization */
+    .race-svg {
+      width: 100%;
+      height: 200px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Speed lines animation */
+    .speed-line {
+      stroke: var(--color-secondary);
+      stroke-width: 2;
+      stroke-linecap: round;
+      opacity: 0;
+      animation: speedLineFlow 1.5s ease-out infinite;
+    }
+
+    .speed-line:nth-child(1) { animation-delay: 0s; }
+    .speed-line:nth-child(2) { animation-delay: 0.3s; }
+    .speed-line:nth-child(3) { animation-delay: 0.6s; }
+    .speed-line:nth-child(4) { animation-delay: 0.9s; }
+    .speed-line:nth-child(5) { animation-delay: 1.2s; }
+
+    @keyframes speedLineFlow {
+      0% {
+        opacity: 0;
+        transform: translateX(0);
+      }
+      20% {
+        opacity: 0.8;
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(-60px);
+      }
+    }
+
+    /* Tangled lines animation (stuck state) */
+    .tangle-line {
+      stroke: rgba(249, 115, 22, 0.4);
+      stroke-width: 2;
+      fill: none;
+      stroke-dasharray: 5 3;
+      animation: tangleWiggle 2s ease-in-out infinite;
+    }
+
+    .tangle-line:nth-child(odd) {
+      animation-direction: reverse;
+    }
+
+    @keyframes tangleWiggle {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(3px); }
+    }
+
+    /* Status text in lanes */
+    .lane-status {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .lane-stuck .lane-status {
+      color: var(--color-text-muted);
+    }
+
+    .lane-ahead .lane-status {
+      color: var(--color-text-bright);
+    }
+
+    .lane-detail {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      margin-top: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Call to action */
+    .cta-container {
+      margin-top: 1rem;
+      padding: 1.5rem 3rem;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+      animation: ctaShimmer 3s ease-in-out infinite;
+    }
+
+    @keyframes ctaShimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    .cta-text {
+      font-size: clamp(1rem, 1.8vw, 1.25rem);
+      font-weight: 500;
+      color: var(--color-text);
+      position: relative;
+      z-index: 1;
+      line-height: 1.5;
+    }
+
+    .cta-text strong {
+      color: var(--color-text-bright);
+      font-weight: 700;
+    }
+
+    /* Checkered flag icon */
+    .flag-icon {
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 120px;
+      height: 120px;
+      opacity: 0.08;
+    }
+
+    /* Racing car silhouette */
+    .car-silhouette {
+      fill: currentColor;
+    }
+
+    .car-stuck {
+      color: rgba(249, 115, 22, 0.5);
+      animation: carShake 0.5s ease-in-out infinite;
+    }
+
+    @keyframes carShake {
+      0%, 100% { transform: translateX(0) rotate(0deg); }
+      25% { transform: translateX(-2px) rotate(-1deg); }
+      75% { transform: translateX(2px) rotate(1deg); }
+    }
+
+    .car-ahead {
+      color: var(--color-secondary);
+      animation: carSpeed 0.8s ease-in-out infinite;
+    }
+
+    @keyframes carSpeed {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(5px); }
+    }
+
+    /* Decorative background elements */
+    .closing-container::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .closing-container::after {
+      content: '';
+      position: absolute;
+      bottom: -20%;
+      left: -10%;
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <main class="slide-content">
+      <div class="closing-container">
+
+        <!-- Main Title -->
+        <h1 class="closing-title fade-in fade-in-1">
+          While Others Rebuild,<br>
+          <span class="highlight">We Ship.</span>
+        </h1>
+
+        <!-- Racing Visualization -->
+        <div class="race-container fade-in fade-in-2">
+
+          <!-- Competitor Lane - Stuck -->
+          <div class="race-lane lane-stuck">
+            <div class="lane-label">The Competition</div>
+
+            <svg class="race-svg" viewBox="0 0 300 200">
+              <!-- Tangled complexity lines -->
+              <path class="tangle-line" d="M40,40 Q80,60 60,100 T100,140 Q140,120 120,80 T160,60" />
+              <path class="tangle-line" d="M60,30 Q100,70 80,110 T130,150 Q170,110 140,70 T180,50" />
+              <path class="tangle-line" d="M50,50 Q90,80 70,120 T120,160 Q160,130 130,90 T170,70" />
+              <path class="tangle-line" d="M70,35 Q110,65 90,105 T140,145 Q180,105 150,65 T190,45" />
+
+              <!-- Stuck car -->
+              <g transform="translate(100, 85)" class="car-stuck">
+                <rect class="car-silhouette" x="0" y="10" width="60" height="20" rx="5"/>
+                <rect class="car-silhouette" x="10" y="0" width="30" height="15" rx="3"/>
+                <circle class="car-silhouette" cx="12" cy="32" r="8"/>
+                <circle class="car-silhouette" cx="48" cy="32" r="8"/>
+              </g>
+
+              <!-- "Loading" spinner -->
+              <g transform="translate(200, 80)">
+                <circle cx="25" cy="25" r="20" fill="none" stroke="rgba(249, 115, 22, 0.3)" stroke-width="3"/>
+                <path d="M25,5 A20,20 0 0,1 45,25" fill="none" stroke="rgba(249, 115, 22, 0.6)" stroke-width="3" stroke-linecap="round">
+                  <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1.5s" repeatCount="indefinite"/>
+                </path>
+              </g>
+
+              <!-- "Rebuilding..." text -->
+              <text x="190" y="140" fill="rgba(249, 115, 22, 0.6)" font-size="12" font-weight="500">Rebuilding...</text>
+            </svg>
+
+            <div class="lane-status">Stuck in the pit stop</div>
+            <div class="lane-detail">Rebuilding infrastructure for every project</div>
+          </div>
+
+          <!-- Your Team Lane - Speeding Ahead -->
+          <div class="race-lane lane-ahead">
+            <div class="lane-label">Your Team</div>
+
+            <svg class="race-svg" viewBox="0 0 300 200">
+              <!-- Clean track lines -->
+              <line x1="0" y1="100" x2="300" y2="100" stroke="rgba(16, 185, 129, 0.2)" stroke-width="40" stroke-linecap="round"/>
+              <line x1="0" y1="100" x2="300" y2="100" stroke="rgba(16, 185, 129, 0.1)" stroke-width="60" stroke-linecap="round"/>
+
+              <!-- Speed lines -->
+              <g transform="translate(80, 85)">
+                <line class="speed-line" x1="0" y1="5" x2="40" y2="5"/>
+                <line class="speed-line" x1="-10" y1="15" x2="50" y2="15"/>
+                <line class="speed-line" x1="5" y1="25" x2="45" y2="25"/>
+                <line class="speed-line" x1="-5" y1="35" x2="35" y2="35"/>
+                <line class="speed-line" x1="10" y1="45" x2="40" y2="45"/>
+              </g>
+
+              <!-- Speeding car -->
+              <g transform="translate(160, 75)" class="car-ahead">
+                <rect class="car-silhouette" x="0" y="15" width="70" height="25" rx="6"/>
+                <rect class="car-silhouette" x="15" y="0" width="35" height="20" rx="4"/>
+                <circle class="car-silhouette" cx="15" cy="42" r="10"/>
+                <circle class="car-silhouette" cx="55" cy="42" r="10"/>
+                <!-- Motion blur effect -->
+                <rect x="-30" y="20" width="25" height="15" rx="3" fill="rgba(16, 185, 129, 0.3)"/>
+                <rect x="-50" y="22" width="15" height="11" rx="2" fill="rgba(16, 185, 129, 0.15)"/>
+              </g>
+
+              <!-- Checkered flag ahead -->
+              <g transform="translate(260, 60)">
+                <rect x="0" y="0" width="8" height="8" fill="rgba(255,255,255,0.4)"/>
+                <rect x="8" y="0" width="8" height="8" fill="rgba(16, 185, 129, 0.4)"/>
+                <rect x="0" y="8" width="8" height="8" fill="rgba(16, 185, 129, 0.4)"/>
+                <rect x="8" y="8" width="8" height="8" fill="rgba(255,255,255,0.4)"/>
+                <rect x="0" y="16" width="8" height="8" fill="rgba(255,255,255,0.4)"/>
+                <rect x="8" y="16" width="8" height="8" fill="rgba(16, 185, 129, 0.4)"/>
+                <rect x="0" y="24" width="8" height="8" fill="rgba(16, 185, 129, 0.4)"/>
+                <rect x="8" y="24" width="8" height="8" fill="rgba(255,255,255,0.4)"/>
+              </g>
+
+              <!-- "Shipping!" text -->
+              <text x="250" y="140" fill="rgba(16, 185, 129, 0.8)" font-size="12" font-weight="600">Shipping!</text>
+            </svg>
+
+            <div class="lane-status">Racing to market</div>
+            <div class="lane-detail">Building features, not infrastructure</div>
+          </div>
+
+        </div>
+
+        <!-- Call to Action -->
+        <div class="cta-container fade-in fade-in-3">
+          <p class="cta-text">
+            <strong>The teams that solve orchestration first<br>will define the next generation of AI products.</strong>
+          </p>
+        </div>
+
+      </div>
+    </main>
+
+    <nav class="slide-nav"></nav>
+  </div>
+
+  <script src="navigation.js"></script>
+</body>
+</html>

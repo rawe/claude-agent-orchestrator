@@ -1,13 +1,14 @@
 {
   "title": "Agent Orchestrator",
   "subtitle": "Executive Summary - A framework for intelligent automation",
-  "totalSlides": 7,
+  "totalSlides": 11,
   "sections": [
     { "id": "intro", "number": "1", "title": "Introduction", "colorClass": "section-intro" },
     { "id": "pillars", "number": "2", "title": "The Six Pillars", "colorClass": "section-pillars" },
     { "id": "architecture", "number": "3", "title": "Architecture", "colorClass": "section-architecture" },
     { "id": "execution", "number": "4", "title": "Execution Model", "colorClass": "section-execution" },
-    { "id": "growth", "number": "5", "title": "Growth Path", "colorClass": "section-growth" }
+    { "id": "growth", "number": "5", "title": "Growth Path", "colorClass": "section-growth" },
+    { "id": "closing", "number": "6", "title": "Closing", "colorClass": "section-closing" }
   ],
   "mainFlow": [
     {
@@ -66,6 +67,34 @@
       "title": "From Laptop to Customer",
       "icon": "📈",
       "section": "growth"
+    },
+    {
+      "id": "closing-unlock",
+      "file": "closing-c-unlock.html",
+      "title": "The Unlock",
+      "icon": "🔓",
+      "section": "closing"
+    },
+    {
+      "id": "closing-ask",
+      "file": "closing-e-ask.html",
+      "title": "Four Questions",
+      "icon": "❓",
+      "section": "closing"
+    },
+    {
+      "id": "closing-edge",
+      "file": "closing-d-edge.html",
+      "title": "The Competitive Edge",
+      "icon": "🏎️",
+      "section": "closing"
+    },
+    {
+      "id": "closing-decision",
+      "file": "closing-a-decision.html",
+      "title": "The Decision",
+      "icon": "⚖️",
+      "section": "closing"
     }
   ]
 }
