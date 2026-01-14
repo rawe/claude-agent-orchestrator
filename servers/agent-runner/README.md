@@ -131,9 +131,29 @@ Runner-owned agents:
 --require-matching-tags    Only accept runs with at least one matching tag
 --project-dir, -p          Default project directory
 --tags, -t                 Comma-separated capability tags
---mcp-port, -m             Port for embedded MCP server
+--mcp-port, -m             Port for embedded MCP server (fixed port)
+--external-mcp-url, -e     External MCP server URL (disables embedded MCP server)
 --verbose, -v              Enable verbose logging
 ```
+
+### Shared MCP Server (Multiple Runners)
+
+When running multiple Agent Runners on the same host, you can share a single MCP server to reduce resource usage:
+
+```bash
+# Primary runner: starts embedded MCP server on fixed port 9001
+./agent-runner --profile coding --mcp-port 9001 --project-dir /project/a
+
+# Secondary runners: use external MCP server (no embedded server started)
+./agent-runner --profile testing --external-mcp-url http://127.0.0.1:9001/mcp --project-dir /project/b
+./agent-runner --profile docs --external-mcp-url http://127.0.0.1:9001/mcp --project-dir /project/c
+```
+
+**Notes:**
+- `--mcp-port` and `--external-mcp-url` are mutually exclusive
+- The external URL must include protocol, host, port, and path (e.g., `http://127.0.0.1:9001/mcp`)
+- All runners share the same MCP server for orchestration tools
+- Each runner still has its own Runner Gateway for authentication
 
 ## Directory Structure
 
