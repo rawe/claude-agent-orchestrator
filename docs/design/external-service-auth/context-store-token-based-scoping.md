@@ -100,9 +100,7 @@ This approach also implicitly secures the Context Store - access is only possibl
 │  │  ┌───────────────────────────────────────────────────────────────┐ │    │
 │  │  │  1. Receives token from Executor request header               │ │    │
 │  │  │  2. LLM calls: doc_query(tags="architecture")                 │ │    │
-│  │  │  3. MCP Server spawns CLI with token in env var:              │ │    │
-│  │  │       CONTEXT_STORE_TOKEN=eyJ... doc-query --tags arch        │ │    │
-│  │  │  4. CLI calls Context Store Server:                           │ │    │
+│  │  │  3. MCP Server calls Context Store Server directly:           │ │    │
 │  │  │       GET /documents?tags=architecture                        │ │    │
 │  │  │       Authorization: Bearer eyJhbGciOiJSUzI1NiIs...           │ │    │
 │  │  └───────────────────────────────────────────────────────────────┘ │    │
@@ -288,30 +286,29 @@ async def validate_token(request: Request):
 | Area | Change |
 |------|--------|
 | **Token reception** | Extract token from Executor's request header (`X-Service-Token`) |
-| **CLI invocation** | Set `CONTEXT_STORE_TOKEN` env var when spawning CLI subprocesses |
+| **HTTP client** | Pass token in Authorization header when calling Context Store Server |
 | **Tool definitions** | No changes - namespace/scope not exposed to LLM |
 
 **MCP Server handling (simplified):**
 
 ```python
 # MCP Server receives token from Executor's request header
-# and passes it to CLI subprocess via environment variable
+# and passes it directly to Context Store Server via Authorization header
 
 async def handle_tool_call(request: Request, tool_name: str, params: dict):
     # Extract token from incoming request header
     token = request.headers.get("X-Service-Token")
 
     if tool_name == "doc_query":
-        # Spawn CLI with token in environment
-        env = os.environ.copy()
-        env["CONTEXT_STORE_TOKEN"] = token
-
-        result = subprocess.run(
-            ["doc-query", "--tags", params.get("tags", "")],
-            env=env,
-            capture_output=True
-        )
-        return result.stdout
+        # Call Context Store Server directly with token
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{CONTEXT_STORE_URL}/documents",
+                params={"tags": params.get("tags", "")},
+                headers=headers
+            )
+            return response.json()
 ```
 
 ### CLI Commands
@@ -359,11 +356,11 @@ doc-query --tags architecture
 | `CONTEXT_STORE_TRUSTED_PUBLIC_KEY` | Public key (PEM) for verifying tokens |
 | `CONTEXT_STORE_ISSUER` | Expected `iss` claim (default: `agent-coordinator`) |
 
-### CLI
+### CLI (Context Store Skill)
 
 | Variable | Description |
 |----------|-------------|
-| `CONTEXT_STORE_TOKEN` | JWT token (set by MCP Server when spawning CLI subprocess) |
+| `CONTEXT_STORE_TOKEN` | JWT token for CLI commands used by Context Store Skill |
 
 ### Token Flow
 
@@ -371,8 +368,7 @@ doc-query --tags architecture
 |-------|-----------|
 | Coordinator → Executor | Token in run assignment payload |
 | Executor → MCP Server | HTTP header (`X-Service-Token`) per-request |
-| MCP Server → CLI | Environment variable when spawning subprocess |
-| CLI → Context Store | HTTP header (`Authorization: Bearer`) |
+| MCP Server → Context Store | HTTP header (`Authorization: Bearer`) |
 
 ## Operation Modes
 
@@ -466,8 +462,8 @@ This pattern is generic and can secure other namespace-scoped services:
 1. Implement token generation in Coordinator
 2. Add token validation middleware to Context Store (disabled by default)
 3. Update Executor to include token in MCP Server request headers
-4. Update MCP Server to extract token from request header and pass to CLI via env var
-5. Update CLI to read token from env var and attach to Context Store requests
+4. Update MCP Server to extract token from request header and pass to Context Store via Authorization header
+5. Update CLI (for Skill use) to read token from env var and attach to Context Store requests
 
 ### Phase 2: Enable in Staging
 

@@ -4,7 +4,7 @@ The MCP Server provides a [Model Context Protocol](https://modelcontextprotocol.
 
 ## Overview
 
-The MCP Server acts as a bridge between MCP-compatible AI clients and the Context Store system. It wraps CLI commands as MCP tools, translating tool calls into command invocations that communicate with the Context Store Server via HTTP.
+The MCP Server acts as a bridge between MCP-compatible AI clients and the Context Store system. It exposes MCP tools that communicate directly with the Context Store Server via async HTTP calls.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -25,11 +25,11 @@ The MCP Server acts as a bridge between MCP-compatible AI clients and the Contex
 │   │   │                     MCP Tools                            │   │   │
 │   │   └─────────────────────────────────────────────────────────┘   │   │
 │   │                              │                                    │   │
-│   │                              │ Subprocess (uv run)               │   │
+│   │                              │ Async HTTP (httpx)                │   │
 │   │                              ▼                                    │   │
 │   │   ┌─────────────────────────────────────────────────────────┐   │   │
-│   │   │  doc-create │ doc-write │ doc-push │ doc-query │ ...    │   │   │
-│   │   │                    CLI Commands                          │   │   │
+│   │   │              ContextStoreClient (lib/)                   │   │   │
+│   │   │                  Async HTTP Client                       │   │   │
 │   │   └─────────────────────────────────────────────────────────┘   │   │
 │   └──────────────────────────────────┬──────────────────────────────┘   │
 │                                      │                                   │
@@ -45,36 +45,32 @@ The MCP Server acts as a bridge between MCP-compatible AI clients and the Contex
 
 ## Architecture
 
-### Tool Wrapping Pattern
+### Direct HTTP Pattern
 
 The MCP server uses [FastMCP](https://github.com/jlowin/fastmcp) to expose Python functions as MCP tools. Each tool function:
 
 1. Receives parameters from the MCP client
-2. Constructs CLI command arguments
-3. Executes the corresponding `doc-*` command via subprocess
-4. Returns the command output to the client
+2. Calls the `ContextStoreClient` async HTTP client directly
+3. Returns the response to the client
 
 ```python
 @mcp.tool()
 async def doc_query(name: str, tags: str, ...) -> str:
-    args = []
-    if name:
-        args.extend(["--name", name])
-    if tags:
-        args.extend(["--tags", tags])
-
-    stdout, stderr, code = await run_command("doc-query", args)
-    return format_response(stdout, stderr, code)
+    tags_list = [t.strip() for t in tags.split(",")] if tags else None
+    result = await client.query_documents(
+        name=name,
+        tags=tags_list,
+        limit=limit,
+    )
+    return json.dumps(result)
 ```
 
-### Auto-Discovery
+### Response Design
 
-On startup, the MCP server automatically discovers the CLI commands directory:
+The MCP server uses different response formats based on operation type:
 
-1. Checks `CONTEXT_STORE_COMMAND_PATH` environment variable
-2. Falls back to relative path from script location: `plugins/context-store/skills/context-store/commands/`
-
-This allows the server to work both when spawned by clients (stdio mode) and when run as a standalone service (HTTP mode).
+- **Read operations** (`doc_read`): Return raw text content without JSON wrapping for better LLM consumption and token efficiency
+- **Write operations** (`doc_create`, `doc_write`, `doc_edit`, etc.): Return compact JSON with metadata (document ID, size, checksum) for verification
 
 ## Operation Modes
 
@@ -106,14 +102,6 @@ uv run --script context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 
 **Lifecycle:** The server runs until manually stopped. Clients connect to `http://host:port/mcp`.
 
-### SSE Mode (Legacy)
-
-Server-Sent Events transport for backward compatibility with older MCP clients.
-
-```bash
-uv run --script context-store-mcp.py --sse-mode --port 9501
-```
-
 ## MCP Tools
 
 | Tool | Description |
@@ -141,6 +129,22 @@ For AI-generated content, use the two-phase approach to reserve document IDs bef
 2. doc_write(document_id="doc_abc123", content="# Architecture\n...")
    -> Returns: {"id": "doc_abc123", "size_bytes": 1234, ...}
 ```
+
+### Known Limitations
+
+#### Filesystem-Dependent Tools: `doc_push` and `doc_pull`
+
+The `doc_push` and `doc_pull` tools operate on file paths, which creates a filesystem locality requirement:
+
+| Transport | Condition | Works? |
+|-----------|-----------|--------|
+| **stdio** | Always | Yes - MCP server shares client's filesystem |
+| **HTTP** | Server on localhost | Yes - same machine, same filesystem |
+| **HTTP** | Server on remote host | No - different filesystems |
+
+**Workarounds for remote HTTP mode:**
+- Use `doc_create` + `doc_write` instead of `doc_push` (content passed directly)
+- Use `doc_read` instead of `doc_pull` (content returned directly)
 
 ## Client Integration
 
@@ -193,15 +197,20 @@ See agent configuration documentation for MCP capability setup.
 
 | File | Description |
 |------|-------------|
-| `mcps/context-store/context-store-mcp.py` | MCP server implementation with all tool definitions |
+| `mcps/context-store/context-store-mcp.py` | MCP server entry point |
+| `mcps/context-store/lib/tools.py` | MCP tool definitions |
+| `mcps/context-store/lib/http_client.py` | Async HTTP client for Context Store |
+| `mcps/context-store/lib/config.py` | Configuration (env vars) |
+| `mcps/context-store/lib/exceptions.py` | Custom exception types |
 | `mcps/context-store/README.md` | Configuration reference and usage examples |
-| `plugins/context-store/skills/context-store/commands/` | CLI commands invoked by MCP tools |
 
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CONTEXT_STORE_COMMAND_PATH` | Path to CLI commands directory | Auto-discovered |
+| `CONTEXT_STORE_HOST` | Context Store server hostname | localhost |
+| `CONTEXT_STORE_PORT` | Context Store server port | 8766 |
+| `CONTEXT_STORE_SCHEME` | URL scheme for Context Store server | http |
 | `CONTEXT_STORE_MCP_PORT` | HTTP mode port (Makefile) | 9501 |
 | `CONTEXT_STORE_MCP_HOST` | HTTP mode host (Makefile) | 127.0.0.1 |
 
@@ -217,6 +226,3 @@ See agent configuration documentation for MCP capability setup.
 - [Configuration](../../../mcps/context-store/README.md#configuration) - Environment variables and .env setup
 - [MCP Tools](../../../mcps/context-store/README.md#mcp-tools) - Tool descriptions and two-phase creation
 - [Client Configuration](../../../mcps/context-store/README.md#client-configuration) - Claude Desktop setup examples
-
-### Implementation
-- [CLI Commands](../../../plugins/context-store/skills/context-store/commands/) - Command implementations invoked by MCP tools

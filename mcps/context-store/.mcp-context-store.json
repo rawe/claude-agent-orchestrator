@@ -5,7 +5,7 @@
       "args": [
         "run",
         "--script",
-        "${PROJECT_ROOT}/interfaces/context-store-mcp-server/context-store-mcp.py"
+        "${PROJECT_ROOT}/mcps/context-store/context-store-mcp.py"
       ]
     }
   }
