@@ -6,5 +6,8 @@
     "internal",
     "graph",
     "context"
+  ],
+  "capabilities": [
+    "context-store"
   ]
 }

@@ -2,10 +2,16 @@
   "name": "web-researcher",
   "description": "Researches the web to answer questions. Performs iterative search and analysis, produces concise answer with documented sources.",
   "type": "autonomous",
-  "tags": ["internal", "research", "web"],
+  "tags": [
+    "internal",
+    "research",
+    "web"
+  ],
   "parameters_schema": {
     "type": "object",
-    "required": ["question"],
+    "required": [
+      "question"
+    ],
     "properties": {
       "question": {
         "type": "string",
@@ -18,5 +24,8 @@
       }
     },
     "additionalProperties": false
-  }
+  },
+  "capabilities": [
+    "context-store"
+  ]
 }

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agent-orchestrator-http": {
+      "type": "http",
+      "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
+      "headers": {
+        "X-Agent-Session-Id": "${AGENT_SESSION_ID}"
+      }
+    }
+  }
+}
