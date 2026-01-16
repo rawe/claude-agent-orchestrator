@@ -1,0 +1,14 @@
+# Secrets - never bake into image
+.env
+.env.*
+!.env.template
+
+# Workspace contents
+workspace/*
+
+# Documentation
+*.md
+
+# Git
+.git
+.gitignore

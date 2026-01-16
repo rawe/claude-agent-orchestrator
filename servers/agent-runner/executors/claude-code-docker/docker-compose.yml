@@ -1,0 +1,20 @@
+services:
+  claude-code:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-code-executor
+    working_dir: /workspace
+    volumes:
+      # Mount a workspace directory for agent work
+      - ./workspace:/workspace
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+    # Keep container running for interactive exec
+    command: ["tail", "-f", "/dev/null"]
+    # Ensure proper TTY for interactive sessions
+    stdin_open: true
+    tty: true
