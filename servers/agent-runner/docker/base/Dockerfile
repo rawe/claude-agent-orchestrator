@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (fast Python package manager)
 RUN pip install uv
 
+# Create non-root user (some coding agents refuse to run in YOLO mode as root)
+RUN useradd -m -s /bin/bash agent
+
 # Create app directory structure
 WORKDIR /app
 
@@ -34,6 +37,9 @@ RUN chmod +x /entrypoint.sh
 
 # Create workspace directory (mount point for projects)
 RUN mkdir -p /workspace
+
+# Set ownership for non-root user
+RUN chown -R agent:agent /app /workspace
 
 # Environment defaults
 ENV AGENT_ORCHESTRATOR_API_URL=http://host.docker.internal:8765

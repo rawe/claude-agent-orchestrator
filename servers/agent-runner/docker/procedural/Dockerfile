@@ -13,10 +13,13 @@ ARG BASE_IMAGE=agent-runner-base:latest
 FROM ${BASE_IMAGE}
 
 # Copy procedural executor
-COPY servers/agent-runner/executors/procedural-executor/ /app/servers/agent-runner/executors/procedural-executor/
+COPY --chown=agent:agent servers/agent-runner/executors/procedural-executor/ /app/servers/agent-runner/executors/procedural-executor/
 
 # Copy compatible profiles (only profiles that use procedural executor)
-COPY servers/agent-runner/docker/procedural/profiles/ /app/servers/agent-runner/profiles/
+COPY --chown=agent:agent servers/agent-runner/docker/procedural/profiles/ /app/servers/agent-runner/profiles/
 
 # Default to echo profile (example procedural agent)
 ENV PROFILE=echo
+
+# Run as non-root user
+USER agent
