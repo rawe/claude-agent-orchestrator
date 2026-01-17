@@ -1,0 +1,76 @@
+# Agent Runner Docker Compose
+#
+# Default configuration uses the Claude Code CLI executor.
+# Requires CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`.
+#
+# Usage:
+#   cp .env.template .env
+#   # Edit .env with your settings
+#   docker compose up -d --build
+
+services:
+  agent-runner:
+    hostname: docker-claude-code-runner
+    build:
+      context: ../../../
+      dockerfile: servers/agent-runner/docker/claude-code/Dockerfile
+      args:
+        BASE_IMAGE: agent-runner-base:latest
+    image: agent-runner-claude-code:latest
+    container_name: agent-runner-claude-code
+    restart: unless-stopped
+
+    # Environment configuration
+    env_file:
+      - .env
+
+    environment:
+      # REQUIRED: Claude Code OAuth token (from: claude setup-token)
+      # Do NOT set ANTHROPIC_API_KEY - it conflicts with OAuth token
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+
+      # Agent Coordinator URL (use host.docker.internal for host access)
+      - AGENT_ORCHESTRATOR_API_URL=${AGENT_ORCHESTRATOR_API_URL:-http://host.docker.internal:8765}
+
+      # Project directory inside container
+      - PROJECT_DIR=/workspace
+
+      # Executor profile (default: best)
+      - PROFILE=${PROFILE:-best}
+
+      # Optional: Runner capability tags
+      - RUNNER_TAGS=${RUNNER_TAGS:-}
+
+      # Optional: Require matching tags on runs
+      - REQUIRE_MATCHING_TAGS=${REQUIRE_MATCHING_TAGS:-false}
+
+      # Optional: Verbose logging
+      - VERBOSE=${VERBOSE:-false}
+
+      # Optional: Fixed MCP server port
+      - MCP_PORT=${MCP_PORT:-}
+
+      # Optional: External MCP server URL
+      - EXTERNAL_MCP_URL=${EXTERNAL_MCP_URL:-}
+
+      # Optional: Auth0 M2M credentials
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN:-}
+      - AUTH0_RUNNER_CLIENT_ID=${AUTH0_RUNNER_CLIENT_ID:-}
+      - AUTH0_RUNNER_CLIENT_SECRET=${AUTH0_RUNNER_CLIENT_SECRET:-}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
+
+    volumes:
+      # Mount workspace for project files
+      - ${HOST_WORKSPACE:-./workspace}:/workspace
+
+    # Enable host.docker.internal on Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Health check: verify agent-runner process is running
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "agent-runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Environment files with secrets
+.env
+.env.*
+!.env.template
+
+# Documentation (not needed in image)
+*.md
+docs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Local workspace contents
+workspace/*
+
+# Test files
+tests/
+
+# Docker compose override
+docker-compose.override.yml

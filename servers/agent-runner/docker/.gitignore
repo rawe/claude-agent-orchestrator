@@ -1,0 +1,9 @@
+# Environment file with secrets
+.env
+
+# Workspace contents
+workspace/*
+!workspace/.gitkeep
+
+# Docker compose override (local customizations)
+docker-compose.override.yml

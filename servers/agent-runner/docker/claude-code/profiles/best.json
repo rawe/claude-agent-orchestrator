@@ -1,0 +1,9 @@
+{
+  "type": "autonomous",
+  "command": "executors/claude-code/ao-claude-code-exec",
+  "config": {
+    "permission_mode": "bypassPermissions",
+    "setting_sources": ["project", "local"],
+    "model": "opus"
+  }
+}
