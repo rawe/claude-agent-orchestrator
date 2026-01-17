@@ -136,6 +136,43 @@ services:
       start_period: 30s
 
   # ============================================================================
+  # AGENT RUNNER (Claude Code executor)
+  # ============================================================================
+  agent-runner:
+    container_name: agent-orchestrator-agent-runner
+    hostname: docker-claude-code-runner
+    build:
+      context: .
+      dockerfile: servers/agent-runner/docker/Dockerfile
+      target: claude-code
+    environment:
+      # REQUIRED: Claude Code OAuth token (generate with: claude setup-token)
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      # Agent Coordinator URL (internal network)
+      - AGENT_ORCHESTRATOR_API_URL=http://agent-coordinator:8765
+      # Project directory inside container
+      - PROJECT_DIR=/workspace
+      # Executor profile
+      - PROFILE=${AGENT_RUNNER_PROFILE:-best}
+      # Optional settings
+      - RUNNER_TAGS=${RUNNER_TAGS:-}
+      - VERBOSE=${AGENT_RUNNER_VERBOSE:-false}
+    volumes:
+      - agent-runner-workspace:/workspace
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    depends_on:
+      agent-coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "agent-runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
   # ELASTICSEARCH (for semantic search)
   # ============================================================================
   elasticsearch:
@@ -182,4 +219,7 @@ volumes:
     driver: local
   neo4j-data:
     name: agent-orchestrator-neo4j-data
+    driver: local
+  agent-runner-workspace:
+    name: agent-orchestrator-runner-workspace
     driver: local

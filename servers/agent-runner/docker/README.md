@@ -53,23 +53,42 @@ docker compose logs -f
 
 ## Building Images
 
-### Build Base Image (required first)
+### Option A: Multi-stage Dockerfile (recommended)
+
+Single Dockerfile with all stages - no manual base image build needed:
 
 ```bash
 # From project root
-docker build -t agent-runner-base:latest \
-  -f servers/agent-runner/docker/base/Dockerfile .
+
+# Claude Code executor
+docker build --target claude-code -t agent-runner-claude-code:latest \
+  -f servers/agent-runner/docker/Dockerfile .
+
+# Procedural executor
+docker build --target procedural -t agent-runner-procedural:latest \
+  -f servers/agent-runner/docker/Dockerfile .
+
+# Base image only (if needed)
+docker build --target base -t agent-runner-base:latest \
+  -f servers/agent-runner/docker/Dockerfile .
 ```
 
-### Build Executor Images
+### Option B: Separate Dockerfiles (for extensibility)
+
+Use separate Dockerfiles when building custom executors that extend the base:
 
 ```bash
-# Claude Code executor
+# From project root
+
+# 1. Build base image first
+docker build -t agent-runner-base:latest \
+  -f servers/agent-runner/docker/base/Dockerfile .
+
+# 2. Build executor images
 docker build -t agent-runner-claude-code:latest \
   --build-arg BASE_IMAGE=agent-runner-base:latest \
   -f servers/agent-runner/docker/claude-code/Dockerfile .
 
-# Procedural executor
 docker build -t agent-runner-procedural:latest \
   --build-arg BASE_IMAGE=agent-runner-base:latest \
   -f servers/agent-runner/docker/procedural/Dockerfile .
@@ -226,15 +245,16 @@ chmod 777 workspace  # Or appropriate permissions
 
 ```
 docker/
+├── Dockerfile            # Multi-stage (base + all executors)
 ├── base/
-│   ├── Dockerfile        # Base image with Python + uv + runner
+│   ├── Dockerfile        # Base image (for extensibility)
 │   └── entrypoint.sh     # Container startup script
 ├── claude-code/
-│   ├── Dockerfile        # Claude Code executor
+│   ├── Dockerfile        # Claude Code executor (for extensibility)
 │   ├── claude-config/    # Claude Code config (.claude.json)
 │   └── profiles/         # claude-code compatible profiles
 ├── procedural/
-│   ├── Dockerfile        # Procedural executor
+│   ├── Dockerfile        # Procedural executor (for extensibility)
 │   └── profiles/         # procedural compatible profiles
 ├── docker-compose.yml    # Default orchestration
 ├── .env.template         # Environment template

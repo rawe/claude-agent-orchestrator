@@ -66,12 +66,12 @@ help:
 	@echo "  make restart-coordinator  - Restart agent coordinator"
 	@echo "  make restart-doc          - Restart context store"
 	@echo ""
-	@echo "Agent Runner (local process):"
-	@echo "  make start-agent-runner   - Start in background (logs to .agent-runner.log)"
-	@echo "  make stop-agent-runner    - Stop agent runner"
-	@echo "  make run-agent-runner     - Run in foreground (Ctrl+C to stop)"
-	@echo "  make run-agent-runner-v   - Run in foreground with verbose/debug output"
-	@echo "  make logs-agent-runner    - Tail logs (Ctrl+C to stop watching)"
+	@echo "Agent Runner:"
+	@echo "  make start-agent-runner   - Start in Docker (requires CLAUDE_CODE_OAUTH_TOKEN)"
+	@echo "  make stop-agent-runner    - Stop Docker agent runner"
+	@echo "  make logs-agent-runner    - Tail Docker logs (Ctrl+C to stop)"
+	@echo "  make run-agent-runner     - Run locally in foreground (Ctrl+C to stop)"
+	@echo "  make run-agent-runner-v   - Run locally with verbose output"
 	@echo ""
 	@echo "MCP servers (mcps/):"
 	@echo "  make start-mcp-context-store      - Start Context Store MCP"
@@ -332,62 +332,47 @@ stop-core:
 	docker-compose stop agent-coordinator dashboard
 
 # ============================================================================
-# AGENT RUNNER (local process, not Docker)
+# AGENT RUNNER
 # ============================================================================
-# Runs agents in a specific project directory.
-# Uses PROJECT_DIR or AGENT_ORCHESTRATOR_PROJECT_DIR from .env if set.
-# Default: .agent-orchestrator/runner-project (git-ignored, auto-created)
+# Docker version (start-agent-runner) or local process (run-agent-runner)
+#
+# Docker requires:
+#   - CLAUDE_CODE_OAUTH_TOKEN in .env (generate with: claude setup-token)
+#   - agent-coordinator running
+#
+# Local requires:
+#   - AGENT_ORCHESTRATOR_PROJECT_DIR in .env (or uses default)
 
 AGENT_RUNNER_SCRIPT := servers/agent-runner/agent-runner
-AGENT_RUNNER_PID_FILE := .agent-runner.pid
-AGENT_RUNNER_LOG_FILE := .agent-runner.log
 
+# Start agent runner in Docker (background)
 start-agent-runner:
-	@echo "Starting Agent Runner..."
-	@if [ -f $(AGENT_RUNNER_PID_FILE) ] && kill -0 $$(cat $(AGENT_RUNNER_PID_FILE)) 2>/dev/null; then \
-		echo "Agent Runner already running (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \
-		echo "Use 'make logs-agent-runner' to view logs"; \
+	@echo "Starting Agent Runner (Docker)..."
+	@if [ ! -f .env ] || ! grep -q "CLAUDE_CODE_OAUTH_TOKEN" .env 2>/dev/null; then \
+		echo ""; \
+		echo "ERROR: CLAUDE_CODE_OAUTH_TOKEN not found in .env"; \
+		echo ""; \
+		echo "To set up:"; \
+		echo "  1. Run: claude setup-token"; \
+		echo "  2. Add to .env: CLAUDE_CODE_OAUTH_TOKEN=<your-token>"; \
+		echo ""; \
 		exit 1; \
 	fi
-	@if [ -f .env ]; then \
-		set -a && . ./.env && set +a; \
-	fi; \
-	PROJ_DIR="$${AGENT_ORCHESTRATOR_PROJECT_DIR:-.agent-orchestrator/runner-project}"; \
-	mkdir -p "$$PROJ_DIR"; \
-	if [ "$$PROJ_DIR" = ".agent-orchestrator/runner-project" ]; then \
-		echo "Notice: Using default project directory (git-ignored)."; \
-		echo "Set AGENT_ORCHESTRATOR_PROJECT_DIR in .env to use a different directory."; \
-	fi; \
-	echo "Configuration:"; \
-	echo "  Project Dir: $$PROJ_DIR"; \
-	echo "  Coordinator: $${AGENT_ORCHESTRATOR_API_URL:-http://localhost:8765}"; \
-	echo "  MCP Port:    9500"; \
-	echo "  Log file:    $(AGENT_RUNNER_LOG_FILE)"; \
-	echo ""; \
-	$(AGENT_RUNNER_SCRIPT) --profile full-access-isolated-best --project-dir "$$PROJ_DIR" --mcp-port 9500 > $(AGENT_RUNNER_LOG_FILE) 2>&1 & \
-	echo $$! > $(AGENT_RUNNER_PID_FILE); \
-	sleep 2; \
-	echo "Agent Runner started (PID: $$(cat $(AGENT_RUNNER_PID_FILE)))"; \
-	echo ""; \
-	echo "View logs:  make logs-agent-runner"
+	@echo "Starting Docker container..."
+	docker-compose up -d --no-deps agent-runner
+	@echo ""
+	@echo "Agent Runner started (Docker)"
+	@echo "  Profile: $${AGENT_RUNNER_PROFILE:-best}"
+	@echo ""
+	@echo "View logs: make logs-agent-runner"
 
 stop-agent-runner:
-	@echo "Stopping Agent Runner..."
-	@if [ -f $(AGENT_RUNNER_PID_FILE) ]; then \
-		PID=$$(cat $(AGENT_RUNNER_PID_FILE)); \
-		if kill -0 $$PID 2>/dev/null; then \
-			kill $$PID; \
-			echo "Agent Runner stopped (PID: $$PID)"; \
-		else \
-			echo "Agent Runner not running (stale PID file)"; \
-		fi; \
-		rm -f $(AGENT_RUNNER_PID_FILE); \
-	else \
-		echo "No PID file found. Trying to find and kill process..."; \
-		pkill -f "agent-runner/agent-runner" 2>/dev/null && echo "Agent Runner stopped" || echo "No Agent Runner process found"; \
-	fi
+	@echo "Stopping Agent Runner (Docker)..."
+	docker-compose stop agent-runner
+	@echo "Agent Runner stopped"
 
-# Run agent runner in foreground (direct output, Ctrl+C to stop)
+# Run agent runner locally in foreground (direct output, Ctrl+C to stop)
+# Useful for development without Docker
 run-agent-runner:
 	@if [ -f .env ]; then \
 		set -a && . ./.env && set +a; \
@@ -402,26 +387,22 @@ run-agent-runner:
 	if [ "$${VERBOSE:-}" = "1" ]; then \
 		VERBOSE_FLAG="--verbose"; \
 	fi; \
-	echo "Starting Agent Runner in foreground (Ctrl+C to stop)..."; \
+	echo "Starting Agent Runner locally (Ctrl+C to stop)..."; \
 	echo "  Project Dir: $$PROJ_DIR"; \
 	echo "  MCP Port:    9500"; \
 	if [ -n "$$VERBOSE_FLAG" ]; then echo "  Verbose: enabled"; fi; \
 	echo ""; \
 	$(AGENT_RUNNER_SCRIPT) --profile full-access-isolated-best --project-dir "$$PROJ_DIR" --mcp-port 9500 $$VERBOSE_FLAG
 
-# Run agent runner in foreground with verbose output (shortcut)
+# Run agent runner locally with verbose output (shortcut)
 run-agent-runner-v:
-	@$(MAKE) run-agent-runner VERBOSE=1
+	@"$(MAKE)" run-agent-runner VERBOSE=1
 
-# Tail agent runner logs
+# Tail agent runner logs (Docker)
 logs-agent-runner:
-	@if [ -f $(AGENT_RUNNER_LOG_FILE) ]; then \
-		echo "Tailing $(AGENT_RUNNER_LOG_FILE) (Ctrl+C to stop)..."; \
-		echo ""; \
-		tail -f $(AGENT_RUNNER_LOG_FILE); \
-	else \
-		echo "No log file found. Start the agent runner first: make start-agent-runner"; \
-	fi
+	@echo "Tailing Agent Runner logs (Ctrl+C to stop)..."
+	@echo ""
+	docker-compose logs -f agent-runner
 
 # External MCP servers (mcps/)
 start-mcp-atlassian:
@@ -527,6 +508,7 @@ stop-mcp-context-store:
 	fi
 
 # Start/stop all services (core + MCPs)
+# Note: agent-runner is included in docker-compose, started/stopped via start-bg/stop
 start-all:
 	@echo "Starting all services..."
 	@echo ""
