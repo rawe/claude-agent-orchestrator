@@ -27,6 +27,13 @@ This folder contains all project documentation organized by purpose and audience
 | [setup/](./setup/) | Deployment guides | Configuring external services |
 | [reference/](./reference/) | Quick-reference specs | Looking up schemas/formats |
 
+### For Deployment & Operations
+
+| Section | Purpose | When to Read |
+|---------|---------|--------------|
+| [containers/](./containers/README.md) | Container images, environment variables, volumes | Deploying with Docker |
+| [RELEASING.md](./RELEASING.md) | Release process, versioning, CI/CD workflow | Publishing new versions |
+
 ### For Contributors
 
 | Section | Purpose | When to Read |
@@ -40,3 +47,5 @@ This folder contains all project documentation organized by purpose and audience
 - **Authentication**: [architecture/auth-oidc.md](./architecture/auth-oidc.md)
 - **MCP Integration**: [architecture/mcp-runner-integration.md](./architecture/mcp-runner-integration.md)
 - **Capabilities System**: [features/capabilities-system.md](./features/capabilities-system.md)
+- **Container Images**: [containers/](./containers/README.md)
+- **Release Process**: [RELEASING.md](./RELEASING.md)

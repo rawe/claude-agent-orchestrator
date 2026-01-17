@@ -11,10 +11,22 @@
 #   docker build --target claude-code -t agent-runner-claude-code:latest -f servers/agent-runner/docker/Dockerfile .
 #   docker build --target procedural -t agent-runner-procedural:latest -f servers/agent-runner/docker/Dockerfile .
 
+# Build arguments for versioning and labels
+ARG VERSION=dev
+ARG COMPONENT_VERSION=unknown
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 # ==============================================================================
 # STAGE: base
 # ==============================================================================
 FROM python:3.12-slim AS base
+
+# Re-declare ARGs after FROM (they don't persist across stages)
+ARG VERSION
+ARG COMPONENT_VERSION
+ARG GIT_COMMIT
+ARG BUILD_DATE
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,6 +74,24 @@ ENTRYPOINT ["/entrypoint.sh"]
 # ==============================================================================
 FROM base AS claude-code
 
+# Re-declare ARGs after FROM (they don't persist across stages)
+ARG VERSION
+ARG COMPONENT_VERSION
+ARG GIT_COMMIT
+ARG BUILD_DATE
+
+# OCI Image Labels (https://github.com/opencontainers/image-spec/blob/main/annotations.md)
+LABEL org.opencontainers.image.title="AOF Runner (Claude Code)" \
+      org.opencontainers.image.description="Agent Orchestration Framework - Agent execution engine with Claude Code executor" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.source="https://github.com/rawe/claude-agent-orchestrator" \
+      org.opencontainers.image.vendor="rawe" \
+      org.opencontainers.image.licenses="MIT" \
+      aof.component="runner-claude-code" \
+      aof.component.version="${COMPONENT_VERSION}"
+
 # Switch back to root for apt-get
 USER root
 
@@ -100,6 +130,24 @@ ENV PROFILE=best
 # STAGE: procedural
 # ==============================================================================
 FROM base AS procedural
+
+# Re-declare ARGs after FROM (they don't persist across stages)
+ARG VERSION
+ARG COMPONENT_VERSION
+ARG GIT_COMMIT
+ARG BUILD_DATE
+
+# OCI Image Labels
+LABEL org.opencontainers.image.title="AOF Runner (Procedural)" \
+      org.opencontainers.image.description="Agent Orchestration Framework - Agent execution engine with procedural executor" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.source="https://github.com/rawe/claude-agent-orchestrator" \
+      org.opencontainers.image.vendor="rawe" \
+      org.opencontainers.image.licenses="MIT" \
+      aof.component="runner-procedural" \
+      aof.component.version="${COMPONENT_VERSION}"
 
 # Copy procedural executor
 COPY --chown=agent:agent servers/agent-runner/executors/procedural-executor/ /app/servers/agent-runner/executors/procedural-executor/

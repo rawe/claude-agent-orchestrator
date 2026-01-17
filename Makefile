@@ -23,7 +23,27 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner release release-coordinator release-runner release-dashboard
+
+# ==============================================================================
+# CONTAINER IMAGE RELEASE CONFIGURATION
+# ==============================================================================
+# Default registry (GitHub Container Registry)
+REGISTRY ?= ghcr.io/rawe
+
+# Image names
+IMAGE_COORDINATOR := $(REGISTRY)/aof-coordinator
+IMAGE_RUNNER := $(REGISTRY)/aof-runner-claude-code
+IMAGE_DASHBOARD := $(REGISTRY)/aof-dashboard
+
+# Build metadata
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Component versions (from their respective package files)
+COORDINATOR_VERSION := $(shell grep -m1 'version' servers/agent-coordinator/pyproject.toml | cut -d'"' -f2)
+DASHBOARD_VERSION := $(shell grep -m1 '"version"' dashboard/package.json | cut -d'"' -f4)
+RUNNER_VERSION := 0.1.0
 
 # Default target
 help:
@@ -92,6 +112,13 @@ help:
 	@echo "Applications (interfaces/):"
 	@echo "  make start-chat-ui         - Start Chat UI (Docker)"
 	@echo "  make stop-chat-ui          - Stop Chat UI (Docker)"
+	@echo ""
+	@echo "Container image release (ghcr.io):"
+	@echo "  make release VERSION=x.y.z             - Build all release images"
+	@echo "  make release VERSION=x.y.z PUSH=true   - Build and push to registry"
+	@echo "  make release-coordinator VERSION=x.y.z - Build coordinator image only"
+	@echo "  make release-runner VERSION=x.y.z      - Build runner image only"
+	@echo "  make release-dashboard VERSION=x.y.z   - Build dashboard image only"
 
 # Build all images
 build:
@@ -555,3 +582,107 @@ stop-chat-ui:
 	@echo "Stopping Chat UI..."
 	@cd $(CHAT_UI_DIR) && docker compose down
 	@echo "Chat UI stopped"
+
+# ==============================================================================
+# CONTAINER IMAGE RELEASE
+# ==============================================================================
+# Build and optionally push versioned container images to GitHub Container Registry.
+#
+# Usage:
+#   make release VERSION=1.0.0                    # Build all images locally
+#   make release VERSION=1.0.0 PUSH=true          # Build and push to registry
+#   make release VERSION=1.0.0 REGISTRY=ghcr.io/other  # Override registry
+#
+# Individual components:
+#   make release-coordinator VERSION=1.0.0
+#   make release-runner VERSION=1.0.0
+#   make release-dashboard VERSION=1.0.0
+#
+# The VERSION parameter is required and should match the git tag (without 'v' prefix).
+# Example: git tag v1.0.0 → make release VERSION=1.0.0
+
+release: _check-version release-coordinator release-runner release-dashboard
+	@echo ""
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo "  Release $(VERSION) complete!"
+	@echo "════════════════════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Images built:"
+	@echo "  $(IMAGE_COORDINATOR):$(VERSION)"
+	@echo "  $(IMAGE_RUNNER):$(VERSION)"
+	@echo "  $(IMAGE_DASHBOARD):$(VERSION)"
+	@echo ""
+ifdef PUSH
+	@echo "Images have been pushed to $(REGISTRY)"
+else
+	@echo "To push images, run: make release VERSION=$(VERSION) PUSH=true"
+endif
+
+_check-version:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release VERSION=1.0.0)
+endif
+
+release-coordinator: _check-version
+	@echo ""
+	@echo "Building $(IMAGE_COORDINATOR):$(VERSION)..."
+	@echo "  Component version: $(COORDINATOR_VERSION)"
+	@echo "  Git commit: $(GIT_COMMIT)"
+	@echo ""
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMPONENT_VERSION=$(COORDINATOR_VERSION) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_COORDINATOR):$(VERSION) \
+		-t $(IMAGE_COORDINATOR):latest \
+		-f servers/agent-coordinator/Dockerfile \
+		servers/agent-coordinator
+ifdef PUSH
+	@echo "Pushing $(IMAGE_COORDINATOR):$(VERSION)..."
+	docker push $(IMAGE_COORDINATOR):$(VERSION)
+	docker push $(IMAGE_COORDINATOR):latest
+endif
+
+release-runner: _check-version
+	@echo ""
+	@echo "Building $(IMAGE_RUNNER):$(VERSION)..."
+	@echo "  Component version: $(RUNNER_VERSION)"
+	@echo "  Git commit: $(GIT_COMMIT)"
+	@echo ""
+	docker build \
+		--target claude-code \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMPONENT_VERSION=$(RUNNER_VERSION) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_RUNNER):$(VERSION) \
+		-t $(IMAGE_RUNNER):latest \
+		-f servers/agent-runner/docker/Dockerfile \
+		.
+ifdef PUSH
+	@echo "Pushing $(IMAGE_RUNNER):$(VERSION)..."
+	docker push $(IMAGE_RUNNER):$(VERSION)
+	docker push $(IMAGE_RUNNER):latest
+endif
+
+release-dashboard: _check-version
+	@echo ""
+	@echo "Building $(IMAGE_DASHBOARD):$(VERSION)..."
+	@echo "  Component version: $(DASHBOARD_VERSION)"
+	@echo "  Git commit: $(GIT_COMMIT)"
+	@echo ""
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMPONENT_VERSION=$(DASHBOARD_VERSION) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_DASHBOARD):$(VERSION) \
+		-t $(IMAGE_DASHBOARD):latest \
+		-f dashboard/Dockerfile \
+		dashboard
+ifdef PUSH
+	@echo "Pushing $(IMAGE_DASHBOARD):$(VERSION)..."
+	docker push $(IMAGE_DASHBOARD):$(VERSION)
+	docker push $(IMAGE_DASHBOARD):latest
+endif
