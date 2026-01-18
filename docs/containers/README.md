@@ -11,21 +11,21 @@ The Agent Orchestration Framework (AOF) provides three container images for depl
 ## Quick Start
 
 ```bash
-# Pull all images
-docker pull ghcr.io/rawe/aof-coordinator:latest
-docker pull ghcr.io/rawe/aof-runner-claude-code:latest
-docker pull ghcr.io/rawe/aof-dashboard:latest
+# Pull all images (replace <version> with actual version, e.g., 0.2.0)
+docker pull ghcr.io/rawe/aof-coordinator:<version>
+docker pull ghcr.io/rawe/aof-runner-claude-code:<version>
+docker pull ghcr.io/rawe/aof-dashboard:<version>
 ```
 
 ## Versioning
 
-All three images share the same release version. When you use version `1.0.0`, all components are guaranteed to work together.
+All three images share the same release version. When you use the same version tag, all components are guaranteed to work together.
 
 ```bash
 # Use a specific version
-docker pull ghcr.io/rawe/aof-coordinator:1.0.0
-docker pull ghcr.io/rawe/aof-runner-claude-code:1.0.0
-docker pull ghcr.io/rawe/aof-dashboard:1.0.0
+docker pull ghcr.io/rawe/aof-coordinator:<version>
+docker pull ghcr.io/rawe/aof-runner-claude-code:<version>
+docker pull ghcr.io/rawe/aof-dashboard:<version>
 ```
 
 ## Image Details
@@ -40,18 +40,18 @@ Use the Makefile to build images locally:
 
 ```bash
 # Build all images with a specific version
-make release VERSION=1.0.0
+make release VERSION=<version>
 
 # Build individual components
-make release-coordinator VERSION=1.0.0
-make release-runner VERSION=1.0.0
-make release-dashboard VERSION=1.0.0
+make release-coordinator VERSION=<version>
+make release-runner VERSION=<version>
+make release-dashboard VERSION=<version>
 
 # Build and push to registry
-make release VERSION=1.0.0 PUSH=true
+make release VERSION=<version> PUSH=true
 
 # Use a different registry
-make release VERSION=1.0.0 REGISTRY=ghcr.io/myorg
+make release VERSION=<version> REGISTRY=ghcr.io/myorg
 ```
 
 ## Image Labels
@@ -69,7 +69,7 @@ All images include OCI-compliant labels:
 Inspect labels with:
 
 ```bash
-docker inspect ghcr.io/rawe/aof-coordinator:1.0.0 --format='{{json .Config.Labels}}' | jq
+docker inspect ghcr.io/rawe/aof-coordinator:<version> --format='{{json .Config.Labels}}' | jq
 ```
 
 ## Architecture
@@ -103,7 +103,7 @@ version: '3.8'
 
 services:
   coordinator:
-    image: ghcr.io/rawe/aof-coordinator:1.0.0
+    image: ghcr.io/rawe/aof-coordinator:<version>
     ports:
       - "8765:8765"
     environment:
@@ -115,14 +115,14 @@ services:
       - ./config:/data/config
 
   dashboard:
-    image: ghcr.io/rawe/aof-dashboard:1.0.0
+    image: ghcr.io/rawe/aof-dashboard:<version>
     ports:
       - "3000:80"
     depends_on:
       - coordinator
 
   runner:
-    image: ghcr.io/rawe/aof-runner-claude-code:1.0.0
+    image: ghcr.io/rawe/aof-runner-claude-code:<version>
     environment:
       - AGENT_ORCHESTRATOR_API_URL=http://coordinator:8765
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}

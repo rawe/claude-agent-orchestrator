@@ -14,7 +14,7 @@ ghcr.io/rawe/aof-dashboard:<version>
 docker run -d \
   --name aof-dashboard \
   -p 3000:80 \
-  ghcr.io/rawe/aof-dashboard:latest
+  ghcr.io/rawe/aof-dashboard:<version>
 ```
 
 ## Build Arguments
@@ -39,7 +39,7 @@ docker build \
   --build-arg VITE_AUTH0_DOMAIN=your-tenant.auth0.com \
   --build-arg VITE_AUTH0_CLIENT_ID=your-client-id \
   --build-arg VITE_AUTH0_AUDIENCE=https://your-api \
-  -t my-aof-dashboard:latest \
+  -t my-aof-dashboard:<version> \
   dashboard/
 ```
 
@@ -74,7 +74,7 @@ For local development, the default image works with localhost:
 docker run -d \
   --name aof-dashboard \
   -p 3000:80 \
-  ghcr.io/rawe/aof-dashboard:latest
+  ghcr.io/rawe/aof-dashboard:<version>
 ```
 
 Access the dashboard at http://localhost:3000
@@ -92,14 +92,14 @@ docker build \
   --build-arg VITE_AUTH0_DOMAIN=example.auth0.com \
   --build-arg VITE_AUTH0_CLIENT_ID=abc123 \
   --build-arg VITE_AUTH0_AUDIENCE=https://api.aof.example.com \
-  -t my-aof-dashboard:1.0.0 \
+  -t my-aof-dashboard:<version> \
   dashboard/
 
 # Run production image
 docker run -d \
   --name aof-dashboard \
   -p 80:80 \
-  my-aof-dashboard:1.0.0
+  my-aof-dashboard:<version>
 ```
 
 ## Docker Compose
@@ -109,7 +109,7 @@ docker run -d \
 ```yaml
 services:
   dashboard:
-    image: ghcr.io/rawe/aof-dashboard:1.0.0
+    image: ghcr.io/rawe/aof-dashboard:<version>
     ports:
       - "3000:80"
     depends_on:
@@ -179,7 +179,7 @@ Mount it when running:
 docker run -d \
   -p 3000:80 \
   -v $(pwd)/nginx.conf:/etc/nginx/conf.d/default.conf:ro \
-  ghcr.io/rawe/aof-dashboard:latest
+  ghcr.io/rawe/aof-dashboard:<version>
 ```
 
 ## Health Check

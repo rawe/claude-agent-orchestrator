@@ -16,7 +16,7 @@ docker run -d \
   -e AGENT_ORCHESTRATOR_API_URL=http://host.docker.internal:8765 \
   -e CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token \
   -v $(pwd)/workspace:/workspace \
-  ghcr.io/rawe/aof-runner-claude-code:latest
+  ghcr.io/rawe/aof-runner-claude-code:<version>
 ```
 
 ## Prerequisites
@@ -41,6 +41,19 @@ claude auth token
 | `POLL_TIMEOUT` | No | `30` | Polling timeout in seconds |
 | `HEARTBEAT_INTERVAL` | No | `60` | Heartbeat interval in seconds |
 | `VERBOSE` | No | `false` | Enable verbose logging |
+
+### Auth0 M2M Authentication
+
+When the Coordinator has authentication enabled (`AUTH_ENABLED=true`), the runner needs M2M credentials:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTH0_DOMAIN` | When auth enabled | - | Auth0 tenant domain (e.g., `your-org.auth0.com`) |
+| `AUTH0_AUDIENCE` | When auth enabled | - | API identifier (must match Coordinator) |
+| `AUTH0_RUNNER_CLIENT_ID` | When auth enabled | - | M2M application client ID |
+| `AUTH0_RUNNER_CLIENT_SECRET` | When auth enabled | - | M2M application client secret |
+
+See [Auth0 Setup Guide](../setup/auth0-setup.md) for configuration details.
 
 **Important:** Do NOT set `ANTHROPIC_API_KEY` - it conflicts with the OAuth token.
 
@@ -97,7 +110,7 @@ docker run -d \
   -e PROFILE=best \
   -e VERBOSE=true \
   -v $(pwd)/workspace:/workspace \
-  ghcr.io/rawe/aof-runner-claude-code:latest
+  ghcr.io/rawe/aof-runner-claude-code:<version>
 ```
 
 ## Example: Production Setup
@@ -111,7 +124,7 @@ docker run -d \
   -e PROFILE=best \
   -e RUNNER_TAGS=production,region-us \
   -v /var/lib/aof/workspace:/workspace \
-  ghcr.io/rawe/aof-runner-claude-code:1.0.0
+  ghcr.io/rawe/aof-runner-claude-code:<version>
 ```
 
 ## Example: With MCP Server Exposed
@@ -125,7 +138,7 @@ docker run -d \
   -e AGENT_ORCHESTRATOR_API_URL=http://host.docker.internal:8765 \
   -e CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN} \
   -v $(pwd)/workspace:/workspace \
-  ghcr.io/rawe/aof-runner-claude-code:latest \
+  ghcr.io/rawe/aof-runner-claude-code:<version> \
   --mcp-port 9500
 ```
 
@@ -134,12 +147,35 @@ docker run -d \
 ```yaml
 services:
   runner:
-    image: ghcr.io/rawe/aof-runner-claude-code:1.0.0
+    image: ghcr.io/rawe/aof-runner-claude-code:<version>
     environment:
       AGENT_ORCHESTRATOR_API_URL: http://coordinator:8765
       CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
       PROFILE: best
       VERBOSE: "false"
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      - coordinator
+    restart: unless-stopped
+```
+
+### With Authentication Enabled
+
+```yaml
+services:
+  runner:
+    image: ghcr.io/rawe/aof-runner-claude-code:<version>
+    environment:
+      AGENT_ORCHESTRATOR_API_URL: http://coordinator:8765
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
+      PROFILE: best
+      VERBOSE: "false"
+      # Auth0 M2M credentials (required when coordinator has AUTH_ENABLED=true)
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      AUTH0_RUNNER_CLIENT_ID: ${AUTH0_RUNNER_CLIENT_ID}
+      AUTH0_RUNNER_CLIENT_SECRET: ${AUTH0_RUNNER_CLIENT_SECRET}
     volumes:
       - ./workspace:/workspace
     depends_on:

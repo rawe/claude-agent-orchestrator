@@ -18,7 +18,7 @@ docker run -d \
   -e CORS_ORIGINS=* \
   -e AGENT_ORCHESTRATOR_AGENTS_DIR=/data/config/agents \
   -v $(pwd)/config:/data/config \
-  ghcr.io/rawe/aof-coordinator:latest
+  ghcr.io/rawe/aof-coordinator:<version>
 ```
 
 ## Environment Variables
@@ -110,7 +110,7 @@ docker run -d \
   -e AGENT_ORCHESTRATOR_AGENTS_DIR=/data/config/agents \
   -v $(pwd)/config:/data/config \
   -v coordinator-data:/app/.agent-orchestrator \
-  ghcr.io/rawe/aof-coordinator:latest
+  ghcr.io/rawe/aof-coordinator:<version>
 ```
 
 ## Example: Production Setup
@@ -126,7 +126,7 @@ docker run -d \
   -e AGENT_ORCHESTRATOR_AGENTS_DIR=/data/config/agents \
   -v /etc/aof/config:/data/config \
   -v /var/lib/aof/coordinator:/app/.agent-orchestrator \
-  ghcr.io/rawe/aof-coordinator:1.0.0
+  ghcr.io/rawe/aof-coordinator:<version>
 ```
 
 ## Docker Compose
@@ -134,7 +134,7 @@ docker run -d \
 ```yaml
 services:
   coordinator:
-    image: ghcr.io/rawe/aof-coordinator:1.0.0
+    image: ghcr.io/rawe/aof-coordinator:<version>
     ports:
       - "8765:8765"
     environment:

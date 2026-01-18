@@ -157,6 +157,11 @@ services:
       # Optional settings
       - RUNNER_TAGS=${RUNNER_TAGS:-}
       - VERBOSE=${AGENT_RUNNER_VERBOSE:-false}
+      # Auth0 M2M authentication (required when coordinator has AUTH_ENABLED=true)
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - AUTH0_RUNNER_CLIENT_ID=${AUTH0_RUNNER_CLIENT_ID}
+      - AUTH0_RUNNER_CLIENT_SECRET=${AUTH0_RUNNER_CLIENT_SECRET}
     volumes:
       - agent-runner-workspace:/workspace
     networks:
