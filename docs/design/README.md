@@ -26,7 +26,8 @@ Token-based server-to-server authentication with scoping. Generic pattern applic
 
 | Document | Description |
 |----------|-------------|
-| [Structured Output Schema Enforcement](./structured-output-schema-enforcement.md) | Enforcing JSON Schema compliance on agent outputs |
+| [Agent Output Schema](./agent-output-schema.md) | Blueprint-defined output schemas for autonomous agents |
+| [Structured Output Schema Enforcement](./structured-output-schema-enforcement.md) | Caller-driven JSON Schema enforcement on agent outputs |
 | [Unified Task Model Overview](./unified-task-model-overview.md) | Architectural overview of the unified task model |
 
 ## Archive (Implemented)
