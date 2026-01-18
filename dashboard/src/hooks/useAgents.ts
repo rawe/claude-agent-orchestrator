@@ -48,9 +48,15 @@ export function useAgents() {
     return updated;
   }, []);
 
-  const checkNameAvailable = useCallback(async (name: string) => {
-    return agentService.checkNameAvailable(name);
-  }, []);
+  const checkNameAvailable = useCallback(
+    async (name: string) => {
+      // Check against local agents list for instant feedback
+      // This avoids slow API calls for each keystroke
+      const exists = agents.some((agent) => agent.name.toLowerCase() === name.toLowerCase());
+      return !exists;
+    },
+    [agents]
+  );
 
   return {
     agents,

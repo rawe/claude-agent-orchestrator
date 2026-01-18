@@ -10,3 +10,4 @@ export type { DropdownOption } from './Dropdown';
 export { TagSelector } from './TagSelector';
 export { JsonSchemaForm } from './JsonSchemaForm';
 export type { JsonSchemaFormProps, RJSFSchema, UiSchema } from './JsonSchemaForm';
+export { InfoPopover } from './InfoPopover';

@@ -4,6 +4,7 @@ import { AlertCircle, Check, Code } from 'lucide-react';
 interface OutputSchemaEditorProps {
   value: Record<string, unknown> | null;
   onChange: (value: Record<string, unknown> | null) => void;
+  className?: string;
 }
 
 // Default schema template for output validation
@@ -19,7 +20,7 @@ const DEFAULT_OUTPUT_SCHEMA_TEMPLATE = {
   additionalProperties: false,
 };
 
-export function OutputSchemaEditor({ value, onChange }: OutputSchemaEditorProps) {
+export function OutputSchemaEditor({ value, onChange, className = '' }: OutputSchemaEditorProps) {
   const [jsonText, setJsonText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isValid, setIsValid] = useState(true);
@@ -94,8 +95,8 @@ export function OutputSchemaEditor({ value, onChange }: OutputSchemaEditorProps)
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className={`flex flex-col ${className}`}>
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           {isValid ? (
             <span className="flex items-center gap-1 text-xs text-green-600">
@@ -123,27 +124,21 @@ export function OutputSchemaEditor({ value, onChange }: OutputSchemaEditorProps)
         value={jsonText}
         onChange={(e) => validateAndUpdate(e.target.value)}
         placeholder={JSON.stringify(DEFAULT_OUTPUT_SCHEMA_TEMPLATE, null, 2)}
-        rows={12}
-        className={`input font-mono text-sm resize-none ${
+        className={`input font-mono text-sm resize-none flex-1 min-h-[200px] ${
           !isValid ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
         }`}
       />
 
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
+        <p className="text-xs text-red-500 flex items-center gap-1 mt-2 flex-shrink-0">
           <AlertCircle className="w-3 h-3" />
           {error}
         </p>
       )}
 
-      <div className="text-xs text-gray-500 space-y-1">
+      <div className="text-xs text-gray-500 mt-2 flex-shrink-0">
         <p>
-          Define a JSON Schema for the agent's output. The agent will be instructed to produce
-          JSON matching this schema, and the output will be validated before completing.
-        </p>
-        <p>
-          If validation fails, the agent will be prompted to retry once. Valid output is stored
-          in <code className="bg-gray-100 px-1 rounded">result_data</code> instead of <code className="bg-gray-100 px-1 rounded">result_text</code>.
+          Agent produces JSON matching this schema. Valid output stored in <code className="bg-gray-100 px-1 rounded">result_data</code>.
         </p>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { AlertCircle, Check, Code } from 'lucide-react';
 interface InputSchemaEditorProps {
   value: Record<string, unknown> | null;
   onChange: (value: Record<string, unknown> | null) => void;
+  className?: string;
 }
 
 // Default schema template for autonomous agents with custom inputs
@@ -18,7 +19,7 @@ const DEFAULT_SCHEMA_TEMPLATE = {
   additionalProperties: false,
 };
 
-export function InputSchemaEditor({ value, onChange }: InputSchemaEditorProps) {
+export function InputSchemaEditor({ value, onChange, className = '' }: InputSchemaEditorProps) {
   const [jsonText, setJsonText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isValid, setIsValid] = useState(true);
@@ -93,8 +94,8 @@ export function InputSchemaEditor({ value, onChange }: InputSchemaEditorProps) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className={`flex flex-col ${className}`}>
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           {isValid ? (
             <span className="flex items-center gap-1 text-xs text-green-600">
@@ -122,26 +123,22 @@ export function InputSchemaEditor({ value, onChange }: InputSchemaEditorProps) {
         value={jsonText}
         onChange={(e) => validateAndUpdate(e.target.value)}
         placeholder={JSON.stringify(DEFAULT_SCHEMA_TEMPLATE, null, 2)}
-        rows={12}
-        className={`input font-mono text-sm resize-none ${
+        className={`input font-mono text-sm resize-none flex-1 min-h-[200px] ${
           !isValid ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
         }`}
       />
 
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1">
+        <p className="text-xs text-red-500 flex items-center gap-1 mt-2 flex-shrink-0">
           <AlertCircle className="w-3 h-3" />
           {error}
         </p>
       )}
 
-      <div className="text-xs text-gray-500 space-y-1">
+      <div className="text-xs text-gray-500 mt-2 flex-shrink-0">
         <p>
-          Define a JSON Schema for additional input parameters. The schema should define properties
-          that will be passed to the agent alongside the prompt.
-        </p>
-        <p className="font-mono bg-gray-100 p-2 rounded">
-          Example: {`{"topic": "AI safety", "max_words": 500}`}
+          Define a JSON Schema for input parameters passed to the agent.
+          Example: <code className="font-mono bg-gray-100 px-1 rounded">{`{"topic": "AI safety"}`}</code>
         </p>
       </div>
     </div>
