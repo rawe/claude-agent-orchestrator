@@ -48,7 +48,7 @@ Before starting services, reset the database for a clean state:
 
 ### 2. Copy Agent Blueprints (if needed)
 
-For tests that require agent blueprints (test cases 03-07), copy them **before** starting the Agent Coordinator. See [Agent Blueprints](#agent-blueprints) section for details.
+For tests that require agent blueprints (test cases 03-07, 13, 17), copy them **before** starting the Agent Coordinator. See [Agent Blueprints](#agent-blueprints) section for details.
 
 ### 3. Start Agent Coordinator
 
@@ -203,6 +203,25 @@ curl -s http://localhost:8765/agents | grep agent-orchestrator
 ### Category 4: Demand Matching (ADR-011)
 - `09-demand-matching-success.md` - Runner with matching tags claims run with demands
 - `10-demand-matching-timeout.md` - Run times out when no matching runner available
+
+### Category 5: Structured Results
+- `11-result-event-emission.md` - Verify executors emit `result` event with structured output
+- `12-structured-result-api.md` - `GET /sessions/{id}/result` endpoint returns `result_text` and `result_data`
+- `13-structured-callback.md` - Callbacks include structured result format
+
+### Category 6: Parameter Validation
+- `14-parameter-validation-valid.md` - Valid parameters accepted by coordinator
+- `15-parameter-validation-invalid.md` - Invalid parameters rejected with structured validation error
+
+### Category 7: Agent Types
+- `16-agent-type-listing.md` - Agent listings include `type` field (autonomous/procedural)
+
+### Category 8: Output Schema Validation
+- `17-output-schema-validation.md` - Output schema validation with retry mechanism (requires `claude-code` executor)
+
+### Category 9: Procedural Agents
+- `20-procedural-executor.md` - Procedural executor runs CLI commands and returns structured results
+- `21-procedural-executor-fallback.md` - Procedural executor fallback handling for non-JSON output
 
 ## Tools Reference
 
