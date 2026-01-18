@@ -6,7 +6,7 @@ import { useNotification, useSSE, useChat, useSessions } from '@/contexts';
 import { Button, Spinner, Dropdown, JsonSchemaForm } from '@/components/common';
 import type { DropdownOption, RJSFSchema } from '@/components/common';
 import { SessionSelector } from '@/components/features/chat';
-import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square } from 'lucide-react';
+import { Send, Bot, User, RefreshCw, Ban, Wrench, CheckCircle2, XCircle, Copy, Check, Square, FileJson } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ToolCall } from '@/contexts/ChatContext';
@@ -601,6 +601,27 @@ export function Chat() {
                         <Spinner size="sm" />
                         <span className="text-sm text-gray-500">Agent is running...</span>
                       </div>
+                    </div>
+                  ) : message.isResult ? (
+                    // Result message - distinct visual treatment
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <FileJson className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
+                          Session Result
+                        </span>
+                      </div>
+                      {message.resultData ? (
+                        // Structured output - dark code block
+                        <pre className="text-sm font-mono bg-gray-900 text-gray-100 rounded-lg p-4 overflow-auto max-h-96">
+                          {JSON.stringify(message.resultData, null, 2)}
+                        </pre>
+                      ) : (
+                        // Text output - markdown rendered
+                        <div className="markdown-content">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                   ) : message.role === 'assistant' ? (
                     <div className="space-y-2">

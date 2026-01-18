@@ -27,6 +27,9 @@ export interface ChatMessage {
   timestamp: Date;
   status?: 'pending' | 'complete' | 'error';
   toolCalls?: ToolCall[];  // Tool calls associated with this message
+  // Result event fields (for displaying structured output)
+  isResult?: boolean;                      // Marks this as a result message
+  resultData?: Record<string, unknown>;    // Structured output (if output_schema defined)
 }
 
 type ChatMode = 'new' | 'linked';
@@ -160,6 +163,25 @@ function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
       // Clear accumulated tool calls after attaching to assistant message
       if (event.role === 'assistant') {
         accumulatedToolCalls = [];
+      }
+    } else if (event.event_type === 'result') {
+      // Handle result events (structured output)
+      const resultData = event.result_data as Record<string, unknown> | undefined;
+      const resultText = event.result_text;
+      const content = resultData
+        ? JSON.stringify(resultData, null, 2)
+        : resultText || '';
+
+      if (content) {
+        result.push({
+          id: `result-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+          role: 'assistant',
+          content,
+          timestamp: new Date(event.timestamp),
+          status: 'complete',
+          isResult: true,
+          resultData: resultData ?? undefined,
+        });
       }
     }
   }
@@ -369,6 +391,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         handleToolEvent(event);
         return;
       }
+
+      // --- RESULT EVENT ---
+      // Structured output from agent (result_data or result_text)
+      if (event.event_type === 'result') {
+        handleResultEvent(event);
+        return;
+      }
     }
   }, []);
 
@@ -499,6 +528,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         });
       }
     }
+  }
+
+  /**
+   * Handle result events (structured output from agent)
+   * Displays result_data (JSON) or result_text in chat
+   */
+  function handleResultEvent(event: SessionEvent) {
+    const resultData = event.result_data as Record<string, unknown> | undefined;
+    const resultText = event.result_text;
+
+    // Prefer result_data (structured), fall back to result_text
+    const content = resultData
+      ? JSON.stringify(resultData, null, 2)
+      : resultText || '';
+
+    // Skip if no content
+    if (!content) return;
+
+    const resultMessage: ChatMessage = {
+      id: `result-${event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+      role: 'assistant',  // Still assistant, but marked as result
+      content,
+      timestamp: new Date(event.timestamp),
+      status: 'complete',
+      isResult: true,
+      resultData: resultData ?? undefined,
+    };
+
+    setMessages(prev => {
+      // Dedupe: don't add if we already have a result with same data
+      if (prev.some(m => m.isResult && m.content === content)) return prev;
+      return [...prev, resultMessage];
+    });
   }
 
   /**
