@@ -5,6 +5,7 @@
 #     "claude-agent-sdk",
 #     "typer",
 #     "httpx",
+#     "jsonschema>=4.0.0",
 # ]
 # ///
 """
@@ -202,6 +203,7 @@ def run_start(inv: ExecutorInvocation):
     agent_name = None
     system_prompt = None
     has_custom_schema = False
+    output_schema = None
 
     if inv.agent_blueprint:
         # Schema 2.0: Use resolved blueprint directly (no API call needed)
@@ -210,12 +212,15 @@ def run_start(inv: ExecutorInvocation):
         mcp_servers = inv.agent_blueprint.get("mcp_servers")
         # ADR-015: Check if agent has custom parameters_schema
         has_custom_schema = inv.agent_blueprint.get("parameters_schema") is not None
+        # Output schema for structured JSON output validation
+        output_schema = inv.agent_blueprint.get("output_schema")
 
         debug_log("ao-claude-code-exec using agent_blueprint", {
             "agent_name": agent_name or "unnamed",
             "has_system_prompt": system_prompt is not None,
             "has_mcp_servers": mcp_servers is not None,
             "has_custom_schema": has_custom_schema,
+            "has_output_schema": output_schema is not None,
         })
 
     # 3. Format inputs based on schema presence (ADR-015)
@@ -246,6 +251,7 @@ def run_start(inv: ExecutorInvocation):
         agent_name=agent_name,
         executor_config=inv.executor_config,
         system_prompt=system_prompt,
+        output_schema=output_schema,
     )
 
     # Print result to stdout
@@ -313,6 +319,7 @@ def run_resume(inv: ExecutorInvocation):
     mcp_servers = None
     agent_name = session_agent
     has_custom_schema = False
+    output_schema = None
 
     if inv.agent_blueprint:
         # Schema 2.0: Use resolved blueprint directly (no API call needed)
@@ -321,11 +328,14 @@ def run_resume(inv: ExecutorInvocation):
         agent_name = inv.agent_blueprint.get("name") or session_agent
         # ADR-015: Check if agent has custom parameters_schema
         has_custom_schema = inv.agent_blueprint.get("parameters_schema") is not None
+        # Output schema for structured JSON output validation
+        output_schema = inv.agent_blueprint.get("output_schema")
 
         debug_log("ao-claude-code-exec resume using agent_blueprint", {
             "agent_name": agent_name or "None",
             "has_mcp_servers": mcp_servers is not None,
             "has_custom_schema": has_custom_schema,
+            "has_output_schema": output_schema is not None,
         })
 
     # 4. Format inputs based on schema presence (ADR-015)
@@ -357,6 +367,7 @@ def run_resume(inv: ExecutorInvocation):
         api_url=api_url,
         agent_name=agent_name,
         executor_config=inv.executor_config,
+        output_schema=output_schema,
     )
 
     # Print result to stdout

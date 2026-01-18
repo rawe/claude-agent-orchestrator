@@ -1,0 +1,28 @@
+{
+  "name": "structured-output-agent",
+  "description": "An agent to test the structure output",
+  "type": "autonomous",
+  "output_schema": {
+    "type": "object",
+    "required": [
+      "answer",
+      "rationale"
+    ],
+    "properties": {
+      "answer": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ],
+        "description": "The decision answer: yes, no, or unknown if the agent doesn't know"
+      },
+      "rationale": {
+        "type": "string",
+        "description": "The reasoning behind the answer"
+      }
+    },
+    "additionalProperties": false
+  }
+}

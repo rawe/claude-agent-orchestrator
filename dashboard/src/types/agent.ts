@@ -32,6 +32,7 @@ export interface Agent {
   description: string;
   type: AgentType;
   parameters_schema: Record<string, unknown> | null;  // JSON Schema for parameter validation
+  output_schema: Record<string, unknown> | null;  // JSON Schema for output validation
   system_prompt: string | null;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[] | null;
@@ -56,6 +57,7 @@ export interface AgentCreate {
   description: string;
   type?: AgentType;  // Defaults to 'autonomous'
   parameters_schema?: Record<string, unknown> | null;  // JSON Schema for parameter validation
+  output_schema?: Record<string, unknown> | null;  // JSON Schema for output validation
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;
   skills?: string[];
@@ -67,6 +69,7 @@ export interface AgentCreate {
 export interface AgentUpdate {
   type?: AgentType;
   parameters_schema?: Record<string, unknown> | null;  // JSON Schema for parameter validation
+  output_schema?: Record<string, unknown> | null;  // JSON Schema for output validation
   description?: string;
   system_prompt?: string;
   mcp_servers?: Record<string, MCPServerConfig> | null;

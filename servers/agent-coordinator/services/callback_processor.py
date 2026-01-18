@@ -39,8 +39,7 @@ _lock = threading.Lock()
 CALLBACK_PROMPT_TEMPLATE = """<agent-callback session="{child_session_id}" status="completed">
 ## Child Result
 
-{result_text}
-{result_data_section}
+{result}
 </agent-callback>
 
 Please continue with the orchestration based on this result."""
@@ -198,12 +197,24 @@ def _queue_notification(
     logger.debug(f"Queued callback: {child_session_id} -> {parent_session_id}")
 
 
-def _format_result_data_section(result_data: Optional[dict]) -> str:
-    """Format result_data as a markdown section if present."""
-    if result_data is None:
-        return ""
+def _format_child_result(result_dict: Optional[dict]) -> str:
+    """Format child result for callback to parent agent.
+
+    Returns result_data (as JSON) if present, otherwise result_text.
+    This prioritizes structured output when available.
+    """
     import json
-    return f"\n## Structured Data\n\n```json\n{json.dumps(result_data, indent=2)}\n```"
+
+    if result_dict is None:
+        return "(No result available)"
+
+    result_data = result_dict.get("result_data")
+    if result_data is not None:
+        # Structured output - return as formatted JSON
+        return json.dumps(result_data, indent=2)
+    else:
+        # Text output - return directly
+        return result_dict.get("result_text") or "(No result available)"
 
 
 def _create_resume_run(
@@ -234,17 +245,10 @@ def _create_resume_run(
                 child_error=error or "Unknown error",
             )
         else:
-            # Extract structured result
-            result_text = "(No result available)"
-            result_data = None
-            if result_dict:
-                result_text = result_dict.get("result_text") or "(No result available)"
-                result_data = result_dict.get("result_data")
-
+            # Format result: prioritize result_data (JSON) over result_text
             prompt = CALLBACK_PROMPT_TEMPLATE.format(
                 child_session_id=child_id,
-                result_text=result_text,
-                result_data_section=_format_result_data_section(result_data),
+                result=_format_child_result(result_dict),
             )
     else:
         # Multiple children - aggregate results
@@ -255,14 +259,8 @@ def _create_resume_run(
                 content = error or "Unknown error"
             else:
                 status = "completed"
-                # Extract structured result
-                result_text = "(No result available)"
-                result_data_section = ""
-                if result_dict:
-                    result_text = result_dict.get("result_text") or "(No result available)"
-                    result_data = result_dict.get("result_data")
-                    result_data_section = _format_result_data_section(result_data)
-                content = result_text + result_data_section
+                # Format result: prioritize result_data (JSON) over result_text
+                content = _format_child_result(result_dict)
 
             results_parts.append(f"### Child: {child_id} (status: {status})\n\n{content}")
 

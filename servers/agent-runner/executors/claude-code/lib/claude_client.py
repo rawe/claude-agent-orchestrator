@@ -22,8 +22,10 @@ Note: Uses session_id (coordinator-generated) per ADR-010.
 
 from pathlib import Path
 from typing import Optional
+from dataclasses import dataclass, field
 import asyncio
 import copy
+import json
 import os
 import re
 from datetime import datetime, UTC
@@ -31,6 +33,147 @@ from datetime import datetime, UTC
 from enum import StrEnum
 
 from session_client import SessionClient, SessionClientError
+
+
+# =============================================================================
+# Output Schema Validation
+# =============================================================================
+
+class OutputSchemaValidationError(Exception):
+    """Raised when output validation fails after retries."""
+    def __init__(self, message: str, errors: list[dict]):
+        super().__init__(message)
+        self.errors = errors
+
+
+@dataclass
+class ValidationResult:
+    """Result of validating agent output against JSON Schema."""
+    valid: bool
+    errors: list[dict] = field(default_factory=list)
+
+
+def validate_against_schema(output: dict | None, schema: dict) -> ValidationResult:
+    """Validate agent output against JSON Schema.
+
+    Args:
+        output: The extracted JSON output from the agent
+        schema: The JSON Schema to validate against
+
+    Returns:
+        ValidationResult with valid=True if valid, or valid=False with errors
+    """
+    from jsonschema import Draft7Validator
+
+    if output is None:
+        return ValidationResult(
+            valid=False,
+            errors=[{"path": "$", "message": "No JSON output found but output_schema requires structured output"}]
+        )
+
+    validator = Draft7Validator(schema)
+    errors = list(validator.iter_errors(output))
+
+    if not errors:
+        return ValidationResult(valid=True)
+
+    return ValidationResult(
+        valid=False,
+        errors=[
+            {
+                "path": f"$.{'.'.join(str(p) for p in e.absolute_path)}" if e.absolute_path else "$",
+                "message": e.message,
+            }
+            for e in errors
+        ]
+    )
+
+
+def extract_json_from_response(text: str) -> dict | None:
+    """Extract JSON object from AI response text.
+
+    Tries to find JSON in code blocks first, then raw JSON objects.
+
+    Args:
+        text: The AI response text
+
+    Returns:
+        Extracted JSON dict or None if no valid JSON found
+    """
+    # Try to find JSON in code blocks first
+    code_block_match = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
+    if code_block_match:
+        try:
+            return json.loads(code_block_match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+
+    # Try to find raw JSON object
+    json_match = re.search(r'\{[\s\S]*\}', text)
+    if json_match:
+        try:
+            return json.loads(json_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+def enrich_system_prompt_with_output_schema(system_prompt: str | None, output_schema: dict | None) -> str | None:
+    """Append output schema instructions to system prompt.
+
+    Args:
+        system_prompt: The original system prompt (may be None)
+        output_schema: The JSON Schema for output validation (may be None)
+
+    Returns:
+        Enriched system prompt or None if no schema
+    """
+    if not output_schema:
+        return system_prompt
+
+    base_prompt = system_prompt or ""
+
+    output_instructions = f"""
+
+## Required Output Format
+
+You MUST provide structured output as JSON conforming to this schema:
+
+```json
+{json.dumps(output_schema, indent=2)}
+```
+
+Your final response MUST be valid JSON that matches this schema exactly. Output ONLY the JSON, no additional text."""
+
+    return base_prompt + output_instructions
+
+
+def build_validation_error_prompt(errors: list[dict], schema: dict) -> str:
+    """Build prompt for schema validation retry.
+
+    Args:
+        errors: List of validation errors
+        schema: The JSON Schema that failed validation
+
+    Returns:
+        Prompt instructing the agent to correct its output
+    """
+    error_lines = "\n".join(f"- {e['path']}: {e['message']}" for e in errors)
+
+    return f"""<output-validation-error>
+Your output did not match the required schema.
+
+## Validation Errors
+{error_lines}
+
+## Required Schema
+```json
+{json.dumps(schema, indent=2)}
+```
+
+Please provide output matching the schema exactly. Output ONLY valid JSON.
+</output-validation-error>"""
 
 
 # =============================================================================
@@ -183,6 +326,7 @@ async def run_claude_session(
     agent_name: Optional[str] = None,
     executor_config: Optional[dict] = None,
     system_prompt: Optional[str] = None,
+    output_schema: Optional[dict] = None,
 ) -> tuple[str, str]:
     """
     Run Claude session with API-based session management.
@@ -204,6 +348,8 @@ async def run_claude_session(
         agent_name: Agent name (optional, for session metadata)
         executor_config: Executor-specific config (permission_mode, setting_sources, model)
         system_prompt: System prompt for Claude (only used for new sessions, not resume)
+        output_schema: JSON Schema for output validation. If provided, the agent's
+            output will be validated against this schema and retried once on failure.
 
     Returns:
         Tuple of (executor_session_id, result) where executor_session_id is
@@ -212,6 +358,7 @@ async def run_claude_session(
     Raises:
         ValueError: If session_id or result not found in messages
         ImportError: If claude-agent-sdk is not installed
+        OutputSchemaValidationError: If output validation fails after retry
         Exception: SDK errors are propagated
 
     Example:
@@ -250,8 +397,10 @@ async def run_claude_session(
         options.model = claude_config[ClaudeConfigKey.MODEL]
 
     # Set system prompt if provided (only for new sessions, not resume)
-    if system_prompt:
-        options.system_prompt = system_prompt
+    # Enrich with output schema instructions if output_schema is defined
+    enriched_system_prompt = enrich_system_prompt_with_output_schema(system_prompt, output_schema)
+    if enriched_system_prompt:
+        options.system_prompt = enriched_system_prompt
 
     # Add programmatic hooks for post_tool events
     try:
@@ -281,37 +430,33 @@ async def run_claude_session(
     # Initialize tracking variables
     executor_session_id = None
     result = None
+    session_bound = False  # Track if we've bound the session
 
-    # Stream session using ClaudeSDKClient
-    try:
-        async with ClaudeSDKClient(options=options) as client:
-            # Send the query
-            await client.query(prompt)
+    # Helper function to process message stream and extract result
+    async def process_message_stream(client, current_prompt: str):
+        nonlocal executor_session_id, result, session_bound
 
-            # Stream messages from client
-            async for message in client.receive_response():
-                # Extract session_id from FIRST SystemMessage (arrives early!)
-                # SystemMessage with subtype='init' contains session_id in data dict
-                if isinstance(message, SystemMessage) and executor_session_id is None:
-                    # Extract session_id from SystemMessage.data
-                    # This is the Claude SDK's session UUID
-                    if message.subtype == 'init' and message.data:
-                        extracted_session_id = message.data.get('session_id')
-                        if extracted_session_id:
-                            executor_session_id = extracted_session_id
+        stream_result = None
 
-                            # Bind session executor (ADR-010)
-                            # This stores the Claude SDK's session_id as executor_session_id
-                            # and sets session status to 'running'
-                            # The Runner Gateway enriches with hostname and executor_profile
+        async for message in client.receive_response():
+            # Extract session_id from FIRST SystemMessage (arrives early!)
+            # Only do binding on first query, not retries
+            if isinstance(message, SystemMessage) and executor_session_id is None:
+                if message.subtype == 'init' and message.data:
+                    extracted_session_id = message.data.get('session_id')
+                    if extracted_session_id:
+                        executor_session_id = extracted_session_id
+
+                        # Bind session executor (ADR-010)
+                        if not session_bound:
                             try:
                                 session_client.bind(
                                     session_id=session_id,
                                     executor_session_id=executor_session_id,
                                     project_dir=str(project_dir),
                                 )
+                                session_bound = True
                             except SessionClientError as e:
-                                # Don't fail the session if bind fails
                                 import sys
                                 print(f"Warning: Session bind failed: {e}", file=sys.stderr)
 
@@ -325,62 +470,116 @@ async def run_claude_session(
                                         session_id=session_id,
                                         last_resumed_at=datetime.now(UTC).isoformat()
                                     )
-                                    # NOTE: Session start event is emitted by the agent runner via
-                                    # POST /runner/runs/{run_id}/started when this process launches.
                                 except SessionClientError as e:
                                     import sys
                                     print(f"Warning: Session update failed: {e}", file=sys.stderr)
 
-                            # Send user message event
-                            try:
-                                session_client.add_event(session_id, {
-                                    "event_type": "message",
-                                    "session_id": session_id,
-                                    "timestamp": datetime.now(UTC).isoformat(),
-                                    "role": "user",
-                                    "content": [{"type": "text", "text": prompt}]
-                                })
-                            except SessionClientError:
-                                pass  # Silent failure
-
-                # Extract result from ResultMessage
-                if isinstance(message, ResultMessage):
-                    # Capture executor_session_id if we somehow didn't get it from SystemMessage
-                    if executor_session_id is None:
-                        executor_session_id = message.session_id
-
-                    # Capture result (overwrite each time to get final result)
-                    result = message.result
-
-                    # Send assistant message event to API (for conversation history)
-                    if message.result and session_id:
+                        # Send user message event (for both initial and retry prompts)
                         try:
                             session_client.add_event(session_id, {
                                 "event_type": "message",
                                 "session_id": session_id,
                                 "timestamp": datetime.now(UTC).isoformat(),
-                                "role": "assistant",
-                                "content": [{"type": "text", "text": message.result}]
+                                "role": "user",
+                                "content": [{"type": "text", "text": current_prompt}]
                             })
                         except SessionClientError:
                             pass  # Silent failure
 
-                    # Send result event (for structured output)
-                    if message.result and session_id:
-                        try:
-                            session_client.add_event(session_id, {
-                                "event_type": "result",
-                                "session_id": session_id,
-                                "timestamp": datetime.now(UTC).isoformat(),
-                                "result_text": message.result,
-                                "result_data": None  # AI agents produce text only
-                            })
-                        except SessionClientError:
-                            pass  # Silent failure
+            # Extract result from ResultMessage
+            if isinstance(message, ResultMessage):
+                if executor_session_id is None:
+                    executor_session_id = message.session_id
+
+                stream_result = message.result
+
+                # Send assistant message event to API (for conversation history)
+                if message.result and session_id:
+                    try:
+                        session_client.add_event(session_id, {
+                            "event_type": "message",
+                            "session_id": session_id,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "role": "assistant",
+                            "content": [{"type": "text", "text": message.result}]
+                        })
+                    except SessionClientError:
+                        pass  # Silent failure
+
+        return stream_result
+
+    # Stream session using ClaudeSDKClient
+    try:
+        async with ClaudeSDKClient(options=options) as client:
+            # Send the initial query and process response
+            await client.query(prompt)
+            result = await process_message_stream(client, prompt)
+
+            # Output schema validation (if schema defined)
+            if output_schema:
+                if not result:
+                    raise OutputSchemaValidationError(
+                        "No result received but output_schema requires structured output",
+                        [{"path": "$", "message": "No result received from agent"}]
+                    )
+
+                output_json = extract_json_from_response(result)
+                validation = validate_against_schema(output_json, output_schema)
+
+                if not validation.valid:
+                    # First attempt failed - retry once
+                    retry_prompt = build_validation_error_prompt(validation.errors, output_schema)
+                    await client.query(retry_prompt)
+                    result = await process_message_stream(client, retry_prompt)
+
+                    # Validate retry response
+                    if not result:
+                        raise OutputSchemaValidationError(
+                            "Output validation failed after 1 retry",
+                            [{"path": "$", "message": "No result received from retry attempt"}]
+                        )
+
+                    output_json = extract_json_from_response(result)
+                    validation = validate_against_schema(output_json, output_schema)
+
+                    if not validation.valid:
+                        # Retry exhausted - report failure
+                        raise OutputSchemaValidationError(
+                            "Output validation failed after 1 retry",
+                            validation.errors
+                        )
+
+                # Validation passed - send result event with structured data
+                try:
+                    session_client.add_event(session_id, {
+                        "event_type": "result",
+                        "session_id": session_id,
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "result_text": None,
+                        "result_data": output_json,
+                    })
+                except SessionClientError:
+                    pass  # Silent failure
+
+            elif result and session_id:
+                # No output schema - send result event with text
+                try:
+                    session_client.add_event(session_id, {
+                        "event_type": "result",
+                        "session_id": session_id,
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "result_text": result,
+                        "result_data": None,
+                    })
+                except SessionClientError:
+                    pass  # Silent failure
 
             # NOTE: Session completion is signaled by the agent runner's supervisor
             # via POST /runner/runs/{run_id}/completed when this process exits.
 
+    except OutputSchemaValidationError:
+        # Re-raise validation errors directly (don't wrap them)
+        raise
     except Exception as e:
         # Propagate SDK errors with context
         raise Exception(f"Claude SDK error during session execution: {e}") from e
@@ -411,6 +610,7 @@ def run_session_sync(
     agent_name: Optional[str] = None,
     executor_config: Optional[dict] = None,
     system_prompt: Optional[str] = None,
+    output_schema: Optional[dict] = None,
 ) -> tuple[str, str]:
     """
     Synchronous wrapper for run_claude_session.
@@ -430,6 +630,8 @@ def run_session_sync(
         agent_name: Agent name (optional, for session metadata)
         executor_config: Executor-specific config (permission_mode, setting_sources, model)
         system_prompt: System prompt for Claude (only used for new sessions, not resume)
+        output_schema: JSON Schema for output validation. If provided, the agent's
+            output will be validated against this schema and retried once on failure.
 
     Returns:
         Tuple of (executor_session_id, result)
@@ -437,6 +639,7 @@ def run_session_sync(
     Raises:
         ValueError: If session_id or result not found in messages
         ImportError: If claude-agent-sdk is not installed
+        OutputSchemaValidationError: If output validation fails after retry
         Exception: SDK errors are propagated
 
     Example:
@@ -458,5 +661,6 @@ def run_session_sync(
             agent_name=agent_name,
             executor_config=executor_config,
             system_prompt=system_prompt,
+            output_schema=output_schema,
         )
     )

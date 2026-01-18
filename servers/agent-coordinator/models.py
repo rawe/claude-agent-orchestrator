@@ -104,6 +104,7 @@ class AgentCreate(AgentBase):
 
     type: AgentType = "autonomous"
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    output_schema: Optional[dict] = None  # JSON Schema for output validation
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
@@ -117,6 +118,7 @@ class AgentUpdate(BaseModel):
 
     type: Optional[AgentType] = None
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    output_schema: Optional[dict] = None  # JSON Schema for output validation
     description: Optional[str] = None
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
@@ -131,6 +133,7 @@ class Agent(AgentBase):
 
     type: AgentType = "autonomous"
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    output_schema: Optional[dict] = None  # JSON Schema for output validation
     system_prompt: Optional[str] = None
     mcp_servers: Optional[dict[str, MCPServerConfig]] = None
     skills: Optional[list[str]] = None
@@ -336,17 +339,21 @@ class Event(BaseModel):
     # Message fields
     role: Optional[str] = None  # 'assistant' | 'user'
     content: Optional[List[dict]] = None  # Array of content blocks
-    # Result fields (for event_type='result')
-    result_text: Optional[str] = None  # Human-readable result text
-    result_data: Optional[dict] = None  # Structured JSON output (for deterministic agents)
+    # Result fields (for event_type='result') - mutually exclusive
+    result_text: Optional[str] = None  # Free-form text (autonomous agents without output_schema)
+    result_data: Optional[dict] = None  # Validated JSON (procedural agents or autonomous with output_schema)
 
 
 class SessionResult(BaseModel):
     """Structured result from a session.
 
     Returned by GET /sessions/{session_id}/result endpoint.
-    - result_text: Human-readable output (always present for completed sessions)
-    - result_data: Structured JSON output (present for deterministic agents, null for AI agents)
+
+    Fields are mutually exclusive based on agent configuration:
+    - result_text: Free-form text output (autonomous agents without output_schema)
+    - result_data: Validated JSON output (procedural agents, or autonomous agents with output_schema)
+
+    Consumers should check which field is non-null to determine the result type.
     """
     result_text: Optional[str] = None
     result_data: Optional[dict] = None
@@ -366,3 +373,4 @@ class RunnerAgent(BaseModel):
     description: Optional[str] = None
     command: str  # CLI command to execute (e.g., "scripts/echo/echo")
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    output_schema: Optional[dict] = None  # JSON Schema for output validation

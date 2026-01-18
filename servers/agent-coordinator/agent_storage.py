@@ -116,6 +116,9 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         # Read parameters_schema (JSON Schema for parameter validation)
         parameters_schema = data.get("parameters_schema")
 
+        # Read output_schema (JSON Schema for output validation)
+        output_schema = data.get("output_schema")
+
         # Check status via .disabled file
         status = "inactive" if (agent_dir / ".disabled").exists() else "active"
 
@@ -127,6 +130,7 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
             description=description,
             type=agent_type,
             parameters_schema=parameters_schema,
+            output_schema=output_schema,
             system_prompt=system_prompt,
             mcp_servers=mcp_servers,
             skills=skills,
@@ -261,6 +265,7 @@ def _resolve_agent_capabilities(agent: Agent) -> Agent:
         description=agent.description,
         type=agent.type,
         parameters_schema=agent.parameters_schema,
+        output_schema=agent.output_schema,
         system_prompt=merged_system_prompt,
         mcp_servers=merged_mcp_servers if merged_mcp_servers else None,
         skills=agent.skills,
@@ -343,6 +348,8 @@ def create_agent(data: AgentCreate) -> Agent:
     agent_data["type"] = data.type
     if data.parameters_schema:
         agent_data["parameters_schema"] = data.parameters_schema
+    if data.output_schema:
+        agent_data["output_schema"] = data.output_schema
     if data.skills:
         agent_data["skills"] = data.skills
     if data.tags:
@@ -399,6 +406,12 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
             agent_data["parameters_schema"] = updates.parameters_schema
         else:
             agent_data.pop("parameters_schema", None)
+
+    if updates.output_schema is not None:
+        if updates.output_schema:
+            agent_data["output_schema"] = updates.output_schema
+        else:
+            agent_data.pop("output_schema", None)
 
     if updates.description is not None:
         agent_data["description"] = updates.description

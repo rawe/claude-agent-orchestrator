@@ -37,6 +37,7 @@ Each ADR follows this structure:
 | [ADR-013](./ADR-013-websocket-to-sse-migration.md) | WebSocket to SSE Migration | 2025-12-21 | |
 | [ADR-014](./ADR-014-callback-message-format.md) | Callback Message Format with XML Tags | 2026-01-06 | |
 | [ADR-015](./ADR-015-autonomous-agent-input-schema.md) | Autonomous Agent Input Schema Handling | 2026-01-10 | |
+| [ADR-016](./ADR-016-autonomous-agent-output-schema.md) | Autonomous Agent Output Schema | 2026-01-18 | |
 
 ### Superseded
 

@@ -3,10 +3,11 @@ import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { InputSchemaEditor } from './InputSchemaEditor';
+import { OutputSchemaEditor } from './OutputSchemaEditor';
 import { Agent, AgentCreate, AgentDemands, MCPServerConfig } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { Eye, Code, X, AlertCircle, Info, Package, FileInput, ScrollText, Server, Target } from 'lucide-react';
+import { Eye, Code, X, AlertCircle, Info, Package, FileInput, FileOutput, ScrollText, Server, Target } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -23,6 +24,8 @@ interface FormData {
   description: string;
   parameters_schema_enabled: boolean;
   parameters_schema: Record<string, unknown> | null;
+  output_schema_enabled: boolean;
+  output_schema: Record<string, unknown> | null;
   system_prompt: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
   skills: string[];
@@ -62,6 +65,8 @@ export function AgentEditor({
       description: '',
       parameters_schema_enabled: false,
       parameters_schema: null,
+      output_schema_enabled: false,
+      output_schema: null,
       system_prompt: '',
       mcp_servers: null,
       skills: [],
@@ -73,6 +78,7 @@ export function AgentEditor({
 
   const watchedName = watch('name');
   const watchedSchemaEnabled = watch('parameters_schema_enabled');
+  const watchedOutputSchemaEnabled = watch('output_schema_enabled');
   const watchedPrompt = watch('system_prompt');
   const watchedMcpServers = watch('mcp_servers');
   const watchedCapabilities = watch('capabilities');
@@ -81,12 +87,15 @@ export function AgentEditor({
   useEffect(() => {
     if (agent) {
       // parameters_schema_enabled is true if the agent has a non-null schema
-      const hasSchema = agent.parameters_schema != null;
+      const hasInputSchema = agent.parameters_schema != null;
+      const hasOutputSchema = agent.output_schema != null;
       reset({
         name: agent.name,
         description: agent.description,
-        parameters_schema_enabled: hasSchema,
+        parameters_schema_enabled: hasInputSchema,
         parameters_schema: agent.parameters_schema,
+        output_schema_enabled: hasOutputSchema,
+        output_schema: agent.output_schema,
         system_prompt: agent.system_prompt || '',
         mcp_servers: agent.mcp_servers,
         skills: agent.skills || [],
@@ -100,6 +109,8 @@ export function AgentEditor({
         description: '',
         parameters_schema_enabled: false,
         parameters_schema: null,
+        output_schema_enabled: false,
+        output_schema: null,
         system_prompt: '',
         mcp_servers: null,
         skills: [],
@@ -168,12 +179,18 @@ export function AgentEditor({
         ? data.parameters_schema
         : null;
 
+      // Handle output_schema: enabled toggle determines if schema is set
+      const outputSchema = data.output_schema_enabled && data.output_schema
+        ? data.output_schema
+        : null;
+
       // UI-created agents are always autonomous (procedural agents are runner-owned)
       const createData: AgentCreate = {
         name: data.name,
         description: data.description,
         type: 'autonomous',
         parameters_schema: parametersSchema,
+        output_schema: outputSchema,
         system_prompt: data.system_prompt || undefined,
         mcp_servers: data.mcp_servers ?? {},  // null → {} to clear MCP servers
         skills: data.skills,                   // empty array clears skills
@@ -350,6 +367,63 @@ export function AgentEditor({
                   control={control}
                   render={({ field }) => (
                     <InputSchemaEditor
+                      value={field.value ?? null}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              )}
+            </div>
+
+            {/* Custom Output Schema */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="label mb-0">
+                  <span className="flex items-center gap-1.5">
+                    <FileOutput className="w-4 h-4" />
+                    Custom Output Schema
+                  </span>
+                </label>
+                <Controller
+                  name="output_schema_enabled"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={(e) => {
+                          field.onChange(e.target.checked);
+                          // When disabling, clear the schema
+                          if (!e.target.checked) {
+                            setValue('output_schema', null);
+                          }
+                        }}
+                        className="w-4 h-4 text-primary-600 rounded"
+                      />
+                      <span className="text-sm font-medium">
+                        {field.value ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                  )}
+                />
+              </div>
+              <div className="flex items-start gap-2 text-xs text-gray-500 mb-3">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p>
+                    {watchedOutputSchemaEnabled
+                      ? 'The agent will be instructed to produce JSON matching this schema. Output will be validated and stored in result_data.'
+                      : 'When disabled, the agent produces free-form text output stored in result_text.'}
+                  </p>
+                </div>
+              </div>
+              {watchedOutputSchemaEnabled && (
+                <Controller
+                  name="output_schema"
+                  control={control}
+                  render={({ field }) => (
+                    <OutputSchemaEditor
                       value={field.value ?? null}
                       onChange={field.onChange}
                     />
