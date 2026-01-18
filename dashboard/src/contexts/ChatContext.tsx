@@ -165,22 +165,19 @@ function convertEventsToMessages(events: SessionEvent[]): ChatMessage[] {
         accumulatedToolCalls = [];
       }
     } else if (event.event_type === 'result') {
-      // Handle result events (structured output)
+      // Handle result events - only show structured output (result_data)
+      // Skip result_text - it's already shown via the assistant message event
+      // (See handleResultEvent for detailed explanation)
       const resultData = event.result_data as Record<string, unknown> | undefined;
-      const resultText = event.result_text;
-      const content = resultData
-        ? JSON.stringify(resultData, null, 2)
-        : resultText || '';
-
-      if (content) {
+      if (resultData) {
         result.push({
           id: `result-${event.id || event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
           role: 'assistant',
-          content,
+          content: JSON.stringify(resultData, null, 2),
           timestamp: new Date(event.timestamp),
           status: 'complete',
           isResult: true,
-          resultData: resultData ?? undefined,
+          resultData,
         });
       }
     }
@@ -532,35 +529,67 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   /**
    * Handle result events (structured output from agent)
-   * Displays result_data (JSON) or result_text in chat
+   *
+   * IMPORTANT: Only displays result events that contain result_data (structured output).
+   * Result events with only result_text are NOT shown in Chat because:
+   * - The result_text is already displayed via the assistant message event
+   * - Showing both would be redundant (same content twice)
+   *
+   * This filtering only affects the Chat tab. The Sessions/Events tab still shows
+   * all events including result_text via EventCard.
+   *
+   * For structured output agents (with output_schema), this replaces the pending
+   * assistant message (which would otherwise show "Session ended" fallback).
    */
   function handleResultEvent(event: SessionEvent) {
     const resultData = event.result_data as Record<string, unknown> | undefined;
-    const resultText = event.result_text;
 
-    // Prefer result_data (structured), fall back to result_text
-    const content = resultData
-      ? JSON.stringify(resultData, null, 2)
-      : resultText || '';
+    // Only show result events with structured output (result_data)
+    // Skip result_text - it's already shown via the assistant message event
+    if (!resultData) return;
 
-    // Skip if no content
-    if (!content) return;
+    const content = JSON.stringify(resultData, null, 2);
 
-    const resultMessage: ChatMessage = {
-      id: `result-${event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
-      role: 'assistant',  // Still assistant, but marked as result
-      content,
-      timestamp: new Date(event.timestamp),
-      status: 'complete',
-      isResult: true,
-      resultData: resultData ?? undefined,
-    };
+    const currentPendingId = pendingMessageIdRef.current;
 
     setMessages(prev => {
       // Dedupe: don't add if we already have a result with same data
       if (prev.some(m => m.isResult && m.content === content)) return prev;
-      return [...prev, resultMessage];
+
+      // If there's a pending message, transform it into the result
+      if (currentPendingId) {
+        const pendingIdx = prev.findIndex(m => m.id === currentPendingId);
+        if (pendingIdx >= 0) {
+          const updated = [...prev];
+          updated[pendingIdx] = {
+            ...updated[pendingIdx],
+            content,
+            status: 'complete' as const,
+            isResult: true,
+            resultData,
+          };
+          return updated;
+        }
+      }
+
+      // No pending message - add as new result message
+      return [...prev, {
+        id: `result-${event.timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+        role: 'assistant' as const,
+        content,
+        timestamp: new Date(event.timestamp),
+        status: 'complete' as const,
+        isResult: true,
+        resultData,
+      }];
     });
+
+    // Clear pending state since we've handled it
+    if (currentPendingId) {
+      setPendingMessageId(null);
+      setCurrentToolCalls([]);
+      setIsLoading(false);
+    }
   }
 
   /**

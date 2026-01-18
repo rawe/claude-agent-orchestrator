@@ -10,6 +10,7 @@ import {
   Wrench,
   MessageSquare,
   Activity,
+  FileOutput,
 } from 'lucide-react';
 
 interface EventTimelineProps {
@@ -21,6 +22,7 @@ interface EventTimelineProps {
 type EventFilter = {
   tools: boolean;
   messages: boolean;
+  results: boolean;
   session: boolean;
 };
 
@@ -37,6 +39,8 @@ function getTimelineDotColor(eventType: EventType, hasError: boolean): string {
       return 'bg-blue-500';
     case 'message':
       return 'bg-violet-500';
+    case 'result':
+      return 'bg-teal-500';
     default:
       return 'bg-gray-400';
   }
@@ -46,6 +50,7 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
   const [filters, setFilters] = useState<EventFilter>({
     tools: true,
     messages: true,
+    results: true,
     session: true,
   });
   const [allExpanded, setAllExpanded] = useState(false);
@@ -62,6 +67,9 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
       if (event.event_type === 'message') {
         return filters.messages;
       }
+      if (event.event_type === 'result') {
+        return filters.results;
+      }
       if (event.event_type === 'run_start' || event.event_type === 'run_completed') {
         return filters.session;
       }
@@ -77,12 +85,14 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
           acc.tools++;
         } else if (event.event_type === 'message') {
           acc.messages++;
+        } else if (event.event_type === 'result') {
+          acc.results++;
         } else if (event.event_type === 'run_start' || event.event_type === 'run_completed') {
           acc.session++;
         }
         return acc;
       },
-      { tools: 0, messages: 0, session: 0 }
+      { tools: 0, messages: 0, results: 0, session: 0 }
     );
   }, [events]);
 
@@ -146,6 +156,14 @@ export function EventTimeline({ events, loading = false, isRunning = false }: Ev
               active={filters.messages}
               onClick={() => toggleFilter('messages')}
               color="violet"
+            />
+            <FilterChip
+              icon={<FileOutput className="w-3.5 h-3.5" />}
+              label="Results"
+              count={eventCounts.results}
+              active={filters.results}
+              onClick={() => toggleFilter('results')}
+              color="teal"
             />
             <FilterChip
               icon={<Activity className="w-3.5 h-3.5" />}
@@ -265,7 +283,7 @@ interface FilterChipProps {
   count: number;
   active: boolean;
   onClick: () => void;
-  color: 'blue' | 'violet' | 'emerald';
+  color: 'blue' | 'violet' | 'teal' | 'emerald';
 }
 
 function FilterChip({ icon, label, count, active, onClick, color }: FilterChipProps) {
@@ -275,6 +293,9 @@ function FilterChip({ icon, label, count, active, onClick, color }: FilterChipPr
       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300',
     violet: active
       ? 'bg-violet-100 text-violet-700 border-violet-200'
+      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300',
+    teal: active
+      ? 'bg-teal-100 text-teal-700 border-teal-200'
       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300',
     emerald: active
       ? 'bg-emerald-100 text-emerald-700 border-emerald-200'

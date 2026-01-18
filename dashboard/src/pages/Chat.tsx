@@ -606,9 +606,9 @@ export function Chat() {
                     // Result message - distinct visual treatment
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <FileJson className="w-4 h-4 text-emerald-600" />
-                        <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
-                          Session Result
+                        <FileJson className="w-4 h-4 text-teal-600" />
+                        <span className="text-xs font-semibold text-teal-600 uppercase tracking-wide">
+                          Run Result
                         </span>
                       </div>
                       {message.resultData ? (

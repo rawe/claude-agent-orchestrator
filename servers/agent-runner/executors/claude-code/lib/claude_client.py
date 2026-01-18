@@ -433,7 +433,9 @@ async def run_claude_session(
     session_bound = False  # Track if we've bound the session
 
     # Helper function to process message stream and extract result
-    async def process_message_stream(client, current_prompt: str):
+    # skip_assistant_message: When True, don't emit assistant message events.
+    # Used for structured output agents where only the result event matters.
+    async def process_message_stream(client, current_prompt: str, skip_assistant_message: bool = False):
         nonlocal executor_session_id, result, session_bound
 
         stream_result = None
@@ -494,7 +496,8 @@ async def run_claude_session(
                 stream_result = message.result
 
                 # Send assistant message event to API (for conversation history)
-                if message.result and session_id:
+                # Skip for structured output agents - they only emit result events
+                if message.result and session_id and not skip_assistant_message:
                     try:
                         session_client.add_event(session_id, {
                             "event_type": "message",
@@ -512,8 +515,10 @@ async def run_claude_session(
     try:
         async with ClaudeSDKClient(options=options) as client:
             # Send the initial query and process response
+            # For structured output agents, skip assistant message events - only result matters
+            skip_messages = output_schema is not None
             await client.query(prompt)
-            result = await process_message_stream(client, prompt)
+            result = await process_message_stream(client, prompt, skip_assistant_message=skip_messages)
 
             # Output schema validation (if schema defined)
             if output_schema:
@@ -530,7 +535,7 @@ async def run_claude_session(
                     # First attempt failed - retry once
                     retry_prompt = build_validation_error_prompt(validation.errors, output_schema)
                     await client.query(retry_prompt)
-                    result = await process_message_stream(client, retry_prompt)
+                    result = await process_message_stream(client, retry_prompt, skip_assistant_message=True)
 
                     # Validate retry response
                     if not result:

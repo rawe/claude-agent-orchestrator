@@ -80,7 +80,7 @@ const eventConfig: Record<EventType, EventConfig> = {
     bgColor: 'bg-white',
     iconBg: 'bg-teal-100',
     iconColor: 'text-teal-600',
-    label: 'Session Result',
+    label: 'Run Result',
   },
 };
 
