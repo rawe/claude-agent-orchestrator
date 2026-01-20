@@ -14,6 +14,7 @@ Documentation for implemented features of the Agent Orchestrator.
 | [Session Stop Command](./session-stop-command.md) | Immediate session termination via SIGTERM/SIGKILL |
 | [Autonomous Agent Input Schema](./autonomous-agent-input-schema.md) | Custom JSON Schema validated inputs |
 | [Autonomous Agent Output Schema](./autonomous-agent-output-schema.md) | JSON Schema validated outputs |
+| [Agent Run Hooks](./agent-run-hooks.md) | Lifecycle hooks for preprocessing and observation |
 
 ## Work in Progress
 
