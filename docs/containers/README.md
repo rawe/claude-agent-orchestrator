@@ -1,12 +1,13 @@
 # AOF Container Images
 
-The Agent Orchestration Framework (AOF) provides three container images for deployment:
+The Agent Orchestration Framework (AOF) provides four container images for deployment:
 
 | Image | Description |
 |-------|-------------|
 | `ghcr.io/rawe/aof-coordinator` | Session management, observability, and agent blueprint registry |
 | `ghcr.io/rawe/aof-runner-claude-code` | Agent execution engine with Claude Code executor |
 | `ghcr.io/rawe/aof-dashboard` | Web UI for agent management and monitoring |
+| `ghcr.io/rawe/aof-context-store` | Document management and synchronization |
 
 ## Quick Start
 
@@ -15,17 +16,19 @@ The Agent Orchestration Framework (AOF) provides three container images for depl
 docker pull ghcr.io/rawe/aof-coordinator:<version>
 docker pull ghcr.io/rawe/aof-runner-claude-code:<version>
 docker pull ghcr.io/rawe/aof-dashboard:<version>
+docker pull ghcr.io/rawe/aof-context-store:<version>
 ```
 
 ## Versioning
 
-All three images share the same release version. When you use the same version tag, all components are guaranteed to work together.
+All four images share the same release version. When you use the same version tag, all components are guaranteed to work together.
 
 ```bash
 # Use a specific version
 docker pull ghcr.io/rawe/aof-coordinator:<version>
 docker pull ghcr.io/rawe/aof-runner-claude-code:<version>
 docker pull ghcr.io/rawe/aof-dashboard:<version>
+docker pull ghcr.io/rawe/aof-context-store:<version>
 ```
 
 ## Image Details
@@ -33,6 +36,7 @@ docker pull ghcr.io/rawe/aof-dashboard:<version>
 - [Coordinator](./coordinator.md) - API server for session orchestration
 - [Runner (Claude Code)](./runner-claude-code.md) - Agent execution with Claude Code
 - [Dashboard](./dashboard.md) - Web-based management UI
+- [Context Store](./context-store.md) - Document management and synchronization
 
 ## Building Locally
 
@@ -46,6 +50,7 @@ make release VERSION=<version>
 make release-coordinator VERSION=<version>
 make release-runner VERSION=<version>
 make release-dashboard VERSION=<version>
+make release-context-store VERSION=<version>
 
 # Build and push to registry
 make release VERSION=<version> PUSH=true
@@ -79,16 +84,16 @@ docker inspect ghcr.io/rawe/aof-coordinator:<version> --format='{{json .Config.L
 │                         Dashboard                                │
 │                    (aof-dashboard:80)                           │
 │                         Web UI                                   │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ HTTP
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       Coordinator                                │
-│                 (aof-coordinator:8765)                          │
-│     Session Management │ Agent Registry │ Event Streaming        │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ HTTP (polling)
-                          ▼
+└───────────────┬─────────────────────────────┬───────────────────┘
+                │ HTTP                         │ HTTP
+                ▼                              ▼
+┌───────────────────────────────┐  ┌──────────────────────────────┐
+│          Coordinator          │  │       Context Store          │
+│    (aof-coordinator:8765)     │  │  (aof-context-store:8766)    │
+│  Sessions │ Registry │ Events │  │  Documents │ Tags │ Search   │
+└───────────────┬───────────────┘  └──────────────────────────────┘
+                │ HTTP (polling)
+                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Runner (Claude Code)                          │
 │               (aof-runner-claude-code)                          │
@@ -114,12 +119,22 @@ services:
       - coordinator-data:/app/.agent-orchestrator
       - ./config:/data/config
 
+  context-store:
+    image: ghcr.io/rawe/aof-context-store:<version>
+    ports:
+      - "8766:8766"
+    environment:
+      - CORS_ORIGINS=*
+    volumes:
+      - context-store-data:/app/document-data
+
   dashboard:
     image: ghcr.io/rawe/aof-dashboard:<version>
     ports:
       - "3000:80"
     depends_on:
       - coordinator
+      - context-store
 
   runner:
     image: ghcr.io/rawe/aof-runner-claude-code:<version>
@@ -133,4 +148,5 @@ services:
 
 volumes:
   coordinator-data:
+  context-store-data:
 ```

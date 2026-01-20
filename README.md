@@ -13,6 +13,7 @@ Infrastructure for building AI agent systems. It provides:
 
 - **Agent Coordinator** — Manages sessions, queues agent runs, tracks state
 - **Agent Runner** — Executes agents via pluggable executors (Claude Code implemented)
+- **Context Store** — Document storage and sharing between agents
 - **Dashboard** — Real-time monitoring and session management
 
 Use it to prototype agent workflows, build multi-agent systems, or as a backend for agent-powered applications.

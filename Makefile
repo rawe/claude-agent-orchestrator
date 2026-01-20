@@ -23,7 +23,7 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner release release-coordinator release-runner release-dashboard
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner release release-coordinator release-runner release-dashboard release-context-store
 
 # ==============================================================================
 # CONTAINER IMAGE RELEASE CONFIGURATION
@@ -35,6 +35,7 @@ REGISTRY ?= ghcr.io/rawe
 IMAGE_COORDINATOR := $(REGISTRY)/aof-coordinator
 IMAGE_RUNNER := $(REGISTRY)/aof-runner-claude-code
 IMAGE_DASHBOARD := $(REGISTRY)/aof-dashboard
+IMAGE_CONTEXT_STORE := $(REGISTRY)/aof-context-store
 
 # Build metadata
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -44,6 +45,7 @@ BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 COORDINATOR_VERSION := $(shell grep -m1 'version' servers/agent-coordinator/pyproject.toml | cut -d'"' -f2)
 DASHBOARD_VERSION := $(shell grep -m1 '"version"' dashboard/package.json | cut -d'"' -f4)
 RUNNER_VERSION := 0.1.0
+CONTEXT_STORE_VERSION := $(shell grep -m1 'version' servers/context-store/pyproject.toml | cut -d'"' -f2)
 
 # Default target
 help:
@@ -114,11 +116,12 @@ help:
 	@echo "  make stop-chat-ui          - Stop Chat UI (Docker)"
 	@echo ""
 	@echo "Container image release (ghcr.io):"
-	@echo "  make release VERSION=x.y.z             - Build all release images"
-	@echo "  make release VERSION=x.y.z PUSH=true   - Build and push to registry"
-	@echo "  make release-coordinator VERSION=x.y.z - Build coordinator image only"
-	@echo "  make release-runner VERSION=x.y.z      - Build runner image only"
-	@echo "  make release-dashboard VERSION=x.y.z   - Build dashboard image only"
+	@echo "  make release VERSION=x.y.z               - Build all release images"
+	@echo "  make release VERSION=x.y.z PUSH=true     - Build and push to registry"
+	@echo "  make release-coordinator VERSION=x.y.z   - Build coordinator image only"
+	@echo "  make release-runner VERSION=x.y.z        - Build runner image only"
+	@echo "  make release-dashboard VERSION=x.y.z     - Build dashboard image only"
+	@echo "  make release-context-store VERSION=x.y.z - Build context-store image only"
 
 # Build all images
 build:
@@ -601,7 +604,7 @@ stop-chat-ui:
 # The VERSION parameter is required and should match the git tag (without 'v' prefix).
 # Example: git tag v1.0.0 → make release VERSION=1.0.0
 
-release: _check-version release-coordinator release-runner release-dashboard
+release: _check-version release-coordinator release-runner release-dashboard release-context-store
 	@echo ""
 	@echo "════════════════════════════════════════════════════════════════════════════"
 	@echo "  Release $(VERSION) complete!"
@@ -611,6 +614,7 @@ release: _check-version release-coordinator release-runner release-dashboard
 	@echo "  $(IMAGE_COORDINATOR):$(VERSION)"
 	@echo "  $(IMAGE_RUNNER):$(VERSION)"
 	@echo "  $(IMAGE_DASHBOARD):$(VERSION)"
+	@echo "  $(IMAGE_CONTEXT_STORE):$(VERSION)"
 	@echo ""
 ifdef PUSH
 	@echo "Images have been pushed to $(REGISTRY)"
@@ -685,4 +689,25 @@ ifdef PUSH
 	@echo "Pushing $(IMAGE_DASHBOARD):$(VERSION)..."
 	docker push $(IMAGE_DASHBOARD):$(VERSION)
 	docker push $(IMAGE_DASHBOARD):latest
+endif
+
+release-context-store: _check-version
+	@echo ""
+	@echo "Building $(IMAGE_CONTEXT_STORE):$(VERSION)..."
+	@echo "  Component version: $(CONTEXT_STORE_VERSION)"
+	@echo "  Git commit: $(GIT_COMMIT)"
+	@echo ""
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMPONENT_VERSION=$(CONTEXT_STORE_VERSION) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_CONTEXT_STORE):$(VERSION) \
+		-t $(IMAGE_CONTEXT_STORE):latest \
+		-f servers/context-store/Dockerfile \
+		servers/context-store
+ifdef PUSH
+	@echo "Pushing $(IMAGE_CONTEXT_STORE):$(VERSION)..."
+	docker push $(IMAGE_CONTEXT_STORE):$(VERSION)
+	docker push $(IMAGE_CONTEXT_STORE):latest
 endif

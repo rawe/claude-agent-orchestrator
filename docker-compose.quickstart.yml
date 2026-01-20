@@ -10,6 +10,7 @@
 # Services:
 #   - Dashboard: http://localhost:3000
 #   - Coordinator API: http://localhost:8765
+#   - Context Store: http://localhost:8766
 
 services:
   coordinator:
@@ -24,12 +25,22 @@ services:
       - coordinator-data:/app/.agent-orchestrator
       - ./config:/data/config
 
+  context-store:
+    image: ghcr.io/rawe/aof-context-store:latest
+    ports:
+      - "8766:8766"
+    environment:
+      - CORS_ORIGINS=*
+    volumes:
+      - context-store-data:/app/document-data
+
   dashboard:
     image: ghcr.io/rawe/aof-dashboard:latest
     ports:
       - "3000:80"
     depends_on:
       - coordinator
+      - context-store
 
   runner:
     image: ghcr.io/rawe/aof-runner-claude-code:latest
@@ -44,3 +55,4 @@ services:
 
 volumes:
   coordinator-data:
+  context-store-data:

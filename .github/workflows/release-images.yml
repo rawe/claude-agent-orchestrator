@@ -1,10 +1,11 @@
 # Release Container Images to GitHub Container Registry
 #
 # Triggered by pushing a tag matching v* (e.g., v1.0.0)
-# Builds and pushes all three AOF container images:
+# Builds and pushes all AOF container images:
 #   - ghcr.io/rawe/aof-coordinator
 #   - ghcr.io/rawe/aof-runner-claude-code
 #   - ghcr.io/rawe/aof-dashboard
+#   - ghcr.io/rawe/aof-context-store
 #
 # Manual trigger also available via workflow_dispatch
 
@@ -78,6 +79,7 @@ jobs:
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-coordinator\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-runner-claude-code\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-dashboard\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-context-store\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Pull Commands" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -85,4 +87,5 @@ jobs:
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-coordinator:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-runner-claude-code:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-dashboard:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-context-store:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
