@@ -11,11 +11,3 @@ In-depth documentation for cross-cutting architectural concerns. For system over
 | [Auth Coordinator](./auth-coordinator.md) | Implemented | Coordinator authentication architecture |
 | [MCP Runner Integration](./mcp-runner-integration.md) | Implemented | Embedded MCP server in Agent Runner |
 | [SSE Sessions](./sse-sessions.md) | Implemented | Server-sent events for real-time updates |
-
-## Archive
-
-Implementation specs and planning documents kept for historical reference.
-
-| Document | Description |
-|----------|-------------|
-| [MCP Runner Integration MVP](./archive/mcp-runner-integration-mvp.md) | Original MVP spec for MCP integration |

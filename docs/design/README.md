@@ -22,14 +22,6 @@ Token-based server-to-server authentication with scoping. Generic pattern applic
 |----------|-------------|
 | [External Service Auth](./external-service-auth/README.md) | Overview and reading guide for token-based authentication and scoping |
 
-### Agent Run Hooks
-
-Lifecycle hooks for preprocessing parameters and postprocessing results.
-
-| Document | Description |
-|----------|-------------|
-| [Agent Run Hooks](./agent-run-hooks.md) | Coordinator-side hooks for run start/finish with agent or HTTP targets |
-
 ### Other
 
 | Document | Description |

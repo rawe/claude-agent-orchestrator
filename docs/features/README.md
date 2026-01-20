@@ -22,7 +22,3 @@ Documentation for implemented features of the Agent Orchestrator.
 |---------|--------|-------------|
 | [Unified Session-Run View](./unified-session-run-view.md) | Draft | Dashboard view consolidation exploration |
 | [Session Stop Integration](./session-stop-integration-todo.md) | TODO | Dashboard integration for stop command |
-
-## Subfolders
-
-- [capabilities-system/](./capabilities-system/) - Implementation work packages
