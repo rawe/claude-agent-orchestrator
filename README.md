@@ -1,29 +1,55 @@
 # Agent Orchestrator Framework (AOF)
 
-A comprehensive framework for orchestrating specialized Claude Code agent sessions.
+A framework for building, running, and observing AI agents. Define agent blueprints, run them as managed sessions, and observe execution in real-time.
+
+**Design principles:**
+- **Provider-agnostic** — Executor layer abstracts the AI framework (Claude Code implemented, others pluggable)
+- **Minimal setup** — Pre-built container images or local development scripts
+- **Observable** — Dashboard for monitoring agent sessions and debugging
 
 ## What is the Agent Orchestrator Framework?
 
-The Agent Orchestrator Framework (AOF) enables you to create, manage, and orchestrate specialized Claude Code agent sessions programmatically. Whether you want to delegate tasks to specialized agents, run long-running background processes, or manage multiple concurrent AI workflows, AOF provides the tools and abstractions you need.
+Infrastructure for building AI agent systems. It provides:
 
-**Key Capabilities:**
-- Launch specialized Claude Code agent sessions programmatically
-- Configure agents with custom system prompts and instructions
-- Manage multiple concurrent agent sessions
-- Inject different MCP server configurations per agent
-- Extract and process results from completed agents
-- Create reusable agent blueprints for common tasks
-- Support for long-running and background tasks
+- **Agent Coordinator** — Manages sessions, queues agent runs, tracks state
+- **Agent Runner** — Executes agents via pluggable executors (Claude Code implemented)
+- **Dashboard** — Real-time monitoring and session management
+
+Use it to prototype agent workflows, build multi-agent systems, or as a backend for agent-powered applications.
+
+See [Architecture](./docs/architecture.md) for detailed component interactions and terminology.
 
 ## Quick Start
 
-### Requirements
+### Option A: Container Images (Recommended)
 
-- **Claude Code CLI** - installed and authenticated
-- **Docker** - Desktop or Engine + Compose V2
-- **Python ≥3.11** + **[uv](https://docs.astral.sh/uv/)**
+Requires only **Docker**.
 
-### 1. Clone and Start Services
+1. Get a Claude Code OAuth token:
+   ```bash
+   claude setup-token
+   ```
+
+2. Create a `.env` file:
+   ```bash
+   CLAUDE_CODE_OAUTH_TOKEN=<your-token>
+   ```
+
+3. Create the config directory:
+   ```bash
+   mkdir -p config/agents
+   ```
+
+4. Start services:
+   ```bash
+   docker compose -f docker-compose.quickstart.yml up
+   ```
+
+5. Open http://localhost:3000
+
+### Option B: Local Development
+
+Requires **Claude Code CLI**, **Docker**, **Python ≥3.11** + **[uv](https://docs.astral.sh/uv/)**.
 
 ```bash
 git clone <repo-url>
@@ -31,180 +57,105 @@ cd claude-agent-orchestrator
 make start-all
 ```
 
-This starts:
-- **Dashboard** at http://localhost:3000
-- **Agent Coordinator** at http://localhost:8765
-- **Context Store** at http://localhost:8766
-- **Neo4j** at http://localhost:7475
-- **MCP Servers** (Context Store, Neo4j)
-
-> **Note:** Atlassian and Azure DevOps MCPs require credentials in `.env` files and will be skipped if not configured. See [mcps/README.md](./mcps/README.md) for setup.
-
-### 2. Start the Agent Runner
-
-The Agent Runner executes agent runs. Run it in your **project directory** (where agents should work):
+Then start the Agent Runner in your project directory:
 
 ```bash
 cd /path/to/your/project
 /path/to/claude-agent-orchestrator/servers/agent-runner/agent-runner
 ```
 
-The runner connects to Agent Coordinator and waits for runs. Keep it running while using the framework.
+Open http://localhost:3000
 
-### 3. Open the Dashboard
-
-```bash
-make open
-# Or manually: open http://localhost:3000
-```
-
-From the Dashboard you can:
-- Create and manage agent sessions
-- Monitor agent execution in real-time
-- Browse and edit agent blueprints
-- Manage documents in the Context Store
-
-### Stopping Everything
+### Stopping Services
 
 ```bash
-make stop-all    # Stop all services
-# Ctrl+C         # Stop the agent runner
+# Containers
+docker compose -f docker-compose.quickstart.yml down
+
+# Local development
+make stop-all
 ```
 
 ## Repository Structure
 
 ```
-agent-orchestrator-framework/
-│
-├── README.md                          # This file
+├── README.md
 ├── Makefile                           # Build, run, deploy commands
-├── docker-compose.yml                 # Container orchestration
+├── docker-compose.yml                 # Full dev environment
+├── docker-compose.quickstart.yml      # Minimal setup with pre-built images
 │
 ├── docs/                              # Documentation
-│   ├── ARCHITECTURE.md                # System architecture overview
-│   └── agent-coordinator/             # Agent Coordinator server docs
+│   ├── architecture.md                # System architecture overview
+│   ├── GETTING_STARTED.md             # Detailed setup guide
+│   └── containers/                    # Container image documentation
 │
-├── servers/                           # Backend servers
-│   ├── agent-coordinator/             # Session management + event capture + agent registry
-│   ├── agent-runner/                  # Run executor (polls coordinator, runs Claude Code)
-│   │   └── lib/agent_orchestrator_mcp/  # Embedded Agent Orchestrator MCP server
-│   └── context-store/                 # Document storage
+├── servers/
+│   ├── agent-coordinator/             # Session management, agent registry, SSE events
+│   ├── agent-runner/                  # Polls coordinator, executes agent runs
+│   │   ├── lib/agent_orchestrator_mcp/  # Embedded MCP server
+│   │   └── executors/
+│   │       └── claude-code/           # Claude Code executor (Agent SDK)
+│   └── context-store/                 # Document storage server
 │
-├── mcps/                              # MCP servers (agent capabilities)
+├── mcps/                              # External MCP servers
 │   ├── context-store/                 # Document management MCP
-│   ├── neo4j/                         # Neo4j graph database MCP (Docker)
-│   ├── atlassian/                     # Jira + Confluence MCP (Docker, requires credentials)
-│   └── ado/                           # Azure DevOps MCP (Docker, requires credentials)
+│   ├── neo4j/                         # Neo4j graph database MCP
+│   ├── atlassian/                     # Jira + Confluence MCP
+│   └── ado/                           # Azure DevOps MCP
 │
 ├── dashboard/                         # Web UI (React + Vite)
 │
 ├── plugins/                           # Claude Code plugins
-│   ├── orchestrator/                  # Agent orchestration commands
-│   └── context-store/                 # Document management commands
+│   ├── orchestrator/                  # ao-* orchestration commands
+│   └── context-store/                 # doc-* document commands
 │
-└── config/                            # Configuration
-    └── agents/                        # Agent blueprints
+├── config/agents/                     # Agent blueprints
+├── scripts/                           # Dev startup scripts
+└── tests/                             # Integration tests
 ```
 
-## MCP Servers (Agent Capabilities)
+## MCP Servers
 
-The `mcps/` directory contains MCP servers that provide capabilities to agents. These are the tools agents can use to interact with external services and the framework itself.
+Optional MCP servers in `mcps/` extend agent capabilities (Neo4j, Atlassian, Azure DevOps, Context Store).
 
-| MCP Server | Port | Purpose | Requires .env |
-|------------|------|---------|---------------|
-| `agent-orchestrator` | embedded in Agent Runner | Agent orchestration tools + framework access | No |
-| `context-store` | 9501 | Document storage and retrieval | No |
-| `neo4j` | 9003 | Neo4j graph database queries | No (has defaults) |
-| `atlassian` | 9000 | Jira + Confluence integration | Yes |
-| `ado` | 9001 | Azure DevOps work items | Yes |
+The **Agent Orchestrator MCP** is embedded in the Agent Runner and automatically available to running agents.
 
-**Start MCP servers:**
-```bash
-make start-mcps                    # Start all external MCP servers
-make start-mcp-context-store       # Document management
-make start-mcp-neo4j               # Neo4j queries (uses defaults)
-make start-mcp-atlassian           # Requires mcps/atlassian/.env
-make start-mcp-ado                 # Requires mcps/ado/.env
-```
-
-The **Agent Orchestrator MCP** is embedded in the Agent Runner:
-- When running agents via the framework, the MCP server is automatically available
-- Agent configurations use `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder (dynamically replaced)
-- For external clients (Claude Desktop), start the runner with `--mcp-port 9500` to expose a fixed endpoint
-
-See `mcps/README.md` for detailed setup.
+See [mcps/README.md](./mcps/README.md) for setup and configuration.
 
 ## Example Agents
 
-The `config/agents/` folder contains example agent blueprints.
+The `config/agents/` directory contains example agent blueprints demonstrating various patterns: web research, Atlassian/ADO integration, knowledge management, browser automation, and more.
 
-| Agent | Purpose | MCP Dependency |
-|-------|---------|----------------|
-| `atlassian-agent` | Jira & Confluence CRUD | Atlassian MCP |
-| `confluence-researcher` | Confluence research (CQL) | Atlassian MCP |
-| `ado-agent` | Azure DevOps work items | ADO MCP |
-| `ado-researcher` | ADO research | ADO MCP |
-| `web-researcher` | Web research | None (built-in) |
-| `browser-tester` | Playwright automation | Playwright (npx) |
+See [config/agents/README.md](./config/agents/README.md) for the full list.
 
 ## Context Store
 
-The Context Store server provides document storage and retrieval for sharing context between agents and sessions. Documents can be tagged, queried, and organized with parent-child relationships.
+Document storage server for sharing context between agents. Supports tagging, querying, and parent-child document relationships.
 
-**Optional: Semantic Search** - Search documents by meaning using vector embeddings. Requires [Ollama](https://ollama.com/) running locally with an embedding model. See [Context Store README](./servers/context-store/README.md) for setup instructions.
+Optional **semantic search** enables finding documents by meaning (requires Ollama + Elasticsearch).
 
-## Core Concepts
-
-### Agent Blueprints
-Reusable configurations that define specialized agent behavior. Each blueprint can include a custom system prompt, instructions, and MCP server configurations. Managed via the Agent Registry server or stored in `.agent-orchestrator/agents/`.
-
-### Sessions
-Isolated Claude Code sessions for individual agents. Each session has a unique ID and configuration. Session data is persisted in the Agent Coordinator server (SQLite).
-
-### MCP Configuration
-Different agents can have different MCP server configurations, enabling specialized capabilities per agent type.
-
-### Orchestration Commands
-The Python-based `ao-*` commands (`ao-start`, `ao-resume`, `ao-status`, etc.) are the foundation of both usage levels. They handle session lifecycle, agent configuration, and result extraction.
-
+See [servers/context-store/README.md](./servers/context-store/README.md) for setup and API documentation.
 
 ## Service URLs
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| Dashboard | http://localhost:3000 | Web UI for agents, sessions, documents |
-| Agent Coordinator | http://localhost:8765 | Session management, SSE events, Blueprint API |
-| Context Store | http://localhost:8766 | Document storage API |
-| Neo4j Browser | http://localhost:7475 | Graph database UI (neo4j/agent-orchestrator) |
-
-See **[DOCKER.md](./DOCKER.md)** for deployment details and **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for full architecture.
-
-## Glossary
-
-| Term | Definition |
-|------|------------|
-| **Agent Blueprint** | Reusable agent configuration (system prompt, MCP config, metadata) that gets instantiated into sessions. |
-| **Agent Type** | Classification: **autonomous** (AI-powered, supports resumption) or **procedural** (deterministic CLI, stateless). |
-| **Session** | Named, persistent agent conversation with state and history. Can have multiple runs. |
-| **Agent Run** | Single execution of a session (start, resume, or stop). Transient work unit queued for a runner. |
-| **Agent Coordinator** | Backend server (port 8765) managing sessions, runs, runners, blueprints, and callbacks. |
-| **Agent Runner** | Standalone process that polls for runs and executes them. Must run in your project directory. |
-| **Context Store** | Backend server (port 8766) for document storage and sharing context between agents. |
-| **Dashboard** | Web UI (port 3000) for monitoring sessions, managing blueprints, and browsing documents. |
-
-See **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md#core-terminology)** for the complete terminology and conceptual hierarchy.
+| Service | URL |
+|---------|-----|
+| Dashboard | http://localhost:3000 |
+| Agent Coordinator | http://localhost:8765 |
+| Context Store | http://localhost:8766 |
 
 ## Testing
 
 The framework includes an integration test suite for verifying Agent Coordinator and Agent Runner functionality. Tests can be run with either a deterministic test executor or the real Claude Code executor.
 
-See **[tests/README.md](./tests/README.md)** for setup and test case documentation.
+See [tests/README.md](./tests/README.md) for setup and test case documentation.
 
 ## Documentation
 
-- **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
+- **[Architecture](./docs/architecture.md)** - Full system architecture and component interactions
 - **[Getting Started Guide](./docs/GETTING_STARTED.md)** - Detailed setup and configuration
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
+- **[Documentation Index](./docs/README.md)** - All documentation topics
 - **[Agent Runner](./servers/agent-runner/README.md)** - Run executor with embedded Agent Orchestrator MCP
 - **[Context Store](./servers/context-store/README.md)** - Document storage server with semantic search
 - **[MCP Servers Overview](./mcps/README.md)** - All available MCP servers

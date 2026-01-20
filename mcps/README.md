@@ -93,6 +93,8 @@ cp .env.example .env
 # Edit .env with your Neo4j credentials
 ```
 
+See [neo4j/README.md](./neo4j/README.md) for browser UI access and full configuration options.
+
 ---
 
 ## External Servers Setup

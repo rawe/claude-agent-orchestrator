@@ -1,0 +1,46 @@
+# Minimal setup using pre-built container images
+#
+# Prerequisites:
+#   1. Create .env file with: CLAUDE_CODE_OAUTH_TOKEN=<your-token>
+#      (Get token with: claude setup-token)
+#   2. Create config/agents/ directory (can be empty initially)
+#
+# Start: docker compose -f docker-compose.quickstart.yml up
+#
+# Services:
+#   - Dashboard: http://localhost:3000
+#   - Coordinator API: http://localhost:8765
+
+services:
+  coordinator:
+    image: ghcr.io/rawe/aof-coordinator:latest
+    ports:
+      - "8765:8765"
+    environment:
+      - AUTH_ENABLED=false
+      - CORS_ORIGINS=*
+      - AGENT_ORCHESTRATOR_AGENTS_DIR=/data/config/agents
+    volumes:
+      - coordinator-data:/app/.agent-orchestrator
+      - ./config:/data/config
+
+  dashboard:
+    image: ghcr.io/rawe/aof-dashboard:latest
+    ports:
+      - "3000:80"
+    depends_on:
+      - coordinator
+
+  runner:
+    image: ghcr.io/rawe/aof-runner-claude-code:latest
+    environment:
+      - AGENT_ORCHESTRATOR_API_URL=http://coordinator:8765
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      - PROJECT_DIR=/workspace
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      - coordinator
+
+volumes:
+  coordinator-data:

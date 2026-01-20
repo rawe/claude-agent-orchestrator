@@ -4,6 +4,17 @@ Docker-based MCP server for Neo4j graph database integration via HTTP transport.
 
 ---
 
+## Neo4j Browser (UI)
+
+The Neo4j container started by the main `docker-compose.yml` includes a browser UI:
+
+- **URL:** http://localhost:7475
+- **Credentials:** `neo4j` / `agent-orchestrator`
+
+Use the browser to explore the graph, run Cypher queries interactively, and inspect data.
+
+---
+
 ## Quick Start
 
 **Works out-of-the-box with the local Neo4j container** from the main `docker-compose.yml`. No configuration required.
