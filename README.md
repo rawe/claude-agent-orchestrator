@@ -17,7 +17,7 @@ Infrastructure for building AI agent systems. It provides:
 
 Use it to prototype agent workflows, build multi-agent systems, or as a backend for agent-powered applications.
 
-See [Architecture](./docs/architecture.md) for detailed component interactions and terminology.
+See [Architecture](./docs/ARCHITECTURE.md) for detailed component interactions and terminology.
 
 ## Quick Start
 
@@ -85,7 +85,7 @@ make stop-all
 ├── docker-compose.quickstart.yml      # Minimal setup with pre-built images
 │
 ├── docs/                              # Documentation
-│   ├── architecture.md                # System architecture overview
+│   ├── ARCHITECTURE.md                # System architecture overview
 │   ├── GETTING_STARTED.md             # Detailed setup guide
 │   └── containers/                    # Container image documentation
 │
@@ -152,7 +152,7 @@ See [tests/README.md](./tests/README.md) for setup and test case documentation.
 
 ## Documentation
 
-- **[Architecture](./docs/architecture.md)** - Full system architecture and component interactions
+- **[Architecture](./docs/ARCHITECTURE.md)** - Full system architecture and component interactions
 - **[Getting Started Guide](./docs/GETTING_STARTED.md)** - Detailed setup and configuration
 - **[Docker Deployment](./DOCKER.md)** - Docker setup and configuration
 - **[Documentation Index](./docs/README.md)** - All documentation topics
