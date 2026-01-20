@@ -28,7 +28,7 @@ from models import (
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
     ExecutionMode, StreamEventType, SessionEventType, SessionResult,
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary,
-    RunnerAgent,
+    RunnerAgent, AgentHooks,
 )
 from openapi_config import (
     API_TITLE, API_DESCRIPTION, API_VERSION, API_CONTACT, API_LICENSE,
@@ -59,6 +59,10 @@ from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunne
 from services.stop_command_queue import stop_command_queue
 from services.sse_manager import sse_manager, SSEConnection
 from services import callback_processor
+from services.hook_executor import (
+    execute_on_run_start_hook, execute_on_run_finish_hook,
+    HookAction, HookResult,
+)
 
 # Debug logging toggle - set DEBUG_LOGGING=true to enable verbose output
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
@@ -1137,6 +1141,34 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
         if run:
             if DEBUG:
                 print(f"[DEBUG] Runner {runner_id} claimed run {run.run_id}", flush=True)
+
+            # Execute on_run_start hook if configured
+            if run.agent_name:
+                agent = agent_storage.get_agent(run.agent_name)
+                if agent and agent.hooks and agent.hooks.on_run_start:
+                    hook_result = await execute_on_run_start_hook(
+                        hook_config=agent.hooks.on_run_start,
+                        run=run,
+                        agent_name=run.agent_name,
+                        run_queue=run_queue,
+                        sse_manager=sse_manager,
+                    )
+
+                    if hook_result.action == HookAction.BLOCK:
+                        # Hook blocked the run
+                        error_msg = f"Blocked by on_run_start hook: {hook_result.block_reason or 'No reason provided'}"
+                        run_queue.update_run_status(run.run_id, RunStatus.FAILED, error=error_msg)
+                        await update_session_status_and_broadcast(run.session_id, "failed")
+                        if DEBUG:
+                            print(f"[DEBUG] Run {run.run_id} blocked by hook: {hook_result.block_reason}", flush=True)
+                        continue  # Try to claim another run
+
+                    # Update parameters if transformed
+                    if hook_result.parameters and hook_result.parameters != run.parameters:
+                        run = run_queue.update_run_parameters(run.run_id, hook_result.parameters)
+                        if DEBUG:
+                            print(f"[DEBUG] Run {run.run_id} parameters transformed by hook", flush=True)
+
             return {"run": run.model_dump()}
 
         # Wait with event for immediate wake-up on stop commands
@@ -1281,6 +1313,26 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
         flushed = callback_processor.on_session_stopped(session_id)
         if flushed > 0 and DEBUG:
             print(f"[DEBUG] Flushed {flushed} pending callbacks for '{session_id}'", flush=True)
+
+        # Execute on_run_finish hook if configured (fire-and-forget)
+        if run.agent_name:
+            agent = agent_storage.get_agent(run.agent_name)
+            if agent and agent.hooks and agent.hooks.on_run_finish:
+                result = get_session_result(session_id)
+                # Fire-and-forget via asyncio.create_task
+                asyncio.create_task(execute_on_run_finish_hook(
+                    hook_config=agent.hooks.on_run_finish,
+                    run=run,
+                    agent_name=run.agent_name,
+                    result_text=result.get("result_text") if result else None,
+                    result_data=result.get("result_data") if result else None,
+                    status="completed",
+                    error=None,
+                    run_queue=run_queue,
+                    sse_manager=sse_manager,
+                ))
+                if DEBUG:
+                    print(f"[DEBUG] Started on_run_finish hook for session '{session_id}'", flush=True)
 
     return {"ok": True}
 

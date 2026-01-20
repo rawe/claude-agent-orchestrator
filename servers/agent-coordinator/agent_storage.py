@@ -21,7 +21,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from models import Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, MCPServerConfig, RunnerDemands
+from models import (
+    Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, MCPServerConfig,
+    RunnerDemands, AgentHooks, HookAgentConfig, HookOnError,
+)
 
 # Debug logging toggle - matches main.py
 DEBUG = os.getenv("DEBUG_LOGGING", "").lower() in ("true", "1", "yes")
@@ -119,6 +122,34 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         # Read output_schema (JSON Schema for output validation)
         output_schema = data.get("output_schema")
 
+        # Read hooks from agent.json
+        hooks = None
+        hooks_data = data.get("hooks")
+        if hooks_data:
+            on_run_start = None
+            on_run_finish = None
+
+            if hooks_data.get("on_run_start"):
+                start_data = hooks_data["on_run_start"]
+                on_run_start = HookAgentConfig(
+                    type=start_data.get("type", "agent"),
+                    agent_name=start_data["agent_name"],
+                    on_error=HookOnError(start_data.get("on_error", "continue")),
+                    timeout_seconds=start_data.get("timeout_seconds", 300),
+                )
+
+            if hooks_data.get("on_run_finish"):
+                finish_data = hooks_data["on_run_finish"]
+                on_run_finish = HookAgentConfig(
+                    type=finish_data.get("type", "agent"),
+                    agent_name=finish_data["agent_name"],
+                    on_error=HookOnError(finish_data.get("on_error", "continue")),
+                    timeout_seconds=finish_data.get("timeout_seconds", 300),
+                )
+
+            if on_run_start or on_run_finish:
+                hooks = AgentHooks(on_run_start=on_run_start, on_run_finish=on_run_finish)
+
         # Check status via .disabled file
         status = "inactive" if (agent_dir / ".disabled").exists() else "active"
 
@@ -137,6 +168,7 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
             tags=tags,
             capabilities=capabilities,
             demands=demands,
+            hooks=hooks,
             status=status,
             created_at=created_at,
             modified_at=modified_at,
@@ -272,6 +304,7 @@ def _resolve_agent_capabilities(agent: Agent) -> Agent:
         tags=agent.tags,
         capabilities=agent.capabilities,  # Keep original list for reference
         demands=agent.demands,
+        hooks=agent.hooks,  # Pass through hooks unchanged
         status=agent.status,
         created_at=agent.created_at,
         modified_at=agent.modified_at,
@@ -358,6 +391,24 @@ def create_agent(data: AgentCreate) -> Agent:
         agent_data["capabilities"] = data.capabilities
     if data.demands:
         agent_data["demands"] = data.demands.model_dump(exclude_none=True)
+    if data.hooks:
+        hooks_dict = {}
+        if data.hooks.on_run_start:
+            hooks_dict["on_run_start"] = {
+                "type": data.hooks.on_run_start.type,
+                "agent_name": data.hooks.on_run_start.agent_name,
+                "on_error": data.hooks.on_run_start.on_error.value,
+                "timeout_seconds": data.hooks.on_run_start.timeout_seconds,
+            }
+        if data.hooks.on_run_finish:
+            hooks_dict["on_run_finish"] = {
+                "type": data.hooks.on_run_finish.type,
+                "agent_name": data.hooks.on_run_finish.agent_name,
+                "on_error": data.hooks.on_run_finish.on_error.value,
+                "timeout_seconds": data.hooks.on_run_finish.timeout_seconds,
+            }
+        if hooks_dict:
+            agent_data["hooks"] = hooks_dict
 
     with open(agent_dir / "agent.json", "w", encoding="utf-8") as f:
         json.dump(agent_data, f, indent=2)
@@ -439,6 +490,28 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
             agent_data["demands"] = updates.demands.model_dump(exclude_none=True)
         else:
             agent_data.pop("demands", None)
+
+    # Update hooks - None means don't update, AgentHooks() with empty hooks means clear
+    if updates.hooks is not None:
+        hooks_dict = {}
+        if updates.hooks.on_run_start:
+            hooks_dict["on_run_start"] = {
+                "type": updates.hooks.on_run_start.type,
+                "agent_name": updates.hooks.on_run_start.agent_name,
+                "on_error": updates.hooks.on_run_start.on_error.value,
+                "timeout_seconds": updates.hooks.on_run_start.timeout_seconds,
+            }
+        if updates.hooks.on_run_finish:
+            hooks_dict["on_run_finish"] = {
+                "type": updates.hooks.on_run_finish.type,
+                "agent_name": updates.hooks.on_run_finish.agent_name,
+                "on_error": updates.hooks.on_run_finish.on_error.value,
+                "timeout_seconds": updates.hooks.on_run_finish.timeout_seconds,
+            }
+        if hooks_dict:
+            agent_data["hooks"] = hooks_dict
+        else:
+            agent_data.pop("hooks", None)
 
     # Write updated agent.json
     with open(agent_json_path, "w", encoding="utf-8") as f:

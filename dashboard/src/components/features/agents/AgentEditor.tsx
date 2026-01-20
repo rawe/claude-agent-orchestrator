@@ -4,9 +4,10 @@ import { Modal, Button, Badge, Spinner, TagSelector, InfoPopover } from '@/compo
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
-import { Agent, AgentCreate, AgentDemands, MCPServerConfig } from '@/types';
+import { Agent, AgentCreate, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useAgents } from '@/hooks/useAgents';
 import {
   Eye,
   Code,
@@ -19,6 +20,7 @@ import {
   Puzzle,
   Server,
   Target,
+  Zap,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -29,6 +31,14 @@ interface AgentEditorProps {
   onSave: (data: AgentCreate) => Promise<void>;
   agent?: Agent | null;
   checkNameAvailable: (name: string) => Promise<boolean>;
+}
+
+// Hook form fields for a single hook
+interface HookFormFields {
+  enabled: boolean;
+  agent_name: string;
+  on_error: HookOnError;
+  timeout_seconds: number;
 }
 
 interface FormData {
@@ -44,9 +54,12 @@ interface FormData {
   tags: string[];
   capabilities: string[];
   demands: AgentDemands | null;
+  // Hooks
+  on_run_start: HookFormFields;
+  on_run_finish: HookFormFields;
 }
 
-type TabId = 'general' | 'input' | 'output' | 'prompt' | 'capabilities' | 'mcp' | 'runner';
+type TabId = 'general' | 'input' | 'output' | 'prompt' | 'capabilities' | 'mcp' | 'runner' | 'hooks';
 
 const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: 'General', icon: Settings },
@@ -56,6 +69,7 @@ const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
   { id: 'capabilities', label: 'Capabilities', icon: Puzzle },
   { id: 'mcp', label: 'MCP', icon: Server },
   { id: 'runner', label: 'Runner', icon: Target },
+  { id: 'hooks', label: 'Hooks', icon: Zap },
 ];
 
 export function AgentEditor({
@@ -74,7 +88,18 @@ export function AgentEditor({
   // Load available capabilities for the multi-select
   const { capabilities: availableCapabilities, loading: capabilitiesLoading } = useCapabilities();
 
+  // Load available agents for hook agent dropdown
+  const { agents: availableAgents, loading: agentsLoading } = useAgents();
+
   const isEditing = !!agent;
+
+  // Default values for hooks
+  const defaultHookFields: HookFormFields = {
+    enabled: false,
+    agent_name: '',
+    on_error: 'continue',
+    timeout_seconds: 300,
+  };
 
   const {
     register,
@@ -99,6 +124,8 @@ export function AgentEditor({
       tags: [],
       capabilities: [],
       demands: null,
+      on_run_start: { ...defaultHookFields },
+      on_run_finish: { ...defaultHookFields },
     },
   });
 
@@ -106,6 +133,19 @@ export function AgentEditor({
   const watchedOutputSchemaEnabled = watch('output_schema_enabled');
   const watchedMcpServers = watch('mcp_servers');
   const watchedCapabilities = watch('capabilities');
+
+  // Helper to convert hook config to form fields
+  const hookConfigToFormFields = (hook: HookConfig | null | undefined): HookFormFields => {
+    if (!hook) {
+      return { ...defaultHookFields };
+    }
+    return {
+      enabled: true,
+      agent_name: hook.agent_name,
+      on_error: hook.on_error,
+      timeout_seconds: hook.timeout_seconds ?? 300,
+    };
+  };
 
   // Load agent data when editing
   useEffect(() => {
@@ -126,6 +166,8 @@ export function AgentEditor({
         tags: agent.tags || [],
         capabilities: agent.capabilities || [],
         demands: agent.demands,
+        on_run_start: hookConfigToFormFields(agent.hooks?.on_run_start),
+        on_run_finish: hookConfigToFormFields(agent.hooks?.on_run_finish),
       });
     } else {
       reset({
@@ -141,6 +183,8 @@ export function AgentEditor({
         tags: [],
         capabilities: [],
         demands: null,
+        on_run_start: { ...defaultHookFields },
+        on_run_finish: { ...defaultHookFields },
       });
     }
     setNameAvailable(null);
@@ -202,6 +246,34 @@ export function AgentEditor({
       const outputSchema =
         data.output_schema_enabled && data.output_schema ? data.output_schema : null;
 
+      // Build on_run_start hook config (includes on_error and timeout_seconds)
+      const onRunStartHook: HookConfig | null =
+        data.on_run_start.enabled && data.on_run_start.agent_name
+          ? {
+              type: 'agent',
+              agent_name: data.on_run_start.agent_name,
+              on_error: data.on_run_start.on_error,
+              timeout_seconds: data.on_run_start.timeout_seconds,
+            }
+          : null;
+
+      // Build on_run_finish hook config (fire-and-forget: only type and agent_name)
+      // on_error and timeout_seconds are meaningless for fire-and-forget hooks
+      const onRunFinishHook: HookConfig | null =
+        data.on_run_finish.enabled && data.on_run_finish.agent_name
+          ? {
+              type: 'agent',
+              agent_name: data.on_run_finish.agent_name,
+            } as HookConfig
+          : null;
+      const hooks: AgentHooks | null =
+        onRunStartHook || onRunFinishHook
+          ? {
+              on_run_start: onRunStartHook,
+              on_run_finish: onRunFinishHook,
+            }
+          : null;
+
       // UI-created agents are always autonomous (procedural agents are runner-owned)
       const createData: AgentCreate = {
         name: data.name,
@@ -215,6 +287,7 @@ export function AgentEditor({
         tags: data.tags, // empty array clears tags
         capabilities: data.capabilities, // capability references
         demands: cleanDemands ?? null, // null clears demands
+        hooks: hooks, // lifecycle hooks
       };
       await onSave(createData);
       onClose();
@@ -754,6 +827,211 @@ export function AgentEditor({
     </div>
   );
 
+  // Single hook configuration section (reused for on_run_start and on_run_finish)
+  const HookSection = ({
+    name,
+    title,
+    description,
+  }: {
+    name: 'on_run_start' | 'on_run_finish';
+    title: string;
+    description: string;
+  }) => {
+    const watchedEnabled = watch(`${name}.enabled`);
+    const watchedAgentName = watch(`${name}.agent_name`);
+
+    // Filter out the current agent from available agents (prevent circular hooks)
+    const hookAgentOptions = availableAgents.filter(
+      (a) => a.name !== agent?.name && a.status === 'active'
+    );
+
+    // on_run_finish is fire-and-forget, so on_error and timeout don't apply
+    const showErrorAndTimeout = name === 'on_run_start';
+
+    return (
+      <div className="border border-gray-200 rounded-lg p-4">
+        {/* Header with enable toggle */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">{title}</label>
+            <InfoPopover title={title}>
+              <p>{description}</p>
+            </InfoPopover>
+          </div>
+          <Controller
+            name={`${name}.enabled`}
+            control={control}
+            render={({ field }) => (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={(e) => {
+                    field.onChange(e.target.checked);
+                    // Clear agent_name when disabling
+                    if (!e.target.checked) {
+                      setValue(`${name}.agent_name`, '');
+                    }
+                  }}
+                  className="w-4 h-4 text-primary-600 rounded"
+                />
+                <span className="text-sm font-medium">{field.value ? 'Enabled' : 'Disabled'}</span>
+              </label>
+            )}
+          />
+        </div>
+
+        {watchedEnabled && (
+          <div className="space-y-4">
+            {/* Hook Agent Selection */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <label className="text-sm font-medium text-gray-700">Hook Agent</label>
+                <span className="text-red-500">*</span>
+                <InfoPopover title="Hook Agent">
+                  <p>Select an agent to execute as this hook. The hook agent will receive context about the run.</p>
+                </InfoPopover>
+              </div>
+              {agentsLoading ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+                  <Spinner size="sm" />
+                  <span>Loading agents...</span>
+                </div>
+              ) : hookAgentOptions.length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-2">
+                  No other agents available. Create another agent to use as a hook.
+                </p>
+              ) : (
+                <Controller
+                  name={`${name}.agent_name`}
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      className={`input ${!watchedAgentName ? 'text-gray-400' : ''}`}
+                    >
+                      <option value="">Select an agent...</option>
+                      {hookAgentOptions.map((a) => (
+                        <option key={a.name} value={a.name}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
+              )}
+            </div>
+
+            {/* On Error Behavior - only for on_run_start (on_run_finish is fire-and-forget) */}
+            {showErrorAndTimeout && (
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <label className="text-sm font-medium text-gray-700">On Error</label>
+                  <InfoPopover title="On Error Behavior">
+                    <p>What to do if the hook fails or times out:</p>
+                    <ul className="list-disc ml-4 mt-2 space-y-1">
+                      <li><strong>Continue:</strong> Proceed with the run despite hook failure</li>
+                      <li><strong>Block:</strong> Fail the run if the hook fails</li>
+                    </ul>
+                  </InfoPopover>
+                </div>
+                <Controller
+                  name={`${name}.on_error`}
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="continue"
+                          checked={field.value === 'continue'}
+                          onChange={() => field.onChange('continue')}
+                          className="w-4 h-4 text-primary-600"
+                        />
+                        <span className="text-sm">Continue</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value="block"
+                          checked={field.value === 'block'}
+                          onChange={() => field.onChange('block')}
+                          className="w-4 h-4 text-primary-600"
+                        />
+                        <span className="text-sm">Block</span>
+                      </label>
+                    </div>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Timeout - only for on_run_start (on_run_finish is fire-and-forget) */}
+            {showErrorAndTimeout && (
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <label className="text-sm font-medium text-gray-700">Timeout (seconds)</label>
+                  <InfoPopover title="Hook Timeout">
+                    <p>Maximum time to wait for the hook to complete. Default is 300 seconds (5 minutes).</p>
+                  </InfoPopover>
+                </div>
+                <Controller
+                  name={`${name}.timeout_seconds`}
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      type="number"
+                      min={1}
+                      max={3600}
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 300)}
+                      className="input w-32"
+                    />
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Fire-and-forget notice for on_run_finish */}
+            {!showErrorAndTimeout && (
+              <p className="text-sm text-gray-500 italic">
+                This hook runs fire-and-forget after the run completes. It cannot block or transform results.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const HooksTab = () => (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-sm font-medium text-gray-700">Agent Run Hooks</label>
+        <InfoPopover title="Agent Run Hooks">
+          <p>
+            Hooks execute automatically at specific points in the agent run lifecycle.
+            Hook agents can validate input, transform parameters, or observe results.
+          </p>
+        </InfoPopover>
+      </div>
+
+      {/* on_run_start hook */}
+      <HookSection
+        name="on_run_start"
+        title="On Run Start"
+        description="Executes when a runner claims this agent's run, before execution begins. Can transform parameters or block the run."
+      />
+
+      {/* on_run_finish hook */}
+      <HookSection
+        name="on_run_finish"
+        title="On Run Finish"
+        description="Executes after a run completes (fire-and-forget). Useful for logging, notifications, or cleanup."
+      />
+    </div>
+  );
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="2xl">
       <form onSubmit={handleSubmit(onSubmit)} className="h-[85vh] flex flex-col">
@@ -805,6 +1083,7 @@ export function AgentEditor({
             {activeTab === 'capabilities' && <CapabilitiesTab />}
             {activeTab === 'mcp' && <McpTab />}
             {activeTab === 'runner' && <RunnerTab />}
+            {activeTab === 'hooks' && <HooksTab />}
           </div>
         </div>
 

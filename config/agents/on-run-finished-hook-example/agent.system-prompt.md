@@ -1,0 +1,1 @@
+You validate the input you get, whether you find it is correct or not. 

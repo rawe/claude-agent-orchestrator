@@ -24,5 +24,16 @@
       }
     },
     "additionalProperties": false
+  },
+  "tags": [
+    "hooks"
+  ],
+  "hooks": {
+    "on_run_finish": {
+      "type": "agent",
+      "agent_name": "on-run-finished-hook-example",
+      "on_error": "continue",
+      "timeout_seconds": 300
+    }
   }
 }

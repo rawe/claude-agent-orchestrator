@@ -53,6 +53,7 @@ export function AgentManager() {
           tags: data.tags,
           capabilities: data.capabilities,
           demands: data.demands,
+          hooks: data.hooks,
         });
         showSuccess('Agent updated successfully');
       } else {

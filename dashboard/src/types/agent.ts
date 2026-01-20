@@ -3,6 +3,31 @@ export type AgentStatus = 'active' | 'inactive';
 // Agent type: autonomous agents interpret intent, procedural agents follow defined procedures
 export type AgentType = 'autonomous' | 'procedural';
 
+// ==============================================================================
+// Agent Hook Types (Agent Run Hooks)
+// ==============================================================================
+
+// Behavior when a hook fails or times out
+export type HookOnError = 'block' | 'continue';
+
+// Configuration for an agent-type hook
+export interface HookAgentConfig {
+  type: 'agent';
+  agent_name: string;
+  on_error: HookOnError;
+  timeout_seconds?: number; // Default: 300 (5 minutes)
+}
+
+// Union type for future extensibility
+export type HookConfig = HookAgentConfig;
+
+// Lifecycle hooks for an agent
+export interface AgentHooks {
+  on_run_start?: HookConfig | null;
+  on_run_finish?: HookConfig | null;
+}
+
+// ==============================================================================
 // Agent Demands (ADR-011)
 // Requirements the agent demands to be satisfied before a session can run
 export interface AgentDemands {
@@ -39,6 +64,7 @@ export interface Agent {
   tags: string[];
   capabilities: string[];
   demands: AgentDemands | null;
+  hooks: AgentHooks | null;  // Lifecycle hooks
   status: AgentStatus;
   created_at: string;
   modified_at: string;
@@ -64,6 +90,7 @@ export interface AgentCreate {
   tags?: string[];
   capabilities?: string[];
   demands?: AgentDemands | null;
+  hooks?: AgentHooks | null;  // Lifecycle hooks
 }
 
 export interface AgentUpdate {
@@ -77,6 +104,7 @@ export interface AgentUpdate {
   tags?: string[];
   capabilities?: string[];
   demands?: AgentDemands | null;
+  hooks?: AgentHooks | null;  // Lifecycle hooks
 }
 
 // Predefined skills available for selection

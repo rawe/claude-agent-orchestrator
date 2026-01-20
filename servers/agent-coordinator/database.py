@@ -710,6 +710,26 @@ def update_run_demands(
     return updated
 
 
+def update_run_parameters(
+    run_id: str,
+    parameters: str,  # JSON string
+) -> bool:
+    """Update run parameters. Returns True if updated.
+
+    Used by on_run_start hooks to transform parameters before execution.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE runs SET parameters = ? WHERE run_id = ?",
+        (parameters, run_id)
+    )
+    conn.commit()
+    updated = cursor.rowcount > 0
+    conn.close()
+    return updated
+
+
 def fail_timed_out_runs(current_time: str) -> list[str]:
     """
     Mark pending runs past their timeout as failed.

@@ -41,6 +41,7 @@ from database import (
     update_run_status as db_update_run_status,
     claim_run as db_claim_run,
     update_run_demands as db_update_run_demands,
+    update_run_parameters as db_update_run_parameters,
     fail_timed_out_runs as db_fail_timed_out_runs,
     get_session_by_id,
     recover_stale_runs as db_recover_stale_runs,
@@ -525,6 +526,36 @@ class RunQueue:
                 run.started_at = started_at
             if completed_at:
                 run.completed_at = completed_at
+
+            return run
+
+    def update_run_parameters(
+        self,
+        run_id: str,
+        parameters: dict,
+    ) -> Optional[Run]:
+        """Update run parameters. Used by on_run_start hooks for parameter transformation.
+
+        Persists to database, then updates cache.
+        """
+        import json
+        with self._lock:
+            run = self._runs.get(run_id)
+            if not run:
+                return None
+
+            # Write to database first
+            parameters_json = json.dumps(parameters)
+            success = db_update_run_parameters(
+                run_id=run_id,
+                parameters=parameters_json,
+            )
+
+            if not success:
+                return None
+
+            # Update cache
+            run.parameters = parameters
 
             return run
 

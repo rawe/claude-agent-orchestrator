@@ -111,6 +111,7 @@ class AgentCreate(AgentBase):
     tags: Optional[list[str]] = None
     capabilities: Optional[list[str]] = None
     demands: Optional["RunnerDemands"] = None
+    hooks: Optional["AgentHooks"] = None  # Lifecycle hooks
 
 
 class AgentUpdate(BaseModel):
@@ -126,6 +127,7 @@ class AgentUpdate(BaseModel):
     tags: Optional[list[str]] = None
     capabilities: Optional[list[str]] = None
     demands: Optional["RunnerDemands"] = None
+    hooks: Optional["AgentHooks"] = None  # Lifecycle hooks
 
 
 class Agent(AgentBase):
@@ -140,6 +142,7 @@ class Agent(AgentBase):
     tags: list[str] = []
     capabilities: list[str] = []
     demands: Optional["RunnerDemands"] = None
+    hooks: Optional["AgentHooks"] = None  # Lifecycle hooks
     status: Literal["active", "inactive"] = "active"
     created_at: str
     modified_at: str
@@ -152,6 +155,40 @@ class AgentStatusUpdate(BaseModel):
     """Request body for status update."""
 
     status: Literal["active", "inactive"]
+
+
+# ==============================================================================
+# Agent Hook Models (Agent Run Hooks)
+# ==============================================================================
+
+class HookOnError(str, Enum):
+    """Behavior when a hook fails or times out."""
+    BLOCK = "block"      # Block the run from executing
+    CONTINUE = "continue"  # Continue with the run despite hook failure
+
+
+class HookAgentConfig(BaseModel):
+    """Configuration for an agent-type hook."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["agent"] = "agent"
+    agent_name: str  # Name of the agent to execute as hook
+    on_error: HookOnError = HookOnError.CONTINUE  # Default: continue on error
+    timeout_seconds: int = 300  # Default: 5 minutes
+
+
+# Union type for future extensibility (e.g., webhook hooks, script hooks)
+HookConfig = HookAgentConfig
+
+
+class AgentHooks(BaseModel):
+    """Lifecycle hooks for an agent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    on_run_start: Optional[HookConfig] = None  # Execute synchronously when run is claimed
+    on_run_finish: Optional[HookConfig] = None  # Execute fire-and-forget when run completes
 
 
 # ==============================================================================
