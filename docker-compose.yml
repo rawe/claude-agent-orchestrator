@@ -69,10 +69,12 @@ services:
   context-store:
     container_name: context-store
     build:
-      context: ./servers/context-store
-      dockerfile: Dockerfile
+      # Context is root directory to include both servers/context-store and mcps/context-store
+      context: .
+      dockerfile: servers/context-store/Dockerfile
     ports:
       - "8766:8766"
+      - "9501:9501"  # MCP HTTP server
     volumes:
       - document-data:/app/data
     environment:
@@ -87,6 +89,10 @@ services:
       - LOG_LEVEL=INFO
       # CORS - allow all origins for browser extension support
       - CORS_ORIGINS=*
+      # MCP HTTP server (enabled by default for development)
+      - MCP_ENABLED=${MCP_ENABLED:-true}
+      - MCP_HTTP_HOST=0.0.0.0
+      - MCP_HTTP_PORT=9501
       # Semantic search settings (optional, disabled by default)
       - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}

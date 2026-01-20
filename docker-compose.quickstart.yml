@@ -11,6 +11,7 @@
 #   - Dashboard: http://localhost:3000
 #   - Coordinator API: http://localhost:8765
 #   - Context Store: http://localhost:8766
+#   - Context Store MCP: http://localhost:9501/mcp
 
 services:
   coordinator:
@@ -29,8 +30,10 @@ services:
     image: ghcr.io/rawe/aof-context-store:latest
     ports:
       - "8766:8766"
+      - "9501:9501"
     environment:
       - CORS_ORIGINS=*
+      - MCP_ENABLED=true
     volumes:
       - context-store-data:/app/document-data
 

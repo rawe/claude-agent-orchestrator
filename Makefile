@@ -705,7 +705,7 @@ release-context-store: _check-version
 		-t $(IMAGE_CONTEXT_STORE):$(VERSION) \
 		-t $(IMAGE_CONTEXT_STORE):latest \
 		-f servers/context-store/Dockerfile \
-		servers/context-store
+		.
 ifdef PUSH
 	@echo "Pushing $(IMAGE_CONTEXT_STORE):$(VERSION)..."
 	docker push $(IMAGE_CONTEXT_STORE):$(VERSION)

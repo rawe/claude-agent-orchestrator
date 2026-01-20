@@ -32,6 +32,14 @@ docker run -d \
 | `DOCUMENT_SERVER_PUBLIC_URL` | No | `http://localhost:8766` | Public URL for document links (important for Docker/proxy setups) |
 | `CORS_ORIGINS` | No | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins (comma-separated) |
 
+### MCP Server (Optional)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MCP_ENABLED` | No | `false` | Enable MCP HTTP server |
+| `MCP_HTTP_HOST` | No | `0.0.0.0` | MCP server bind host |
+| `MCP_HTTP_PORT` | No | `9501` | MCP server port |
+
 ### Semantic Search (Optional)
 
 | Variable | Required | Default | Description |
@@ -48,7 +56,8 @@ docker run -d \
 
 | Port | Protocol | Description |
 |------|----------|-------------|
-| 8766 | HTTP | API endpoints |
+| 8766 | HTTP | Context Store REST API |
+| 9501 | HTTP | MCP HTTP server (when `MCP_ENABLED=true`) |
 
 ## Volumes
 
@@ -297,3 +306,82 @@ Elasticsearch can run in a container since it doesn't require special hardware a
 - Vector embeddings via Ollama
 - Elasticsearch for vector storage
 - Returns matching document sections with character offsets
+
+## MCP Server
+
+The container includes an optional **MCP (Model Context Protocol) HTTP server** that exposes document management tools to MCP clients like Claude Desktop or Claude Code.
+
+### Enabling MCP Server
+
+Set `MCP_ENABLED=true` to start the MCP server alongside the Context Store API:
+
+```bash
+docker run -d \
+  --name aof-context-store \
+  -p 8766:8766 \
+  -p 9501:9501 \
+  -e CORS_ORIGINS=* \
+  -e MCP_ENABLED=true \
+  -v context-store-data:/app/document-data \
+  ghcr.io/rawe/aof-context-store:<version>
+```
+
+### MCP Endpoint
+
+When enabled, the MCP server is available at:
+
+```
+http://localhost:9501/mcp
+```
+
+### MCP Tools Available
+
+The MCP server provides these tools to MCP clients:
+
+| Tool | Description |
+|------|-------------|
+| `doc_create` | Create placeholder document (returns ID) |
+| `doc_write` | Write/replace document content |
+| `doc_edit` | Surgically edit document content |
+| `doc_push` | Upload file from filesystem |
+| `doc_read` | Read document content |
+| `doc_pull` | Download document to filesystem |
+| `doc_query` | Query by filename pattern and/or tags |
+| `doc_search` | Semantic search by natural language |
+| `doc_info` | Get metadata and relations |
+| `doc_link` | Manage document relations |
+| `doc_delete` | Delete a document |
+
+### Configuring MCP Clients
+
+**Claude Desktop (HTTP mode):**
+
+```json
+{
+  "mcpServers": {
+    "context-store": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp"
+    }
+  }
+}
+```
+
+### Docker Compose with MCP
+
+```yaml
+services:
+  context-store:
+    image: ghcr.io/rawe/aof-context-store:<version>
+    ports:
+      - "8766:8766"
+      - "9501:9501"
+    environment:
+      CORS_ORIGINS: "*"
+      MCP_ENABLED: "true"
+    volumes:
+      - context-store-data:/app/document-data
+
+volumes:
+  context-store-data:
+```

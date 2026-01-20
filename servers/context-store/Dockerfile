@@ -24,21 +24,39 @@ RUN pip install --no-cache-dir uv
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml ./
-
-# Install dependencies using UV (including semantic search extras)
+# Copy Context Store dependency files and install
+COPY servers/context-store/pyproject.toml ./
 RUN uv pip install --system -e ".[semantic]"
 
-# Copy application code
-COPY . .
+# Install MCP server dependencies
+RUN uv pip install --system "mcp>=1.7.0" "fastmcp>=2.0.0" "pydantic>=2.0.0" "httpx>=0.27.0"
 
-# Expose port
-EXPOSE 8766
+# Copy Context Store application code
+COPY servers/context-store/src ./src
 
-# Health check
+# Copy MCP server code
+COPY mcps/context-store/context-store-mcp.py ./mcp-server/
+COPY mcps/context-store/lib ./mcp-server/lib
+
+# Copy entrypoint script
+COPY servers/context-store/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Expose ports:
+# - 8766: Context Store REST API
+# - 9501: MCP HTTP server (optional, enabled via MCP_ENABLED=true)
+EXPOSE 8766 9501
+
+# Environment variables
+ENV DOCUMENT_SERVER_HOST=0.0.0.0 \
+    DOCUMENT_SERVER_PORT=8766 \
+    MCP_ENABLED=false \
+    MCP_HTTP_HOST=0.0.0.0 \
+    MCP_HTTP_PORT=9501
+
+# Health check (Context Store API)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8766/health')" || exit 1
 
-# Run the server
-CMD ["python", "-m", "src.main"]
+# Run via entrypoint script
+ENTRYPOINT ["/docker-entrypoint.sh"]
