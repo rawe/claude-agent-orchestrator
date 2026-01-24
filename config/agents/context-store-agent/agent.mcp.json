@@ -2,7 +2,7 @@
   "mcpServers": {
     "context-store-http": {
       "type": "http",
-      "url": "http://localhost:9501/mcp"
+      "url": "http://context-store:9501/mcp"
     }
   }
 }

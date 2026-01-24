@@ -82,10 +82,16 @@ class PollResult:
     run: Optional[Run] = None
     deregistered: bool = False
     stop_runs: list[str] = None  # Run IDs to stop
+    sync_scripts: list[str] = None  # Script names to sync
+    remove_scripts: list[str] = None  # Script names to remove
 
     def __post_init__(self):
         if self.stop_runs is None:
             self.stop_runs = []
+        if self.sync_scripts is None:
+            self.sync_scripts = []
+        if self.remove_scripts is None:
+            self.remove_scripts = []
 
 
 class CoordinatorAPIClient:
@@ -244,6 +250,13 @@ class CoordinatorAPIClient:
             # Check for stop commands
             if "stop_runs" in data:
                 return PollResult(stop_runs=data["stop_runs"])
+
+            # Check for script sync commands
+            if "sync_scripts" in data or "remove_scripts" in data:
+                return PollResult(
+                    sync_scripts=data.get("sync_scripts", []),
+                    remove_scripts=data.get("remove_scripts", []),
+                )
 
             # Normal run response
             run_data = data["run"]
@@ -411,4 +424,23 @@ class CoordinatorAPIClient:
             return data.get("run_id")
         except Exception as e:
             logger.error(f"Failed to create resume run for {session_id}: {e}")
+            return None
+
+    def download_script(self, script_name: str) -> Optional[bytes]:
+        """Download a script tarball from the coordinator.
+
+        Returns the tar.gz bytes if successful, None on error.
+        """
+        try:
+            response = self._client.get(
+                f"{self.base_url}/scripts/{script_name}/download",
+                headers=self._get_auth_headers(),
+            )
+            if response.status_code == 404:
+                logger.warning(f"Script not found: {script_name}")
+                return None
+            response.raise_for_status()
+            return response.content
+        except Exception as e:
+            logger.error(f"Failed to download script {script_name}: {e}")
             return None

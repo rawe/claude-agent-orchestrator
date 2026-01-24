@@ -181,7 +181,7 @@ Becomes skill description:
 |----------|---------|
 | Same sync mechanism as Phase 1? | Reuse long-poll sync commands |
 | Which scripts go to autonomous runners? | Based on capability assignment? All scripts? |
-| Storage location on runner? | Same as procedural: `{project_dir}/.agent-orchestrator/scripts/` |
+| Storage location on runner? | Same as procedural: `{PROJECT_DIR}/scripts/` |
 
 ### Execution
 

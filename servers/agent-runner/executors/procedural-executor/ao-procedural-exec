@@ -22,6 +22,7 @@ Usage:
 """
 
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -42,14 +43,25 @@ from session_client import SessionClient, SessionClientError
 from executor_config import get_api_url
 
 
-def get_agent_command(agent_name: str) -> str | None:
-    """Get the command for an agent from the coordinator.
+def get_scripts_dir() -> Path:
+    """
+    Get scripts directory for synced scripts.
+
+    Scripts are stored in {PROJECT_DIR}/scripts/ where PROJECT_DIR
+    is the runner's working directory.
+    """
+    project_dir = os.environ.get("PROJECT_DIR", os.getcwd())
+    return Path(project_dir) / "scripts"
+
+
+def get_agent_info(agent_name: str) -> dict | None:
+    """Get agent info from the coordinator.
 
     Args:
         agent_name: Name of the agent to look up
 
     Returns:
-        Command string or None if agent not found or has no command
+        Agent dict with 'command' and/or 'script' fields, or None if not found
     """
     import httpx
     api_url = get_api_url()
@@ -57,8 +69,7 @@ def get_agent_command(agent_name: str) -> str | None:
     try:
         response = httpx.get(f"{api_url}/agents/{agent_name}")
         if response.status_code == 200:
-            agent = response.json()
-            return agent.get("command")
+            return response.json()
         elif response.status_code == 404:
             return None
         else:
@@ -66,6 +77,37 @@ def get_agent_command(agent_name: str) -> str | None:
             return None
     except Exception as e:
         print(f"Error fetching agent: {e}", file=sys.stderr)
+        return None
+
+
+def get_local_script(script_name: str) -> dict | None:
+    """Get script info from local scripts directory.
+
+    Args:
+        script_name: Name of the script to look up
+
+    Returns:
+        Dict with 'script_file' and 'script_dir' or None if not found
+    """
+    scripts_dir = get_scripts_dir()
+    script_dir = scripts_dir / script_name
+
+    if not script_dir.exists():
+        return None
+
+    script_json = script_dir / "script.json"
+    if not script_json.exists():
+        return None
+
+    try:
+        with open(script_json, encoding="utf-8") as f:
+            data = json.load(f)
+        return {
+            "script_file": data.get("script_file"),
+            "script_dir": script_dir,
+        }
+    except Exception as e:
+        print(f"Error reading script.json for {script_name}: {e}", file=sys.stderr)
         return None
 
 
@@ -100,24 +142,26 @@ def build_cli_args(command: str, parameters: dict) -> list[str]:
     return args
 
 
-def execute_command(command: str, parameters: dict) -> tuple[str, str, int]:
+def execute_command(command: str, parameters: dict, base_dir: Path | None = None) -> tuple[str, str, int]:
     """Execute a CLI command with parameters as CLI arguments.
 
     Args:
-        command: Command to execute (relative to executor directory)
+        command: Command to execute (relative to base_dir or executor directory)
         parameters: Parameters to convert to --key value CLI args
+        base_dir: Base directory for resolving command path (defaults to executor directory)
 
     Returns:
         Tuple of (stdout, stderr, return_code)
     """
-    # Resolve command path relative to executor directory
-    executor_dir = Path(__file__).parent
+    # Resolve command path relative to base directory (or executor directory)
+    if base_dir is None:
+        base_dir = Path(__file__).parent
 
     # Build CLI args from parameters
     args = build_cli_args(command, parameters)
 
-    # Resolve the command path (first element) relative to executor directory
-    command_path = executor_dir / args[0]
+    # Resolve the command path (first element) relative to base directory
+    command_path = base_dir / args[0]
     if not command_path.exists():
         return "", f"Command not found: {command_path}", 1
     args[0] = str(command_path)
@@ -140,19 +184,22 @@ def run_procedural(inv: ExecutorInvocation) -> None:
     """Execute a procedural agent.
 
     Procedural agents are stateless - they don't support resume.
+    Supports two execution modes:
+    - Script-based: agent has 'script' field, script is fetched from local scripts directory
+    - Legacy: agent has 'command' field, executed relative to executor directory
     """
     api_url = get_api_url()
     client = SessionClient(api_url)
     session_id = inv.session_id
 
-    # Get agent command from coordinator
+    # Get agent info from coordinator
     if not inv.agent_name:
         print("Error: agent_name is required for procedural executor", file=sys.stderr)
         sys.exit(1)
 
-    command = get_agent_command(inv.agent_name)
-    if not command:
-        print(f"Error: Agent '{inv.agent_name}' not found or has no command", file=sys.stderr)
+    agent = get_agent_info(inv.agent_name)
+    if not agent:
+        print(f"Error: Agent '{inv.agent_name}' not found", file=sys.stderr)
         sys.exit(1)
 
     # Bind session (procedural agents still need to bind for tracking)
@@ -164,8 +211,31 @@ def run_procedural(inv: ExecutorInvocation) -> None:
     except SessionClientError as e:
         print(f"Warning: Could not bind session: {e}", file=sys.stderr)
 
-    # Execute the command with parameters
-    stdout, stderr, return_code = execute_command(command, inv.parameters)
+    # Determine execution mode: script-based or legacy command
+    script_name = agent.get("script")
+    command = agent.get("command")
+
+    if script_name:
+        # Script-based execution: look for script in local scripts directory
+        script_info = get_local_script(script_name)
+        if not script_info:
+            print(f"Error: Script '{script_name}' not found in local scripts directory", file=sys.stderr)
+            print(f"       Expected location: {get_scripts_dir() / script_name}", file=sys.stderr)
+            sys.exit(1)
+
+        script_file = script_info["script_file"]
+        script_dir = script_info["script_dir"]
+
+        # Execute script from scripts directory
+        stdout, stderr, return_code = execute_command(script_file, inv.parameters, base_dir=script_dir)
+
+    elif command:
+        # Legacy execution: command relative to executor directory
+        stdout, stderr, return_code = execute_command(command, inv.parameters)
+
+    else:
+        print(f"Error: Agent '{inv.agent_name}' has neither 'script' nor 'command' field", file=sys.stderr)
+        sys.exit(1)
 
     if stderr:
         print(stderr, file=sys.stderr)

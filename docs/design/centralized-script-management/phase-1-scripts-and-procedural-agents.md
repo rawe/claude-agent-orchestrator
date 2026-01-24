@@ -197,11 +197,13 @@ Currently, procedural agents in the Dashboard are read-only (registered by runne
 When scripts are synced to a runner, they are stored in:
 
 ```
-{project_dir}/.agent-orchestrator/scripts/
+{PROJECT_DIR}/scripts/
 └── {script_name}/
     ├── script.json
     └── {script_file}
 ```
+
+Where `PROJECT_DIR` is the runner's working directory (environment variable or current working directory).
 
 The entire script folder is copied from Coordinator to Runner.
 
@@ -262,11 +264,26 @@ The Coordinator decides which scripts to sync to which runner based on:
    │
    ▼
 6. Runner writes to local scripts directory
-   {project_dir}/.agent-orchestrator/scripts/{name}/
+   {PROJECT_DIR}/scripts/{name}/
    │
    ▼
 7. Runner reports sync complete (optional)
 ```
+
+#### Script Extraction Process
+
+When the runner downloads a script (`GET /scripts/{name}/download`), it receives a gzipped tarball containing the script folder. The extraction process:
+
+1. **Download**: Fetch tarball from Coordinator
+2. **Clean existing**: Remove any existing local script directory (for updates)
+3. **Extract**: Unpack tarball to `{PROJECT_DIR}/scripts/{name}/`
+   - Uses `filter='tar'` for security (blocks path traversal attacks)
+4. **Verify**: Confirm `script.json` exists after extraction
+5. **Make executable**: Read `script_file` from `script.json` and add execute permissions
+   - Only the specific script file is made executable (not all files)
+   - Adds `chmod +x` equivalent (`S_IXUSR | S_IXGRP | S_IXOTH`)
+
+This ensures scripts are ready to execute immediately after sync without manual intervention.
 
 #### Script Cleanup
 
@@ -331,7 +348,7 @@ When a procedural agent is invoked:
    │
    ▼
 5. Runner locates script in local scripts directory
-   {project_dir}/.agent-orchestrator/scripts/send-notification/
+   {PROJECT_DIR}/scripts/send-notification/
    │
    ▼
 6. Procedural executor executes script
@@ -343,6 +360,75 @@ When a procedural agent is invoked:
 
 ---
 
+## Procedural Agent Ownership Model
+
+Procedural agents can be defined in two ways, distinguished by mutually exclusive fields in the Agent model.
+
+### Ownership Types
+
+| Ownership | Defined In | Key Fields | Scripts Location |
+|-----------|-----------|------------|------------------|
+| **Coordinator-owned** | Coordinator (file-based or Dashboard) | `script` set, `command`/`runner_id` null | `{PROJECT_DIR}/scripts/{script_name}/` |
+| **Runner-owned** | Runner registration | `command`/`runner_id` set, `script` null | Executor directory (bundled with runner) |
+
+### Agent Model Fields
+
+```
+Agent {
+  script: Optional[str]      # Coordinator-owned: references centralized script
+  command: Optional[str]     # Runner-owned: CLI command relative to executor
+  runner_id: Optional[str]   # Runner-owned: non-null indicates runner ownership
+}
+```
+
+**Critical constraint:** `script` and `command` MUST NOT both be set. This mutual exclusivity is the differentiation criteria.
+
+### Differentiation Responsibility
+
+The **Procedural Executor** (`ao-procedural-exec`) is responsible for determining execution mode:
+
+1. Fetches agent definition from Coordinator via `GET /agents/{name}`
+2. Checks `script` field first → if set, uses synced scripts from `{PROJECT_DIR}/scripts/`
+3. Falls back to `command` field → if set, executes relative to executor directory
+4. Fails if neither field is set
+
+### Example: Coordinator-owned Agent
+
+```json
+{
+  "name": "notifier",
+  "type": "procedural",
+  "script": "send-notification",
+  "runner_id": null,
+  "command": null
+}
+```
+
+Execution: `{PROJECT_DIR}/scripts/send-notification/send-notification.py --args`
+
+### Example: Runner-owned Agent
+
+```json
+{
+  "name": "legacy-tool",
+  "type": "procedural",
+  "script": null,
+  "runner_id": "runner_abc123",
+  "command": "./tools/legacy-tool.sh"
+}
+```
+
+Execution: `{executor_dir}/tools/legacy-tool.sh --args`
+
+### Migration Path
+
+Runner-owned agents (legacy) can coexist with coordinator-owned agents. To migrate:
+1. Create a Script in the Coordinator with the same logic
+2. Create a coordinator-owned agent referencing the script
+3. Decommission the runner-owned agent
+
+---
+
 ## Summary
 
 | Component | Responsibility |
@@ -351,6 +437,7 @@ When a procedural agent is invoked:
 | **Procedural Agent** | References script, adds orchestration config (hooks, description, extra demands) |
 | **Coordinator** | Stores scripts and agents, manages distribution, validates parameters |
 | **Runner** | Syncs scripts locally, executes via procedural executor |
+| **Procedural Executor** | Differentiates agent ownership, resolves script/command, executes |
 | **Dashboard** | Manages scripts and procedural agents |
 | **Orchestrator MCP** | Provides `start_agent_session` for invoking procedural agents |
 

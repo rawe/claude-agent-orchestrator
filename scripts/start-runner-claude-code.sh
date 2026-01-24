@@ -4,7 +4,7 @@
 # =============================================================================
 # - Executor: Claude Code (autonomous profile)
 # - Connects to Agent Coordinator at http://localhost:8765
-# - Project dir: .agent-orchestrator/runner-claude-code/
+# - Project dir: .agent-orchestrator/runner-workdir/ (shared with other runners)
 # - No auth required (coordinator must also run without auth)
 # =============================================================================
 
@@ -13,7 +13,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-RUNNER_PROJECT_DIR="$PROJECT_ROOT/.agent-orchestrator/runner-claude-code"
+# TEMP: Shared workdir for all runners to test file access without complex sync mechanisms
+RUNNER_PROJECT_DIR="$PROJECT_ROOT/.agent-orchestrator/runner-workdir"
 
 mkdir -p "$RUNNER_PROJECT_DIR"
 

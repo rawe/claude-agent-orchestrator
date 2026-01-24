@@ -4,10 +4,11 @@ import { Modal, Button, Badge, Spinner, TagSelector, InfoPopover } from '@/compo
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
-import { Agent, AgentCreate, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
+import { Agent, AgentCreate, AgentType, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAgents } from '@/hooks/useAgents';
+import { useScripts } from '@/hooks/useScripts';
 import {
   Eye,
   Code,
@@ -21,6 +22,7 @@ import {
   Server,
   Target,
   Zap,
+  FileCode,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -44,6 +46,8 @@ interface HookFormFields {
 interface FormData {
   name: string;
   description: string;
+  type: AgentType;
+  script: string;  // Script name for procedural agents
   parameters_schema_enabled: boolean;
   parameters_schema: Record<string, unknown> | null;
   output_schema_enabled: boolean;
@@ -59,15 +63,24 @@ interface FormData {
   on_run_finish: HookFormFields;
 }
 
-type TabId = 'general' | 'input' | 'output' | 'prompt' | 'capabilities' | 'mcp' | 'runner' | 'hooks';
+type TabId = 'general' | 'script' | 'input' | 'output' | 'prompt' | 'capabilities' | 'mcp' | 'runner' | 'hooks';
 
-const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
+// Tabs for autonomous agents
+const autonomousTabs: { id: TabId; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'input', label: 'Input', icon: FileInput },
   { id: 'output', label: 'Output', icon: FileOutput },
   { id: 'prompt', label: 'Prompt', icon: ScrollText },
   { id: 'capabilities', label: 'Capabilities', icon: Puzzle },
   { id: 'mcp', label: 'MCP', icon: Server },
+  { id: 'runner', label: 'Runner', icon: Target },
+  { id: 'hooks', label: 'Hooks', icon: Zap },
+];
+
+// Tabs for procedural agents (simpler: no input/output/prompt/capabilities/mcp)
+const proceduralTabs: { id: TabId; label: string; icon: typeof Settings }[] = [
+  { id: 'general', label: 'General', icon: Settings },
+  { id: 'script', label: 'Script', icon: FileCode },
   { id: 'runner', label: 'Runner', icon: Target },
   { id: 'hooks', label: 'Hooks', icon: Zap },
 ];
@@ -90,6 +103,9 @@ export function AgentEditor({
 
   // Load available agents for hook agent dropdown
   const { agents: availableAgents, loading: agentsLoading } = useAgents();
+
+  // Load available scripts for procedural agents
+  const { scripts: availableScripts, loading: scriptsLoading } = useScripts();
 
   const isEditing = !!agent;
 
@@ -114,6 +130,8 @@ export function AgentEditor({
     defaultValues: {
       name: '',
       description: '',
+      type: 'autonomous',
+      script: '',
       parameters_schema_enabled: false,
       parameters_schema: null,
       output_schema_enabled: false,
@@ -128,6 +146,12 @@ export function AgentEditor({
       on_run_finish: { ...defaultHookFields },
     },
   });
+
+  const watchedType = watch('type');
+  const watchedScript = watch('script');
+
+  // Select tabs based on agent type
+  const tabs = watchedType === 'procedural' ? proceduralTabs : autonomousTabs;
 
   const watchedSchemaEnabled = watch('parameters_schema_enabled');
   const watchedOutputSchemaEnabled = watch('output_schema_enabled');
@@ -156,6 +180,8 @@ export function AgentEditor({
       reset({
         name: agent.name,
         description: agent.description,
+        type: agent.type || 'autonomous',
+        script: agent.script || '',
         parameters_schema_enabled: hasInputSchema,
         parameters_schema: agent.parameters_schema,
         output_schema_enabled: hasOutputSchema,
@@ -173,6 +199,8 @@ export function AgentEditor({
       reset({
         name: '',
         description: '',
+        type: 'autonomous',
+        script: '',
         parameters_schema_enabled: false,
         parameters_schema: null,
         output_schema_enabled: false,
@@ -274,21 +302,37 @@ export function AgentEditor({
             }
           : null;
 
-      // UI-created agents are always autonomous (procedural agents are runner-owned)
-      const createData: AgentCreate = {
-        name: data.name,
-        description: data.description,
-        type: 'autonomous',
-        parameters_schema: parametersSchema,
-        output_schema: outputSchema,
-        system_prompt: data.system_prompt || undefined,
-        mcp_servers: data.mcp_servers ?? {}, // null → {} to clear MCP servers
-        skills: data.skills, // empty array clears skills
-        tags: data.tags, // empty array clears tags
-        capabilities: data.capabilities, // capability references
-        demands: cleanDemands ?? null, // null clears demands
-        hooks: hooks, // lifecycle hooks
-      };
+      // Build agent create data based on type
+      let createData: AgentCreate;
+
+      if (data.type === 'procedural') {
+        // Procedural agents: include script, exclude autonomous-specific fields
+        createData = {
+          name: data.name,
+          description: data.description,
+          type: 'procedural',
+          script: data.script || undefined,
+          tags: data.tags, // empty array clears tags
+          demands: cleanDemands ?? null, // null clears demands
+          hooks: hooks, // lifecycle hooks
+        };
+      } else {
+        // Autonomous agents: include all autonomous-specific fields
+        createData = {
+          name: data.name,
+          description: data.description,
+          type: 'autonomous',
+          parameters_schema: parametersSchema,
+          output_schema: outputSchema,
+          system_prompt: data.system_prompt || undefined,
+          mcp_servers: data.mcp_servers ?? {}, // null → {} to clear MCP servers
+          skills: data.skills, // empty array clears skills
+          tags: data.tags, // empty array clears tags
+          capabilities: data.capabilities, // capability references
+          demands: cleanDemands ?? null, // null clears demands
+          hooks: hooks, // lifecycle hooks
+        };
+      }
       await onSave(createData);
       onClose();
     } catch (err) {
@@ -361,6 +405,64 @@ export function AgentEditor({
         )}
       </div>
 
+      {/* Agent Type */}
+      <div>
+        <div className="flex items-center gap-2 mb-1.5">
+          <label className="text-sm font-medium text-gray-700">Agent Type</label>
+          <span className="text-red-500">*</span>
+          <InfoPopover title="Agent Type">
+            <p>Choose the type of agent:</p>
+            <ul className="list-disc ml-4 mt-2 space-y-1">
+              <li>
+                <strong>Autonomous:</strong> AI-powered agents that interpret intent and execute tasks using Claude
+              </li>
+              <li>
+                <strong>Procedural:</strong> Script-based agents that execute predefined scripts with parameters
+              </li>
+            </ul>
+          </InfoPopover>
+        </div>
+        <Controller
+          name="type"
+          control={control}
+          render={({ field }) => (
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="autonomous"
+                  checked={field.value === 'autonomous'}
+                  onChange={() => {
+                    field.onChange('autonomous');
+                    setActiveTab('general');
+                  }}
+                  disabled={isEditing}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className={`text-sm ${isEditing ? 'text-gray-400' : ''}`}>Autonomous</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="procedural"
+                  checked={field.value === 'procedural'}
+                  onChange={() => {
+                    field.onChange('procedural');
+                    setActiveTab('general');
+                  }}
+                  disabled={isEditing}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className={`text-sm ${isEditing ? 'text-gray-400' : ''}`}>Procedural</span>
+              </label>
+            </div>
+          )}
+        />
+        {isEditing && (
+          <p className="mt-1 text-xs text-gray-500">Agent type cannot be changed after creation</p>
+        )}
+      </div>
+
       {/* Description */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
@@ -413,6 +515,98 @@ export function AgentEditor({
           )}
         />
       </div>
+    </div>
+  );
+
+  // Script tab for procedural agents
+  const ScriptTab = () => (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-sm font-medium text-gray-700">Script</label>
+        <InfoPopover title="Script">
+          <p>
+            Select a script to execute when this agent is invoked. The script defines the execution
+            logic, input parameters schema, and execution requirements.
+          </p>
+        </InfoPopover>
+      </div>
+
+      {scriptsLoading ? (
+        <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
+          <Spinner size="sm" />
+          <span>Loading scripts...</span>
+        </div>
+      ) : availableScripts.length === 0 ? (
+        <div className="text-sm text-gray-500 italic py-4 p-4 bg-yellow-50 rounded-md border border-yellow-200">
+          <p className="font-medium text-yellow-800 mb-1">No scripts available</p>
+          <p>Create scripts in the Scripts page first, then come back to select one.</p>
+        </div>
+      ) : (
+        <>
+          <Controller
+            name="script"
+            control={control}
+            render={({ field }) => (
+              <select
+                {...field}
+                className={`input ${!watchedScript ? 'text-gray-400' : ''}`}
+              >
+                <option value="">Select a script...</option>
+                {availableScripts.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          />
+
+          {watchedScript && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Script Details</h4>
+              {(() => {
+                const selectedScript = availableScripts.find((s) => s.name === watchedScript);
+                if (!selectedScript) return null;
+                return (
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <span className="text-gray-500">File:</span>{' '}
+                      <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">
+                        {selectedScript.script_file}
+                      </code>
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Description:</span>{' '}
+                      <span className="text-gray-700">{selectedScript.description}</span>
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      {selectedScript.has_parameters_schema && (
+                        <Badge size="sm" variant="default">
+                          Has Schema
+                        </Badge>
+                      )}
+                      {selectedScript.has_demands && (
+                        <Badge size="sm" variant="info">
+                          Has Demands
+                        </Badge>
+                      )}
+                      {selectedScript.demand_tags.length > 0 && (
+                        <span className="text-xs text-gray-500">
+                          Tags: {selectedScript.demand_tags.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      Parameters schema and demands are inherited from the script.
+                      Agent-level demands will be merged with script demands.
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 
@@ -1077,6 +1271,7 @@ export function AgentEditor({
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeTab === 'general' && <GeneralTab />}
+            {activeTab === 'script' && <ScriptTab />}
             {activeTab === 'input' && <InputTab />}
             {activeTab === 'output' && <OutputTab />}
             {activeTab === 'prompt' && <PromptTab />}

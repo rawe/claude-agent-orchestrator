@@ -28,6 +28,7 @@ from models import (
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
     ExecutionMode, StreamEventType, SessionEventType, SessionResult,
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary,
+    Script, ScriptCreate, ScriptUpdate, ScriptSummary,
     RunnerAgent, AgentHooks,
 )
 from openapi_config import (
@@ -41,9 +42,10 @@ from openapi_config import (
     HealthResponse, ConfigImportResponse
 )
 import agent_storage
-from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError
+from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError, MissingScriptError
 import capability_storage
-from validation import validate_agent_name, validate_capability_name
+import script_storage
+from validation import validate_agent_name, validate_capability_name, validate_script_name
 from datetime import datetime, timezone
 
 # Initialize database BEFORE run_queue (which loads from DB on init)
@@ -57,6 +59,7 @@ from services.run_queue import (
 # Import runner registry and other services
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError, AgentNameCollisionError
 from services.stop_command_queue import stop_command_queue
+from services.script_sync_queue import script_sync_queue
 from services.sse_manager import sse_manager, SSEConnection
 from services import callback_processor
 from services.hook_executor import (
@@ -136,8 +139,9 @@ async def runner_lifecycle_task():
                 if DEBUG:
                     print(f"[DEBUG] Runner removed: {runner_id}", flush=True)
 
-                # Cleanup stop command queue
+                # Cleanup stop command queue and script sync queue
                 stop_command_queue.unregister_runner(runner_id)
+                script_sync_queue.unregister_runner(runner_id)
 
                 # Fail orphaned runs and handle callbacks
                 now = datetime.now(timezone.utc).isoformat()
@@ -760,13 +764,30 @@ def list_agents(
 
     Returns both file-based agents and runner-owned agents.
     Runner-owned agents have `runner_id` set and `type: "procedural"`.
+    Agent dependencies (capabilities, scripts) are resolved.
 
     - No tags parameter: Returns all agents (for management UI)
     - tags=foo: Returns agents with tag "foo"
     - tags=foo,bar: Returns agents with BOTH "foo" AND "bar" tags
     """
-    # Get file-based agents
-    agents = agent_storage.list_agents()
+    # Get file-based agents (with dependencies resolved)
+    try:
+        agents = agent_storage.list_agents()
+    except MissingCapabilityError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Capability resolution failed for agent '{e.agent_name}': {e.capability_name} not found"
+        )
+    except MCPServerConflictError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"MCP server conflict in agent '{e.agent_name}': '{e.server_name}' defined in {', '.join(e.sources)}"
+        )
+    except MissingScriptError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Script resolution failed for agent '{e.agent_name}': {e.script_name} not found"
+        )
 
     # Get runner-owned agents and convert to Agent format
     runner_agents_data = runner_registry.get_all_runner_agents()
@@ -784,12 +805,14 @@ def list_agents(
 
 
 @app.get("/agents/{name}", tags=["Agents"], response_model=Agent, response_model_exclude_none=True)
-def get_agent(name: str, raw: bool = Query(False, description="Return raw agent without capability resolution")):
+def get_agent(name: str, raw: bool = Query(False, description="Return raw agent without dependency resolution")):
     """
     Get agent by name.
 
     Checks file-based agents first, then runner-owned agents.
-    By default, capabilities are resolved and merged into system_prompt and mcp_servers.
+    By default, agent dependencies are resolved based on type:
+    - Autonomous agents: capabilities merged into system_prompt and mcp_servers
+    - Procedural agents: script's parameters_schema merged (supersedes agent's)
     Use `?raw=true` to get the unresolved agent configuration (for editing).
     """
     # Check file-based agents first
@@ -804,6 +827,11 @@ def get_agent(name: str, raw: bool = Query(False, description="Return raw agent 
         raise HTTPException(
             status_code=422,
             detail=f"MCP server name conflict: '{e.server_name}' defined in {', '.join(e.sources)}"
+        )
+    except MissingScriptError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Script resolution failed: {e.script_name} not found"
         )
 
     if agent:
@@ -945,6 +973,125 @@ def delete_capability(name: str):
 
 
 # ==============================================================================
+# Script Registry Routes (Centralized Script Management)
+# ==============================================================================
+
+@app.get("/scripts", tags=["Scripts"], response_model=list[ScriptSummary])
+def list_scripts():
+    """List all scripts.
+
+    Returns summary view with metadata (script_file, has_parameters_schema, demand_tags).
+    """
+    return script_storage.list_scripts()
+
+
+@app.get("/scripts/{name}", tags=["Scripts"], response_model=Script, response_model_exclude_none=True)
+def get_script(name: str):
+    """Get script by name with full content."""
+    script = script_storage.get_script(name)
+    if not script:
+        raise HTTPException(status_code=404, detail=f"Script not found: {name}")
+    return script
+
+
+@app.post("/scripts", tags=["Scripts"], response_model=Script, status_code=201, response_model_exclude_none=True)
+def create_script(data: ScriptCreate):
+    """Create a new script."""
+    try:
+        validate_script_name(data.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        script = script_storage.create_script(data)
+
+        # Queue sync command for all runners
+        count = script_sync_queue.add_sync_all_runners(data.name)
+        if DEBUG and count > 0:
+            print(f"[DEBUG] Queued script sync '{data.name}' to {count} runners", flush=True)
+
+        return script
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.patch("/scripts/{name}", tags=["Scripts"], response_model=Script, response_model_exclude_none=True)
+def update_script(name: str, updates: ScriptUpdate):
+    """Update an existing script (partial update)."""
+    script = script_storage.update_script(name, updates)
+    if not script:
+        raise HTTPException(status_code=404, detail=f"Script not found: {name}")
+
+    # Queue sync command for all runners
+    count = script_sync_queue.add_sync_all_runners(name)
+    if DEBUG and count > 0:
+        print(f"[DEBUG] Queued script sync '{name}' to {count} runners", flush=True)
+
+    return script
+
+
+def _get_agents_using_script(script_name: str) -> list[str]:
+    """Get list of agent names that reference a script."""
+    agents = agent_storage.list_agents()
+    return [a.name for a in agents if getattr(a, 'script', None) == script_name]
+
+
+@app.delete("/scripts/{name}", tags=["Scripts"], status_code=204)
+def delete_script(name: str):
+    """Delete a script.
+
+    Fails with 409 Conflict if script is referenced by any agents.
+    """
+    # Check if script exists
+    if not script_storage.get_script(name):
+        raise HTTPException(status_code=404, detail=f"Script not found: {name}")
+
+    # Check for agent references
+    agents_using = _get_agents_using_script(name)
+    if agents_using:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Script is referenced by agents: {', '.join(agents_using)}"
+        )
+
+    script_storage.delete_script(name)
+
+    # Queue remove command for all runners
+    count = script_sync_queue.add_remove_all_runners(name)
+    if DEBUG and count > 0:
+        print(f"[DEBUG] Queued script removal '{name}' to {count} runners", flush=True)
+
+    return None
+
+
+@app.get("/scripts/{name}/download", tags=["Scripts"])
+def download_script(name: str):
+    """Download script folder as tar.gz for runner sync.
+
+    Returns the entire script directory (script.json + script file) as a tarball.
+    """
+    script = script_storage.get_script(name)
+    if not script:
+        raise HTTPException(status_code=404, detail=f"Script not found: {name}")
+
+    script_dir = script_storage.get_scripts_dir() / name
+
+    # Create tar.gz in memory
+    buffer = BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        tar.add(script_dir, arcname=name)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}.tar.gz"'
+        }
+    )
+
+
+# ==============================================================================
 # Runner API Routes (for Agent Runner communication)
 # ==============================================================================
 
@@ -1036,6 +1183,18 @@ async def register_runner(request: RunnerRegisterRequest):
     # Register with stop command queue for immediate wake-up on stop requests
     stop_command_queue.register_runner(runner.runner_id)
 
+    # Register with script sync queue for script distribution (procedural only)
+    executor_type = request.executor.get("type") if request.executor else None
+    if executor_type == "procedural":
+        # Only procedural runners need script sync; other executors don't use synced scripts
+        script_sync_queue.register_runner(runner.runner_id)
+        # Queue initial script sync
+        scripts = script_storage.list_scripts()
+        for script in scripts:
+            script_sync_queue.add_sync(runner.runner_id, script.name)
+        if DEBUG and scripts:
+            print(f"[DEBUG] Queued initial sync for {len(scripts)} scripts to runner {runner.runner_id}", flush=True)
+
     # Store runner-owned agents (Phase 4 - Procedural Executor)
     # Replaces existing agents for this runner on re-registration
     # Rejects registration if any agent name collides with another runner's agent
@@ -1047,6 +1206,7 @@ async def register_runner(request: RunnerRegisterRequest):
             # Rollback: remove the runner we just registered
             runner_registry.remove_runner(runner.runner_id)
             stop_command_queue.unregister_runner(runner.runner_id)
+            script_sync_queue.unregister_runner(runner.runner_id)
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -1100,6 +1260,7 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
         # Confirm deregistration and remove from registry
         runner_registry.confirm_deregistered(runner_id)
         stop_command_queue.unregister_runner(runner_id)
+        script_sync_queue.unregister_runner(runner_id)
         # Delete runner-owned agents (Phase 4)
         runner_registry.delete_runner_agents(runner_id)
         if DEBUG:
@@ -1126,10 +1287,21 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
                 print(f"[DEBUG] Runner {runner_id} received stop commands for runs: {stop_runs}", flush=True)
             return {"stop_runs": stop_runs}
 
+        # Check for script sync commands (second priority)
+        sync_scripts, remove_scripts = script_sync_queue.get_and_clear(runner_id)
+        if sync_scripts or remove_scripts:
+            if DEBUG:
+                if sync_scripts:
+                    print(f"[DEBUG] Runner {runner_id} received sync commands for scripts: {sync_scripts}", flush=True)
+                if remove_scripts:
+                    print(f"[DEBUG] Runner {runner_id} received remove commands for scripts: {remove_scripts}", flush=True)
+            return {"sync_scripts": sync_scripts, "remove_scripts": remove_scripts}
+
         # Check for deregistration during polling
         if runner_registry.is_deregistered(runner_id):
             runner_registry.confirm_deregistered(runner_id)
             stop_command_queue.unregister_runner(runner_id)
+            script_sync_queue.unregister_runner(runner_id)
             # Delete runner-owned agents (Phase 4)
             runner_registry.delete_runner_agents(runner_id)
             if DEBUG:
@@ -1490,6 +1662,7 @@ async def deregister_runner(
         # Runner is shutting down gracefully - remove immediately
         runner_registry.remove_runner(runner_id)
         stop_command_queue.unregister_runner(runner_id)
+        script_sync_queue.unregister_runner(runner_id)
         # Delete runner-owned agents (Phase 4)
         runner_registry.delete_runner_agents(runner_id)
         if DEBUG:
@@ -1563,6 +1736,23 @@ async def create_run(run_create: RunCreate):
             }
         )
 
+    # Resolve script for procedural agents with script reference
+    script = None
+    if agent and agent.script:
+        script = script_storage.get_script(agent.script)
+        if not script:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "script_not_found",
+                    "message": f"Script '{agent.script}' referenced by agent '{agent_name}' not found",
+                    "agent_name": agent_name,
+                    "script_name": agent.script,
+                }
+            )
+        if DEBUG:
+            print(f"[DEBUG] Resolved script '{agent.script}' for agent '{agent_name}'", flush=True)
+
     # Parameter validation with explicit schema choice:
     # - RESUME: Always use implicit schema (prompt-only) - Option A from ADR-015
     #   Rationale: Resume is conversational continuation, not reconfiguration
@@ -1578,6 +1768,14 @@ async def create_run(run_create: RunCreate):
             errors = list(validator.iter_errors(run_create.parameters))
             if errors:
                 raise ParameterValidationError(agent_name or "(no agent)", errors, IMPLICIT_AUTONOMOUS_SCHEMA)
+        elif script:
+            # START with script-based procedural agent: validate against script's schema
+            if script.parameters_schema:
+                validator = Draft7Validator(script.parameters_schema)
+                errors = list(validator.iter_errors(run_create.parameters))
+                if errors:
+                    raise ParameterValidationError(agent_name or "(no agent)", errors, script.parameters_schema)
+            # If script has no schema, any parameters are valid
         elif agent:
             # START with agent: validate against agent's schema
             validate_parameters(run_create.parameters, agent)
@@ -1681,6 +1879,17 @@ async def create_run(run_create: RunCreate):
     # Load blueprint demands from agent (already loaded for validation)
     if agent and agent.demands:
         blueprint_demands = agent.demands
+
+    # Load script demands and merge with blueprint demands (script + agent tags combined)
+    script_demands = RunnerDemands()
+    if script and script.demands:
+        script_demands = script.demands
+        if DEBUG:
+            print(f"[DEBUG] Run {run.run_id}: script '{script.name}' has demands: "
+                  f"{script.demands.model_dump(exclude_none=True)}", flush=True)
+
+    # Merge script demands into blueprint demands (combined tags)
+    blueprint_demands = RunnerDemands.merge(script_demands, blueprint_demands)
 
     # Parse additional_demands from request
     if run_create.additional_demands:

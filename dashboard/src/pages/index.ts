@@ -3,6 +3,7 @@ export { AgentSessions } from './AgentSessions';
 export { Documents } from './Documents';
 export { AgentManager } from './AgentManager';
 export { Capabilities } from './Capabilities';
+export { Scripts } from './Scripts';
 export { Chat } from './Chat';
 export { Runners } from './Runners';
 export { Runs } from './Runs';

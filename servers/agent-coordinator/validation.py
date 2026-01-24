@@ -78,3 +78,30 @@ def validate_unique_capability_name(name: str, capabilities_dir: Path) -> None:
     """
     if (capabilities_dir / name).exists():
         raise ValueError(f"Capability already exists: {name}")
+
+
+def validate_script_name(name: str) -> None:
+    """
+    Validate script name format.
+
+    Rules:
+        - 1-60 characters
+        - Alphanumeric, hyphens, underscores only
+        - Must start with letter or number
+
+    Same rules as agent names for consistency.
+
+    Raises:
+        ValueError: If name is invalid
+    """
+    if not name:
+        raise ValueError("Script name is required")
+
+    if len(name) > 60:
+        raise ValueError("Script name must be 60 characters or less")
+
+    if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", name):
+        raise ValueError(
+            "Script name must start with letter/number and contain only "
+            "alphanumeric characters, hyphens, and underscores"
+        )

@@ -103,6 +103,7 @@ class AgentCreate(AgentBase):
     """Request body for creating an agent."""
 
     type: AgentType = "autonomous"
+    script: Optional[str] = None  # Script reference for procedural agents
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     output_schema: Optional[dict] = None  # JSON Schema for output validation
     system_prompt: Optional[str] = None
@@ -118,6 +119,7 @@ class AgentUpdate(BaseModel):
     """Request body for updating an agent (partial)."""
 
     type: Optional[AgentType] = None
+    script: Optional[str] = None  # Script reference for procedural agents
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     output_schema: Optional[dict] = None  # JSON Schema for output validation
     description: Optional[str] = None
@@ -131,9 +133,20 @@ class AgentUpdate(BaseModel):
 
 
 class Agent(AgentBase):
-    """Full agent representation."""
+    """Full agent representation.
+
+    Procedural Agent Ownership (mutually exclusive):
+    - Coordinator-owned: `script` is set, `command` and `runner_id` are null
+    - Runner-owned: `command` and `runner_id` are set, `script` is null
+
+    The `script` and `command` fields MUST NOT both be set. This is the
+    differentiation criteria used by the Procedural Executor to determine
+    execution mode. See design doc: phase-1-scripts-and-procedural-agents.md
+    """
 
     type: AgentType = "autonomous"
+    # Coordinator-owned procedural agent: references a centrally managed script
+    script: Optional[str] = None
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     output_schema: Optional[dict] = None  # JSON Schema for output validation
     system_prompt: Optional[str] = None
@@ -146,9 +159,9 @@ class Agent(AgentBase):
     status: Literal["active", "inactive"] = "active"
     created_at: str
     modified_at: str
-    # Runner-owned agent fields (Phase 4 - Procedural Executor)
-    command: Optional[str] = None  # CLI command for procedural agents
-    runner_id: Optional[str] = None  # Runner that owns this agent (None = file-based)
+    # Runner-owned procedural agent: command executed relative to executor directory
+    command: Optional[str] = None
+    runner_id: Optional[str] = None  # Non-null indicates runner ownership
 
 
 class AgentStatusUpdate(BaseModel):
@@ -411,3 +424,55 @@ class RunnerAgent(BaseModel):
     command: str  # CLI command to execute (e.g., "scripts/echo/echo")
     parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
     output_schema: Optional[dict] = None  # JSON Schema for output validation
+
+
+# ==============================================================================
+# Script Models (Centralized Script Management)
+# ==============================================================================
+
+class ScriptBase(BaseModel):
+    """Base script fields."""
+
+    name: str
+    description: str
+
+
+class ScriptCreate(ScriptBase):
+    """Request body for creating a script."""
+
+    script_file: str  # Filename of the script (e.g., "send-notification.py")
+    script_content: str  # Content of the script file
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    demands: Optional[RunnerDemands] = None  # Execution requirements (e.g., tags: ["uv"])
+
+
+class ScriptUpdate(BaseModel):
+    """Request body for updating a script (partial)."""
+
+    description: Optional[str] = None
+    script_file: Optional[str] = None  # New filename if changed
+    script_content: Optional[str] = None  # New content if changed
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    demands: Optional[RunnerDemands] = None  # Execution requirements
+
+
+class Script(ScriptBase):
+    """Full script representation."""
+
+    script_file: str  # Filename of the script
+    script_content: str  # Content of the script file
+    parameters_schema: Optional[dict] = None  # JSON Schema for parameters validation
+    demands: Optional[RunnerDemands] = None  # Execution requirements
+    created_at: str
+    modified_at: str
+
+
+class ScriptSummary(ScriptBase):
+    """Summary script for list endpoint (without script content)."""
+
+    script_file: str
+    has_parameters_schema: bool
+    has_demands: bool
+    demand_tags: list[str]  # Quick access to demand tags
+    created_at: str
+    modified_at: str

@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "context-store-http": {
-      "type": "http",
-      "url": "http://localhost:9501/mcp"
-    }
-  }
-}

@@ -122,6 +122,9 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
         # Read output_schema (JSON Schema for output validation)
         output_schema = data.get("output_schema")
 
+        # Read script reference for procedural agents
+        script = data.get("script")
+
         # Read hooks from agent.json
         hooks = None
         hooks_data = data.get("hooks")
@@ -160,6 +163,7 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
             name=name,
             description=description,
             type=agent_type,
+            script=script,
             parameters_schema=parameters_schema,
             output_schema=output_schema,
             system_prompt=system_prompt,
@@ -200,6 +204,16 @@ class MissingCapabilityError(CapabilityResolutionError):
         )
 
 
+class MissingScriptError(Exception):
+    """Raised when a referenced script doesn't exist."""
+    def __init__(self, agent_name: str, script_name: str):
+        self.agent_name = agent_name
+        self.script_name = script_name
+        super().__init__(
+            f"Agent '{agent_name}' references missing script: '{script_name}'"
+        )
+
+
 class MCPServerConflictError(CapabilityResolutionError):
     """Raised when multiple sources define the same MCP server name."""
     def __init__(self, agent_name: str, server_name: str, sources: list[str]):
@@ -212,9 +226,9 @@ class MCPServerConflictError(CapabilityResolutionError):
         )
 
 
-def _resolve_agent_capabilities(agent: Agent) -> Agent:
+def _resolve_autonomous_dependencies(agent: Agent) -> Agent:
     """
-    Resolve and merge capabilities into agent.
+    Resolve dependencies for autonomous agents (capabilities).
 
     This function:
     1. Loads each referenced capability
@@ -311,8 +325,100 @@ def _resolve_agent_capabilities(agent: Agent) -> Agent:
     )
 
 
+def _resolve_procedural_dependencies(agent: Agent) -> Agent:
+    """
+    Resolve dependencies for procedural agents (script reference).
+
+    Merges:
+    - parameters_schema: Script's schema supersedes agent's schema
+
+    Args:
+        agent: Raw procedural agent with script reference
+
+    Returns:
+        Agent with resolved parameters_schema from script
+
+    Raises:
+        MissingScriptError: If referenced script doesn't exist
+    """
+    # Import here to avoid circular imports
+    from script_storage import get_script
+
+    # No script reference? Return as-is
+    if not agent.script:
+        return agent
+
+    script = get_script(agent.script)
+    if script is None:
+        raise MissingScriptError(agent.name, agent.script)
+
+    # Script's parameters_schema supersedes agent's (if script has one)
+    resolved_parameters_schema = script.parameters_schema if script.parameters_schema else agent.parameters_schema
+
+    # Return new Agent with resolved parameters_schema
+    return Agent(
+        name=agent.name,
+        description=agent.description,
+        type=agent.type,
+        script=agent.script,
+        parameters_schema=resolved_parameters_schema,
+        output_schema=agent.output_schema,
+        system_prompt=agent.system_prompt,
+        mcp_servers=agent.mcp_servers,
+        skills=agent.skills,
+        tags=agent.tags,
+        capabilities=agent.capabilities,
+        demands=agent.demands,
+        hooks=agent.hooks,
+        status=agent.status,
+        created_at=agent.created_at,
+        modified_at=agent.modified_at,
+    )
+
+
+def _resolve_agent_dependencies(agent: Agent) -> Agent:
+    """
+    Resolve agent dependencies based on agent type.
+
+    Routes to type-specific resolver:
+    - autonomous: Resolves capabilities (system_prompt, mcp_servers)
+    - procedural: Resolves script reference (parameters_schema)
+
+    Args:
+        agent: Raw agent with unresolved dependencies
+
+    Returns:
+        Agent with resolved dependencies
+
+    Raises:
+        MissingCapabilityError: For autonomous agents with missing capabilities
+        MCPServerConflictError: For autonomous agents with MCP server conflicts
+        MissingScriptError: For procedural agents with missing scripts
+    """
+    if agent.type == "procedural":
+        return _resolve_procedural_dependencies(agent)
+    else:
+        # Default to autonomous resolution (handles capabilities)
+        return _resolve_autonomous_dependencies(agent)
+
+
 def list_agents() -> list[Agent]:
-    """List all valid agents, sorted by name."""
+    """
+    List all valid agents, sorted by name.
+
+    Dependencies are resolved for each agent (capabilities for autonomous,
+    scripts for procedural). This performs additional file I/O per agent to
+    resolve dependencies - not the most performant approach, but sufficient
+    for current use cases.
+
+    Returns:
+        List of resolved agents
+
+    Raises:
+        MissingCapabilityError: If any agent references a missing capability
+        MCPServerConflictError: If any agent has MCP server name conflicts
+        MissingScriptError: If any procedural agent references a missing script
+    """
     agents_dir = get_agents_dir()
     if not agents_dir.exists():
         return []
@@ -323,6 +429,7 @@ def list_agents() -> list[Agent]:
             continue
         agent = _read_agent_from_dir(subdir)
         if agent:
+            agent = _resolve_agent_dependencies(agent)
             agents.append(agent)
 
     agents.sort(key=lambda a: a.name)
@@ -335,8 +442,10 @@ def get_agent(name: str, resolve: bool = True) -> Optional[Agent]:
 
     Args:
         name: Agent name
-        resolve: If True (default), resolve and merge capabilities.
-                 If False, return raw agent with unresolved capabilities.
+        resolve: If True (default), resolve agent dependencies:
+                 - Autonomous agents: merge capabilities into system_prompt/mcp_servers
+                 - Procedural agents: merge script's parameters_schema
+                 If False, return raw agent with unresolved dependencies.
 
     Returns:
         Agent or None if not found
@@ -344,6 +453,7 @@ def get_agent(name: str, resolve: bool = True) -> Optional[Agent]:
     Raises:
         MissingCapabilityError: If resolve=True and a capability doesn't exist
         MCPServerConflictError: If resolve=True and MCP server names conflict
+        MissingScriptError: If resolve=True and a script doesn't exist
     """
     agent_dir = get_agents_dir() / name
     if not agent_dir.is_dir():
@@ -354,7 +464,7 @@ def get_agent(name: str, resolve: bool = True) -> Optional[Agent]:
         return None
 
     if resolve:
-        return _resolve_agent_capabilities(agent)
+        return _resolve_agent_dependencies(agent)
     return agent
 
 
@@ -379,6 +489,8 @@ def create_agent(data: AgentCreate) -> Agent:
     agent_data = {"name": data.name, "description": data.description}
     # Always write type (explicit is better than relying on defaults)
     agent_data["type"] = data.type
+    if data.script:
+        agent_data["script"] = data.script
     if data.parameters_schema:
         agent_data["parameters_schema"] = data.parameters_schema
     if data.output_schema:
@@ -451,6 +563,13 @@ def update_agent(name: str, updates: AgentUpdate) -> Optional[Agent]:
     # Apply updates
     if updates.type is not None:
         agent_data["type"] = updates.type
+
+    if updates.script is not None:
+        if updates.script:
+            agent_data["script"] = updates.script
+        else:
+            # Empty string means clear
+            agent_data.pop("script", None)
 
     if updates.parameters_schema is not None:
         if updates.parameters_schema:

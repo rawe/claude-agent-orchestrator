@@ -2,5 +2,7 @@
   "name": "context-store-agent",
   "description": "agent interacting with context-store",
   "type": "autonomous",
-  "tags": ["internal"]
+  "tags": [
+    "internal"
+  ]
 }

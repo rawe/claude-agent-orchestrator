@@ -100,6 +100,10 @@ OPENAPI_TAGS = [
         "description": "Capability management - reusable components (text, MCP servers) that can be attached to agents.",
     },
     {
+        "name": "Scripts",
+        "description": "Script management - executable scripts that procedural agents reference for execution.",
+    },
+    {
         "name": "Health",
         "description": "Service health checks.",
     },
