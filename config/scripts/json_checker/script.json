@@ -13,5 +13,10 @@
     "required": [
       "file"
     ]
+  },
+  "demands": {
+    "tags": [
+      "uv"
+    ]
   }
 }

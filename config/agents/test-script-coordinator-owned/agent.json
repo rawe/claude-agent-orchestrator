@@ -1,6 +1,0 @@
-{
-  "name": "test-script-coordinator-owned",
-  "description": "This agent executes a script provided by the coordinator. ",
-  "type": "procedural",
-  "script": "test-script"
-}
