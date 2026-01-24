@@ -1,0 +1,17 @@
+{
+  "name": "hello_world",
+  "description": "A hello world script",
+  "script_file": "hello.py",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "The username to greet"
+      }
+    },
+    "required": [
+      "username"
+    ]
+  }
+}

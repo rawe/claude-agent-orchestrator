@@ -31,8 +31,8 @@
  * ```
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { CoordinatorClient } from '@/lib/coordinator-client';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { CoordinatorClient, RunHandle } from '@/lib/coordinator-client';
 import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
 import { fetchAccessToken } from '@/services/auth';
 import { agentService } from '@/services/agentService';
@@ -160,6 +160,7 @@ export interface UseAiAssistReturn<TOutput> {
   // Actions
   toggle: () => void;
   submit: () => Promise<void>;
+  cancel: () => void;
   accept: () => void;
   reject: () => void;
   clearError: () => void;
@@ -180,6 +181,10 @@ export function useAiAssist<TInput, TOutput>(
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Refs for cancellation
+  const currentRunRef = useRef<RunHandle | null>(null);
+  const cancelledRef = useRef(false);
 
   // Check agent availability on mount
   useEffect(() => {
@@ -229,19 +234,28 @@ export function useAiAssist<TInput, TOutput>(
     setIsLoading(true);
     setError(null);
     setResult(null);
+    cancelledRef.current = false;
 
     try {
       const input = buildInput(userRequest.trim() || defaultRequest);
 
       // Start run - may fail if agent doesn't exist or validation fails
-      let run;
+      let run: RunHandle;
       try {
         run = await coordinatorClient.startRun({
           agentName,
           parameters: input as unknown as Record<string, unknown>,
         });
+        currentRunRef.current = run;
       } catch (startError) {
-        setError(formatErrorMessage(startError));
+        if (!cancelledRef.current) {
+          setError(formatErrorMessage(startError));
+        }
+        return;
+      }
+
+      // Check if cancelled during start
+      if (cancelledRef.current) {
         return;
       }
 
@@ -250,7 +264,14 @@ export function useAiAssist<TInput, TOutput>(
       try {
         runResult = await run.waitForResult();
       } catch (pollError) {
-        setError(formatErrorMessage(pollError));
+        if (!cancelledRef.current) {
+          setError(formatErrorMessage(pollError));
+        }
+        return;
+      }
+
+      // Check if cancelled during polling
+      if (cancelledRef.current) {
         return;
       }
 
@@ -260,16 +281,22 @@ export function useAiAssist<TInput, TOutput>(
       } else if (runResult.status === 'failed') {
         setError(formatErrorMessage(runResult.error || 'AI request failed'));
       } else if (runResult.status === 'stopped') {
-        setError('Request was stopped.');
+        // Don't show error if we cancelled it ourselves
+        if (!cancelledRef.current) {
+          setError('Request was stopped.');
+        }
       } else {
         setError(formatErrorMessage('No result returned from agent'));
       }
     } catch (err) {
       // Catch-all for unexpected errors
-      setError(formatErrorMessage(err));
+      if (!cancelledRef.current) {
+        setError(formatErrorMessage(err));
+      }
     } finally {
       setIsLoading(false);
       setUserRequest('');
+      currentRunRef.current = null;
     }
   }, [agentName, buildInput, defaultRequest, userRequest]);
 
@@ -283,6 +310,24 @@ export function useAiAssist<TInput, TOutput>(
   const reject = useCallback(() => {
     setResult(null);
     setError(null);
+  }, []);
+
+  // Cancel ongoing AI request
+  const cancel = useCallback(() => {
+    cancelledRef.current = true;
+    setIsLoading(false);
+    setShowInput(false);
+    setUserRequest('');
+    setError(null);
+    setResult(null);
+
+    // TODO: Future enhancement - call the Coordinator SDK to stop the run
+    // This would send a cancel/stop request to the API to terminate the agent run.
+    // Implementation:
+    //   if (currentRunRef.current) {
+    //     currentRunRef.current.stop().catch(console.error);
+    //   }
+    currentRunRef.current = null;
   }, []);
 
   // Clear error
@@ -309,6 +354,7 @@ export function useAiAssist<TInput, TOutput>(
     // Actions
     toggle,
     submit,
+    cancel,
     accept,
     reject,
     clearError,

@@ -9,6 +9,7 @@ import { AlertCircle, Check, Code, Eye, FileCode, Settings, FileInput, Target, X
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAiAssist } from '@/hooks/useAiAssist';
+import { useAiGroup } from '@/hooks/useAiGroup';
 import {
   scriptAssistantDefinition,
   type ScriptAssistantInput,
@@ -243,8 +244,8 @@ export function ScriptEditor({
     }
   };
 
-  // AI Assist hook for script content
-  const ai = useAiAssist<ScriptAssistantInput, ScriptAssistantOutput>({
+  // AI Assist: Script Assistant for script content
+  const scriptAssistantAi = useAiAssist<ScriptAssistantInput, ScriptAssistantOutput>({
     agentName: scriptAssistantDefinition.name,
     buildInput: (userRequest) => {
       const schemaEnabled = getValues(F.parameters_schema_enabled);
@@ -259,21 +260,25 @@ export function ScriptEditor({
     defaultRequest: 'Check for issues',
   });
 
+  // AI Group: Aggregates all AI instances for unified protection
+  // Add more AI instances to this array as they are added to the component
+  const ai = useAiGroup([scriptAssistantAi]);
+
   // Handle accepting AI result
   const handleAiAccept = () => {
-    if (ai.result?.[OUT.script]) {
-      setValue(F.script_content, ai.result[OUT.script]);
+    if (scriptAssistantAi.result?.[OUT.script]) {
+      setValue(F.script_content, scriptAssistantAi.result[OUT.script]);
     }
     // Apply updated schema if returned
-    if (ai.result?.[OUT.parameters_schema]) {
-      const newSchema = ai.result[OUT.parameters_schema];
+    if (scriptAssistantAi.result?.[OUT.parameters_schema]) {
+      const newSchema = scriptAssistantAi.result[OUT.parameters_schema];
       setValue(F.parameters_schema, newSchema ?? null);
       setValue(F.parameters_schema_enabled, true);
       setSchemaText(JSON.stringify(newSchema, null, 2));
       setSchemaValid(true);
       setSchemaError(null);
     }
-    ai.accept();
+    scriptAssistantAi.accept();
   };
 
   const onSubmit = async (data: FormData) => {
@@ -438,45 +443,57 @@ export function ScriptEditor({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <label className="label mb-0">Script Content *</label>
-            <button
-              type="button"
-              onClick={ai.toggle}
-              disabled={!ai.available || ai.checkingAvailability || ai.isLoading}
-              className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed ${
-                ai.showInput
-                  ? 'bg-purple-200 text-purple-800'
-                  : ai.available
-                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                    : 'bg-gray-100 text-gray-400'
-              }`}
-              title={ai.unavailableReason || 'AI Assistant'}
-            >
-              {ai.isLoading || ai.checkingAvailability ? (
+            {scriptAssistantAi.isLoading ? (
+              <button
+                type="button"
+                onClick={scriptAssistantAi.cancel}
+                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700"
+                title="Cancel AI request"
+              >
                 <Spinner size="sm" />
-              ) : (
-                <Sparkles className="w-3 h-3" />
-              )}
-              AI
-            </button>
+                Cancel
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={scriptAssistantAi.toggle}
+                disabled={!scriptAssistantAi.available || scriptAssistantAi.checkingAvailability}
+                className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed ${
+                  scriptAssistantAi.showInput
+                    ? 'bg-purple-200 text-purple-800'
+                    : scriptAssistantAi.available
+                      ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                      : 'bg-gray-100 text-gray-400'
+                }`}
+                title={scriptAssistantAi.unavailableReason || 'AI Assistant'}
+              >
+                {scriptAssistantAi.checkingAvailability ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <Sparkles className="w-3 h-3" />
+                )}
+                AI
+              </button>
+            )}
           </div>
           <p className="text-xs text-gray-500">Parameters passed as CLI arguments (--key value)</p>
         </div>
 
         {/* AI Input */}
-        {ai.showInput && !ai.isLoading && (
+        {scriptAssistantAi.showInput && !scriptAssistantAi.isLoading && (
           <div className="mb-2 flex gap-2">
             <input
               type="text"
-              value={ai.userRequest}
-              onChange={(e) => ai.setUserRequest(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && ai.submit()}
+              value={scriptAssistantAi.userRequest}
+              onChange={(e) => scriptAssistantAi.setUserRequest(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && scriptAssistantAi.submit()}
               placeholder="What should I do? (e.g., 'Check for issues', 'Add error handling')"
               className="input flex-1 text-sm"
               autoFocus
             />
             <button
               type="button"
-              onClick={ai.submit}
+              onClick={scriptAssistantAi.submit}
               className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded"
             >
               Send
@@ -485,12 +502,12 @@ export function ScriptEditor({
         )}
 
         {/* AI Error */}
-        {ai.error && (
+        {scriptAssistantAi.error && (
           <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 whitespace-pre-line">{ai.error}</div>
-              <button type="button" onClick={ai.clearError} className="flex-shrink-0 text-red-400 hover:text-red-600">
+              <div className="flex-1 whitespace-pre-line">{scriptAssistantAi.error}</div>
+              <button type="button" onClick={scriptAssistantAi.clearError} className="flex-shrink-0 text-red-400 hover:text-red-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -498,7 +515,7 @@ export function ScriptEditor({
         )}
 
         {/* AI Result Preview Overlay */}
-        {ai.result && (
+        {scriptAssistantAi.result && (
           <div className="absolute inset-0 z-10 bg-white border border-purple-300 rounded-md shadow-lg flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border-b border-purple-200">
               <span className="text-sm font-medium text-purple-700 flex items-center gap-1">
@@ -516,7 +533,7 @@ export function ScriptEditor({
                 </button>
                 <button
                   type="button"
-                  onClick={ai.reject}
+                  onClick={scriptAssistantAi.reject}
                   className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded"
                 >
                   <X className="w-3 h-3" />
@@ -525,21 +542,21 @@ export function ScriptEditor({
               </div>
             </div>
             <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-              {ai.result[OUT.remarks] && (
+              {scriptAssistantAi.result[OUT.remarks] && (
                 <div className="px-3 py-2 bg-purple-50 border-b border-purple-100 text-sm text-purple-800">
-                  {ai.result[OUT.remarks]}
+                  {scriptAssistantAi.result[OUT.remarks]}
                 </div>
               )}
-              {ai.result[OUT.parameters_schema] && (
+              {scriptAssistantAi.result[OUT.parameters_schema] && (
                 <div className="px-3 py-2 bg-blue-50 border-b border-blue-100">
                   <div className="text-xs font-medium text-blue-700 mb-1">Updated Parameters Schema:</div>
-                  <pre className="text-xs font-mono text-blue-800">{JSON.stringify(ai.result[OUT.parameters_schema], null, 2)}</pre>
+                  <pre className="text-xs font-mono text-blue-800">{JSON.stringify(scriptAssistantAi.result[OUT.parameters_schema], null, 2)}</pre>
                 </div>
               )}
               <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
                 <div className="text-xs font-medium text-gray-700 mb-1">Script:</div>
               </div>
-              <pre className="flex-1 p-3 font-mono text-sm whitespace-pre-wrap">{ai.result[OUT.script]}</pre>
+              <pre className="flex-1 p-3 font-mono text-sm whitespace-pre-wrap">{scriptAssistantAi.result[OUT.script]}</pre>
             </div>
           </div>
         )}
@@ -762,7 +779,7 @@ export function ScriptEditor({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+    <Modal isOpen={isOpen} onClose={() => { if (!ai.isAnyLoading) onClose(); }} size="xl">
       <form onSubmit={handleSubmit(onSubmit)} className="h-[75vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
@@ -772,7 +789,8 @@ export function ScriptEditor({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
+            disabled={ai.isAnyLoading}
+            className="text-gray-400 hover:text-gray-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>
@@ -820,13 +838,13 @@ export function ScriptEditor({
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={ai.isAnyLoading}>
             Cancel
           </Button>
           <Button
             type="submit"
             loading={saving}
-            disabled={!isEditing && nameAvailable === false}
+            disabled={ai.isAnyLoading || (!isEditing && nameAvailable === false)}
           >
             {isEditing ? 'Save Changes' : 'Create Script'}
           </Button>

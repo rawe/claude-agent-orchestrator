@@ -88,8 +88,97 @@ Reusable React hook that encapsulates AI assist state and interactions.
 - Loading state
 - Result state
 - Error state
+- Cancellation
 
 **Documentation:** `dashboard/src/hooks/README.md`
+
+## Cancellation and UI Protection
+
+### Cancel Functionality
+
+The `useAiAssist` hook provides a `cancel()` function to abort ongoing AI requests:
+
+- Sets `isLoading` to false immediately
+- Clears pending state (result, error, userRequest)
+- Ignores any results that arrive after cancellation
+
+**Usage:**
+```tsx
+{ai.isLoading ? (
+  <button onClick={ai.cancel}>Cancel</button>
+) : (
+  <button onClick={ai.toggle}>AI</button>
+)}
+```
+
+### UI Protection Pattern
+
+When AI is loading, the UI must be protected to prevent accidental actions:
+
+| Element | Protection |
+|---------|------------|
+| Save button | `disabled={ai.isAnyLoading}` |
+| Close button | `disabled={ai.isAnyLoading}` |
+| X button (header) | `disabled={ai.isAnyLoading}` |
+| Modal backdrop | `onClose={() => { if (!ai.isAnyLoading) onClose(); }}` |
+
+Users must explicitly click Cancel to abort the AI operation before they can close or save.
+
+### Open: API Cancellation Not Yet Implemented
+
+**Status:** UI-only cancellation
+
+Currently, the `cancel()` function only stops the UI from waiting for results. It does **not** send a cancel/stop request to the Coordinator API. The agent run continues in the background until completion.
+
+**Location for future implementation:** `dashboard/src/hooks/useAiAssist.ts`, inside the `cancel` callback:
+
+```typescript
+// TODO: Future enhancement - call the Coordinator SDK to stop the run
+// This would send a cancel/stop request to the API to terminate the agent run.
+// Implementation:
+//   if (currentRunRef.current) {
+//     currentRunRef.current.stop().catch(console.error);
+//   }
+```
+
+**What's needed:**
+1. The `RunHandle.stop()` method already exists in the Coordinator Client SDK
+2. The `currentRunRef` already stores the active run handle
+3. Uncomment and test the stop call when API cancellation is needed
+
+## useAiGroup Hook
+
+Aggregates multiple `useAiAssist` instances for unified state management.
+
+**Location:** `dashboard/src/hooks/useAiGroup.ts`
+
+**Purpose:** When a component has multiple AI buttons (e.g., one for script, one for schema), the group provides unified protection state.
+
+**Usage:**
+```tsx
+// Individual named AI instances
+const scriptAssistantAi = useAiAssist({ agentName: 'script-assistant', ... });
+const schemaAssistantAi = useAiAssist({ agentName: 'schema-assistant', ... });
+
+// Aggregate for unified protection
+const ai = useAiGroup([scriptAssistantAi, schemaAssistantAi]);
+
+// Individual buttons use their own instance
+<button onClick={scriptAssistantAi.toggle}>Script AI</button>
+<button onClick={schemaAssistantAi.toggle}>Schema AI</button>
+
+// Protection uses aggregated state
+<Button disabled={ai.isAnyLoading}>Save</Button>
+```
+
+**Returns:**
+| Property | Type | Description |
+|----------|------|-------------|
+| `isAnyLoading` | `boolean` | True if any AI instance is loading |
+| `hasAnyResult` | `boolean` | True if any AI instance has a pending result |
+| `hasAnyError` | `boolean` | True if any AI instance has an error |
+| `cancelAll` | `() => void` | Cancel all loading AI instances |
+| `count` | `number` | Number of registered AI instances |
 
 ## Extending with New Agents
 
@@ -166,6 +255,7 @@ System agents can be provisioned (created or updated) from the Settings page.
 | `dashboard/src/lib/coordinator-client/` | SDK for Coordinator API |
 | `dashboard/src/lib/system-agents/` | System agent definitions and provisioning |
 | `dashboard/src/hooks/useAiAssist.ts` | Reusable AI assist hook |
+| `dashboard/src/hooks/useAiGroup.ts` | Aggregates multiple AI instances |
 | `dashboard/src/hooks/README.md` | Hook documentation |
 | `dashboard/src/components/features/scripts/ScriptEditor.tsx` | Example integration |
 | `dashboard/src/pages/Settings.tsx` | Provisioning UI |

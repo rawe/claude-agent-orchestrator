@@ -97,6 +97,7 @@ function MyComponent() {
 | `setUserRequest` | `(v: string) => void` | Update user input |
 | `toggle` | `() => void` | Show/hide input |
 | `submit` | `() => Promise<void>` | Send request |
+| `cancel` | `() => void` | Cancel ongoing request |
 | `accept` | `() => void` | Clear result (call after applying) |
 | `reject` | `() => void` | Dismiss result |
 | `clearError` | `() => void` | Clear error |
@@ -108,3 +109,58 @@ function MyComponent() {
 3. **Use hook** with `buildInput` gathering data from your form/state
 4. **Render UI** using hook's state and actions
 5. **Apply result** in your `handleAccept`, then call `ai.accept()`
+
+---
+
+## useAiGroup
+
+Aggregates multiple `useAiAssist` instances for unified state management.
+Use when a component has multiple AI buttons and needs to protect Save/Close when any AI is loading.
+
+### Usage
+
+```tsx
+import { useAiAssist } from '@/hooks/useAiAssist';
+import { useAiGroup } from '@/hooks/useAiGroup';
+
+function MyEditor() {
+  // Individual named AI instances
+  const scriptAssistantAi = useAiAssist({ agentName: 'script-assistant', ... });
+  const schemaAssistantAi = useAiAssist({ agentName: 'schema-assistant', ... });
+
+  // Aggregate for unified protection
+  const ai = useAiGroup([scriptAssistantAi, schemaAssistantAi]);
+
+  return (
+    <Modal onClose={() => { if (!ai.isAnyLoading) onClose(); }}>
+      {/* Individual AI buttons use their own instance */}
+      {scriptAssistantAi.isLoading ? (
+        <button onClick={scriptAssistantAi.cancel}>Cancel</button>
+      ) : (
+        <button onClick={scriptAssistantAi.toggle}>Script AI</button>
+      )}
+
+      {/* Protection uses aggregated state */}
+      <Button disabled={ai.isAnyLoading}>Save</Button>
+      <Button onClick={onClose} disabled={ai.isAnyLoading}>Close</Button>
+    </Modal>
+  );
+}
+```
+
+### Return Values
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isAnyLoading` | `boolean` | True if any AI instance is loading |
+| `hasAnyResult` | `boolean` | True if any AI instance has a pending result |
+| `hasAnyError` | `boolean` | True if any AI instance has an error |
+| `cancelAll` | `() => void` | Cancel all loading AI instances |
+| `count` | `number` | Number of registered AI instances |
+
+### Pattern
+
+1. **Create named AI instances** with `useAiAssist` for each AI button
+2. **Aggregate with `useAiGroup`** passing array of instances
+3. **Use individual instances** for button-specific UI (toggle, cancel, result)
+4. **Use aggregated `ai`** for component-level protection (Save, Close, Modal backdrop)
