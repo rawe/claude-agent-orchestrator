@@ -96,7 +96,9 @@ export function ScriptEditor({
   // Load script data when editing
   useEffect(() => {
     if (script) {
-      const hasSchema = script.parameters_schema !== null;
+      // Loose equality (!=) catches both null and undefined
+      // API uses response_model_exclude_none=True, so missing fields are undefined, not null
+      const hasSchema = script.parameters_schema != null;
       const hasDemands = script.demands !== null;
       reset({
         name: script.name,
