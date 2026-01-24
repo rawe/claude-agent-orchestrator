@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Modal, Button, Spinner, TagSelector } from '@/components/common';
 import { Script, ScriptCreate } from '@/types/script';
 import { AgentDemands } from '@/types/agent';
@@ -22,16 +24,31 @@ interface ScriptEditorProps {
   checkNameAvailable: (name: string) => Promise<boolean>;
 }
 
-interface FormData {
-  name: string;
-  description: string;
-  script_file: string;
-  script_content: string;
-  parameters_schema_enabled: boolean;
-  parameters_schema: Record<string, unknown> | null;
-  demands_enabled: boolean;
-  demands: AgentDemands | null;
-}
+// Zod schema for form validation
+const formSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Minimum 2 characters')
+    .max(60, 'Maximum 60 characters')
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, 'Must start with letter/number, then letters, numbers, hyphens, or underscores'),
+  description: z.string().min(1, 'Description is required'),
+  script_file: z
+    .string()
+    .min(1, 'Script file name is required')
+    .regex(/^[a-zA-Z0-9._-]+$/, 'Only letters, numbers, dots, hyphens, and underscores allowed'),
+  script_content: z.string().min(1, 'Script content is required'),
+  parameters_schema_enabled: z.boolean(),
+  parameters_schema: z.record(z.unknown()).nullable(),
+  demands_enabled: z.boolean(),
+  demands: z.object({
+    hostname: z.string().optional(),
+    project_dir: z.string().optional(),
+    executor_profile: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  }).nullable(),
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 // Type-safe form field names
 const F = {
@@ -95,6 +112,9 @@ export function ScriptEditor({
     getValues,
     formState: { errors },
   } = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    mode: 'onBlur', // Only validate when leaving fields, not while typing
+    reValidateMode: 'onBlur', // After failed submit, still only re-validate on blur
     defaultValues: {
       name: '',
       description: '',
@@ -257,6 +277,23 @@ export function ScriptEditor({
   };
 
   const onSubmit = async (data: FormData) => {
+    // Check name availability if not yet checked (user typed name and clicked Save without leaving field)
+    if (!isEditing && nameAvailable === null && data.name.length >= 2) {
+      setCheckingName(true);
+      try {
+        const available = await checkNameAvailable(data.name);
+        setNameAvailable(available);
+        if (!available) {
+          setCheckingName(false);
+          return; // Don't submit if name is taken
+        }
+      } catch {
+        setNameAvailable(null);
+      } finally {
+        setCheckingName(false);
+      }
+    }
+
     setSaving(true);
     try {
       // Clean up demands
@@ -301,16 +338,7 @@ export function ScriptEditor({
         <label className="label">Script Name *</label>
         <div className="relative">
           <input
-            {...register('name', {
-              required: 'Script name is required',
-              pattern: {
-                value: /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/,
-                message: 'Must start with letter/number, then letters, numbers, hyphens, or underscores',
-              },
-              minLength: { value: 2, message: 'Minimum 2 characters' },
-              maxLength: { value: 60, message: 'Maximum 60 characters' },
-              onBlur: handleNameBlur,
-            })}
+            {...register('name', { onBlur: handleNameBlur })}
             disabled={isEditing}
             placeholder="my-script-name"
             className={`input ${isEditing ? 'bg-gray-100' : ''} ${errors.name ? 'border-red-500' : ''}`}
@@ -365,9 +393,7 @@ export function ScriptEditor({
         </div>
         {descriptionTab === 'edit' ? (
           <textarea
-            {...register('description', {
-              required: 'Description is required',
-            })}
+            {...register('description')}
             placeholder="Describe what this script does. Supports Markdown."
             className={`input resize-none flex-1 ${errors.description ? 'border-red-500' : ''}`}
           />
@@ -397,13 +423,7 @@ export function ScriptEditor({
         <div className="relative">
           <FileCode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
-            {...register('script_file', {
-              required: 'Script file name is required',
-              pattern: {
-                value: /^[a-zA-Z0-9._-]+$/,
-                message: 'Only letters, numbers, dots, hyphens, and underscores allowed',
-              },
-            })}
+            {...register('script_file')}
             placeholder="run.sh"
             className={`input pl-10 ${errors.script_file ? 'border-red-500' : ''}`}
           />
@@ -525,9 +545,7 @@ export function ScriptEditor({
         )}
 
         <textarea
-          {...register('script_content', {
-            required: 'Script content is required',
-          })}
+          {...register('script_content')}
           placeholder="#!/bin/bash&#10;&#10;echo &quot;Hello, World!&quot;"
           className={`input font-mono text-sm resize-none flex-1 ${errors.script_content ? 'border-red-500' : ''}`}
         />
@@ -785,15 +803,18 @@ export function ScriptEditor({
             })}
           </div>
 
-          {/* Tab Content
-              - flex flex-col: allows children with flex-1 to expand (Script, Schema, General tabs)
-              - overflow-y-auto: provides scrolling for tabs without flex-1 children (Demands tab)
-              Both work together: expandable content fills space, fixed content scrolls if needed */}
-          <div className="flex-1 p-6 flex flex-col overflow-y-auto">
-            {activeTab === 'general' && <GeneralTab />}
-            {activeTab === 'script' && <ScriptTab />}
-            {activeTab === 'schema' && <SchemaTab />}
-            {activeTab === 'demands' && <DemandsTab />}
+          {/* Tab Content - all tabs always rendered (hidden when inactive) for form validation */}
+          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'general' ? 'hidden' : ''}`}>
+            <GeneralTab />
+          </div>
+          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'script' ? 'hidden' : ''}`}>
+            <ScriptTab />
+          </div>
+          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'schema' ? 'hidden' : ''}`}>
+            <SchemaTab />
+          </div>
+          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'demands' ? 'hidden' : ''}`}>
+            <DemandsTab />
           </div>
         </div>
 

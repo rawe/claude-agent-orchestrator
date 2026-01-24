@@ -1,0 +1,17 @@
+{
+  "name": "json_checker",
+  "description": "cdfgdfgdgf",
+  "script_file": "json_check.py",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "file": {
+        "type": "string",
+        "description": "Path to the file to validate as JSON"
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}
