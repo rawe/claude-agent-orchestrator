@@ -1,17 +1,17 @@
 {
   "name": "script-assistant",
-  "description": "Reviews and improves scripts, suggests parameter schema changes",
+  "description": "Creates new scripts or reviews/improves existing scripts with parameter schemas",
   "type": "autonomous",
   "parameters_schema": {
     "type": "object",
     "properties": {
-      "script_content": {
-        "type": "string",
-        "description": "Current script content to review"
-      },
       "user_request": {
         "type": "string",
-        "description": "User instruction"
+        "description": "What the user wants (create new script or modify existing)"
+      },
+      "script_content": {
+        "type": "string",
+        "description": "Existing script content (empty for new scripts)"
       },
       "parameters_schema": {
         "type": "object",
@@ -19,26 +19,41 @@
       }
     },
     "required": [
-      "script_content"
+      "user_request"
     ]
   },
   "output_schema": {
     "type": "object",
     "properties": {
+      "name": {
+        "type": "string",
+        "description": "Script name/identifier (lowercase with hyphens)"
+      },
+      "description": {
+        "type": "string",
+        "description": "Script description in markdown"
+      },
+      "script_file": {
+        "type": "string",
+        "description": "Filename for the script (e.g., run.py)"
+      },
       "script": {
         "type": "string",
-        "description": "Updated script content"
+        "description": "Complete script content"
       },
       "parameters_schema": {
         "type": "object",
-        "description": "Updated parameters schema (if changes suggested)"
+        "description": "JSON Schema for input parameters"
       },
       "remarks": {
         "type": "string",
-        "description": "Explanation of changes"
+        "description": "Brief explanation of changes or notes"
       }
     },
     "required": [
+      "name",
+      "description",
+      "script_file",
       "script"
     ]
   },

@@ -62,7 +62,7 @@ dashboard/src/lib/system-agents/
 
 | Agent | Purpose | Used By |
 |-------|---------|---------|
-| `script-assistant` | Review/improve scripts, suggest schema changes | ScriptEditor |
+| `script-assistant` | Create new scripts or review/improve existing scripts | ScriptEditor |
 
 ## Coordinator Client SDK
 

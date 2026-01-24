@@ -244,40 +244,75 @@ export function ScriptEditor({
     }
   };
 
-  // AI Assist: Script Assistant for script content
+  // AI Assist: Script Assistant for creating/editing scripts
   const scriptAssistantAi = useAiAssist<ScriptAssistantInput, ScriptAssistantOutput>({
     agentName: scriptAssistantDefinition.name,
     buildInput: (userRequest) => {
+      const scriptContent = getValues(F.script_content);
       const schemaEnabled = getValues(F.parameters_schema_enabled);
       const schema = getValues(F.parameters_schema);
 
-      return {
-        script_content: getValues(F.script_content),
+      // Build input - script_content is optional (empty for new scripts)
+      const input: ScriptAssistantInput = {
         user_request: userRequest,
-        parameters_schema: schemaEnabled && schema ? schema : undefined,
       };
+
+      // Include script_content if it exists (edit mode)
+      if (scriptContent?.trim()) {
+        input.script_content = scriptContent;
+      }
+
+      // Include current schema if defined
+      if (schemaEnabled && schema) {
+        input.parameters_schema = schema;
+      }
+
+      return input;
     },
-    defaultRequest: 'Check for issues',
+    defaultRequest: isEditing ? 'Review and improve this script' : 'Create a simple hello world script',
   });
 
   // AI Group: Aggregates all AI instances for unified protection
   // Add more AI instances to this array as they are added to the component
   const ai = useAiGroup([scriptAssistantAi]);
 
-  // Handle accepting AI result
+  // Handle accepting AI result - applies all generated fields
   const handleAiAccept = () => {
-    if (scriptAssistantAi.result?.[OUT.script]) {
-      setValue(F.script_content, scriptAssistantAi.result[OUT.script]);
+    const result = scriptAssistantAi.result;
+    if (!result) return;
+
+    // Apply name (only if creating new script or name is empty)
+    if (result[OUT.name] && !isEditing) {
+      setValue(F.name, result[OUT.name]);
+      // Reset name availability since we have a new name
+      setNameAvailable(null);
     }
-    // Apply updated schema if returned
-    if (scriptAssistantAi.result?.[OUT.parameters_schema]) {
-      const newSchema = scriptAssistantAi.result[OUT.parameters_schema];
+
+    // Apply description
+    if (result[OUT.description]) {
+      setValue(F.description, result[OUT.description]);
+    }
+
+    // Apply script_file
+    if (result[OUT.script_file]) {
+      setValue(F.script_file, result[OUT.script_file]);
+    }
+
+    // Apply script content
+    if (result[OUT.script]) {
+      setValue(F.script_content, result[OUT.script]);
+    }
+
+    // Apply parameters schema if returned
+    if (result[OUT.parameters_schema]) {
+      const newSchema = result[OUT.parameters_schema];
       setValue(F.parameters_schema, newSchema ?? null);
       setValue(F.parameters_schema_enabled, true);
       setSchemaText(JSON.stringify(newSchema, null, 2));
       setSchemaValid(true);
       setSchemaError(null);
     }
+
     scriptAssistantAi.accept();
   };
 
@@ -338,6 +373,97 @@ export function ScriptEditor({
 
   const GeneralTab = () => (
     <div className="h-full flex flex-col gap-6">
+      {/* AI Assistant Card */}
+      <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              <span className="font-medium text-purple-900">AI Script Assistant</span>
+            </div>
+            <p className="text-sm text-purple-700">
+              {isEditing
+                ? 'Describe changes you want to make to this script.'
+                : 'Describe what you want the script to do and AI will generate it for you.'}
+            </p>
+          </div>
+          {scriptAssistantAi.isLoading ? (
+            <button
+              type="button"
+              onClick={scriptAssistantAi.cancel}
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-medium"
+            >
+              <Spinner size="sm" />
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={scriptAssistantAi.toggle}
+              disabled={!scriptAssistantAi.available || scriptAssistantAi.checkingAvailability}
+              className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                scriptAssistantAi.showInput
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                  : scriptAssistantAi.available
+                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                    : 'bg-gray-100 text-gray-400'
+              }`}
+              title={scriptAssistantAi.unavailableReason || 'AI Assistant'}
+            >
+              {scriptAssistantAi.checkingAvailability ? (
+                <Spinner size="sm" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {scriptAssistantAi.showInput ? 'Hide' : isEditing ? 'Edit with AI' : 'Generate with AI'}
+            </button>
+          )}
+        </div>
+
+        {/* AI Input */}
+        {scriptAssistantAi.showInput && !scriptAssistantAi.isLoading && (
+          <div className="mt-4 flex gap-2">
+            <input
+              type="text"
+              value={scriptAssistantAi.userRequest}
+              onChange={(e) => scriptAssistantAi.setUserRequest(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && scriptAssistantAi.submit()}
+              placeholder={
+                isEditing
+                  ? "What changes do you want? (e.g., 'Add error handling', 'Optimize performance')"
+                  : "What should the script do? (e.g., 'Backup PostgreSQL database to S3')"
+              }
+              className="input flex-1 text-sm"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={scriptAssistantAi.submit}
+              className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-md font-medium"
+            >
+              Generate
+            </button>
+          </div>
+        )}
+
+        {/* AI Error */}
+        {scriptAssistantAi.error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 whitespace-pre-line">{scriptAssistantAi.error}</div>
+              <button
+                type="button"
+                onClick={scriptAssistantAi.clearError}
+                className="flex-shrink-0 text-red-400 hover:text-red-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Name */}
       <div>
         <label className="label">Script Name *</label>
@@ -429,7 +555,7 @@ export function ScriptEditor({
           <FileCode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             {...register('script_file')}
-            placeholder="run.sh"
+            placeholder="run.py"
             className={`input pl-10 ${errors.script_file ? 'border-red-500' : ''}`}
           />
         </div>
@@ -439,131 +565,15 @@ export function ScriptEditor({
       </div>
 
       {/* Script Content - fills remaining space */}
-      <div className="flex-1 flex flex-col min-h-0 relative">
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <label className="label mb-0">Script Content *</label>
-            {scriptAssistantAi.isLoading ? (
-              <button
-                type="button"
-                onClick={scriptAssistantAi.cancel}
-                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700"
-                title="Cancel AI request"
-              >
-                <Spinner size="sm" />
-                Cancel
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={scriptAssistantAi.toggle}
-                disabled={!scriptAssistantAi.available || scriptAssistantAi.checkingAvailability}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed ${
-                  scriptAssistantAi.showInput
-                    ? 'bg-purple-200 text-purple-800'
-                    : scriptAssistantAi.available
-                      ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                      : 'bg-gray-100 text-gray-400'
-                }`}
-                title={scriptAssistantAi.unavailableReason || 'AI Assistant'}
-              >
-                {scriptAssistantAi.checkingAvailability ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <Sparkles className="w-3 h-3" />
-                )}
-                AI
-              </button>
-            )}
-          </div>
+          <label className="label mb-0">Script Content *</label>
           <p className="text-xs text-gray-500">Parameters passed as CLI arguments (--key value)</p>
         </div>
 
-        {/* AI Input */}
-        {scriptAssistantAi.showInput && !scriptAssistantAi.isLoading && (
-          <div className="mb-2 flex gap-2">
-            <input
-              type="text"
-              value={scriptAssistantAi.userRequest}
-              onChange={(e) => scriptAssistantAi.setUserRequest(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && scriptAssistantAi.submit()}
-              placeholder="What should I do? (e.g., 'Check for issues', 'Add error handling')"
-              className="input flex-1 text-sm"
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={scriptAssistantAi.submit}
-              className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded"
-            >
-              Send
-            </button>
-          </div>
-        )}
-
-        {/* AI Error */}
-        {scriptAssistantAi.error && (
-          <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 whitespace-pre-line">{scriptAssistantAi.error}</div>
-              <button type="button" onClick={scriptAssistantAi.clearError} className="flex-shrink-0 text-red-400 hover:text-red-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* AI Result Preview Overlay */}
-        {scriptAssistantAi.result && (
-          <div className="absolute inset-0 z-10 bg-white border border-purple-300 rounded-md shadow-lg flex flex-col">
-            <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border-b border-purple-200">
-              <span className="text-sm font-medium text-purple-700 flex items-center gap-1">
-                <Sparkles className="w-4 h-4" />
-                AI Suggestion
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAiAccept}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded"
-                >
-                  <Check className="w-3 h-3" />
-                  Accept
-                </button>
-                <button
-                  type="button"
-                  onClick={scriptAssistantAi.reject}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded"
-                >
-                  <X className="w-3 h-3" />
-                  Reject
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-              {scriptAssistantAi.result[OUT.remarks] && (
-                <div className="px-3 py-2 bg-purple-50 border-b border-purple-100 text-sm text-purple-800">
-                  {scriptAssistantAi.result[OUT.remarks]}
-                </div>
-              )}
-              {scriptAssistantAi.result[OUT.parameters_schema] && (
-                <div className="px-3 py-2 bg-blue-50 border-b border-blue-100">
-                  <div className="text-xs font-medium text-blue-700 mb-1">Updated Parameters Schema:</div>
-                  <pre className="text-xs font-mono text-blue-800">{JSON.stringify(scriptAssistantAi.result[OUT.parameters_schema], null, 2)}</pre>
-                </div>
-              )}
-              <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-                <div className="text-xs font-medium text-gray-700 mb-1">Script:</div>
-              </div>
-              <pre className="flex-1 p-3 font-mono text-sm whitespace-pre-wrap">{scriptAssistantAi.result[OUT.script]}</pre>
-            </div>
-          </div>
-        )}
-
         <textarea
           {...register('script_content')}
-          placeholder="#!/bin/bash&#10;&#10;echo &quot;Hello, World!&quot;"
+          placeholder="#!/usr/bin/env -S uv run --script&#10;# /// script&#10;# requires-python = &quot;>=3.11&quot;&#10;# dependencies = []&#10;# ///&#10;&#10;print(&quot;Hello, World!&quot;)"
           className={`input font-mono text-sm resize-none flex-1 ${errors.script_content ? 'border-red-500' : ''}`}
         />
         {errors.script_content && (
@@ -779,77 +789,173 @@ export function ScriptEditor({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={() => { if (!ai.isAnyLoading) onClose(); }} size="xl">
-      <form onSubmit={handleSubmit(onSubmit)} className="h-[75vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {isEditing ? `Edit Script: ${script.name}` : 'New Script'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={ai.isAnyLoading}
-            className="text-gray-400 hover:text-gray-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <>
+      <Modal isOpen={isOpen} onClose={() => { if (!ai.isAnyLoading && !ai.hasAnyResult) onClose(); }} size="xl">
+        <form onSubmit={handleSubmit(onSubmit)} className="h-[75vh] flex flex-col">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isEditing ? `Edit Script: ${script.name}` : 'New Script'}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={ai.isAnyLoading}
+              className="text-gray-400 hover:text-gray-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        {/* Body: Sidebar + Content */}
-        <div className="flex-1 flex min-h-0">
-          {/* Sidebar Tabs */}
-          <div className="w-40 bg-gray-50 border-r border-gray-200 p-2 flex flex-col gap-1 flex-shrink-0">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
+          {/* Body: Sidebar + Content */}
+          <div className="flex-1 flex min-h-0">
+            {/* Sidebar Tabs */}
+            <div className="w-40 bg-gray-50 border-r border-gray-200 p-2 flex flex-col gap-1 flex-shrink-0">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-white shadow-sm text-gray-900 border-l-2 border-primary-600'
+                        : 'text-gray-600 hover:bg-gray-100 border-l-2 border-transparent'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab Content - all tabs always rendered (hidden when inactive) for form validation */}
+            <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'general' ? 'hidden' : ''}`}>
+              <GeneralTab />
+            </div>
+            <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'script' ? 'hidden' : ''}`}>
+              <ScriptTab />
+            </div>
+            <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'schema' ? 'hidden' : ''}`}>
+              <SchemaTab />
+            </div>
+            <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'demands' ? 'hidden' : ''}`}>
+              <DemandsTab />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={ai.isAnyLoading}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              loading={saving}
+              disabled={ai.isAnyLoading || (!isEditing && nameAvailable === false)}
+            >
+              {isEditing ? 'Save Changes' : 'Create Script'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* AI Result Modal - rendered outside main modal to avoid z-index issues */}
+      {scriptAssistantAi.result && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-[90vw] max-w-4xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-purple-50">
+              <span className="text-lg font-semibold text-purple-700 flex items-center gap-2">
+                <Sparkles className="w-5 h-5" />
+                AI Generated Script
+              </span>
+              <div className="flex items-center gap-3">
+                <Button
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? 'bg-white shadow-sm text-gray-900 border-l-2 border-primary-600'
-                      : 'text-gray-600 hover:bg-gray-100 border-l-2 border-transparent'
-                  }`}
+                  variant="secondary"
+                  onClick={scriptAssistantAi.reject}
+                  className="flex items-center gap-1"
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+                  <X className="w-4 h-4" />
+                  Reject
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleAiAccept}
+                  className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
+                >
+                  <Check className="w-4 h-4" />
+                  Accept
+                </Button>
+              </div>
+            </div>
 
-          {/* Tab Content - all tabs always rendered (hidden when inactive) for form validation */}
-          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'general' ? 'hidden' : ''}`}>
-            <GeneralTab />
-          </div>
-          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'script' ? 'hidden' : ''}`}>
-            <ScriptTab />
-          </div>
-          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'schema' ? 'hidden' : ''}`}>
-            <SchemaTab />
-          </div>
-          <div className={`flex-1 p-6 flex flex-col overflow-y-auto ${activeTab !== 'demands' ? 'hidden' : ''}`}>
-            <DemandsTab />
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Remarks */}
+              {scriptAssistantAi.result[OUT.remarks] && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="text-sm font-medium text-purple-700 mb-1">AI Notes</div>
+                  <div className="text-sm text-purple-800">{scriptAssistantAi.result[OUT.remarks]}</div>
+                </div>
+              )}
+
+              {/* Name, File - Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Script Name</label>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md font-mono text-sm">
+                    {scriptAssistantAi.result[OUT.name]}
+                    {isEditing && (
+                      <span className="ml-2 text-xs text-amber-600">(name cannot be changed when editing)</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">File Name</label>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md font-mono text-sm">{scriptAssistantAi.result[OUT.script_file]}</div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Description</label>
+                <div className="mt-1 p-4 bg-gray-50 rounded-md border border-gray-200 prose prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{scriptAssistantAi.result[OUT.description]}</ReactMarkdown>
+                </div>
+              </div>
+
+              {/* Script Content */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Script Content</label>
+                <pre className="mt-1 p-4 bg-gray-900 text-gray-100 rounded-md overflow-x-auto text-sm font-mono max-h-64 overflow-y-auto">
+                  {scriptAssistantAi.result[OUT.script]}
+                </pre>
+              </div>
+
+              {/* Parameters Schema */}
+              {scriptAssistantAi.result[OUT.parameters_schema] && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Parameters Schema</label>
+                  <pre className="mt-1 p-4 bg-blue-50 border border-blue-200 rounded-md overflow-x-auto text-sm font-mono text-blue-800">
+                    {JSON.stringify(scriptAssistantAi.result[OUT.parameters_schema], null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={ai.isAnyLoading}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            loading={saving}
-            disabled={ai.isAnyLoading || (!isEditing && nameAvailable === false)}
-          >
-            {isEditing ? 'Save Changes' : 'Create Script'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+      )}
+    </>
   );
 }
