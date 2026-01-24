@@ -38,6 +38,7 @@ Scripts are synced to autonomous runners and exposed as skills, enabling local e
 | [Phase 1: Scripts and Procedural Agents](./phase-1-scripts-and-procedural-agents.md) | Script model, procedural agents, distribution mechanism |
 | [Phase 2: Scripts as Capabilities](./phase-2-scripts-as-capabilities.md) | Local execution for autonomous agents (future) |
 | [Open Questions](./open-questions.md) | Unresolved design questions |
+| [Implementation References](./implementation-references.md) | Key documents and code locations for implementation |
 
 ## Scope Summary
 
