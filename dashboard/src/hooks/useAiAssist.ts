@@ -321,12 +321,13 @@ export function useAiAssist<TInput, TOutput>(
     setError(null);
     setResult(null);
 
-    // TODO: Future enhancement - call the Coordinator SDK to stop the run
-    // This would send a cancel/stop request to the API to terminate the agent run.
-    // Implementation:
-    //   if (currentRunRef.current) {
-    //     currentRunRef.current.stop().catch(console.error);
-    //   }
+    // Send stop request to Coordinator to terminate the agent run
+    if (currentRunRef.current) {
+      currentRunRef.current.stop().catch((err) => {
+        // Log but don't surface to user - UI is already reset
+        console.warn('Failed to stop run:', err);
+      });
+    }
     currentRunRef.current = null;
   }, []);
 

@@ -124,27 +124,29 @@ When AI is loading, the UI must be protected to prevent accidental actions:
 
 Users must explicitly click Cancel to abort the AI operation before they can close or save.
 
-### Open: API Cancellation Not Yet Implemented
+### API Cancellation
 
-**Status:** UI-only cancellation
+**Status:** Implemented
 
-Currently, the `cancel()` function only stops the UI from waiting for results. It does **not** send a cancel/stop request to the Coordinator API. The agent run continues in the background until completion.
+The `cancel()` function sends a stop request to the Coordinator API via `RunHandle.stop()` to terminate the agent run.
 
-**Location for future implementation:** `dashboard/src/hooks/useAiAssist.ts`, inside the `cancel` callback:
+**Implementation:** `dashboard/src/hooks/useAiAssist.ts`, inside the `cancel` callback:
 
 ```typescript
-// TODO: Future enhancement - call the Coordinator SDK to stop the run
-// This would send a cancel/stop request to the API to terminate the agent run.
-// Implementation:
-//   if (currentRunRef.current) {
-//     currentRunRef.current.stop().catch(console.error);
-//   }
+// Send stop request to Coordinator to terminate the agent run
+if (currentRunRef.current) {
+  currentRunRef.current.stop().catch((err) => {
+    // Log but don't surface to user - UI is already reset
+    console.warn('Failed to stop run:', err);
+  });
+}
 ```
 
-**What's needed:**
-1. The `RunHandle.stop()` method already exists in the Coordinator Client SDK
-2. The `currentRunRef` already stores the active run handle
-3. Uncomment and test the stop call when API cancellation is needed
+**How it works:**
+1. The `currentRunRef` stores the active `RunHandle` during a run
+2. When `cancel()` is called, it invokes `RunHandle.stop()` which POSTs to `/sessions/{sessionId}/stop`
+3. The Coordinator queues a stop command for the runner
+4. Errors are logged but not surfaced to the user since the UI has already reset
 
 ## useAiGroup Hook
 
