@@ -1,0 +1,44 @@
+{
+  "name": "script-assistant",
+  "description": "Internal agent to improve scripts. ",
+  "type": "autonomous",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "script_content": {
+        "type": "string",
+        "description": "Current script content to review"
+      },
+      "user_request": {
+        "type": "string",
+        "description": "User instruction (optional)"
+      },
+      "context": {
+        "type": "string",
+        "description": "Additional context like parameter schema"
+      }
+    },
+    "required": [
+      "script_content"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "script": {
+        "type": "string",
+        "description": "Updated script content"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "Explanation of changes"
+      }
+    },
+    "required": [
+      "script"
+    ]
+  },
+  "tags": [
+    "internal"
+  ]
+}
