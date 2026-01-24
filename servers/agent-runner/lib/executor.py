@@ -321,12 +321,14 @@ class RunExecutor:
 
         # Spawn subprocess with stdin pipe
         # encoding='utf-8' required for Windows (defaults to CP1252 which can't handle emojis)
+        # cwd is set for start mode so the executor runs in the correct project directory
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
+            cwd=payload.get("project_dir") or self.default_project_dir,
             text=True,
             encoding='utf-8',
             errors='replace',

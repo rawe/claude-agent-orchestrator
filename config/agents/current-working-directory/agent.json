@@ -1,0 +1,6 @@
+{
+  "name": "current-working-directory",
+  "description": "Shows the current working directory",
+  "type": "procedural",
+  "script": "current-working-directory"
+}
