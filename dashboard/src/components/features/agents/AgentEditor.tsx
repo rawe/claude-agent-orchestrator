@@ -611,7 +611,7 @@ export function AgentEditor({
   );
 
   const InputTab = () => (
-    <div className="h-full flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+    <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Input Schema</label>
@@ -671,7 +671,7 @@ export function AgentEditor({
   );
 
   const OutputTab = () => (
-    <div className="h-full flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+    <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Output Schema</label>
@@ -773,13 +773,9 @@ export function AgentEditor({
           {...register('system_prompt')}
           placeholder="# Agent System Prompt&#10;&#10;Define the agent's behavior, capabilities, and constraints..."
           className="flex-1 input font-mono text-sm resize-none min-h-0"
-          style={{ height: 'calc(85vh - 220px)' }}
         />
       ) : (
-        <div
-          className="flex-1 border border-gray-300 rounded-md p-4 overflow-y-auto bg-white min-h-0"
-          style={{ height: 'calc(85vh - 220px)' }}
-        >
+        <div className="flex-1 border border-gray-300 rounded-md p-4 overflow-y-auto bg-white min-h-0">
           {getValues('system_prompt') ? (
             <div className="markdown-content prose prose-sm max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{getValues('system_prompt')}</ReactMarkdown>
@@ -874,7 +870,7 @@ export function AgentEditor({
   );
 
   const McpTab = () => (
-    <div className="h-full flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+    <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
         <label className="text-sm font-medium text-gray-700">MCP Servers</label>
         <InfoPopover title="MCP Servers">
@@ -1268,8 +1264,11 @@ export function AgentEditor({
             })}
           </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          {/* Tab Content
+              - flex flex-col: allows children with flex-1 to expand (Input, Output, Prompt, MCP tabs)
+              - overflow-y-auto: provides scrolling for tabs without flex-1 children (General, Runner, Hooks)
+              Both work together: expandable content fills space, fixed content scrolls if needed */}
+          <div className="flex-1 p-6 flex flex-col overflow-y-auto">
             {activeTab === 'general' && <GeneralTab />}
             {activeTab === 'script' && <ScriptTab />}
             {activeTab === 'input' && <InputTab />}

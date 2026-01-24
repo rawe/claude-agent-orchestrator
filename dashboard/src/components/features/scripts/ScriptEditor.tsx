@@ -26,10 +26,11 @@ interface FormData {
   demands: AgentDemands | null;
 }
 
-type TabId = 'general' | 'schema' | 'demands';
+type TabId = 'general' | 'script' | 'schema' | 'demands';
 
 const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: 'General', icon: Settings },
+  { id: 'script', label: 'Script', icon: FileCode },
   { id: 'schema', label: 'Schema', icon: FileInput },
   { id: 'demands', label: 'Runner', icon: Target },
 ];
@@ -239,7 +240,7 @@ export function ScriptEditor({
   };
 
   const GeneralTab = () => (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col gap-6">
       {/* Name */}
       <div>
         <label className="label">Script Name *</label>
@@ -273,8 +274,8 @@ export function ScriptEditor({
         )}
       </div>
 
-      {/* Description */}
-      <div>
+      {/* Description - expands to fill remaining space */}
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
           <label className="label mb-0">Description *</label>
           <div className="flex rounded-md border border-gray-300 overflow-hidden">
@@ -313,11 +314,10 @@ export function ScriptEditor({
               required: 'Description is required',
             })}
             placeholder="Describe what this script does. Supports Markdown."
-            rows={4}
-            className={`input resize-none ${errors.description ? 'border-red-500' : ''}`}
+            className={`input resize-none flex-1 ${errors.description ? 'border-red-500' : ''}`}
           />
         ) : (
-          <div className="border border-gray-300 rounded-md p-4 min-h-[100px] max-h-[200px] overflow-auto bg-white">
+          <div className="border border-gray-300 rounded-md p-4 flex-1 overflow-auto bg-white">
             {previewContent ? (
               <div className="markdown-content prose prose-sm max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewContent}</ReactMarkdown>
@@ -331,10 +331,14 @@ export function ScriptEditor({
           <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>
         )}
       </div>
+    </div>
+  );
 
-      {/* Script File */}
+  const ScriptTab = () => (
+    <div className="h-full flex flex-col gap-4">
+      {/* Script File Name - compact row */}
       <div>
-        <label className="label">Script File Name *</label>
+        <label className="label">File Name *</label>
         <div className="relative">
           <FileCode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -352,34 +356,30 @@ export function ScriptEditor({
         {errors.script_file && (
           <p className="mt-1 text-xs text-red-500">{errors.script_file.message}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500">
-          The executable file name that will be stored in the script directory
-        </p>
       </div>
 
-      {/* Script Content */}
-      <div>
-        <label className="label">Script Content *</label>
+      {/* Script Content - fills remaining space */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex items-center justify-between mb-2">
+          <label className="label mb-0">Script Content *</label>
+          <p className="text-xs text-gray-500">Parameters passed as CLI arguments (--key value)</p>
+        </div>
         <textarea
           {...register('script_content', {
             required: 'Script content is required',
           })}
           placeholder="#!/bin/bash&#10;&#10;echo &quot;Hello, World!&quot;"
-          rows={12}
-          className={`input font-mono text-sm resize-none ${errors.script_content ? 'border-red-500' : ''}`}
+          className={`input font-mono text-sm resize-none flex-1 ${errors.script_content ? 'border-red-500' : ''}`}
         />
         {errors.script_content && (
           <p className="mt-1 text-xs text-red-500">{errors.script_content.message}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500">
-          The script content. Parameters will be passed as CLI arguments (--key value).
-        </p>
       </div>
     </div>
   );
 
   const SchemaTab = () => (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
           <label className="label mb-0">Parameters Schema</label>
@@ -416,7 +416,7 @@ export function ScriptEditor({
       </div>
 
       {watchedSchemaEnabled && (
-        <div className="flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               {schemaValid ? (
@@ -445,8 +445,7 @@ export function ScriptEditor({
             value={schemaText}
             onChange={(e) => validateAndUpdateSchema(e.target.value)}
             placeholder={JSON.stringify(DEFAULT_SCHEMA_TEMPLATE, null, 2)}
-            rows={15}
-            className={`input font-mono text-sm resize-none ${
+            className={`input font-mono text-sm resize-none flex-1 ${
               !schemaValid ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
             }`}
           />
@@ -626,9 +625,13 @@ export function ScriptEditor({
             })}
           </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          {/* Tab Content
+              - flex flex-col: allows children with flex-1 to expand (Script, Schema, General tabs)
+              - overflow-y-auto: provides scrolling for tabs without flex-1 children (Demands tab)
+              Both work together: expandable content fills space, fixed content scrolls if needed */}
+          <div className="flex-1 p-6 flex flex-col overflow-y-auto">
             {activeTab === 'general' && <GeneralTab />}
+            {activeTab === 'script' && <ScriptTab />}
             {activeTab === 'schema' && <SchemaTab />}
             {activeTab === 'demands' && <DemandsTab />}
           </div>
