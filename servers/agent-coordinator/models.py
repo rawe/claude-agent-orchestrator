@@ -208,6 +208,21 @@ class AgentHooks(BaseModel):
 # Capability Models (Capabilities System)
 # ==============================================================================
 
+class CapabilityType(str, Enum):
+    """
+    Type of capability - determines which fields are allowed.
+
+    - script: Local script execution (script field allowed, mcp_servers forbidden)
+    - mcp: MCP server integration (mcp_servers field allowed, script forbidden)
+    - text: Instructions only (both script and mcp_servers forbidden)
+
+    The text field is always allowed for additional instructions.
+    """
+    SCRIPT = "script"
+    MCP = "mcp"
+    TEXT = "text"
+
+
 class CapabilityBase(BaseModel):
     """Base capability fields."""
 
@@ -218,23 +233,29 @@ class CapabilityBase(BaseModel):
 class CapabilityCreate(CapabilityBase):
     """Request body for creating a capability."""
 
-    text: Optional[str] = None
-    mcp_servers: Optional[dict[str, MCPServerConfig]] = None
+    type: CapabilityType = CapabilityType.TEXT
+    script: Optional[str] = None  # Allowed when type=script
+    text: Optional[str] = None  # Always allowed
+    mcp_servers: Optional[dict[str, MCPServerConfig]] = None  # Allowed when type=mcp
 
 
 class CapabilityUpdate(BaseModel):
     """Request body for updating a capability (partial)."""
 
     description: Optional[str] = None
-    text: Optional[str] = None
-    mcp_servers: Optional[dict[str, MCPServerConfig]] = None
+    type: Optional[CapabilityType] = None
+    script: Optional[str] = None  # Allowed when type=script
+    text: Optional[str] = None  # Always allowed
+    mcp_servers: Optional[dict[str, MCPServerConfig]] = None  # Allowed when type=mcp
 
 
 class Capability(CapabilityBase):
     """Full capability representation."""
 
-    text: Optional[str] = None
-    mcp_servers: Optional[dict[str, MCPServerConfig]] = None
+    type: CapabilityType = CapabilityType.TEXT
+    script: Optional[str] = None  # Allowed when type=script
+    text: Optional[str] = None  # Always allowed
+    mcp_servers: Optional[dict[str, MCPServerConfig]] = None  # Allowed when type=mcp
     created_at: str
     modified_at: str
 
@@ -242,6 +263,9 @@ class Capability(CapabilityBase):
 class CapabilitySummary(CapabilityBase):
     """Summary capability for list endpoint (without full text content)."""
 
+    type: CapabilityType
+    has_script: bool
+    script_name: Optional[str]
     has_text: bool
     has_mcp: bool
     mcp_server_names: list[str]

@@ -11,7 +11,7 @@ import {
 import { Agent, isRunnerOwned } from '@/types';
 import { Badge, StatusBadge, EmptyState, SkeletonLine } from '@/components/common';
 import { truncate } from '@/utils/formatters';
-import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag, X, Server } from 'lucide-react';
+import { Settings, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Tag, X, Server, Eye } from 'lucide-react';
 
 // Tag filter component
 function TagFilter({
@@ -116,6 +116,7 @@ interface AgentTableProps {
   onEditAgent: (agent: Agent) => void;
   onDeleteAgent: (name: string) => void;
   onToggleStatus: (name: string, currentStatus: 'active' | 'inactive') => void;
+  onViewResolved?: (agent: Agent) => void;
 }
 
 const columnHelper = createColumnHelper<Agent>();
@@ -128,6 +129,7 @@ export function AgentTable({
   onEditAgent,
   onDeleteAgent,
   onToggleStatus,
+  onViewResolved,
 }: AgentTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'name', desc: false },
@@ -297,6 +299,15 @@ export function AgentTable({
 
           return (
             <div className="flex items-center gap-1">
+              {onViewResolved && (
+                <button
+                  onClick={() => onViewResolved(agent)}
+                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  title="View Resolved System Prompt"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => onToggleStatus(agent.name, agent.status)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -325,10 +336,10 @@ export function AgentTable({
             </div>
           );
         },
-        size: 120,
+        size: 140,
       }),
     ],
-    [onEditAgent, onDeleteAgent, onToggleStatus]
+    [onEditAgent, onDeleteAgent, onToggleStatus, onViewResolved]
   );
 
   const table = useReactTable({

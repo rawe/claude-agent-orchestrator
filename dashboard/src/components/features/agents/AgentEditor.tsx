@@ -9,6 +9,7 @@ import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAgents } from '@/hooks/useAgents';
 import { useScripts } from '@/hooks/useScripts';
+import { agentService } from '@/services/agentService';
 import {
   Eye,
   Code,
@@ -171,31 +172,33 @@ export function AgentEditor({
     };
   };
 
-  // Load agent data when editing
+  // Load agent data when editing - fetch RAW data to avoid showing resolved system_prompt
   useEffect(() => {
-    if (agent) {
-      // parameters_schema_enabled is true if the agent has a non-null schema
-      const hasInputSchema = agent.parameters_schema != null;
-      const hasOutputSchema = agent.output_schema != null;
-      reset({
-        name: agent.name,
-        description: agent.description,
-        type: agent.type || 'autonomous',
-        script: agent.script || '',
-        parameters_schema_enabled: hasInputSchema,
-        parameters_schema: agent.parameters_schema,
-        output_schema_enabled: hasOutputSchema,
-        output_schema: agent.output_schema,
-        system_prompt: agent.system_prompt || '',
-        mcp_servers: agent.mcp_servers,
-        skills: agent.skills || [],
-        tags: agent.tags || [],
-        capabilities: agent.capabilities || [],
-        demands: agent.demands,
-        on_run_start: hookConfigToFormFields(agent.hooks?.on_run_start),
-        on_run_finish: hookConfigToFormFields(agent.hooks?.on_run_finish),
+    if (agent && isOpen) {
+      // Fetch raw agent data for editing (not resolved)
+      agentService.getAgentRaw(agent.name).then((rawAgent) => {
+        const hasInputSchema = rawAgent.parameters_schema != null;
+        const hasOutputSchema = rawAgent.output_schema != null;
+        reset({
+          name: rawAgent.name,
+          description: rawAgent.description,
+          type: rawAgent.type || 'autonomous',
+          script: rawAgent.script || '',
+          parameters_schema_enabled: hasInputSchema,
+          parameters_schema: rawAgent.parameters_schema,
+          output_schema_enabled: hasOutputSchema,
+          output_schema: rawAgent.output_schema,
+          system_prompt: rawAgent.system_prompt || '',
+          mcp_servers: rawAgent.mcp_servers,
+          skills: rawAgent.skills || [],
+          tags: rawAgent.tags || [],
+          capabilities: rawAgent.capabilities || [],
+          demands: rawAgent.demands,
+          on_run_start: hookConfigToFormFields(rawAgent.hooks?.on_run_start),
+          on_run_finish: hookConfigToFormFields(rawAgent.hooks?.on_run_finish),
+        });
       });
-    } else {
+    } else if (!agent) {
       reset({
         name: '',
         description: '',

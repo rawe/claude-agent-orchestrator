@@ -1,0 +1,8 @@
+{
+  "name": "json-checker-agent",
+  "description": "Agent with the capability to check json",
+  "type": "autonomous",
+  "capabilities": [
+    "json-checker"
+  ]
+}

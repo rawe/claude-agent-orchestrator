@@ -1,7 +1,8 @@
 # Phase 2: Scripts as Capabilities for Autonomous Agents
 
-**Status:** Future Consideration
+**Status:** Implemented
 **Created:** 2025-01-24
+**Implemented:** 2026-01-24
 
 ## Overview
 
@@ -232,9 +233,63 @@ Phase 2 builds on Phase 1 - scripts remain stored in Coordinator, but are additi
 
 ---
 
-## Next Steps
+## Implementation Details
 
-1. Complete Phase 1 implementation
-2. Gather real use cases requiring local script execution
-3. Validate that Phase 1 doesn't cover these use cases
-4. Design detailed Phase 2 implementation based on learnings
+### Deployment Workaround
+
+Both procedural and autonomous runners share the same `PROJECT_DIR` (`.agent-orchestrator/runner-workdir/`), so scripts synced by Phase 1 are automatically available to the Claude Code executor. No additional deployment mechanism was needed.
+
+### Capability Model
+
+Added optional `script` field to capabilities:
+
+```json
+{
+  "name": "json-validation-skill",
+  "description": "Validate JSON files locally",
+  "script": "json_checker"
+}
+```
+
+### System Prompt Injection
+
+When an agent has a capability that references a script, the system generates CLI usage instructions from the script's `parameters_schema` and injects them into the agent's system prompt:
+
+```markdown
+## Local Script: json_checker
+**Description:** Checks a given file for proper JSON format
+
+**Usage:**
+```bash
+uv run --script scripts/json_checker/json_check.py --file <file>
+```
+
+**Arguments:**
+- `--file` (required) - Path to the file to validate as JSON
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `models.py` | Added `script` field to `CapabilityCreate`, `CapabilityUpdate`, `Capability`, `CapabilitySummary` |
+| `capability_storage.py` | Read/write `script` field from `capability.json` |
+| `agent_storage.py` | Added `_generate_script_usage()`, `_get_placeholder()`, `_format_argument()` helpers; Updated `_resolve_autonomous_dependencies()` to inject script usage |
+| `main.py` | Added script validation in capability create/update endpoints |
+
+### Schema-to-CLI Transformation
+
+The implementation handles:
+- Enum types: Shows as `<option1|option2>` in usage
+- Boolean flags: No placeholder needed
+- Integer/number types: Shows as `<N>`
+- Array types: Shows as `<value1,value2,...>`
+- Default values: Shown as `[default: value]`
+- Required vs optional: Required args shown without brackets, optional with `[--arg]`
+
+## Next Steps (Completed)
+
+1. ~~Complete Phase 1 implementation~~ ✓
+2. ~~Gather real use cases requiring local script execution~~ ✓
+3. ~~Validate that Phase 1 doesn't cover these use cases~~ ✓
+4. ~~Design detailed Phase 2 implementation based on learnings~~ ✓

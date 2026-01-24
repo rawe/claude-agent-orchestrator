@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Spinner } from '@/components/common';
 import { MCPJsonEditor } from '../agents/MCPJsonEditor';
-import { Capability, CapabilityCreate } from '@/types/capability';
+import { Capability, CapabilityCreate, CapabilityType } from '@/types/capability';
 import { MCPServerConfig } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
-import { Eye, Code } from 'lucide-react';
+import { Eye, Code, FileCode, Server, FileText, FlaskConical } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useScripts } from '@/hooks/useScripts';
 
 interface CapabilityEditorProps {
   isOpen: boolean;
@@ -20,9 +21,33 @@ interface CapabilityEditorProps {
 interface FormData {
   name: string;
   description: string;
+  type: CapabilityType;
+  script: string;
   text: string;
   mcp_servers: Record<string, MCPServerConfig> | null;
 }
+
+const TYPE_OPTIONS: { value: CapabilityType; label: string; description: string; icon: React.ReactNode; experimental?: boolean }[] = [
+  {
+    value: 'script',
+    label: 'Script',
+    description: 'Local script execution',
+    icon: <FileCode className="w-4 h-4" />,
+    experimental: true,
+  },
+  {
+    value: 'mcp',
+    label: 'MCP',
+    description: 'MCP server integration',
+    icon: <Server className="w-4 h-4" />,
+  },
+  {
+    value: 'text',
+    label: 'Text',
+    description: 'Instructions only',
+    icon: <FileText className="w-4 h-4" />,
+  },
+];
 
 export function CapabilityEditor({
   isOpen,
@@ -35,6 +60,8 @@ export function CapabilityEditor({
   const [saving, setSaving] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
   const [checkingName, setCheckingName] = useState(false);
+
+  const { scripts: availableScripts, loading: scriptsLoading } = useScripts();
 
   const isEditing = !!capability;
 
@@ -50,12 +77,15 @@ export function CapabilityEditor({
     defaultValues: {
       name: '',
       description: '',
+      type: 'text',
+      script: '',
       text: '',
       mcp_servers: null,
     },
   });
 
   const watchedName = watch('name');
+  const watchedType = watch('type');
   const watchedText = watch('text');
   const watchedMcpServers = watch('mcp_servers');
 
@@ -65,6 +95,8 @@ export function CapabilityEditor({
       reset({
         name: capability.name,
         description: capability.description,
+        type: capability.type,
+        script: capability.script || '',
         text: capability.text || '',
         mcp_servers: capability.mcp_servers,
       });
@@ -72,6 +104,8 @@ export function CapabilityEditor({
       reset({
         name: '',
         description: '',
+        type: 'text',
+        script: '',
         text: '',
         mcp_servers: null,
       });
@@ -112,8 +146,12 @@ export function CapabilityEditor({
       const createData: CapabilityCreate = {
         name: data.name,
         description: data.description,
+        type: data.type,
+        // Only include script if type is 'script'
+        script: data.type === 'script' ? (data.script || undefined) : undefined,
         text: data.text || undefined,
-        mcp_servers: data.mcp_servers ?? {},  // null -> {} to clear MCP servers
+        // Only include mcp_servers if type is 'mcp'
+        mcp_servers: data.type === 'mcp' ? (data.mcp_servers ?? {}) : undefined,
       };
       await onSave(createData);
       onClose();
@@ -190,6 +228,81 @@ export function CapabilityEditor({
             </div>
           </div>
 
+          {/* Capability Type */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-gray-900">Capability Type</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {TYPE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`relative flex flex-col items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    watchedType === option.value
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    {...register('type')}
+                    value={option.value}
+                    className="sr-only"
+                  />
+                  {option.experimental && (
+                    <span className="absolute top-1 right-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded">
+                      <FlaskConical className="w-2.5 h-2.5" />
+                      Experimental
+                    </span>
+                  )}
+                  <div className={`mb-2 ${watchedType === option.value ? 'text-primary-600' : 'text-gray-400'}`}>
+                    {option.icon}
+                  </div>
+                  <span className={`text-sm font-medium ${watchedType === option.value ? 'text-primary-700' : 'text-gray-700'}`}>
+                    {option.label}
+                  </span>
+                  <span className="text-xs text-gray-500 text-center mt-1">
+                    {option.description}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Script Selector (only for type=script) */}
+          {watchedType === 'script' && (
+            <div className="space-y-3">
+              {/* Experimental Notice */}
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <FlaskConical className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-800">
+                  <span className="font-medium">Experimental:</span> Script capabilities currently rely on procedural and autonomous runners sharing the same project directory. Explicit script deployment to autonomous agents is not yet implemented.
+                </p>
+              </div>
+
+              <h3 className="text-sm font-medium text-gray-900">Script</h3>
+              <p className="text-xs text-gray-500">
+                Select a script that agents can execute locally when using this capability.
+              </p>
+              <select
+                {...register('script')}
+                className="input"
+                disabled={scriptsLoading}
+              >
+                <option value="">Select a script...</option>
+                {availableScripts.map((script) => (
+                  <option key={script.name} value={script.name}>
+                    {script.name} - {script.description}
+                  </option>
+                ))}
+              </select>
+              {scriptsLoading && (
+                <p className="text-xs text-gray-500">Loading scripts...</p>
+              )}
+              {!scriptsLoading && availableScripts.length === 0 && (
+                <p className="text-xs text-amber-600">No scripts available. Create scripts first.</p>
+              )}
+            </div>
+          )}
+
           {/* Text Content (for system prompt) */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -247,40 +360,42 @@ export function CapabilityEditor({
             )}
           </div>
 
-          {/* MCP Servers */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-900">MCP Servers</h3>
-            <p className="text-xs text-gray-500 -mt-2">
-              MCP server configurations that will be available to agents using this capability.
-            </p>
+          {/* MCP Servers (only for type=mcp) */}
+          {watchedType === 'mcp' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-gray-900">MCP Servers</h3>
+              <p className="text-xs text-gray-500 -mt-2">
+                MCP server configurations that will be available to agents using this capability.
+              </p>
 
-            {/* Template Quick Add Buttons */}
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-gray-500 py-1">Quick add:</span>
-              {TEMPLATE_NAMES.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => handleAddTemplate(name)}
-                  className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200"
-                >
-                  + {name}
-                </button>
-              ))}
+              {/* Template Quick Add Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-gray-500 py-1">Quick add:</span>
+                {TEMPLATE_NAMES.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => handleAddTemplate(name)}
+                    className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200"
+                  >
+                    + {name}
+                  </button>
+                ))}
+              </div>
+
+              {/* JSON Editor */}
+              <Controller
+                name="mcp_servers"
+                control={control}
+                render={({ field }) => (
+                  <MCPJsonEditor
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </div>
-
-            {/* JSON Editor */}
-            <Controller
-              name="mcp_servers"
-              control={control}
-              render={({ field }) => (
-                <MCPJsonEditor
-                  value={field.value ?? null}
-                  onChange={field.onChange}
-                />
-              )}
-            />
-          </div>
+          )}
         </div>
 
         {/* Footer */}

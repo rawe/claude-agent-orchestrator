@@ -27,7 +27,7 @@ from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
     Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
     ExecutionMode, StreamEventType, SessionEventType, SessionResult,
-    Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary,
+    Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary, CapabilityType,
     Script, ScriptCreate, ScriptUpdate, ScriptSummary,
     RunnerAgent, AgentHooks,
 )
@@ -920,6 +920,41 @@ def get_capability(name: str):
     return capability
 
 
+def _validate_capability_type_fields(
+    cap_type: CapabilityType,
+    script: str | None,
+    mcp_servers: dict | None,
+) -> None:
+    """
+    Validate that only allowed fields are set for the capability type.
+
+    Raises HTTPException if forbidden fields are set.
+    """
+    if cap_type == CapabilityType.SCRIPT:
+        if mcp_servers:
+            raise HTTPException(
+                status_code=400,
+                detail="Capability type 'script' cannot have 'mcp_servers'"
+            )
+    elif cap_type == CapabilityType.MCP:
+        if script:
+            raise HTTPException(
+                status_code=400,
+                detail="Capability type 'mcp' cannot have 'script'"
+            )
+    elif cap_type == CapabilityType.TEXT:
+        if script:
+            raise HTTPException(
+                status_code=400,
+                detail="Capability type 'text' cannot have 'script'"
+            )
+        if mcp_servers:
+            raise HTTPException(
+                status_code=400,
+                detail="Capability type 'text' cannot have 'mcp_servers'"
+            )
+
+
 @app.post("/capabilities", tags=["Capabilities"], response_model=Capability, status_code=201, response_model_exclude_none=True)
 def create_capability(data: CapabilityCreate):
     """Create a new capability."""
@@ -927,6 +962,17 @@ def create_capability(data: CapabilityCreate):
         validate_capability_name(data.name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Validate type-specific field constraints
+    _validate_capability_type_fields(data.type, data.script, data.mcp_servers)
+
+    # Validate script reference exists (Phase 2: Scripts as Capabilities)
+    if data.script:
+        if not script_storage.get_script(data.script):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Script not found: {data.script}"
+            )
 
     try:
         capability = capability_storage.create_capability(data)
@@ -938,9 +984,38 @@ def create_capability(data: CapabilityCreate):
 @app.patch("/capabilities/{name}", tags=["Capabilities"], response_model=Capability, response_model_exclude_none=True)
 def update_capability(name: str, updates: CapabilityUpdate):
     """Update an existing capability (partial update)."""
-    capability = capability_storage.update_capability(name, updates)
-    if not capability:
+    # Get existing capability to determine final state after update
+    existing = capability_storage.get_capability(name)
+    if not existing:
         raise HTTPException(status_code=404, detail=f"Capability not found: {name}")
+
+    # Determine effective type and fields after update
+    effective_type = updates.type if updates.type is not None else existing.type
+
+    # For script/mcp_servers, empty string means "remove", None means "keep existing"
+    if updates.script is not None:
+        effective_script = updates.script if updates.script else None
+    else:
+        effective_script = existing.script
+
+    if updates.mcp_servers is not None:
+        effective_mcp = updates.mcp_servers if updates.mcp_servers else None
+    else:
+        effective_mcp = existing.mcp_servers
+
+    # Validate type-specific field constraints on the effective state
+    _validate_capability_type_fields(effective_type, effective_script, effective_mcp)
+
+    # Validate script reference exists (Phase 2: Scripts as Capabilities)
+    # Note: empty string means "remove script", so only validate non-empty values
+    if updates.script:
+        if not script_storage.get_script(updates.script):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Script not found: {updates.script}"
+            )
+
+    capability = capability_storage.update_capability(name, updates)
     return capability
 
 

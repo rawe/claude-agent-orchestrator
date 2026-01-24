@@ -226,6 +226,126 @@ class MCPServerConflictError(CapabilityResolutionError):
         )
 
 
+class MissingCapabilityScriptError(CapabilityResolutionError):
+    """Raised when a capability references a script that doesn't exist."""
+    def __init__(self, agent_name: str, capability_name: str, script_name: str):
+        self.agent_name = agent_name
+        self.capability_name = capability_name
+        self.script_name = script_name
+        super().__init__(
+            f"Agent '{agent_name}' capability '{capability_name}' references "
+            f"missing script: '{script_name}'"
+        )
+
+
+# ==============================================================================
+# Script Usage Generation (Phase 2: Scripts as Capabilities)
+# ==============================================================================
+
+def _get_placeholder(arg_name: str, arg_def: dict) -> str:
+    """Generate placeholder for usage line based on type/enum."""
+    if "enum" in arg_def:
+        # Show enum options: <slack|email|sms>
+        return "<" + "|".join(str(v) for v in arg_def["enum"]) + ">"
+
+    arg_type = arg_def.get("type", "string")
+
+    if arg_type == "boolean":
+        return ""  # Flags don't need placeholder
+    elif arg_type == "integer" or arg_type == "number":
+        return "<N>"
+    elif arg_type == "array":
+        return "<value1,value2,...>"
+    else:
+        # Default: use arg name as hint
+        return f"<{arg_name}>"
+
+
+def _format_argument(arg_name: str, arg_def: dict, is_required: bool) -> str:
+    """Format a single argument for the Arguments section."""
+    parts = [f"- `--{arg_name}`"]
+
+    # Required/optional
+    parts.append("(required)" if is_required else "(optional)")
+
+    # Type info
+    arg_type = arg_def.get("type", "string")
+    if "enum" in arg_def:
+        parts.append(f"One of: {', '.join(str(v) for v in arg_def['enum'])}")
+    elif arg_type != "string":
+        parts.append(f"({arg_type})")
+
+    # Default value
+    if "default" in arg_def:
+        parts.append(f"[default: {arg_def['default']}]")
+
+    # Description
+    if "description" in arg_def:
+        parts.append(f"- {arg_def['description']}")
+
+    return " ".join(parts)
+
+
+def _generate_script_usage(script) -> str:
+    """
+    Generate CLI usage instructions from script metadata.
+
+    Transforms JSON Schema parameters into CLI argument documentation
+    for injection into agent system prompts.
+
+    Args:
+        script: Script object with name, description, script_file, parameters_schema
+
+    Returns:
+        Markdown-formatted usage instructions
+    """
+    lines = [
+        f"## Local Script: {script.name}",
+        f"**Description:** {script.description}",
+        "",
+    ]
+
+    schema = script.parameters_schema or {}
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    if not properties:
+        # No parameters - simple invocation
+        lines.append("**Usage:**")
+        lines.append("```bash")
+        lines.append(f"uv run --script scripts/{script.name}/{script.script_file}")
+        lines.append("```")
+        return "\n".join(lines)
+
+    # Build usage line with placeholders
+    usage_parts = [f"uv run --script scripts/{script.name}/{script.script_file}"]
+    for arg_name in properties:
+        placeholder = _get_placeholder(arg_name, properties[arg_name])
+        if arg_name in required:
+            if placeholder:
+                usage_parts.append(f"--{arg_name} {placeholder}")
+            else:
+                usage_parts.append(f"--{arg_name}")
+        else:
+            if placeholder:
+                usage_parts.append(f"[--{arg_name} {placeholder}]")
+            else:
+                usage_parts.append(f"[--{arg_name}]")
+
+    lines.append("**Usage:**")
+    lines.append("```bash")
+    lines.append(" ".join(usage_parts))
+    lines.append("```")
+    lines.append("")
+
+    # Arguments section
+    lines.append("**Arguments:**")
+    for arg_name, arg_def in properties.items():
+        lines.append(_format_argument(arg_name, arg_def, arg_name in required))
+
+    return "\n".join(lines)
+
+
 def _resolve_autonomous_dependencies(agent: Agent) -> Agent:
     """
     Resolve dependencies for autonomous agents (capabilities).
@@ -234,7 +354,8 @@ def _resolve_autonomous_dependencies(agent: Agent) -> Agent:
     1. Loads each referenced capability
     2. Merges system prompts (agent + capabilities in declaration order)
     3. Merges MCP servers (capabilities + agent-level)
-    4. Raises errors for missing capabilities or MCP server conflicts
+    4. Generates script usage instructions for capabilities with scripts
+    5. Raises errors for missing capabilities or MCP server conflicts
 
     Args:
         agent: Raw agent with unresolved capabilities
@@ -245,9 +366,11 @@ def _resolve_autonomous_dependencies(agent: Agent) -> Agent:
     Raises:
         MissingCapabilityError: If a referenced capability doesn't exist
         MCPServerConflictError: If same MCP server name appears in multiple sources
+        MissingCapabilityScriptError: If a capability references a missing script
     """
     # Import here to avoid circular imports
     from capability_storage import get_capability
+    from script_storage import get_script
 
     # No capabilities? Return as-is
     if not agent.capabilities:
@@ -273,6 +396,16 @@ def _resolve_autonomous_dependencies(agent: Agent) -> Agent:
         # Merge capability text into system prompt
         if capability.text:
             system_prompt_parts.append(capability.text)
+
+        # Phase 2: If capability has a script, generate usage instructions
+        if capability.script:
+            script = get_script(capability.script)
+            if script is None:
+                raise MissingCapabilityScriptError(
+                    agent.name, cap_name, capability.script
+                )
+            script_usage = _generate_script_usage(script)
+            system_prompt_parts.append(script_usage)
 
         # Merge capability MCP servers
         if capability.mcp_servers:
