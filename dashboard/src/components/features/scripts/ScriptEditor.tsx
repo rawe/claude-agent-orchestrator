@@ -6,9 +6,7 @@ import { AgentDemands } from '@/types/agent';
 import { AlertCircle, Check, Code, Eye, FileCode, Settings, FileInput, Target, X, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CoordinatorClient } from '@/lib/coordinator-client';
-import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
-import { fetchAccessToken } from '@/services/auth';
+import { useAiAssist } from '@/hooks/useAiAssist';
 
 interface ScriptEditorProps {
   isOpen: boolean;
@@ -28,6 +26,18 @@ interface FormData {
   demands_enabled: boolean;
   demands: AgentDemands | null;
 }
+
+// Type-safe form field names
+const F = {
+  name: 'name',
+  description: 'description',
+  script_file: 'script_file',
+  script_content: 'script_content',
+  parameters_schema_enabled: 'parameters_schema_enabled',
+  parameters_schema: 'parameters_schema',
+  demands_enabled: 'demands_enabled',
+  demands: 'demands',
+} as const satisfies Record<keyof FormData, keyof FormData>;
 
 type TabId = 'general' | 'script' | 'schema' | 'demands';
 
@@ -50,10 +60,9 @@ const DEFAULT_SCHEMA_TEMPLATE = {
   additionalProperties: false,
 };
 
-// Script assistant agent name
+// Script assistant configuration
 const SCRIPT_ASSISTANT_AGENT = 'script-assistant';
 
-// Script assistant input/output types
 interface ScriptAssistantInput {
   script_content: string;
   user_request?: string;
@@ -65,11 +74,11 @@ interface ScriptAssistantOutput {
   remarks?: string;
 }
 
-// Coordinator client singleton
-const coordinatorClient = new CoordinatorClient({
-  baseUrl: AGENT_ORCHESTRATOR_API_URL,
-  getToken: fetchAccessToken,
-});
+// Type-safe output field names
+const OUT = {
+  script: 'script',
+  remarks: 'remarks',
+} as const satisfies Record<keyof ScriptAssistantOutput, keyof ScriptAssistantOutput>;
 
 export function ScriptEditor({
   isOpen,
@@ -86,13 +95,6 @@ export function ScriptEditor({
   const [schemaText, setSchemaText] = useState('');
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [schemaValid, setSchemaValid] = useState(true);
-
-  // AI Check state
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<ScriptAssistantOutput | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiShowInput, setAiShowInput] = useState(false);
-  const [aiUserRequest, setAiUserRequest] = useState('');
 
   const isEditing = !!script;
 
@@ -212,7 +214,7 @@ export function ScriptEditor({
 
         setSchemaError(null);
         setSchemaValid(true);
-        setValue('parameters_schema', parsed);
+        setValue(F.parameters_schema, parsed);
       } catch (e) {
         if (e instanceof SyntaxError) {
           setSchemaError(`Invalid JSON: ${e.message}`);
@@ -234,89 +236,31 @@ export function ScriptEditor({
     }
   };
 
-  // AI Check handler
-  const handleAiCheck = async () => {
-    const scriptContent = getValues('script_content');
-    if (!scriptContent.trim()) {
-      setAiError('Script content is empty');
-      return;
-    }
-
-    setAiLoading(true);
-    setAiError(null);
-    setAiResult(null);
-
-    try {
-      // Build context from schema
-      const schemaEnabled = getValues('parameters_schema_enabled');
-      const schema = getValues('parameters_schema');
+  // AI Assist hook for script content
+  const ai = useAiAssist<ScriptAssistantInput, ScriptAssistantOutput>({
+    agentName: SCRIPT_ASSISTANT_AGENT,
+    buildInput: (userRequest) => {
+      const schemaEnabled = getValues(F.parameters_schema_enabled);
+      const schema = getValues(F.parameters_schema);
       const context = schemaEnabled && schema
         ? `Parameter schema: ${JSON.stringify(schema)}`
         : undefined;
 
-      // Build structured input
-      const input: ScriptAssistantInput = {
-        script_content: scriptContent,
-        user_request: aiUserRequest.trim() || 'Check for issues',
+      return {
+        script_content: getValues(F.script_content),
+        user_request: userRequest,
         context,
       };
+    },
+    defaultRequest: 'Check for issues',
+  });
 
-      // Start run with script-assistant agent
-      const run = await coordinatorClient.startRun({
-        agentName: SCRIPT_ASSISTANT_AGENT,
-        parameters: input as unknown as Record<string, unknown>,
-      });
-
-      const result = await run.waitForResult();
-
-      if (result.status === 'completed' && result.resultData) {
-        const output = result.resultData as unknown as ScriptAssistantOutput;
-        if (output.script) {
-          setAiResult(output);
-        } else {
-          setAiError('No script returned');
-        }
-      } else if (result.status === 'failed') {
-        setAiError(result.error || 'AI check failed');
-      } else {
-        setAiError('No result returned');
-      }
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'AI check failed');
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  // Accept AI result
+  // Handle accepting AI result
   const handleAiAccept = () => {
-    if (aiResult?.script) {
-      setValue('script_content', aiResult.script);
+    if (ai.result?.[OUT.script]) {
+      setValue(F.script_content, ai.result[OUT.script]);
     }
-    setAiResult(null);
-    setAiError(null);
-  };
-
-  // Reject AI result
-  const handleAiReject = () => {
-    setAiResult(null);
-    setAiError(null);
-  };
-
-  // Toggle AI input visibility
-  const handleAiToggle = () => {
-    if (aiShowInput) {
-      setAiShowInput(false);
-      setAiUserRequest('');
-    } else {
-      setAiShowInput(true);
-    }
-  };
-
-  // Submit AI request (from input)
-  const handleAiSubmit = () => {
-    setAiShowInput(false);
-    handleAiCheck();
+    ai.accept();
   };
 
   const onSubmit = async (data: FormData) => {
@@ -412,7 +356,7 @@ export function ScriptEditor({
             <button
               type="button"
               onClick={() => {
-                setPreviewContent(getValues('description') || '');
+                setPreviewContent(getValues(F.description) || '');
                 setDescriptionTab('preview');
               }}
               className={`flex items-center gap-1 px-3 py-1 text-xs border-l ${
@@ -483,16 +427,16 @@ export function ScriptEditor({
             <label className="label mb-0">Script Content *</label>
             <button
               type="button"
-              onClick={handleAiToggle}
-              disabled={aiLoading}
+              onClick={ai.toggle}
+              disabled={ai.isLoading}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed ${
-                aiShowInput
+                ai.showInput
                   ? 'bg-purple-200 text-purple-800'
                   : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
               }`}
               title="AI Assistant"
             >
-              {aiLoading ? (
+              {ai.isLoading ? (
                 <Spinner size="sm" />
               ) : (
                 <Sparkles className="w-3 h-3" />
@@ -504,20 +448,20 @@ export function ScriptEditor({
         </div>
 
         {/* AI Input */}
-        {aiShowInput && !aiLoading && (
+        {ai.showInput && !ai.isLoading && (
           <div className="mb-2 flex gap-2">
             <input
               type="text"
-              value={aiUserRequest}
-              onChange={(e) => setAiUserRequest(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAiSubmit()}
+              value={ai.userRequest}
+              onChange={(e) => ai.setUserRequest(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && ai.submit()}
               placeholder="What should I do? (e.g., 'Check for issues', 'Add error handling')"
               className="input flex-1 text-sm"
               autoFocus
             />
             <button
               type="button"
-              onClick={handleAiSubmit}
+              onClick={ai.submit}
               className="px-3 py-1 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded"
             >
               Send
@@ -526,18 +470,18 @@ export function ScriptEditor({
         )}
 
         {/* AI Error */}
-        {aiError && (
+        {ai.error && (
           <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-center gap-2">
             <AlertCircle className="w-3 h-3 flex-shrink-0" />
-            {aiError}
-            <button type="button" onClick={() => setAiError(null)} className="ml-auto">
+            {ai.error}
+            <button type="button" onClick={ai.clearError} className="ml-auto">
               <X className="w-3 h-3" />
             </button>
           </div>
         )}
 
         {/* AI Result Preview Overlay */}
-        {aiResult && (
+        {ai.result && (
           <div className="absolute inset-0 z-10 bg-white border border-purple-300 rounded-md shadow-lg flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border-b border-purple-200">
               <span className="text-sm font-medium text-purple-700 flex items-center gap-1">
@@ -555,7 +499,7 @@ export function ScriptEditor({
                 </button>
                 <button
                   type="button"
-                  onClick={handleAiReject}
+                  onClick={ai.reject}
                   className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded"
                 >
                   <X className="w-3 h-3" />
@@ -564,12 +508,12 @@ export function ScriptEditor({
               </div>
             </div>
             <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-              {aiResult.remarks && (
+              {ai.result[OUT.remarks] && (
                 <div className="px-3 py-2 bg-purple-25 border-b border-purple-100 text-sm text-purple-800">
-                  {aiResult.remarks}
+                  {ai.result[OUT.remarks]}
                 </div>
               )}
-              <pre className="flex-1 p-3 font-mono text-sm whitespace-pre-wrap">{aiResult.script}</pre>
+              <pre className="flex-1 p-3 font-mono text-sm whitespace-pre-wrap">{ai.result[OUT.script]}</pre>
             </div>
           </div>
         )}
@@ -610,11 +554,11 @@ export function ScriptEditor({
                   if (e.target.checked) {
                     // Initialize with template
                     setSchemaText(JSON.stringify(DEFAULT_SCHEMA_TEMPLATE, null, 2));
-                    setValue('parameters_schema', DEFAULT_SCHEMA_TEMPLATE);
+                    setValue(F.parameters_schema, DEFAULT_SCHEMA_TEMPLATE);
                     setSchemaValid(true);
                     setSchemaError(null);
                   } else {
-                    setValue('parameters_schema', null);
+                    setValue(F.parameters_schema, null);
                   }
                 }}
                 className="w-4 h-4 text-primary-600 rounded"
@@ -697,9 +641,9 @@ export function ScriptEditor({
                 onChange={(e) => {
                   field.onChange(e.target.checked);
                   if (!e.target.checked) {
-                    setValue('demands', null);
+                    setValue(F.demands, null);
                   } else {
-                    setValue('demands', {});
+                    setValue(F.demands, {});
                   }
                 }}
                 className="w-4 h-4 text-primary-600 rounded"
