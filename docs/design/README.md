@@ -22,6 +22,14 @@ Token-based server-to-server authentication with scoping. Generic pattern applic
 |----------|-------------|
 | [External Service Auth](./external-service-auth/README.md) | Overview and reading guide for token-based authentication and scoping |
 
+### Centralized Script Management
+
+Deploy UV/Python scripts centrally via Dashboard with automatic distribution to procedural executors.
+
+| Document | Description |
+|----------|-------------|
+| [Overview](./centralized-script-management/README.md) | Requirements, use cases, and document index |
+
 ### Other
 
 | Document | Description |
