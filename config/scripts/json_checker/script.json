@@ -1,6 +1,6 @@
 {
   "name": "json_checker",
-  "description": "cdfgdfgdgf",
+  "description": "Checks a given file for proper JSON format",
   "script_file": "json_check.py",
   "parameters_schema": {
     "type": "object",

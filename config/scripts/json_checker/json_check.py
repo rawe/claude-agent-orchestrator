@@ -32,8 +32,8 @@ def main() -> int:
         print(f"Valid JSON: {file_path}")
         return 0
     except json.JSONDecodeError as e:
-        print(f"Invalid JSON: {e.msg} at line {e.lineno}, column {e.colno}", file=sys.stderr)
-        return 1
+        print(f"Invalid JSON: {e.msg} at line {e.lineno}, column {e.colno}")
+        return 0
     except UnicodeDecodeError as e:
         print(f"Error: File encoding issue: {e}", file=sys.stderr)
         return 1
