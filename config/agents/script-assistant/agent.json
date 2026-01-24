@@ -1,6 +1,6 @@
 {
   "name": "script-assistant",
-  "description": "Internal agent to improve scripts. ",
+  "description": "Reviews and improves scripts, suggests parameter schema changes",
   "type": "autonomous",
   "parameters_schema": {
     "type": "object",
@@ -11,11 +11,11 @@
       },
       "user_request": {
         "type": "string",
-        "description": "User instruction (optional)"
+        "description": "User instruction"
       },
-      "context": {
-        "type": "string",
-        "description": "Additional context like parameter schema"
+      "parameters_schema": {
+        "type": "object",
+        "description": "Current parameters schema (if defined)"
       }
     },
     "required": [
@@ -28,6 +28,10 @@
       "script": {
         "type": "string",
         "description": "Updated script content"
+      },
+      "parameters_schema": {
+        "type": "object",
+        "description": "Updated parameters schema (if changes suggested)"
       },
       "remarks": {
         "type": "string",

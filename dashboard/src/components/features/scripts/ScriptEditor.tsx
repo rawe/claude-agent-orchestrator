@@ -7,6 +7,12 @@ import { AlertCircle, Check, Code, Eye, FileCode, Settings, FileInput, Target, X
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAiAssist } from '@/hooks/useAiAssist';
+import {
+  scriptAssistantDefinition,
+  type ScriptAssistantInput,
+  type ScriptAssistantOutput,
+  ScriptAssistantOutputKeys as OUT,
+} from '@/lib/system-agents';
 
 interface ScriptEditorProps {
   isOpen: boolean;
@@ -60,25 +66,6 @@ const DEFAULT_SCHEMA_TEMPLATE = {
   additionalProperties: false,
 };
 
-// Script assistant configuration
-const SCRIPT_ASSISTANT_AGENT = 'script-assistant';
-
-interface ScriptAssistantInput {
-  script_content: string;
-  user_request?: string;
-  context?: string;
-}
-
-interface ScriptAssistantOutput {
-  script: string;
-  remarks?: string;
-}
-
-// Type-safe output field names
-const OUT = {
-  script: 'script',
-  remarks: 'remarks',
-} as const satisfies Record<keyof ScriptAssistantOutput, keyof ScriptAssistantOutput>;
 
 export function ScriptEditor({
   isOpen,
@@ -238,18 +225,15 @@ export function ScriptEditor({
 
   // AI Assist hook for script content
   const ai = useAiAssist<ScriptAssistantInput, ScriptAssistantOutput>({
-    agentName: SCRIPT_ASSISTANT_AGENT,
+    agentName: scriptAssistantDefinition.name,
     buildInput: (userRequest) => {
       const schemaEnabled = getValues(F.parameters_schema_enabled);
       const schema = getValues(F.parameters_schema);
-      const context = schemaEnabled && schema
-        ? `Parameter schema: ${JSON.stringify(schema)}`
-        : undefined;
 
       return {
         script_content: getValues(F.script_content),
         user_request: userRequest,
-        context,
+        parameters_schema: schemaEnabled && schema ? schema : undefined,
       };
     },
     defaultRequest: 'Check for issues',
@@ -259,6 +243,15 @@ export function ScriptEditor({
   const handleAiAccept = () => {
     if (ai.result?.[OUT.script]) {
       setValue(F.script_content, ai.result[OUT.script]);
+    }
+    // Apply updated schema if returned
+    if (ai.result?.[OUT.parameters_schema]) {
+      const newSchema = ai.result[OUT.parameters_schema];
+      setValue(F.parameters_schema, newSchema ?? null);
+      setValue(F.parameters_schema_enabled, true);
+      setSchemaText(JSON.stringify(newSchema, null, 2));
+      setSchemaValid(true);
+      setSchemaError(null);
     }
     ai.accept();
   };
@@ -428,15 +421,17 @@ export function ScriptEditor({
             <button
               type="button"
               onClick={ai.toggle}
-              disabled={ai.isLoading}
+              disabled={!ai.available || ai.checkingAvailability || ai.isLoading}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed ${
                 ai.showInput
                   ? 'bg-purple-200 text-purple-800'
-                  : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                  : ai.available
+                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                    : 'bg-gray-100 text-gray-400'
               }`}
-              title="AI Assistant"
+              title={ai.unavailableReason || 'AI Assistant'}
             >
-              {ai.isLoading ? (
+              {ai.isLoading || ai.checkingAvailability ? (
                 <Spinner size="sm" />
               ) : (
                 <Sparkles className="w-3 h-3" />
@@ -471,12 +466,14 @@ export function ScriptEditor({
 
         {/* AI Error */}
         {ai.error && (
-          <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-center gap-2">
-            <AlertCircle className="w-3 h-3 flex-shrink-0" />
-            {ai.error}
-            <button type="button" onClick={ai.clearError} className="ml-auto">
-              <X className="w-3 h-3" />
-            </button>
+          <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 whitespace-pre-line">{ai.error}</div>
+              <button type="button" onClick={ai.clearError} className="flex-shrink-0 text-red-400 hover:text-red-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -509,10 +506,19 @@ export function ScriptEditor({
             </div>
             <div className="flex-1 flex flex-col min-h-0 overflow-auto">
               {ai.result[OUT.remarks] && (
-                <div className="px-3 py-2 bg-purple-25 border-b border-purple-100 text-sm text-purple-800">
+                <div className="px-3 py-2 bg-purple-50 border-b border-purple-100 text-sm text-purple-800">
                   {ai.result[OUT.remarks]}
                 </div>
               )}
+              {ai.result[OUT.parameters_schema] && (
+                <div className="px-3 py-2 bg-blue-50 border-b border-blue-100">
+                  <div className="text-xs font-medium text-blue-700 mb-1">Updated Parameters Schema:</div>
+                  <pre className="text-xs font-mono text-blue-800">{JSON.stringify(ai.result[OUT.parameters_schema], null, 2)}</pre>
+                </div>
+              )}
+              <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                <div className="text-xs font-medium text-gray-700 mb-1">Script:</div>
+              </div>
               <pre className="flex-1 p-3 font-mono text-sm whitespace-pre-wrap">{ai.result[OUT.script]}</pre>
             </div>
           </div>

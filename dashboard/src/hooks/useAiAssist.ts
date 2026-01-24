@@ -31,10 +31,11 @@
  * ```
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CoordinatorClient } from '@/lib/coordinator-client';
 import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
 import { fetchAccessToken } from '@/services/auth';
+import { agentService } from '@/services/agentService';
 
 // Shared coordinator client
 const coordinatorClient = new CoordinatorClient({
@@ -53,7 +54,99 @@ export interface UseAiAssistOptions<TInput> {
   defaultRequest?: string;
 }
 
+/** Message shown when agent is not available */
+const AGENT_UNAVAILABLE_MESSAGE = 'AI agent not available. Go to Settings → System Agents to provision.';
+
+/** Suffix added to error messages */
+const ERROR_HELP_SUFFIX = '\n\nIf this persists, go to Settings → System Agents to re-provision.';
+
+/**
+ * Extracts a readable message from various error types.
+ */
+function extractErrorMessage(error: unknown): string {
+  // String
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  // Error instance
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  // Object with common error properties
+  if (error && typeof error === 'object') {
+    const obj = error as Record<string, unknown>;
+
+    // API error format: { detail: "message" } or { detail: { message: "..." } }
+    if (obj.detail) {
+      if (typeof obj.detail === 'string') {
+        return obj.detail;
+      }
+      if (typeof obj.detail === 'object' && obj.detail !== null) {
+        const detail = obj.detail as Record<string, unknown>;
+        if (typeof detail.message === 'string') {
+          return detail.message;
+        }
+        if (typeof detail.error === 'string') {
+          return detail.error;
+        }
+      }
+    }
+
+    // Common error properties
+    if (typeof obj.message === 'string') {
+      return obj.message;
+    }
+    if (typeof obj.error === 'string') {
+      return obj.error;
+    }
+
+    // Try to stringify, but avoid [object Object]
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== '{}') {
+        return json;
+      }
+    } catch {
+      // Ignore stringify errors
+    }
+  }
+
+  return 'An unexpected error occurred';
+}
+
+/**
+ * Wraps an error message with helpful context.
+ */
+function formatErrorMessage(error: unknown): string {
+  const message = extractErrorMessage(error);
+
+  // Check for common error patterns and provide clearer messages
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes('not found') || lowerMessage.includes('404')) {
+    return `Agent not found. Please ensure system agents are provisioned.${ERROR_HELP_SUFFIX}`;
+  }
+
+  if (lowerMessage.includes('validation') || lowerMessage.includes('schema')) {
+    return `Input/output schema mismatch. The agent may need to be re-provisioned.${ERROR_HELP_SUFFIX}`;
+  }
+
+  if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
+    return `Request timed out. The agent may be unavailable.${ERROR_HELP_SUFFIX}`;
+  }
+
+  // Generic error with help suffix
+  return `${message}${ERROR_HELP_SUFFIX}`;
+}
+
 export interface UseAiAssistReturn<TOutput> {
+  // Availability
+  available: boolean;
+  checkingAvailability: boolean;
+  unavailableReason: string | null;
+
   // State
   showInput: boolean;
   userRequest: string;
@@ -77,12 +170,48 @@ export function useAiAssist<TInput, TOutput>(
 ): UseAiAssistReturn<TOutput> {
   const { agentName, buildInput, defaultRequest = 'Check for issues' } = options;
 
+  // Availability state
+  const [available, setAvailable] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(true);
+
   // State
   const [showInput, setShowInput] = useState(false);
   const [userRequest, setUserRequest] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Check agent availability on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAvailability = async () => {
+      setCheckingAvailability(true);
+      try {
+        // checkNameAvailable returns true if name is FREE (agent doesn't exist)
+        // We want the opposite - true if agent EXISTS
+        const isFree = await agentService.checkNameAvailable(agentName);
+        if (!cancelled) {
+          setAvailable(!isFree);
+        }
+      } catch {
+        // On error, assume not available
+        if (!cancelled) {
+          setAvailable(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingAvailability(false);
+        }
+      }
+    };
+
+    checkAvailability();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agentName]);
 
   // Toggle input visibility
   const toggle = useCallback(() => {
@@ -104,22 +233,40 @@ export function useAiAssist<TInput, TOutput>(
     try {
       const input = buildInput(userRequest.trim() || defaultRequest);
 
-      const run = await coordinatorClient.startRun({
-        agentName,
-        parameters: input as unknown as Record<string, unknown>,
-      });
+      // Start run - may fail if agent doesn't exist or validation fails
+      let run;
+      try {
+        run = await coordinatorClient.startRun({
+          agentName,
+          parameters: input as unknown as Record<string, unknown>,
+        });
+      } catch (startError) {
+        setError(formatErrorMessage(startError));
+        return;
+      }
 
-      const runResult = await run.waitForResult();
+      // Poll for result - may fail due to timeout or agent errors
+      let runResult;
+      try {
+        runResult = await run.waitForResult();
+      } catch (pollError) {
+        setError(formatErrorMessage(pollError));
+        return;
+      }
 
+      // Process result
       if (runResult.status === 'completed' && runResult.resultData) {
         setResult(runResult.resultData as unknown as TOutput);
       } else if (runResult.status === 'failed') {
-        setError(runResult.error || 'AI request failed');
+        setError(formatErrorMessage(runResult.error || 'AI request failed'));
+      } else if (runResult.status === 'stopped') {
+        setError('Request was stopped.');
       } else {
-        setError('No result returned');
+        setError(formatErrorMessage('No result returned from agent'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI request failed');
+      // Catch-all for unexpected errors
+      setError(formatErrorMessage(err));
     } finally {
       setIsLoading(false);
       setUserRequest('');
@@ -144,12 +291,22 @@ export function useAiAssist<TInput, TOutput>(
   }, []);
 
   return {
+    // Availability
+    available,
+    checkingAvailability,
+    unavailableReason: available ? null : AGENT_UNAVAILABLE_MESSAGE,
+
+    // State
     showInput,
     userRequest,
     isLoading,
     result,
     error,
+
+    // Setters
     setUserRequest,
+
+    // Actions
     toggle,
     submit,
     accept,

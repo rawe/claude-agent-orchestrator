@@ -80,7 +80,13 @@ export class CoordinatorClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to resume session: ${response.statusText}`);
+      const detail = errorData.detail;
+      const message = typeof detail === 'string'
+        ? detail
+        : detail != null
+          ? JSON.stringify(detail, null, 2)
+          : `Failed to resume session: ${response.statusText}`;
+      throw new Error(message);
     }
 
     const data = await response.json();
@@ -117,7 +123,13 @@ export class CoordinatorClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to start run: ${response.statusText}`);
+      const detail = errorData.detail;
+      const message = typeof detail === 'string'
+        ? detail
+        : detail != null
+          ? JSON.stringify(detail, null, 2)
+          : `Failed to start run: ${response.statusText}`;
+      throw new Error(message);
     }
 
     const data = await response.json();

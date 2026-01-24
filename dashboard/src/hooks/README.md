@@ -40,8 +40,12 @@ function MyComponent() {
   return (
     <>
       {/* Toggle button */}
-      <button onClick={ai.toggle} disabled={ai.isLoading}>
-        {ai.isLoading ? 'Loading...' : 'AI'}
+      <button
+        onClick={ai.toggle}
+        disabled={!ai.available || ai.checkingAvailability || ai.isLoading}
+        title={ai.unavailableReason || 'AI Assistant'}
+      >
+        {ai.isLoading || ai.checkingAvailability ? 'Loading...' : 'AI'}
       </button>
 
       {/* User input */}
@@ -82,6 +86,9 @@ function MyComponent() {
 
 | Property | Type | Description |
 |----------|------|-------------|
+| `available` | `boolean` | Whether agent exists and is ready |
+| `checkingAvailability` | `boolean` | Initial availability check in progress |
+| `unavailableReason` | `string \| null` | Message explaining why unavailable |
 | `showInput` | `boolean` | Whether input field is visible |
 | `userRequest` | `string` | Current user input |
 | `isLoading` | `boolean` | Request in progress |
