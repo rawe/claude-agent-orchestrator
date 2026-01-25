@@ -22,6 +22,14 @@ Token-based server-to-server authentication with scoping. Generic pattern applic
 |----------|-------------|
 | [External Service Auth](./external-service-auth/README.md) | Overview and reading guide for token-based authentication and scoping |
 
+### MCP Server Management
+
+Centralized MCP server registry with discovery API, parameterization, and URL resolution.
+
+| Document | Description |
+|----------|-------------|
+| [MCP Server Management](./mcp-server-management/mcp-server-management.md) | Registry-based MCP server management with discovery API, environment-aware URL resolution, and Dashboard integration |
+
 ## Archive (Implemented)
 
 Completed design documents kept for historical reference.
