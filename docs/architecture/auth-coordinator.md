@@ -193,7 +193,7 @@ The framework evaluated three approaches:
 - Approach 3: OAuth2/OIDC with External IdP - Industry standard, chosen for production
 
 See `docs/architecture/auth-oidc.md` for the OIDC architecture details.
-See `docs/setup/auth0-setup.md` for configuration instructions.
+See `docs/guides/auth0-setup.md` for configuration instructions.
 
 ---
 
@@ -235,4 +235,4 @@ Note: The query parameter is named `api_key` for backwards compatibility but exp
 
 See:
 - `docs/architecture/auth-oidc.md` - OIDC flow diagrams and component details
-- `docs/setup/auth0-setup.md` - Step-by-step Auth0 configuration
+- `docs/guides/auth0-setup.md` - Step-by-step Auth0 configuration

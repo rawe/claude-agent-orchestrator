@@ -22,22 +22,6 @@ Token-based server-to-server authentication with scoping. Generic pattern applic
 |----------|-------------|
 | [External Service Auth](./external-service-auth/README.md) | Overview and reading guide for token-based authentication and scoping |
 
-### Centralized Script Management
-
-Deploy UV/Python scripts centrally via Dashboard with automatic distribution to procedural executors.
-
-| Document | Description |
-|----------|-------------|
-| [Overview](./centralized-script-management/README.md) | Requirements, use cases, and document index |
-
-### Other
-
-| Document | Description |
-|----------|-------------|
-| [Agent Output Schema](./agent-output-schema.md) | Blueprint-defined output schemas for autonomous agents |
-| [Structured Output Schema Enforcement](./structured-output-schema-enforcement.md) | Caller-driven JSON Schema enforcement on agent outputs |
-| [Unified Task Model Overview](./unified-task-model-overview.md) | Architectural overview of the unified task model |
-
 ## Archive (Implemented)
 
 Completed design documents kept for historical reference.

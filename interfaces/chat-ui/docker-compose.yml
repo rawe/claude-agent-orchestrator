@@ -6,7 +6,7 @@ services:
       # Vite env vars must be passed as build args (baked at build time)
       args:
         - VITE_API_URL=${VITE_API_URL:-http://localhost:8765}
-        # Auth0 OIDC (optional - see docs/setup/auth0-setup.md)
+        # Auth0 OIDC (optional - see docs/guides/auth0-setup.md)
         - VITE_AUTH0_DOMAIN=${VITE_AUTH0_DOMAIN:-}
         - VITE_AUTH0_CLIENT_ID=${VITE_AUTH0_CLIENT_ID:-}
         - VITE_AUTH0_AUDIENCE=${VITE_AUTH0_AUDIENCE:-}

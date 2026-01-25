@@ -16,6 +16,7 @@ Documentation for implemented features of the Agent Orchestrator.
 | [Autonomous Agent Output Schema](./autonomous-agent-output-schema.md) | JSON Schema validated outputs |
 | [Agent Run Hooks](./agent-run-hooks.md) | Lifecycle hooks for preprocessing and observation |
 | [Dashboard AI Assistance](./dashboard-ai-assistance.md) | Built-in AI features powered by system agents |
+| [Centralized Script Management](./centralized-script-management.md) | Scripts as first-class primitives with automatic sync |
 
 ## Work in Progress
 
