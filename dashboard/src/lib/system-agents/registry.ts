@@ -7,6 +7,7 @@
 
 import { scriptAssistantDefinition } from './agents/script-assistant';
 import { schemaAssistantDefinition } from './agents/schema-assistant';
+import { promptAssistantDefinition } from './agents/prompt-assistant';
 
 // =============================================================================
 // Agent Definition Type
@@ -32,8 +33,8 @@ export interface SystemAgentDefinition {
 export const systemAgentRegistry: readonly SystemAgentDefinition[] = [
   scriptAssistantDefinition,
   schemaAssistantDefinition,
+  promptAssistantDefinition,
   // Add more agents here as needed:
-  // agentEditorAssistantDefinition,
   // descriptionAssistantDefinition,
 ];
 

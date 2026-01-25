@@ -5,12 +5,13 @@ import { MCPJsonEditor } from './MCPJsonEditor';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
 import { SchemaAiAssistantCard, SchemaAiAssistantResultModal } from './SchemaAiAssistant';
+import { PromptAiAssistantCard, PromptAiAssistantResultModal } from './PromptAiAssistant';
 import { Agent, AgentCreate, AgentType, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAgents } from '@/hooks/useAgents';
 import { useScripts } from '@/hooks/useScripts';
-import { useAiAssist } from '@/hooks/useAiAssist';
+import { useAiAssist, type UseAiAssistReturn } from '@/hooks/useAiAssist';
 import { useAiGroup } from '@/hooks/useAiGroup';
 import { agentService } from '@/services/agentService';
 import {
@@ -18,6 +19,10 @@ import {
   type SchemaAssistantInput,
   type SchemaAssistantOutput,
   SchemaAssistantOutputKeys as SCHEMA_OUT,
+  promptAssistantDefinition,
+  type PromptAssistantInput,
+  type PromptAssistantOutput,
+  PromptAssistantOutputKeys as PROMPT_OUT,
 } from '@/lib/system-agents';
 import {
   Eye,
@@ -197,8 +202,30 @@ export function AgentEditor({
     defaultRequest: 'Create an output schema for structured results',
   });
 
+  // AI Assist: System Prompt Assistant
+  const systemPromptAi = useAiAssist<PromptAssistantInput, PromptAssistantOutput>({
+    agentName: promptAssistantDefinition.name,
+    buildInput: useCallback((userRequest: string) => {
+      const currentPrompt = getValues('system_prompt');
+      const description = getValues('description');
+      const input: PromptAssistantInput = {
+        user_request: userRequest,
+      };
+      if (currentPrompt?.trim()) {
+        input.current_prompt = currentPrompt;
+      }
+      // Pass agent description as context
+      if (description?.trim()) {
+        input.context = `Agent description: ${description}`;
+      }
+      return input;
+    }, [getValues]),
+    defaultRequest: 'Create a system prompt based on the agent description',
+  });
+
   // AI Group: Aggregates all AI instances for unified protection
-  const ai = useAiGroup([inputSchemaAi, outputSchemaAi]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ai = useAiGroup([inputSchemaAi, outputSchemaAi, systemPromptAi] as UseAiAssistReturn<any>[]);
 
   // Handle accepting AI result for input schema
   const handleInputSchemaAiAccept = useCallback(() => {
@@ -225,6 +252,18 @@ export function AgentEditor({
 
     outputSchemaAi.accept();
   }, [outputSchemaAi, setValue]);
+
+  // Handle accepting AI result for system prompt
+  const handleSystemPromptAiAccept = useCallback(() => {
+    const result = systemPromptAi.result;
+    if (!result) return;
+
+    if (result[PROMPT_OUT.system_prompt]) {
+      setValue('system_prompt', result[PROMPT_OUT.system_prompt]);
+    }
+
+    systemPromptAi.accept();
+  }, [systemPromptAi, setValue]);
 
   const watchedSchemaEnabled = watch('parameters_schema_enabled');
   const watchedOutputSchemaEnabled = watch('output_schema_enabled');
@@ -815,8 +854,18 @@ export function AgentEditor({
     </div>
   );
 
+  const watchedSystemPrompt = watch('system_prompt');
+
   const PromptTab = () => (
     <div className="h-full flex flex-col">
+      {/* AI Assistant */}
+      <PromptAiAssistantCard
+        ai={systemPromptAi}
+        hasPrompt={!!watchedSystemPrompt?.trim()}
+        editPlaceholder="What changes do you want? (e.g., 'Add error handling instructions', 'Make it more concise')"
+        createPlaceholder="What should this agent do? (e.g., 'Research assistant that summarizes articles')"
+      />
+
       {/* Header with Edit/Preview toggle */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -1402,6 +1451,10 @@ export function AgentEditor({
       ai={outputSchemaAi}
       label="Output Schema"
       onAccept={handleOutputSchemaAiAccept}
+    />
+    <PromptAiAssistantResultModal
+      ai={systemPromptAi}
+      onAccept={handleSystemPromptAiAccept}
     />
     </>
   );

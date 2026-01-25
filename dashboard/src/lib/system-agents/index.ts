@@ -30,6 +30,10 @@ export { schemaAssistantDefinition } from './agents/schema-assistant';
 export type { SchemaAssistantInput, SchemaAssistantOutput } from './agents/schema-assistant';
 export { SchemaAssistantInputKeys, SchemaAssistantOutputKeys } from './agents/schema-assistant';
 
+export { promptAssistantDefinition } from './agents/prompt-assistant';
+export type { PromptAssistantInput, PromptAssistantOutput } from './agents/prompt-assistant';
+export { PromptAssistantInputKeys, PromptAssistantOutputKeys } from './agents/prompt-assistant';
+
 // Registry
 export {
   systemAgentRegistry,
