@@ -6,6 +6,7 @@ import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
 import { SchemaAiAssistantCard, SchemaAiAssistantResultModal } from './SchemaAiAssistant';
 import { PromptAiAssistantCard, PromptAiAssistantResultModal } from './PromptAiAssistant';
+import { ScriptSelector } from '../scripts';
 import { Agent, AgentCreate, AgentType, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -645,81 +646,24 @@ export function AgentEditor({
         </InfoPopover>
       </div>
 
-      {scriptsLoading ? (
-        <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
-          <Spinner size="sm" />
-          <span>Loading scripts...</span>
-        </div>
-      ) : availableScripts.length === 0 ? (
-        <div className="text-sm text-gray-500 italic py-4 p-4 bg-yellow-50 rounded-md border border-yellow-200">
-          <p className="font-medium text-yellow-800 mb-1">No scripts available</p>
-          <p>Create scripts in the Scripts page first, then come back to select one.</p>
-        </div>
-      ) : (
-        <>
-          <Controller
-            name="script"
-            control={control}
-            render={({ field }) => (
-              <select
-                {...field}
-                className={`input ${!watchedScript ? 'text-gray-400' : ''}`}
-              >
-                <option value="">Select a script...</option>
-                {availableScripts.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            )}
+      <Controller
+        name="script"
+        control={control}
+        render={({ field }) => (
+          <ScriptSelector
+            value={field.value || ''}
+            onChange={field.onChange}
+            scripts={availableScripts}
+            loading={scriptsLoading}
           />
+        )}
+      />
 
-          {watchedScript && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Script Details</h4>
-              {(() => {
-                const selectedScript = availableScripts.find((s) => s.name === watchedScript);
-                if (!selectedScript) return null;
-                return (
-                  <div className="space-y-2 text-sm">
-                    <p>
-                      <span className="text-gray-500">File:</span>{' '}
-                      <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">
-                        {selectedScript.script_file}
-                      </code>
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Description:</span>{' '}
-                      <span className="text-gray-700">{selectedScript.description}</span>
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      {selectedScript.has_parameters_schema && (
-                        <Badge size="sm" variant="default">
-                          Has Schema
-                        </Badge>
-                      )}
-                      {selectedScript.has_demands && (
-                        <Badge size="sm" variant="info">
-                          Has Demands
-                        </Badge>
-                      )}
-                      {selectedScript.demand_tags.length > 0 && (
-                        <span className="text-xs text-gray-500">
-                          Tags: {selectedScript.demand_tags.join(', ')}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2 italic">
-                      Parameters schema and demands are inherited from the script.
-                      Agent-level demands will be merged with script demands.
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </>
+      {watchedScript && (
+        <p className="text-xs text-gray-500 italic">
+          Parameters schema and demands are inherited from the script.
+          Agent-level demands will be merged with script demands.
+        </p>
       )}
     </div>
   );

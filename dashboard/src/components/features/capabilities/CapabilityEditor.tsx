@@ -11,6 +11,7 @@ import { Eye, Code, FileCode, Server, FileText, Settings, X, FlaskConical } from
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useScripts } from '@/hooks/useScripts';
+import { ScriptSelector } from '../scripts';
 
 // =============================================================================
 // ZOD SCHEMA
@@ -403,18 +404,18 @@ export function CapabilityEditor({
         <p className="text-xs text-gray-500 mb-2">
           Select a script that agents can execute locally when using this capability.
         </p>
-        <select {...register(F.script)} className="input" disabled={scriptsLoading}>
-          <option value="">Select a script...</option>
-          {availableScripts.map((script) => (
-            <option key={script.name} value={script.name}>
-              {script.name} - {script.description}
-            </option>
-          ))}
-        </select>
-        {scriptsLoading && <p className="mt-1 text-xs text-gray-500">Loading scripts...</p>}
-        {!scriptsLoading && availableScripts.length === 0 && (
-          <p className="mt-1 text-xs text-amber-600">No scripts available. Create scripts first.</p>
-        )}
+        <Controller
+          name={F.script}
+          control={control}
+          render={({ field }) => (
+            <ScriptSelector
+              value={field.value || ''}
+              onChange={field.onChange}
+              scripts={availableScripts}
+              loading={scriptsLoading}
+            />
+          )}
+        />
       </div>
     </div>
   );

@@ -51,6 +51,7 @@ export function AgentManager() {
       if (editingAgent) {
         await updateAgent(editingAgent.name, {
           description: data.description,
+          script: data.script,
           parameters_schema: data.parameters_schema,
           output_schema: data.output_schema,
           system_prompt: data.system_prompt,
