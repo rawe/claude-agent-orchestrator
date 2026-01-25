@@ -26,6 +26,10 @@ export { scriptAssistantDefinition } from './agents/script-assistant';
 export type { ScriptAssistantInput, ScriptAssistantOutput } from './agents/script-assistant';
 export { ScriptAssistantInputKeys, ScriptAssistantOutputKeys } from './agents/script-assistant';
 
+export { schemaAssistantDefinition } from './agents/schema-assistant';
+export type { SchemaAssistantInput, SchemaAssistantOutput } from './agents/schema-assistant';
+export { SchemaAssistantInputKeys, SchemaAssistantOutputKeys } from './agents/schema-assistant';
+
 // Registry
 export {
   systemAgentRegistry,
