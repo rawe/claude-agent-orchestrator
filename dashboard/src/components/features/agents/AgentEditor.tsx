@@ -1,13 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector, InfoPopover } from '@/components/common';
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
-import { Agent, AgentCreate, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
+import { SchemaAiAssistantCard, SchemaAiAssistantResultModal } from './SchemaAiAssistant';
+import { PromptAiAssistantCard, PromptAiAssistantResultModal } from './PromptAiAssistant';
+import { ScriptSelector } from '../scripts';
+import { Agent, AgentCreate, AgentType, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAgents } from '@/hooks/useAgents';
+import { useScripts } from '@/hooks/useScripts';
+import { useAiAssist, type UseAiAssistReturn } from '@/hooks/useAiAssist';
+import { useAiGroup } from '@/hooks/useAiGroup';
+import { agentService } from '@/services/agentService';
+import {
+  schemaAssistantDefinition,
+  type SchemaAssistantInput,
+  type SchemaAssistantOutput,
+  SchemaAssistantOutputKeys as SCHEMA_OUT,
+  promptAssistantDefinition,
+  type PromptAssistantInput,
+  type PromptAssistantOutput,
+  PromptAssistantOutputKeys as PROMPT_OUT,
+} from '@/lib/system-agents';
 import {
   Eye,
   Code,
@@ -21,6 +38,7 @@ import {
   Server,
   Target,
   Zap,
+  FileCode,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -44,6 +62,8 @@ interface HookFormFields {
 interface FormData {
   name: string;
   description: string;
+  type: AgentType;
+  script: string;  // Script name for procedural agents
   parameters_schema_enabled: boolean;
   parameters_schema: Record<string, unknown> | null;
   output_schema_enabled: boolean;
@@ -59,15 +79,24 @@ interface FormData {
   on_run_finish: HookFormFields;
 }
 
-type TabId = 'general' | 'input' | 'output' | 'prompt' | 'capabilities' | 'mcp' | 'runner' | 'hooks';
+type TabId = 'general' | 'script' | 'input' | 'output' | 'prompt' | 'capabilities' | 'mcp' | 'runner' | 'hooks';
 
-const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
+// Tabs for autonomous agents
+const autonomousTabs: { id: TabId; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'input', label: 'Input', icon: FileInput },
   { id: 'output', label: 'Output', icon: FileOutput },
   { id: 'prompt', label: 'Prompt', icon: ScrollText },
   { id: 'capabilities', label: 'Capabilities', icon: Puzzle },
   { id: 'mcp', label: 'MCP', icon: Server },
+  { id: 'runner', label: 'Runner', icon: Target },
+  { id: 'hooks', label: 'Hooks', icon: Zap },
+];
+
+// Tabs for procedural agents (simpler: no input/output/prompt/capabilities/mcp)
+const proceduralTabs: { id: TabId; label: string; icon: typeof Settings }[] = [
+  { id: 'general', label: 'General', icon: Settings },
+  { id: 'script', label: 'Script', icon: FileCode },
   { id: 'runner', label: 'Runner', icon: Target },
   { id: 'hooks', label: 'Hooks', icon: Zap },
 ];
@@ -90,6 +119,9 @@ export function AgentEditor({
 
   // Load available agents for hook agent dropdown
   const { agents: availableAgents, loading: agentsLoading } = useAgents();
+
+  // Load available scripts for procedural agents
+  const { scripts: availableScripts, loading: scriptsLoading } = useScripts();
 
   const isEditing = !!agent;
 
@@ -114,6 +146,8 @@ export function AgentEditor({
     defaultValues: {
       name: '',
       description: '',
+      type: 'autonomous',
+      script: '',
       parameters_schema_enabled: false,
       parameters_schema: null,
       output_schema_enabled: false,
@@ -128,6 +162,109 @@ export function AgentEditor({
       on_run_finish: { ...defaultHookFields },
     },
   });
+
+  const watchedType = watch('type');
+  const watchedScript = watch('script');
+
+  // Select tabs based on agent type
+  const tabs = watchedType === 'procedural' ? proceduralTabs : autonomousTabs;
+
+  // AI Assist: Input Schema Assistant
+  const inputSchemaAi = useAiAssist<SchemaAssistantInput, SchemaAssistantOutput>({
+    agentName: schemaAssistantDefinition.name,
+    buildInput: useCallback((userRequest: string) => {
+      const schema = getValues('parameters_schema');
+      const input: SchemaAssistantInput = {
+        user_request: userRequest,
+        schema_context: 'input parameters for an autonomous agent',
+      };
+      if (schema) {
+        input.current_schema = schema;
+      }
+      return input;
+    }, [getValues]),
+    defaultRequest: 'Create a simple input schema with a prompt field',
+  });
+
+  // AI Assist: Output Schema Assistant
+  const outputSchemaAi = useAiAssist<SchemaAssistantInput, SchemaAssistantOutput>({
+    agentName: schemaAssistantDefinition.name,
+    buildInput: useCallback((userRequest: string) => {
+      const schema = getValues('output_schema');
+      const input: SchemaAssistantInput = {
+        user_request: userRequest,
+        schema_context: 'structured output data from an autonomous agent',
+      };
+      if (schema) {
+        input.current_schema = schema;
+      }
+      return input;
+    }, [getValues]),
+    defaultRequest: 'Create an output schema for structured results',
+  });
+
+  // AI Assist: System Prompt Assistant
+  const systemPromptAi = useAiAssist<PromptAssistantInput, PromptAssistantOutput>({
+    agentName: promptAssistantDefinition.name,
+    buildInput: useCallback((userRequest: string) => {
+      const currentPrompt = getValues('system_prompt');
+      const description = getValues('description');
+      const input: PromptAssistantInput = {
+        user_request: userRequest,
+      };
+      if (currentPrompt?.trim()) {
+        input.current_prompt = currentPrompt;
+      }
+      // Pass agent description as context
+      if (description?.trim()) {
+        input.context = `Agent description: ${description}`;
+      }
+      return input;
+    }, [getValues]),
+    defaultRequest: 'Create a system prompt based on the agent description',
+  });
+
+  // AI Group: Aggregates all AI instances for unified protection
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ai = useAiGroup([inputSchemaAi, outputSchemaAi, systemPromptAi] as UseAiAssistReturn<any>[]);
+
+  // Handle accepting AI result for input schema
+  const handleInputSchemaAiAccept = useCallback(() => {
+    const result = inputSchemaAi.result;
+    if (!result) return;
+
+    if (result[SCHEMA_OUT.schema]) {
+      setValue('parameters_schema', result[SCHEMA_OUT.schema]);
+      setValue('parameters_schema_enabled', true);
+    }
+
+    inputSchemaAi.accept();
+  }, [inputSchemaAi, setValue]);
+
+  // Handle accepting AI result for output schema
+  const handleOutputSchemaAiAccept = useCallback(() => {
+    const result = outputSchemaAi.result;
+    if (!result) return;
+
+    if (result[SCHEMA_OUT.schema]) {
+      setValue('output_schema', result[SCHEMA_OUT.schema]);
+      setValue('output_schema_enabled', true);
+    }
+
+    outputSchemaAi.accept();
+  }, [outputSchemaAi, setValue]);
+
+  // Handle accepting AI result for system prompt
+  const handleSystemPromptAiAccept = useCallback(() => {
+    const result = systemPromptAi.result;
+    if (!result) return;
+
+    if (result[PROMPT_OUT.system_prompt]) {
+      setValue('system_prompt', result[PROMPT_OUT.system_prompt]);
+    }
+
+    systemPromptAi.accept();
+  }, [systemPromptAi, setValue]);
 
   const watchedSchemaEnabled = watch('parameters_schema_enabled');
   const watchedOutputSchemaEnabled = watch('output_schema_enabled');
@@ -147,32 +284,38 @@ export function AgentEditor({
     };
   };
 
-  // Load agent data when editing
+  // Load agent data when editing - fetch RAW data to avoid showing resolved system_prompt
   useEffect(() => {
-    if (agent) {
-      // parameters_schema_enabled is true if the agent has a non-null schema
-      const hasInputSchema = agent.parameters_schema != null;
-      const hasOutputSchema = agent.output_schema != null;
-      reset({
-        name: agent.name,
-        description: agent.description,
-        parameters_schema_enabled: hasInputSchema,
-        parameters_schema: agent.parameters_schema,
-        output_schema_enabled: hasOutputSchema,
-        output_schema: agent.output_schema,
-        system_prompt: agent.system_prompt || '',
-        mcp_servers: agent.mcp_servers,
-        skills: agent.skills || [],
-        tags: agent.tags || [],
-        capabilities: agent.capabilities || [],
-        demands: agent.demands,
-        on_run_start: hookConfigToFormFields(agent.hooks?.on_run_start),
-        on_run_finish: hookConfigToFormFields(agent.hooks?.on_run_finish),
+    if (agent && isOpen) {
+      // Fetch raw agent data for editing (not resolved)
+      agentService.getAgentRaw(agent.name).then((rawAgent) => {
+        const hasInputSchema = rawAgent.parameters_schema != null;
+        const hasOutputSchema = rawAgent.output_schema != null;
+        reset({
+          name: rawAgent.name,
+          description: rawAgent.description,
+          type: rawAgent.type || 'autonomous',
+          script: rawAgent.script || '',
+          parameters_schema_enabled: hasInputSchema,
+          parameters_schema: rawAgent.parameters_schema,
+          output_schema_enabled: hasOutputSchema,
+          output_schema: rawAgent.output_schema,
+          system_prompt: rawAgent.system_prompt || '',
+          mcp_servers: rawAgent.mcp_servers,
+          skills: rawAgent.skills || [],
+          tags: rawAgent.tags || [],
+          capabilities: rawAgent.capabilities || [],
+          demands: rawAgent.demands,
+          on_run_start: hookConfigToFormFields(rawAgent.hooks?.on_run_start),
+          on_run_finish: hookConfigToFormFields(rawAgent.hooks?.on_run_finish),
+        });
       });
-    } else {
+    } else if (!agent) {
       reset({
         name: '',
         description: '',
+        type: 'autonomous',
+        script: '',
         parameters_schema_enabled: false,
         parameters_schema: null,
         output_schema_enabled: false,
@@ -274,21 +417,37 @@ export function AgentEditor({
             }
           : null;
 
-      // UI-created agents are always autonomous (procedural agents are runner-owned)
-      const createData: AgentCreate = {
-        name: data.name,
-        description: data.description,
-        type: 'autonomous',
-        parameters_schema: parametersSchema,
-        output_schema: outputSchema,
-        system_prompt: data.system_prompt || undefined,
-        mcp_servers: data.mcp_servers ?? {}, // null → {} to clear MCP servers
-        skills: data.skills, // empty array clears skills
-        tags: data.tags, // empty array clears tags
-        capabilities: data.capabilities, // capability references
-        demands: cleanDemands ?? null, // null clears demands
-        hooks: hooks, // lifecycle hooks
-      };
+      // Build agent create data based on type
+      let createData: AgentCreate;
+
+      if (data.type === 'procedural') {
+        // Procedural agents: include script, exclude autonomous-specific fields
+        createData = {
+          name: data.name,
+          description: data.description,
+          type: 'procedural',
+          script: data.script || undefined,
+          tags: data.tags, // empty array clears tags
+          demands: cleanDemands ?? null, // null clears demands
+          hooks: hooks, // lifecycle hooks
+        };
+      } else {
+        // Autonomous agents: include all autonomous-specific fields
+        createData = {
+          name: data.name,
+          description: data.description,
+          type: 'autonomous',
+          parameters_schema: parametersSchema,
+          output_schema: outputSchema,
+          system_prompt: data.system_prompt || undefined,
+          mcp_servers: data.mcp_servers ?? {}, // null → {} to clear MCP servers
+          skills: data.skills, // empty array clears skills
+          tags: data.tags, // empty array clears tags
+          capabilities: data.capabilities, // capability references
+          demands: cleanDemands ?? null, // null clears demands
+          hooks: hooks, // lifecycle hooks
+        };
+      }
       await onSave(createData);
       onClose();
     } catch (err) {
@@ -361,6 +520,64 @@ export function AgentEditor({
         )}
       </div>
 
+      {/* Agent Type */}
+      <div>
+        <div className="flex items-center gap-2 mb-1.5">
+          <label className="text-sm font-medium text-gray-700">Agent Type</label>
+          <span className="text-red-500">*</span>
+          <InfoPopover title="Agent Type">
+            <p>Choose the type of agent:</p>
+            <ul className="list-disc ml-4 mt-2 space-y-1">
+              <li>
+                <strong>Autonomous:</strong> AI-powered agents that interpret intent and execute tasks using Claude
+              </li>
+              <li>
+                <strong>Procedural:</strong> Script-based agents that execute predefined scripts with parameters
+              </li>
+            </ul>
+          </InfoPopover>
+        </div>
+        <Controller
+          name="type"
+          control={control}
+          render={({ field }) => (
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="autonomous"
+                  checked={field.value === 'autonomous'}
+                  onChange={() => {
+                    field.onChange('autonomous');
+                    setActiveTab('general');
+                  }}
+                  disabled={isEditing}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className={`text-sm ${isEditing ? 'text-gray-400' : ''}`}>Autonomous</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="procedural"
+                  checked={field.value === 'procedural'}
+                  onChange={() => {
+                    field.onChange('procedural');
+                    setActiveTab('general');
+                  }}
+                  disabled={isEditing}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className={`text-sm ${isEditing ? 'text-gray-400' : ''}`}>Procedural</span>
+              </label>
+            </div>
+          )}
+        />
+        {isEditing && (
+          <p className="mt-1 text-xs text-gray-500">Agent type cannot be changed after creation</p>
+        )}
+      </div>
+
       {/* Description */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
@@ -416,8 +633,52 @@ export function AgentEditor({
     </div>
   );
 
+  // Script tab for procedural agents
+  const ScriptTab = () => (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-sm font-medium text-gray-700">Script</label>
+        <InfoPopover title="Script">
+          <p>
+            Select a script to execute when this agent is invoked. The script defines the execution
+            logic, input parameters schema, and execution requirements.
+          </p>
+        </InfoPopover>
+      </div>
+
+      <Controller
+        name="script"
+        control={control}
+        render={({ field }) => (
+          <ScriptSelector
+            value={field.value || ''}
+            onChange={field.onChange}
+            scripts={availableScripts}
+            loading={scriptsLoading}
+          />
+        )}
+      />
+
+      {watchedScript && (
+        <p className="text-xs text-gray-500 italic">
+          Parameters schema and demands are inherited from the script.
+          Agent-level demands will be merged with script demands.
+        </p>
+      )}
+    </div>
+  );
+
   const InputTab = () => (
-    <div className="h-full flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+    <div className="h-full flex flex-col">
+      {/* AI Assistant */}
+      <SchemaAiAssistantCard
+        ai={inputSchemaAi}
+        label="Input Schema"
+        schemaEnabled={watchedSchemaEnabled}
+        editPlaceholder="What changes do you want? (e.g., 'Add a max_tokens field', 'Make prompt optional')"
+        createPlaceholder="What inputs does this agent need? (e.g., 'A topic to research and optional max results')"
+      />
+
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Input Schema</label>
@@ -477,7 +738,16 @@ export function AgentEditor({
   );
 
   const OutputTab = () => (
-    <div className="h-full flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+    <div className="h-full flex flex-col">
+      {/* AI Assistant */}
+      <SchemaAiAssistantCard
+        ai={outputSchemaAi}
+        label="Output Schema"
+        schemaEnabled={watchedOutputSchemaEnabled}
+        editPlaceholder="What changes do you want? (e.g., 'Add an error field', 'Include metadata')"
+        createPlaceholder="What should this agent output? (e.g., 'A summary with key points and confidence score')"
+      />
+
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Output Schema</label>
@@ -528,8 +798,18 @@ export function AgentEditor({
     </div>
   );
 
+  const watchedSystemPrompt = watch('system_prompt');
+
   const PromptTab = () => (
     <div className="h-full flex flex-col">
+      {/* AI Assistant */}
+      <PromptAiAssistantCard
+        ai={systemPromptAi}
+        hasPrompt={!!watchedSystemPrompt?.trim()}
+        editPlaceholder="What changes do you want? (e.g., 'Add error handling instructions', 'Make it more concise')"
+        createPlaceholder="What should this agent do? (e.g., 'Research assistant that summarizes articles')"
+      />
+
       {/* Header with Edit/Preview toggle */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -579,13 +859,9 @@ export function AgentEditor({
           {...register('system_prompt')}
           placeholder="# Agent System Prompt&#10;&#10;Define the agent's behavior, capabilities, and constraints..."
           className="flex-1 input font-mono text-sm resize-none min-h-0"
-          style={{ height: 'calc(85vh - 220px)' }}
         />
       ) : (
-        <div
-          className="flex-1 border border-gray-300 rounded-md p-4 overflow-y-auto bg-white min-h-0"
-          style={{ height: 'calc(85vh - 220px)' }}
-        >
+        <div className="flex-1 border border-gray-300 rounded-md p-4 overflow-y-auto bg-white min-h-0">
           {getValues('system_prompt') ? (
             <div className="markdown-content prose prose-sm max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{getValues('system_prompt')}</ReactMarkdown>
@@ -680,7 +956,7 @@ export function AgentEditor({
   );
 
   const McpTab = () => (
-    <div className="h-full flex flex-col" style={{ height: 'calc(85vh - 180px)' }}>
+    <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
         <label className="text-sm font-medium text-gray-700">MCP Servers</label>
         <InfoPopover title="MCP Servers">
@@ -1033,7 +1309,8 @@ export function AgentEditor({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl">
+    <>
+    <Modal isOpen={isOpen} onClose={() => { if (!ai.isAnyLoading && !ai.hasAnyResult) onClose(); }} size="2xl">
       <form onSubmit={handleSubmit(onSubmit)} className="h-[85vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
@@ -1043,7 +1320,8 @@ export function AgentEditor({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
+            disabled={ai.isAnyLoading}
+            className="text-gray-400 hover:text-gray-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1074,9 +1352,13 @@ export function AgentEditor({
             })}
           </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          {/* Tab Content
+              - flex flex-col: allows children with flex-1 to expand (Input, Output, Prompt, MCP tabs)
+              - overflow-y-auto: provides scrolling for tabs without flex-1 children (General, Runner, Hooks)
+              Both work together: expandable content fills space, fixed content scrolls if needed */}
+          <div className="flex-1 p-6 flex flex-col overflow-y-auto">
             {activeTab === 'general' && <GeneralTab />}
+            {activeTab === 'script' && <ScriptTab />}
             {activeTab === 'input' && <InputTab />}
             {activeTab === 'output' && <OutputTab />}
             {activeTab === 'prompt' && <PromptTab />}
@@ -1089,14 +1371,35 @@ export function AgentEditor({
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={ai.isAnyLoading}>
             Cancel
           </Button>
-          <Button type="submit" loading={saving} disabled={!isEditing && nameAvailable === false}>
+          <Button
+            type="submit"
+            loading={saving}
+            disabled={ai.isAnyLoading || (!isEditing && nameAvailable === false)}
+          >
             {isEditing ? 'Save Changes' : 'Create Agent'}
           </Button>
         </div>
       </form>
     </Modal>
+
+    {/* AI Result Modals - rendered outside main modal to avoid z-index issues */}
+    <SchemaAiAssistantResultModal
+      ai={inputSchemaAi}
+      label="Input Schema"
+      onAccept={handleInputSchemaAiAccept}
+    />
+    <SchemaAiAssistantResultModal
+      ai={outputSchemaAi}
+      label="Output Schema"
+      onAccept={handleOutputSchemaAiAccept}
+    />
+    <PromptAiAssistantResultModal
+      ai={systemPromptAi}
+      onAccept={handleSystemPromptAiAccept}
+    />
+    </>
   );
 }

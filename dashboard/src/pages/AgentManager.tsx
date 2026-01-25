@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAgents } from '@/hooks/useAgents';
-import { AgentTable, AgentEditor } from '@/components/features/agents';
+import { AgentTable, AgentEditor, ResolvedPromptModal } from '@/components/features/agents';
 import { Button, ConfirmModal } from '@/components/common';
 import { useNotification } from '@/contexts';
 import { Agent, AgentCreate } from '@/types';
 import { Plus } from 'lucide-react';
+import { agentService } from '@/services/agentService';
 
 export function AgentManager() {
   const {
@@ -29,6 +30,11 @@ export function AgentManager() {
     agentName: null,
   });
   const [actionLoading, setActionLoading] = useState(false);
+  const [viewResolvedAgent, setViewResolvedAgent] = useState<Agent | null>(null);
+
+  const fetchResolvedAgent = useCallback(async (name: string) => {
+    return agentService.getAgent(name);
+  }, []);
 
   const handleCreateNew = () => {
     setEditingAgent(null);
@@ -45,6 +51,7 @@ export function AgentManager() {
       if (editingAgent) {
         await updateAgent(editingAgent.name, {
           description: data.description,
+          script: data.script,
           parameters_schema: data.parameters_schema,
           output_schema: data.output_schema,
           system_prompt: data.system_prompt,
@@ -117,6 +124,7 @@ export function AgentManager() {
           onEditAgent={handleEditAgent}
           onDeleteAgent={(name) => setDeleteConfirm({ isOpen: true, agentName: name })}
           onToggleStatus={handleToggleStatus}
+          onViewResolved={setViewResolvedAgent}
         />
       </div>
 
@@ -142,6 +150,14 @@ export function AgentManager() {
         confirmText="Delete"
         variant="danger"
         loading={actionLoading}
+      />
+
+      {/* Resolved Prompt Modal */}
+      <ResolvedPromptModal
+        isOpen={viewResolvedAgent !== null}
+        onClose={() => setViewResolvedAgent(null)}
+        agent={viewResolvedAgent}
+        fetchResolvedAgent={fetchResolvedAgent}
       />
     </div>
   );

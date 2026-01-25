@@ -18,6 +18,7 @@ from models import (
     Capability,
     CapabilityCreate,
     CapabilitySummary,
+    CapabilityType,
     CapabilityUpdate,
     MCPServerHttp,
     MCPServerStdio,
@@ -66,6 +67,28 @@ def _get_file_times(capability_dir: Path) -> tuple[str, str]:
     return now, now
 
 
+def _detect_capability_type(
+    data: dict,
+    has_mcp: bool,
+) -> CapabilityType:
+    """
+    Detect capability type from data.
+
+    Used for auto-migration of existing capabilities without explicit type.
+    Priority: explicit type > has script > has mcp > text (default)
+    """
+    # If type is explicitly set, use it
+    if "type" in data:
+        return CapabilityType(data["type"])
+
+    # Auto-detect based on fields present
+    if data.get("script"):
+        return CapabilityType.SCRIPT
+    if has_mcp:
+        return CapabilityType.MCP
+    return CapabilityType.TEXT
+
+
 def _read_mcp_servers(
     mcp_file: Path,
 ) -> Optional[dict]:
@@ -104,6 +127,9 @@ def _read_capability_from_dir(capability_dir: Path) -> Optional[Capability]:
         if not name or not description:
             return None
 
+        # Read optional script reference
+        script = data.get("script")
+
         # Read optional text content
         text = None
         text_file = capability_dir / "capability.text.md"
@@ -111,7 +137,11 @@ def _read_capability_from_dir(capability_dir: Path) -> Optional[Capability]:
             text = text_file.read_text(encoding="utf-8")
 
         # Read optional MCP config
-        mcp_servers = _read_mcp_servers(capability_dir / "capability.mcp.json")
+        mcp_file = capability_dir / "capability.mcp.json"
+        mcp_servers = _read_mcp_servers(mcp_file)
+
+        # Detect type (auto-migrate existing capabilities without type)
+        capability_type = _detect_capability_type(data, mcp_file.exists())
 
         # Get timestamps
         created_at, modified_at = _get_file_times(capability_dir)
@@ -119,6 +149,8 @@ def _read_capability_from_dir(capability_dir: Path) -> Optional[Capability]:
         return Capability(
             name=name,
             description=description,
+            type=capability_type,
+            script=script,
             text=text,
             mcp_servers=mcp_servers,
             created_at=created_at,
@@ -145,12 +177,19 @@ def _read_capability_summary_from_dir(
         if not name or not description:
             return None
 
+        # Check for script reference
+        script_name = data.get("script")
+        has_script = script_name is not None
+
         # Check for optional files
         text_file = capability_dir / "capability.text.md"
         mcp_file = capability_dir / "capability.mcp.json"
 
         has_text = text_file.exists()
         has_mcp = mcp_file.exists()
+
+        # Detect type (auto-migrate existing capabilities without type)
+        capability_type = _detect_capability_type(data, has_mcp)
 
         # Get MCP server names if present
         mcp_server_names = []
@@ -165,6 +204,9 @@ def _read_capability_summary_from_dir(
         return CapabilitySummary(
             name=name,
             description=description,
+            type=capability_type,
+            has_script=has_script,
+            script_name=script_name,
             has_text=has_text,
             has_mcp=has_mcp,
             mcp_server_names=mcp_server_names,
@@ -219,7 +261,13 @@ def create_capability(data: CapabilityCreate) -> Capability:
     capability_dir.mkdir()
 
     # Write capability.json
-    capability_data = {"name": data.name, "description": data.description}
+    capability_data = {
+        "name": data.name,
+        "description": data.description,
+        "type": data.type.value,
+    }
+    if data.script:
+        capability_data["script"] = data.script
     with open(capability_dir / "capability.json", "w", encoding="utf-8") as f:
         json.dump(capability_data, f, indent=2)
         f.write("\n")
@@ -260,6 +308,19 @@ def update_capability(name: str, updates: CapabilityUpdate) -> Optional[Capabili
     # Apply updates
     if updates.description is not None:
         capability_data["description"] = updates.description
+
+    # Update type
+    if updates.type is not None:
+        capability_data["type"] = updates.type.value
+
+    # Update script reference
+    # script="" (empty string) means clear, None means don't update
+    if updates.script is not None:
+        if updates.script:
+            capability_data["script"] = updates.script
+        else:
+            # Empty string means remove script reference
+            capability_data.pop("script", None)
 
     # Write updated capability.json
     with open(capability_json_path, "w", encoding="utf-8") as f:

@@ -1,0 +1,6 @@
+{
+  "name": "json-checker",
+  "description": "Can check files for propper JSON format.",
+  "type": "script",
+  "script": "json_checker"
+}

@@ -1,0 +1,44 @@
+{
+  "name": "schema-assistant",
+  "description": "Creates or improves JSON schemas for input parameters, output data, or other purposes",
+  "type": "autonomous",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "user_request": {
+        "type": "string",
+        "description": "What the user wants (create new schema or modify existing)"
+      },
+      "current_schema": {
+        "type": "object",
+        "description": "Current schema content (if editing existing)"
+      },
+      "schema_context": {
+        "type": "string",
+        "description": "Context about what this schema is for (e.g., \"input parameters for an agent\")"
+      }
+    },
+    "required": [
+      "user_request"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "schema": {
+        "type": "object",
+        "description": "The generated or modified JSON Schema"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "Brief explanation of what was done/changed"
+      }
+    },
+    "required": [
+      "schema"
+    ]
+  },
+  "tags": [
+    "internal"
+  ]
+}

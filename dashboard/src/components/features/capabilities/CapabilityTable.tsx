@@ -8,10 +8,16 @@ import {
   createColumnHelper,
   SortingState,
 } from '@tanstack/react-table';
-import { CapabilitySummary } from '@/types/capability';
+import { CapabilitySummary, CapabilityType } from '@/types/capability';
 import { Badge, EmptyState, SkeletonLine } from '@/components/common';
 import { truncate } from '@/utils/formatters';
-import { Puzzle, Search, Edit2, Trash2, FileText, Server } from 'lucide-react';
+import { Puzzle, Search, Edit2, Trash2, FileText, Server, FileCode } from 'lucide-react';
+
+const TYPE_BADGE_CONFIG: Record<CapabilityType, { variant: 'default' | 'info' | 'success'; icon: React.ReactNode; label: string }> = {
+  script: { variant: 'success', icon: <FileCode className="w-3 h-3 mr-1" />, label: 'Script' },
+  mcp: { variant: 'info', icon: <Server className="w-3 h-3 mr-1" />, label: 'MCP' },
+  text: { variant: 'default', icon: <FileText className="w-3 h-3 mr-1" />, label: 'Text' },
+};
 
 interface CapabilityTableProps {
   capabilities: CapabilitySummary[];
@@ -60,11 +66,24 @@ export function CapabilityTable({
           </button>
         ),
       }),
+      columnHelper.accessor('type', {
+        header: 'Type',
+        cell: (info) => {
+          const type = info.getValue();
+          const config = TYPE_BADGE_CONFIG[type];
+          return (
+            <Badge size="sm" variant={config.variant}>
+              {config.icon}
+              {config.label}
+            </Badge>
+          );
+        },
+      }),
       columnHelper.accessor('description', {
         header: 'Description',
         cell: (info) => (
           <span className="text-gray-600" title={info.getValue()}>
-            {truncate(info.getValue(), 60)}
+            {truncate(info.getValue(), 50)}
           </span>
         ),
       }),
@@ -75,6 +94,12 @@ export function CapabilityTable({
           const cap = info.row.original;
           return (
             <div className="flex items-center gap-2">
+              {cap.has_script && (
+                <Badge size="sm" variant="success">
+                  <FileCode className="w-3 h-3 mr-1" />
+                  {cap.script_name}
+                </Badge>
+              )}
               {cap.has_text && (
                 <Badge size="sm" variant="default">
                   <FileText className="w-3 h-3 mr-1" />
@@ -87,7 +112,7 @@ export function CapabilityTable({
                   {cap.mcp_server_names.length} MCP
                 </Badge>
               )}
-              {!cap.has_text && !cap.has_mcp && (
+              {!cap.has_script && !cap.has_text && !cap.has_mcp && (
                 <span className="text-gray-400 text-xs italic">Empty</span>
               )}
             </div>

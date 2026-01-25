@@ -71,6 +71,8 @@ export interface Agent {
   // Runner-owned agent fields (Phase 4 - Procedural Executor)
   command?: string | null;      // CLI command for procedural agents
   runner_id?: string | null;    // Runner that owns this agent (null = file-based)
+  // Script reference for procedural agents
+  script?: string | null;       // Script name for procedural agents
 }
 
 // Helper to check if agent is runner-owned (read-only in UI)
@@ -82,6 +84,7 @@ export interface AgentCreate {
   name: string;
   description: string;
   type?: AgentType;  // Defaults to 'autonomous'
+  script?: string;   // Script name for procedural agents
   parameters_schema?: Record<string, unknown> | null;  // JSON Schema for parameter validation
   output_schema?: Record<string, unknown> | null;  // JSON Schema for output validation
   system_prompt?: string;
@@ -95,6 +98,7 @@ export interface AgentCreate {
 
 export interface AgentUpdate {
   type?: AgentType;
+  script?: string;   // Script name for procedural agents
   parameters_schema?: Record<string, unknown> | null;  // JSON Schema for parameter validation
   output_schema?: Record<string, unknown> | null;  // JSON Schema for output validation
   description?: string;

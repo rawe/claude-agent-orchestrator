@@ -1,0 +1,6 @@
+{
+  "name": "json-checker",
+  "description": "Checks a given file for valid json ",
+  "type": "procedural",
+  "script": "json_checker"
+}

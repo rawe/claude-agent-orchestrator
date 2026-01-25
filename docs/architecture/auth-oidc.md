@@ -4,7 +4,7 @@
 
 This document describes the authentication architecture using OpenID Connect (OIDC) with Auth0 as the Identity Provider (IdP). This replaces the static API key approach with industry-standard token-based authentication.
 
-For setup instructions, see `docs/setup/auth0-setup.md`.
+For setup instructions, see `docs/guides/auth0-setup.md`.
 
 ## System Components
 

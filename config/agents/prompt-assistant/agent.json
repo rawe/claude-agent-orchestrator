@@ -1,0 +1,44 @@
+{
+  "name": "prompt-assistant",
+  "description": "Creates or improves system prompts for autonomous agents",
+  "type": "autonomous",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "user_request": {
+        "type": "string",
+        "description": "What the user wants (create new prompt or modify existing)"
+      },
+      "current_prompt": {
+        "type": "string",
+        "description": "Current system prompt content (if editing existing)"
+      },
+      "context": {
+        "type": "string",
+        "description": "Context about the agent (e.g., description, purpose, capabilities)"
+      }
+    },
+    "required": [
+      "user_request"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "system_prompt": {
+        "type": "string",
+        "description": "The generated or modified system prompt"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "Brief explanation of what was done/changed"
+      }
+    },
+    "required": [
+      "system_prompt"
+    ]
+  },
+  "tags": [
+    "internal"
+  ]
+}

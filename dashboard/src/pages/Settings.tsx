@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { Button, ConfirmModal } from '@/components/common';
 import { useNotification } from '@/contexts';
 import { configService, ConfigImportResponse } from '@/services/configService';
-import { Download, Upload, AlertTriangle, X, File, Check } from 'lucide-react';
+import { provisionAllAgents, getSystemAgentNames, type ProvisionAllResult } from '@/lib/system-agents';
+import { Download, Upload, AlertTriangle, X, File, Check, Sparkles, RefreshCw } from 'lucide-react';
 
 export function Settings() {
   const { showSuccess, showError } = useNotification();
@@ -13,6 +14,10 @@ export function Settings() {
   const [dragActive, setDragActive] = useState(false);
   const [importConfirm, setImportConfirm] = useState(false);
   const [lastImportResult, setLastImportResult] = useState<ConfigImportResponse | null>(null);
+
+  // System agents provisioning
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<ProvisionAllResult | null>(null);
 
   const handleExport = async () => {
     setExporting(true);
@@ -104,6 +109,24 @@ export function Settings() {
 
   const clearSelectedFile = () => {
     setSelectedFile(null);
+  };
+
+  const handleProvisionAgents = async () => {
+    setProvisioning(true);
+    setProvisionResult(null);
+    try {
+      const result = await provisionAllAgents();
+      setProvisionResult(result);
+      if (result.failed === 0) {
+        showSuccess(`Provisioned ${result.success} system agent(s)`);
+      } else {
+        showError(`Provisioned ${result.success}, failed ${result.failed}`);
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to provision agents');
+    } finally {
+      setProvisioning(false);
+    }
   };
 
   return (
@@ -231,6 +254,71 @@ export function Settings() {
                   <ul className="list-disc list-inside space-y-1">
                     <li>{lastImportResult.agents_imported} agents imported (replaced {lastImportResult.agents_replaced})</li>
                     <li>{lastImportResult.capabilities_imported} capabilities imported (replaced {lastImportResult.capabilities_replaced})</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* System Agents Section */}
+          <section className="bg-gray-50 rounded-lg p-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              System Agents
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Provision internal agents used by the dashboard for AI-assisted features.
+              This will create or update the following agents:
+            </p>
+
+            {/* Agent List */}
+            <div className="mb-4 p-3 bg-white border border-gray-200 rounded-lg">
+              <ul className="text-sm text-gray-700 space-y-1">
+                {getSystemAgentNames().map((name) => (
+                  <li key={name} className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
+                    <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{name}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <Button
+              onClick={handleProvisionAgents}
+              loading={provisioning}
+              icon={<RefreshCw className="w-4 h-4" />}
+            >
+              Provision System Agents
+            </Button>
+
+            {/* Provision Result */}
+            {provisionResult && (
+              <div className={`flex items-start gap-3 p-4 mt-4 rounded-lg border ${
+                provisionResult.failed === 0
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                  provisionResult.failed === 0 ? 'text-green-600' : 'text-amber-600'
+                }`} />
+                <div className={`text-sm ${
+                  provisionResult.failed === 0 ? 'text-green-800' : 'text-amber-800'
+                }`}>
+                  <p className="font-medium mb-1">Provisioning Complete</p>
+                  <ul className="space-y-1">
+                    {provisionResult.results.map((r) => (
+                      <li key={r.name} className="flex items-center gap-2">
+                        <code className="text-xs bg-white/50 px-1.5 py-0.5 rounded">{r.name}</code>
+                        <span className={`text-xs ${
+                          r.action === 'error' ? 'text-red-600' : ''
+                        }`}>
+                          {r.action === 'created' && '✓ Created'}
+                          {r.action === 'updated' && '✓ Updated'}
+                          {r.action === 'unchanged' && '– Unchanged'}
+                          {r.action === 'error' && `✗ Error: ${r.error}`}
+                        </span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>

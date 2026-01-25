@@ -12,7 +12,7 @@ services:
       args:
         - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765
         - VITE_DOCUMENT_SERVER_URL=http://localhost:8766
-        # Auth0 OIDC (optional - see docs/setup/auth0-setup.md)
+        # Auth0 OIDC (optional - see docs/guides/auth0-setup.md)
         - VITE_AUTH0_DOMAIN=${AUTH0_DOMAIN}
         - VITE_AUTH0_CLIENT_ID=${AUTH0_DASHBOARD_CLIENT_ID}
         - VITE_AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
@@ -45,7 +45,7 @@ services:
       # Default false: docker-compose is for local development only
       - AUTH_ENABLED=${AUTH_ENABLED:-false}
       # Auth0 OIDC - required when AUTH_ENABLED=true
-      # See docs/setup/auth0-setup.md for setup guide
+      # See docs/guides/auth0-setup.md for setup guide
       - AUTH0_DOMAIN=${AUTH0_DOMAIN}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
       # Enable verbose debug logging for troubleshooting (set to true to enable)
@@ -57,7 +57,11 @@ services:
       - agent-orchestrator-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      # Old HTTP-based check - no longer works because /health endpoint is secured
+      # and we don't want to expose it without authentication.
+      # test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      # New TCP-based check - verifies port is listening without requiring authentication
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('localhost', 8765), timeout=2); s.close()"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -169,6 +173,57 @@ services:
       - AUTH0_RUNNER_CLIENT_ID=${AUTH0_RUNNER_CLIENT_ID}
       - AUTH0_RUNNER_CLIENT_SECRET=${AUTH0_RUNNER_CLIENT_SECRET}
     volumes:
+      # WORKAROUND: Shared volume with agent-runner-procedural.
+      # Both runners use the same workspace so that scripts referenced in
+      # agent capabilities are accessible to autonomous agents (Claude Code).
+      # Without this, scripts uploaded/managed by procedural agents wouldn't
+      # be visible to Claude Code agents.
+      - agent-runner-workspace:/workspace
+    networks:
+      - agent-orchestrator-network
+    restart: unless-stopped
+    depends_on:
+      agent-coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "agent-runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # AGENT RUNNER (Procedural executor)
+  # ============================================================================
+  agent-runner-procedural:
+    container_name: agent-orchestrator-agent-runner-procedural
+    hostname: docker-procedural-runner
+    build:
+      context: .
+      dockerfile: servers/agent-runner/docker/Dockerfile
+      target: procedural
+    environment:
+      # Agent Coordinator URL (internal network)
+      - AGENT_ORCHESTRATOR_API_URL=http://agent-coordinator:8765
+      # Project directory inside container
+      - PROJECT_DIR=/workspace
+      # Executor profile (echo is the default procedural test profile)
+      - PROFILE=${PROCEDURAL_RUNNER_PROFILE:-echo}
+      # Optional settings
+      # Default tag 'uv' required for procedural scripts that use uv for Python execution
+      - RUNNER_TAGS=${PROCEDURAL_RUNNER_TAGS:-uv}
+      - VERBOSE=${AGENT_RUNNER_VERBOSE:-false}
+      # Auth0 M2M authentication (required when coordinator has AUTH_ENABLED=true)
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - AUTH0_RUNNER_CLIENT_ID=${AUTH0_RUNNER_CLIENT_ID}
+      - AUTH0_RUNNER_CLIENT_SECRET=${AUTH0_RUNNER_CLIENT_SECRET}
+    volumes:
+      # WORKAROUND: Shared volume with agent-runner (Claude Code).
+      # Both runners use the same workspace so that scripts referenced in
+      # agent capabilities are accessible to autonomous agents (Claude Code).
+      # Without this, scripts uploaded/managed by procedural agents wouldn't
+      # be visible to Claude Code agents.
       - agent-runner-workspace:/workspace
     networks:
       - agent-orchestrator-network

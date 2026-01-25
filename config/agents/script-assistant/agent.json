@@ -1,0 +1,63 @@
+{
+  "name": "script-assistant",
+  "description": "Creates new scripts or reviews/improves existing scripts with parameter schemas",
+  "type": "autonomous",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {
+      "user_request": {
+        "type": "string",
+        "description": "What the user wants (create new script or modify existing)"
+      },
+      "script_content": {
+        "type": "string",
+        "description": "Existing script content (empty for new scripts)"
+      },
+      "parameters_schema": {
+        "type": "object",
+        "description": "Current parameters schema (if defined)"
+      }
+    },
+    "required": [
+      "user_request"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Script name/identifier (lowercase with hyphens)"
+      },
+      "description": {
+        "type": "string",
+        "description": "Script description in markdown"
+      },
+      "script_file": {
+        "type": "string",
+        "description": "Filename for the script (e.g., run.py)"
+      },
+      "script": {
+        "type": "string",
+        "description": "Complete script content"
+      },
+      "parameters_schema": {
+        "type": "object",
+        "description": "JSON Schema for input parameters"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "Brief explanation of changes or notes"
+      }
+    },
+    "required": [
+      "name",
+      "description",
+      "script_file",
+      "script"
+    ]
+  },
+  "tags": [
+    "internal"
+  ]
+}

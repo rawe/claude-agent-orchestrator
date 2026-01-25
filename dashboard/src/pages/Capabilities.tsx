@@ -52,6 +52,8 @@ export function Capabilities() {
       if (editingCapability) {
         await updateCapability(editingCapability.name, {
           description: data.description,
+          type: data.type,
+          script: data.script,
           text: data.text,
           mcp_servers: data.mcp_servers,
         });

@@ -16,6 +16,7 @@ Framework for managing multiple concurrent Claude Code agent sessions with real-
 | **Agent Coordinator Proxy** | Local HTTP proxy started by Agent Runner that forwards executor requests to Agent Coordinator with authentication. |
 | **Executor** | Framework-specific code that spawns the actual agent process (e.g., Claude Code via Agent SDK). Communicates with Agent Coordinator via the proxy. |
 | **Agent Type** | Classification of agents: **autonomous** (AI-powered, supports resumption) or **procedural** (deterministic CLI execution, stateless). See [agent-types.md](architecture/agent-types.md). |
+| **Script** | Reusable executable unit stored in Coordinator. Defines execution logic, parameters schema, and demand tags. Referenced by procedural agents and capabilities. See [Centralized Script Management](features/centralized-script-management.md). |
 | **Context Store** | Backend server (port 8766) for document storage and sharing context between agents. |
 
 ### Conceptual Hierarchy
@@ -42,7 +43,8 @@ Claude Code / AI Framework
 │   ├── agent-coordinator/            # FastAPI server - sessions, agent runs, runner registry
 │   ├── agent-runner/           # Processes agent runs - polls Agent Coordinator, spawns executors
 │   │   ├── lib/                  # Core runner (framework-agnostic)
-│   │   └── claude-code/          # Claude Code executors (Claude Agent SDK)
+│   │   ├── claude-code/          # Claude Code executor (autonomous agents)
+│   │   └── procedural-executor/  # Procedural executor (script-based agents)
 │   └── context-store/            # Document synchronization server
 ├── plugins/
 │   ├── orchestrator/             # Claude Code plugin - orchestrator skill: ao-* CLI commands
@@ -88,10 +90,15 @@ Claude Code / AI Framework
 - Executors don't need authentication credentials
 - Supports multiple runners on the same machine (each gets own port)
 
-**Claude Code Executors** (`servers/agent-runner/claude-code/`)
+**Claude Code Executor** (`servers/agent-runner/claude-code/`)
 - `ao-claude-code-exec` - Start new Claude Code sessions or resumes existing ones
 - Uses Claude Agent SDK for execution
-- Only Claude-specific code in the framework
+- Handles autonomous agents
+
+**Procedural Executor** (`servers/agent-runner/procedural-executor/`)
+- `ao-procedural-exec` - Executes scripts for procedural agents
+- Scripts synced from Coordinator to `{PROJECT_DIR}/scripts/`
+- Deterministic execution with JSON input/output
 
 **Context Store** (`servers/context-store/`) - Port 8766
 - Document synchronization between agents
@@ -154,11 +161,17 @@ Claude Code / AI Framework
            │ Subprocess
            ▼
 ┌─────────────────────────────────────┐
-│  Claude Code Executors              │
-│  (servers/agent-runner/claude-code) │
-│  - ao-start: Start new sessions     │
-│  - ao-resume: Resume sessions       │
-│  - Uses Claude Agent SDK            │
+│  Executors                          │
+│  ┌────────────────────────────────┐ │
+│  │ claude-code/ (autonomous)      │ │
+│  │  - ao-claude-code-exec         │ │
+│  │  - Uses Claude Agent SDK       │ │
+│  └────────────────────────────────┘ │
+│  ┌────────────────────────────────┐ │
+│  │ procedural-executor/           │ │
+│  │  - ao-procedural-exec          │ │
+│  │  - Executes synced scripts     │ │
+│  └────────────────────────────────┘ │
 └─────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────┐
@@ -248,20 +261,27 @@ Starting agent sessions requires spawning AI framework processes (e.g., Claude C
                    │
                    │ Subprocess + HTTP via proxy
                    ▼
-┌─────────────────────────────────────┐
-│  Framework-Specific Executors       │
-│  ┌───────────────────────────────┐  │
-│  │ claude-code/                  │  │
-│  │  - ao-claude-code-exec        │  │
-│  │  - Uses Claude Agent SDK      │  │
-│  │  - Calls Sessions API         │  │
-│  │  - Calls Agent Blueprints API │  │
-│  │  (via proxy, no auth needed)  │  │
-│  └───────────────────────────────┘  │
-│  ┌───────────────────────────────┐  │
-│  │ (future: other frameworks)    │  │
-│  └───────────────────────────────┘  │
-└─────────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│  Framework-Specific Executors                     │
+│  ┌─────────────────────────────────────────────┐  │
+│  │ claude-code/          (autonomous agents)   │  │
+│  │  - ao-claude-code-exec                      │  │
+│  │  - Uses Claude Agent SDK                    │  │
+│  │  - Calls Sessions API, Blueprints API       │  │
+│  └───────────────────────┬─────────────────────┘  │
+│                          │                        │
+│             ┌────────────┴────────────┐           │
+│             │   Shared PROJECT_DIR    │           │
+│             │   └── scripts/          │           │
+│             └────────────┬────────────┘           │
+│                          │                        │
+│  ┌───────────────────────┴─────────────────────┐  │
+│  │ procedural-executor/  (procedural agents)   │  │
+│  │  - ao-procedural-exec                       │  │
+│  │  - Executes synced scripts                  │  │
+│  │  - Deterministic JSON in/out                │  │
+│  └─────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────┘
 ```
 
 ### Runner Lifecycle
@@ -339,17 +359,19 @@ Parent (orchestrator)          Child (worker)
 
 ### Extensibility
 
-The architecture supports multiple agent frameworks:
-- **Claude Code**: Currently implemented (`servers/agent-runner/claude-code/`)
-- **Future**: LangChain, AutoGen, or other frameworks can add executors
+The architecture separates orchestration from execution, avoiding vendor lock-in:
+
+- **Autonomous agents**: Claude Code is the current executor, but LangChain, AutoGen, or other AI frameworks can be added as alternative executors. The choice of AI provider is an implementation detail.
+- **Procedural agents**: The procedural executor runs deterministic scripts. Scripts are provider-independent.
 
 Only the executor directory is framework-specific. The Runner core, Agent Coordinator, Agent Runs API, and all ao-* CLI commands are framework-agnostic.
 
-## Related Architecture Documents
+## Related Documents
 
 | Document | Description |
 |----------|-------------|
 | [Agent Types](architecture/agent-types.md) | Autonomous vs procedural agents, unified invocation model, parameter validation |
+| [Centralized Script Management](features/centralized-script-management.md) | Scripts as first-class primitives, sync mechanism, shared project directory |
 | [MCP Runner Integration](architecture/mcp-runner-integration.md) | Embedded MCP server in Agent Runner |
 | [SSE Sessions](architecture/sse-sessions.md) | Server-sent events for real-time updates |
 | [Auth OIDC](architecture/auth-oidc.md) | Authentication with Auth0 |
