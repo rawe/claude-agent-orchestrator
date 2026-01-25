@@ -6,6 +6,7 @@ The Agent Orchestration Framework (AOF) provides four container images for deplo
 |-------|-------------|
 | `ghcr.io/rawe/aof-coordinator` | Session management, observability, and agent blueprint registry |
 | `ghcr.io/rawe/aof-runner-claude-code` | Agent execution engine with Claude Code executor |
+| `ghcr.io/rawe/aof-runner-procedural` | Agent execution engine with procedural (CLI) executor |
 | `ghcr.io/rawe/aof-dashboard` | Web UI for agent management and monitoring |
 | `ghcr.io/rawe/aof-context-store` | Document management and synchronization |
 
@@ -15,6 +16,7 @@ The Agent Orchestration Framework (AOF) provides four container images for deplo
 # Pull all images (replace <version> with actual version, e.g., 0.2.0)
 docker pull ghcr.io/rawe/aof-coordinator:<version>
 docker pull ghcr.io/rawe/aof-runner-claude-code:<version>
+docker pull ghcr.io/rawe/aof-runner-procedural:<version>
 docker pull ghcr.io/rawe/aof-dashboard:<version>
 docker pull ghcr.io/rawe/aof-context-store:<version>
 ```
@@ -27,6 +29,7 @@ All four images share the same release version. When you use the same version ta
 # Use a specific version
 docker pull ghcr.io/rawe/aof-coordinator:<version>
 docker pull ghcr.io/rawe/aof-runner-claude-code:<version>
+docker pull ghcr.io/rawe/aof-runner-procedural:<version>
 docker pull ghcr.io/rawe/aof-dashboard:<version>
 docker pull ghcr.io/rawe/aof-context-store:<version>
 ```
@@ -35,6 +38,7 @@ docker pull ghcr.io/rawe/aof-context-store:<version>
 
 - [Coordinator](./coordinator.md) - API server for session orchestration
 - [Runner (Claude Code)](./runner-claude-code.md) - Agent execution with Claude Code
+- [Runner (Procedural)](./runner-procedural.md) - Agent execution with CLI commands
 - [Dashboard](./dashboard.md) - Web-based management UI
 - [Context Store](./context-store.md) - Document management and synchronization
 
@@ -49,6 +53,7 @@ make release VERSION=<version>
 # Build individual components
 make release-coordinator VERSION=<version>
 make release-runner VERSION=<version>
+make release-runner-procedural VERSION=<version>
 make release-dashboard VERSION=<version>
 make release-context-store VERSION=<version>
 
@@ -94,11 +99,17 @@ docker inspect ghcr.io/rawe/aof-coordinator:<version> --format='{{json .Config.L
 └───────────────┬───────────────┘  └──────────────────────────────┘
                 │ HTTP (polling)
                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Runner (Claude Code)                          │
-│               (aof-runner-claude-code)                          │
-│          Polls for runs │ Executes agents │ Reports status       │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│   Runner (Claude Code)       │  │   Runner (Procedural)        │
+│ (aof-runner-claude-code)     │  │ (aof-runner-procedural)      │
+│ AI-powered agent execution   │  │ CLI command execution        │
+└──────────────────────────────┘  └──────────────────────────────┘
+                └────────────────┬─────────────────┘
+                                 │
+                        ┌────────▼────────┐
+                        │ Shared Workspace │
+                        │   ./workspace    │
+                        └─────────────────┘
 ```
 
 ## Docker Compose Example
@@ -141,6 +152,16 @@ services:
     environment:
       - AGENT_ORCHESTRATOR_API_URL=http://coordinator:8765
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      - coordinator
+
+  runner-procedural:
+    image: ghcr.io/rawe/aof-runner-procedural:<version>
+    environment:
+      - AGENT_ORCHESTRATOR_API_URL=http://coordinator:8765
+      - PROFILE=echo
     volumes:
       - ./workspace:/workspace
     depends_on:

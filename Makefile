@@ -23,7 +23,7 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner start-agent-runner-procedural stop-agent-runner-procedural logs-agent-runner-procedural release release-coordinator release-runner release-dashboard release-context-store
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner start-agent-runner-procedural stop-agent-runner-procedural logs-agent-runner-procedural release release-coordinator release-runner release-runner-procedural release-dashboard release-context-store
 
 # ==============================================================================
 # CONTAINER IMAGE RELEASE CONFIGURATION
@@ -34,6 +34,7 @@ REGISTRY ?= ghcr.io/rawe
 # Image names
 IMAGE_COORDINATOR := $(REGISTRY)/aof-coordinator
 IMAGE_RUNNER := $(REGISTRY)/aof-runner-claude-code
+IMAGE_RUNNER_PROCEDURAL := $(REGISTRY)/aof-runner-procedural
 IMAGE_DASHBOARD := $(REGISTRY)/aof-dashboard
 IMAGE_CONTEXT_STORE := $(REGISTRY)/aof-context-store
 
@@ -629,7 +630,7 @@ stop-chat-ui:
 # The VERSION parameter is required and should match the git tag (without 'v' prefix).
 # Example: git tag v1.0.0 → make release VERSION=1.0.0
 
-release: _check-version release-coordinator release-runner release-dashboard release-context-store
+release: _check-version release-coordinator release-runner release-runner-procedural release-dashboard release-context-store
 	@echo ""
 	@echo "════════════════════════════════════════════════════════════════════════════"
 	@echo "  Release $(VERSION) complete!"
@@ -693,6 +694,28 @@ ifdef PUSH
 	@echo "Pushing $(IMAGE_RUNNER):$(VERSION)..."
 	docker push $(IMAGE_RUNNER):$(VERSION)
 	docker push $(IMAGE_RUNNER):latest
+endif
+
+release-runner-procedural: _check-version
+	@echo ""
+	@echo "Building $(IMAGE_RUNNER_PROCEDURAL):$(VERSION)..."
+	@echo "  Component version: $(RUNNER_VERSION)"
+	@echo "  Git commit: $(GIT_COMMIT)"
+	@echo ""
+	docker build \
+		--target procedural \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMPONENT_VERSION=$(RUNNER_VERSION) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_RUNNER_PROCEDURAL):$(VERSION) \
+		-t $(IMAGE_RUNNER_PROCEDURAL):latest \
+		-f servers/agent-runner/docker/Dockerfile \
+		.
+ifdef PUSH
+	@echo "Pushing $(IMAGE_RUNNER_PROCEDURAL):$(VERSION)..."
+	docker push $(IMAGE_RUNNER_PROCEDURAL):$(VERSION)
+	docker push $(IMAGE_RUNNER_PROCEDURAL):latest
 endif
 
 release-dashboard: _check-version

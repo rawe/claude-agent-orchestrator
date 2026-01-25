@@ -4,6 +4,7 @@
 # Builds and pushes all AOF container images:
 #   - ghcr.io/rawe/aof-coordinator
 #   - ghcr.io/rawe/aof-runner-claude-code
+#   - ghcr.io/rawe/aof-runner-procedural
 #   - ghcr.io/rawe/aof-dashboard
 #   - ghcr.io/rawe/aof-context-store
 #
@@ -78,6 +79,7 @@ jobs:
           echo "|-------|-----|" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-coordinator\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-runner-claude-code\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-runner-procedural\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-dashboard\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-context-store\` | \`${{ env.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -86,6 +88,7 @@ jobs:
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-coordinator:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-runner-claude-code:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-runner-procedural:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-dashboard:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/aof-context-store:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

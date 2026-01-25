@@ -12,6 +12,12 @@
 #   - Coordinator API: http://localhost:8765
 #   - Context Store: http://localhost:8766
 #   - Context Store MCP: http://localhost:9501/mcp
+#
+# Runners:
+#   - runner: Claude Code executor (requires CLAUDE_CODE_OAUTH_TOKEN)
+#   - runner-procedural: Procedural executor (CLI command execution)
+#
+# Both runners share the same workspace volume for file collaboration.
 
 services:
   coordinator:
@@ -51,6 +57,19 @@ services:
       - AGENT_ORCHESTRATOR_API_URL=http://coordinator:8765
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
       - PROJECT_DIR=/workspace
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      - coordinator
+
+  runner-procedural:
+    image: ghcr.io/rawe/aof-runner-procedural:latest
+    environment:
+      - AGENT_ORCHESTRATOR_API_URL=http://coordinator:8765
+      - PROJECT_DIR=/workspace
+      - PROFILE=${PROCEDURAL_PROFILE:-echo}
+      - RUNNER_TAGS=uv
+      - REQUIRE_MATCHING_TAGS=true
     volumes:
       - ./workspace:/workspace
     depends_on:
