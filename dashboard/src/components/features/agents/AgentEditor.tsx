@@ -4,6 +4,7 @@ import { Modal, Button, Badge, Spinner, TagSelector, InfoPopover } from '@/compo
 import { MCPJsonEditor } from './MCPJsonEditor';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
+import { SchemaAiAssistantCard, SchemaAiAssistantResultModal } from './SchemaAiAssistant';
 import { Agent, AgentCreate, AgentType, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
 import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -32,8 +33,6 @@ import {
   Target,
   Zap,
   FileCode,
-  Sparkles,
-  Check,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -181,9 +180,25 @@ export function AgentEditor({
     defaultRequest: 'Create a simple input schema with a prompt field',
   });
 
+  // AI Assist: Output Schema Assistant
+  const outputSchemaAi = useAiAssist<SchemaAssistantInput, SchemaAssistantOutput>({
+    agentName: schemaAssistantDefinition.name,
+    buildInput: useCallback((userRequest: string) => {
+      const schema = getValues('output_schema');
+      const input: SchemaAssistantInput = {
+        user_request: userRequest,
+        schema_context: 'structured output data from an autonomous agent',
+      };
+      if (schema) {
+        input.current_schema = schema;
+      }
+      return input;
+    }, [getValues]),
+    defaultRequest: 'Create an output schema for structured results',
+  });
+
   // AI Group: Aggregates all AI instances for unified protection
-  // Add more AI instances to this array as they are added to the component
-  const ai = useAiGroup([inputSchemaAi]);
+  const ai = useAiGroup([inputSchemaAi, outputSchemaAi]);
 
   // Handle accepting AI result for input schema
   const handleInputSchemaAiAccept = useCallback(() => {
@@ -197,6 +212,19 @@ export function AgentEditor({
 
     inputSchemaAi.accept();
   }, [inputSchemaAi, setValue]);
+
+  // Handle accepting AI result for output schema
+  const handleOutputSchemaAiAccept = useCallback(() => {
+    const result = outputSchemaAi.result;
+    if (!result) return;
+
+    if (result[SCHEMA_OUT.schema]) {
+      setValue('output_schema', result[SCHEMA_OUT.schema]);
+      setValue('output_schema_enabled', true);
+    }
+
+    outputSchemaAi.accept();
+  }, [outputSchemaAi, setValue]);
 
   const watchedSchemaEnabled = watch('parameters_schema_enabled');
   const watchedOutputSchemaEnabled = watch('output_schema_enabled');
@@ -659,96 +687,14 @@ export function AgentEditor({
 
   const InputTab = () => (
     <div className="h-full flex flex-col">
-      {/* AI Assistant Card */}
-      <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg flex-shrink-0">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-5 h-5 text-purple-600" />
-              <span className="font-medium text-purple-900">AI Schema Assistant</span>
-            </div>
-            <p className="text-sm text-purple-700">
-              {watchedSchemaEnabled
-                ? 'Describe changes you want to make to the input schema.'
-                : 'Describe what input parameters this agent needs and AI will generate the schema.'}
-            </p>
-          </div>
-          {inputSchemaAi.isLoading ? (
-            <button
-              type="button"
-              onClick={inputSchemaAi.cancel}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-medium"
-            >
-              <Spinner size="sm" />
-              Cancel
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={inputSchemaAi.toggle}
-              disabled={!inputSchemaAi.available || inputSchemaAi.checkingAvailability}
-              className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                inputSchemaAi.showInput
-                  ? 'bg-purple-600 text-white hover:bg-purple-700'
-                  : inputSchemaAi.available
-                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                    : 'bg-gray-100 text-gray-400'
-              }`}
-              title={inputSchemaAi.unavailableReason || 'AI Assistant'}
-            >
-              {inputSchemaAi.checkingAvailability ? (
-                <Spinner size="sm" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-              {inputSchemaAi.showInput ? 'Hide' : watchedSchemaEnabled ? 'Edit with AI' : 'Generate with AI'}
-            </button>
-          )}
-        </div>
-
-        {/* AI Input */}
-        {inputSchemaAi.showInput && !inputSchemaAi.isLoading && (
-          <div className="mt-4 flex gap-2">
-            <input
-              type="text"
-              value={inputSchemaAi.userRequest}
-              onChange={(e) => inputSchemaAi.setUserRequest(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && inputSchemaAi.submit()}
-              placeholder={
-                watchedSchemaEnabled
-                  ? "What changes do you want? (e.g., 'Add a max_tokens field', 'Make prompt optional')"
-                  : "What inputs does this agent need? (e.g., 'A topic to research and optional max results')"
-              }
-              className="input flex-1 text-sm"
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={inputSchemaAi.submit}
-              className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-md font-medium"
-            >
-              Generate
-            </button>
-          </div>
-        )}
-
-        {/* AI Error */}
-        {inputSchemaAi.error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 whitespace-pre-line">{inputSchemaAi.error}</div>
-              <button
-                type="button"
-                onClick={inputSchemaAi.clearError}
-                className="flex-shrink-0 text-red-400 hover:text-red-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* AI Assistant */}
+      <SchemaAiAssistantCard
+        ai={inputSchemaAi}
+        label="Input Schema"
+        schemaEnabled={watchedSchemaEnabled}
+        editPlaceholder="What changes do you want? (e.g., 'Add a max_tokens field', 'Make prompt optional')"
+        createPlaceholder="What inputs does this agent need? (e.g., 'A topic to research and optional max results')"
+      />
 
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -810,6 +756,15 @@ export function AgentEditor({
 
   const OutputTab = () => (
     <div className="h-full flex flex-col">
+      {/* AI Assistant */}
+      <SchemaAiAssistantCard
+        ai={outputSchemaAi}
+        label="Output Schema"
+        schemaEnabled={watchedOutputSchemaEnabled}
+        editPlaceholder="What changes do you want? (e.g., 'Add an error field', 'Include metadata')"
+        createPlaceholder="What should this agent output? (e.g., 'A summary with key points and confidence score')"
+      />
+
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">Output Schema</label>
@@ -1437,64 +1392,17 @@ export function AgentEditor({
       </form>
     </Modal>
 
-    {/* AI Result Modal for Input Schema - rendered outside main modal to avoid z-index issues */}
-    {inputSchemaAi.result && (
-      <div
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="bg-white rounded-lg shadow-xl w-[90vw] max-w-2xl max-h-[70vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Modal Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-purple-50">
-            <span className="text-lg font-semibold text-purple-700 flex items-center gap-2">
-              <Sparkles className="w-5 h-5" />
-              AI Generated Schema
-            </span>
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={inputSchemaAi.reject}
-                className="flex items-center gap-1"
-              >
-                <X className="w-4 h-4" />
-                Reject
-              </Button>
-              <Button
-                type="button"
-                onClick={handleInputSchemaAiAccept}
-                className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
-              >
-                <Check className="w-4 h-4" />
-                Accept
-              </Button>
-            </div>
-          </div>
-
-          {/* Modal Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {/* Remarks */}
-            {inputSchemaAi.result[SCHEMA_OUT.remarks] && (
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <div className="text-sm font-medium text-purple-700 mb-1">AI Notes</div>
-                <div className="text-sm text-purple-800">{inputSchemaAi.result[SCHEMA_OUT.remarks]}</div>
-              </div>
-            )}
-
-            {/* Schema Preview */}
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Generated Schema</label>
-              <pre className="mt-1 p-4 bg-blue-50 border border-blue-200 rounded-md overflow-x-auto text-sm font-mono text-blue-800 max-h-96 overflow-y-auto">
-                {JSON.stringify(inputSchemaAi.result[SCHEMA_OUT.schema], null, 2)}
-              </pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
+    {/* AI Result Modals - rendered outside main modal to avoid z-index issues */}
+    <SchemaAiAssistantResultModal
+      ai={inputSchemaAi}
+      label="Input Schema"
+      onAccept={handleInputSchemaAiAccept}
+    />
+    <SchemaAiAssistantResultModal
+      ai={outputSchemaAi}
+      label="Output Schema"
+      onAccept={handleOutputSchemaAiAccept}
+    />
     </>
   );
 }
