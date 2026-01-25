@@ -23,7 +23,7 @@
 
 SHELL := bash
 
-.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner release release-coordinator release-runner release-dashboard release-context-store
+.PHONY: help build start stop restart clean status health clean-docs clean-sessions info urls open restart-dashboard restart-coordinator restart-doc start-mcp-atlassian stop-mcp-atlassian start-mcp-ado stop-mcp-ado start-mcp-neo4j stop-mcp-neo4j start-mcp-context-store stop-mcp-context-store start-mcps stop-mcps start-all stop-all start-chat-ui stop-chat-ui start-coordinator stop-coordinator start-dashboard stop-dashboard start-context-store stop-context-store start-neo4j stop-neo4j start-elasticsearch stop-elasticsearch start-core stop-core start-agent-runner stop-agent-runner run-agent-runner logs-agent-runner start-agent-runner-procedural stop-agent-runner-procedural logs-agent-runner-procedural release release-coordinator release-runner release-dashboard release-context-store
 
 # ==============================================================================
 # CONTAINER IMAGE RELEASE CONFIGURATION
@@ -88,12 +88,15 @@ help:
 	@echo "  make restart-coordinator  - Restart agent coordinator"
 	@echo "  make restart-doc          - Restart context store"
 	@echo ""
-	@echo "Agent Runner:"
-	@echo "  make start-agent-runner   - Start in Docker (requires CLAUDE_CODE_OAUTH_TOKEN)"
-	@echo "  make stop-agent-runner    - Stop Docker agent runner"
-	@echo "  make logs-agent-runner    - Tail Docker logs (Ctrl+C to stop)"
-	@echo "  make run-agent-runner     - Run locally in foreground (Ctrl+C to stop)"
-	@echo "  make run-agent-runner-v   - Run locally with verbose output"
+	@echo "Agent Runners:"
+	@echo "  make start-agent-runner            - Start Claude Code runner (requires CLAUDE_CODE_OAUTH_TOKEN)"
+	@echo "  make stop-agent-runner             - Stop Claude Code runner"
+	@echo "  make logs-agent-runner             - Tail Claude Code runner logs"
+	@echo "  make start-agent-runner-procedural - Start procedural runner"
+	@echo "  make stop-agent-runner-procedural  - Stop procedural runner"
+	@echo "  make logs-agent-runner-procedural  - Tail procedural runner logs"
+	@echo "  make run-agent-runner              - Run Claude Code locally (Ctrl+C to stop)"
+	@echo "  make run-agent-runner-v            - Run Claude Code locally with verbose output"
 	@echo ""
 	@echo "MCP servers (mcps/):"
 	@echo "  make start-mcp-context-store      - Start Context Store MCP"
@@ -128,15 +131,15 @@ build:
 	@echo "Building all Docker images..."
 	docker-compose build
 
-# Start all services (with build)
+# Start all services (uses cached images, run 'make build' first if needed)
 start:
 	@echo "Starting all services..."
-	docker-compose up --build
+	docker-compose up
 
-# Start all services in background
+# Start all services in background (uses cached images, run 'make build' first if needed)
 start-bg:
 	@echo "Starting all services in background..."
-	docker-compose up --build -d
+	docker-compose up -d
 	@echo ""
 	@"$(MAKE)" --no-print-directory info
 	@echo ""
@@ -434,6 +437,27 @@ logs-agent-runner:
 	@echo ""
 	docker-compose logs -f agent-runner
 
+# Start procedural agent runner in Docker (background)
+start-agent-runner-procedural:
+	@echo "Starting Procedural Agent Runner (Docker)..."
+	docker-compose up -d --no-deps agent-runner-procedural
+	@echo ""
+	@echo "Procedural Agent Runner started (Docker)"
+	@echo "  Profile: $${PROCEDURAL_RUNNER_PROFILE:-echo}"
+	@echo ""
+	@echo "View logs: make logs-agent-runner-procedural"
+
+stop-agent-runner-procedural:
+	@echo "Stopping Procedural Agent Runner (Docker)..."
+	docker-compose stop agent-runner-procedural
+	@echo "Procedural Agent Runner stopped"
+
+# Tail procedural agent runner logs (Docker)
+logs-agent-runner-procedural:
+	@echo "Tailing Procedural Agent Runner logs (Ctrl+C to stop)..."
+	@echo ""
+	docker-compose logs -f agent-runner-procedural
+
 # External MCP servers (mcps/)
 start-mcp-atlassian:
 	@echo "Starting Atlassian MCP server..."
@@ -538,7 +562,8 @@ stop-mcp-context-store:
 	fi
 
 # Start/stop all services (core + MCPs)
-# Note: agent-runner is included in docker-compose, started/stopped via start-bg/stop
+# Note: both agent-runner and agent-runner-procedural are included in docker-compose,
+# started/stopped via start-bg/stop
 start-all:
 	@echo "Starting all services..."
 	@echo ""
