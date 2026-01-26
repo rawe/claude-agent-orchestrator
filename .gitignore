@@ -90,3 +90,6 @@ docker-compose.override.yml
 agent-orchestrator-launcher/
 agent-orchestrator-cli/
 tickets/
+
+# Claude Code plans
+.claude/plans/

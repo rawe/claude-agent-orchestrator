@@ -1,20 +1,162 @@
 # MCP Server Registry
 
 **Status:** Draft
-**Date:** 2026-01-25
+**Date:** 2026-01-26
 
 ## Overview
 
-A centralized registry for MCP server definitions with framework-controlled HTTP header injection. The registry provides a single source of truth for MCP server URLs and defines what headers each server accepts. Headers are resolved through an inheritance chain and injected by the framework—the LLM cannot influence them.
+A centralized registry for MCP server definitions with framework-controlled configuration injection. The registry provides a single source of truth for MCP server URLs and defines what configuration each server accepts. Configuration values are resolved through an inheritance chain and injected by the framework at the transport level—the LLM cannot influence them.
 
 **Key Principles:**
 
 1. MCP server URLs defined once in registry, referenced by name elsewhere
-2. Header schemas document what headers each server accepts (for UI/validation)
-3. Header values flow through inheritance chain: Registry → Capability → Agent → Run → Parent
-4. Framework injects headers at HTTP transport level—LLM never sees them
-5. Simple key-value headers for auth and scoping (no JWT complexity for most servers)
-6. Orchestrator MCP remains special case with Auth0 M2M
+2. Config schemas document what configuration each server accepts (for UI/validation)
+3. Config values flow through inheritance chain: Registry → Capability → Agent
+4. Placeholders resolved at Coordinator level using params, scope, env, and runtime sources
+5. Fully resolved configuration included in run payload to Runner
+6. Framework injects configuration at transport level—LLM never sees them
+7. Simple key-value configuration for auth and scoping
+
+## Run Scope
+
+Run scope provides framework-controlled values that flow through agent execution without LLM visibility. Unlike agent parameters (which the LLM sees and uses), run scope values are invisible to the LLM and are used exclusively for framework concerns like scoping, correlation, and authentication.
+
+### Characteristics
+
+| Property | Description |
+|----------|-------------|
+| **LLM-invisible** | Values never exposed to the LLM context |
+| **Provided at run creation** | Caller supplies scope when starting a run |
+| **Not persisted to session** | Must be provided fresh for each run |
+| **Inherited by child runs** | When an agent spawns sub-agents, scope is automatically inherited |
+| **Used in config mappings** | Values can be mapped to MCP server configuration |
+
+### Use Cases
+
+| Key | Purpose |
+|-----|---------|
+| `context_id` | Scope MCP server access (e.g., limit Context Store to specific documents) |
+| `workflow_id` | Correlate related runs across systems |
+| Credentials | Pass authentication tokens to MCP servers without LLM exposure |
+
+### Example
+
+```json
+POST /runs
+{
+  "agent_name": "researcher",
+  "params": {"topic": "API design"},
+  "scope": {
+    "context_id": "ctx-123",
+    "workflow_id": "wf-456"
+  }
+}
+```
+
+The `params.topic` is visible to the LLM. The `scope.context_id` and `scope.workflow_id` are not.
+
+## Placeholder Sources
+
+Config values in MCP server configurations can reference dynamic values using placeholder syntax: `${source.key}`. The Coordinator resolves these placeholders before including the configuration in the run payload.
+
+### Available Sources
+
+| Source | Syntax | Description | Where Usable |
+|--------|--------|-------------|--------------|
+| **params** | `${params.X}` | Agent input parameters, validated against agent's parameter schema | Agent |
+| **scope** | `${scope.X}` | Run scope values (LLM-invisible) | Registry, Capability, Agent |
+| **env** | `${env.X}` | Environment variables from Coordinator | All levels |
+| **runtime** | `${runtime.X}` | Framework-provided execution context | All levels |
+| **runner** | `${runner.X}` | Runner-specific values (resolved by Runner, not Coordinator) | All levels |
+
+### Runtime Keys (Coordinator)
+
+The `runtime` source provides framework-managed values resolved at Coordinator level:
+
+| Key | Description |
+|-----|-------------|
+| `session_id` | Current session identifier |
+| `run_id` | Current run identifier |
+
+### Runner Keys (Runner)
+
+The `runner` source provides values only the Runner knows, resolved at Runner level:
+
+| Key | Description |
+|-----|-------------|
+| `orchestrator_mcp_url` | URL of the embedded Orchestrator MCP (dynamic port) |
+
+**Note**: The `runner` prefix clearly indicates these placeholders are NOT resolved by the Coordinator. They are resolved by the Runner because only the Runner has access to these values (e.g., the dynamic port of the embedded Orchestrator MCP).
+
+### Resolution Location
+
+Most resolution happens at Coordinator level, with one exception:
+
+1. Coordinator merges: Registry defaults → Capability → Agent
+2. Coordinator resolves placeholders using:
+   - Run's params
+   - Run's scope
+   - Run's runtime (session_id, run_id)
+   - Coordinator's environment variables
+3. Fully resolved configuration included in run payload to Runner
+
+### Placeholder Validation
+
+When resolving placeholders, the Coordinator validates that required values are present. This happens at run creation time.
+
+| Scenario | Config Key Required | Behavior |
+|----------|---------------------|----------|
+| Value present | - | Placeholder resolved, config key included |
+| Value missing | Yes (`required: true`) | **Error** - run creation rejected, error returned to caller |
+| Value missing | No | **Omit** - config key not included |
+
+#### Why Validation at Coordinator
+
+Resolving and validating at Coordinator level enables:
+- **Immediate feedback** - Caller receives error response directly (e.g., "missing required scope.context_id")
+- **No failed runs** - Invalid configurations never become runs
+- **Clear errors** - Caller knows exactly what's missing before run starts
+
+#### Validation Example
+
+Registry defines:
+```json
+{
+  "config_schema": {
+    "context_id": {"type": "string", "required": true},
+    "workflow_id": {"type": "string", "required": false}
+  }
+}
+```
+
+Agent configures:
+```json
+{
+  "config": {
+    "context_id": "${scope.context_id}",
+    "workflow_id": "${scope.workflow_id}"
+  }
+}
+```
+
+Run created with:
+```json
+{
+  "scope": {"context_id": "ctx-123"}
+}
+```
+
+Result:
+- `context_id`: resolved to `"ctx-123"` ✓
+- `workflow_id`: omitted (optional, value missing) ✓
+
+If `scope` had no `context_id`:
+```json
+HTTP 400 Bad Request
+{
+  "error": "Missing required value: scope.context_id for config key 'context_id'"
+}
+```
 
 ## Problem Statement
 
@@ -39,41 +181,43 @@ config/capabilities/neo4j-knowledge-graph/capability.mcp.json:
 |---------|--------|
 | **Scattered URLs** | Changing a URL (e.g., localhost → production) requires editing multiple files |
 | **No central management** | No single view of "what MCP servers exist and where they are" |
-| **Limited header support** | Only `${AGENT_SESSION_ID}` and `${AGENT_ORCHESTRATOR_MCP_URL}` placeholders exist |
 | **No scoping mechanism** | Cannot scope MCP server access (e.g., limit Jira to specific projects) |
 | **No generic auth** | Each MCP server handles auth differently, no unified pattern |
 | **Config duplication** | Same MCP server definition copied across agents/capabilities |
+| **No dynamic values** | Cannot inject run-specific values into MCP configuration |
 
-### Use Cases Not Currently Supported
+### Use Cases Addressed
 
 1. **Context Store scoping**: Agent should only see documents tagged with `project-123`
 2. **Atlassian scoping**: Agent should only access Jira projects `ALPHA` and `BETA`
 3. **Neo4j partitioning**: Agent should only query subgraph `team-alpha`
-4. **API key auth**: MCP server requires `X-API-Key` header for access
+4. **API key auth**: MCP server requires API key passed via configuration
 5. **Multi-environment**: Same agent config works in dev (localhost) and prod (different URLs)
+6. **Sub-agent context**: Child agents inherit parent's scope automatically
 
 ## What This Design Solves
 
 | Solved | How |
 |--------|-----|
 | **Centralized URL management** | Registry is single source of truth for all MCP server URLs |
-| **Framework-controlled headers** | Headers injected at HTTP level, LLM cannot influence |
-| **Flexible scoping** | Any header can be used for scoping (X-Context-Scope, X-Jira-Projects, etc.) |
-| **Simple auth pattern** | Auth via configurable headers (X-API-Key, Authorization, custom) |
-| **Multi-level configuration** | Capability sets defaults, agent overrides, run overrides further |
-| **UI-friendly** | Header schemas enable form-based editing in Dashboard |
+| **Framework-controlled config** | Configuration injected at transport level, LLM cannot influence |
+| **Flexible scoping** | Any config key can be used for scoping via placeholders |
+| **Simple auth pattern** | Auth via configurable values (API keys, tokens) |
+| **Multi-level configuration** | Capability sets defaults, agent overrides |
+| **UI-friendly** | Config schemas enable form-based editing in Dashboard |
 | **Reduced duplication** | Define MCP server once, reference by name |
+| **Immediate validation** | Missing required values caught at run creation |
+| **Sub-agent inheritance** | Scope automatically passed to child runs |
 
 ## What This Design Does NOT Solve
 
 | Not Solved | Why | Future Work |
 |------------|-----|-------------|
 | **Dynamic token acquisition** | Adds complexity; only Orchestrator MCP needs this | Extend auth types later |
-| **Client-provided credentials** | Run endpoint doesn't accept client auth yet | Add to run API later |
 | **Secret store integration** | Keep config simple for now | Add vault/secret manager integration |
 | **MCP server discovery** | Out of scope | Service mesh / discovery pattern |
 | **Per-request scoping** | Too complex, per-session is sufficient | Not planned |
-| **Cross-MCP-server policies** | E.g., "if accessing Jira, must also log to audit" | Not planned |
+| **Scope parameter documentation** | Agent-dependent, complex to infer | Separate documentation |
 
 ## Design
 
@@ -89,26 +233,26 @@ Stored in Coordinator database, managed via API/Dashboard.
   "name": "Context Store",
   "description": "Document storage for agent context",
   "url": "http://localhost:9501/mcp",
-  "header_schema": {
-    "X-Context-Namespace": {
+  "config_schema": {
+    "context_id": {
       "type": "string",
-      "description": "Namespace for document isolation",
+      "description": "Context for document isolation",
       "required": true
     },
-    "X-Context-Scope-Filters": {
-      "type": "json",
-      "description": "JSON object with scope filters (e.g., root_session_id)",
+    "workflow_id": {
+      "type": "string",
+      "description": "Workflow correlation ID",
       "required": false
     },
-    "X-API-Key": {
+    "api_key": {
       "type": "string",
       "description": "API key for authentication",
       "required": false,
       "sensitive": true
     }
   },
-  "default_headers": {
-    "X-Context-Namespace": "default"
+  "default_config": {
+    "context_id": "default"
   }
 }
 ```
@@ -118,44 +262,32 @@ Stored in Coordinator database, managed via API/Dashboard.
 | `id` | string | Unique identifier, used in references |
 | `name` | string | Human-readable name |
 | `description` | string | What this MCP server provides |
-| `url` | string | Base URL for MCP HTTP transport |
-| `header_schema` | object | Defines accepted headers with type, description, required flag |
-| `default_headers` | object | Default header values (can be overridden) |
+| `url` | string | Base URL for MCP transport (can contain placeholders) |
+| `config_schema` | object | Defines accepted config keys with type, description, required flag |
+| `default_config` | object | Default config values (can be overridden) |
 
-#### Header Schema Field Properties
+#### Config Schema Field Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `type` | string | `"string"`, `"json"`, `"boolean"`, `"number"` |
-| `description` | string | Explains what the header controls |
+| `description` | string | Explains what the config key controls |
 | `required` | boolean | If true, must be provided at some level |
 | `sensitive` | boolean | If true, value hidden in UI, not logged |
+| `internal` | boolean | If true, framework-managed (e.g., run_id) |
 | `example` | string | Example value for documentation |
 
 #### MCP Server Reference (in Capability/Agent)
 
-Instead of full MCP config, capabilities and agents **reference** the registry:
+Capabilities and agents **reference** the registry:
 
-**Old format (current):**
-```json
-{
-  "mcpServers": {
-    "context-store-http": {
-      "type": "http",
-      "url": "http://localhost:9501/mcp"
-    }
-  }
-}
-```
-
-**New format (with registry):**
 ```json
 {
   "mcpServers": {
     "context-store": {
       "ref": "context-store",
-      "headers": {
-        "X-Context-Namespace": "project-alpha"
+      "config": {
+        "context_id": "${scope.context_id}"
       }
     }
   }
@@ -165,74 +297,57 @@ Instead of full MCP config, capabilities and agents **reference** the registry:
 | Field | Type | Description |
 |-------|------|-------------|
 | `ref` | string | References registry entry by ID |
-| `headers` | object | Header values to set/override at this level |
+| `config` | object | Config values to set/override at this level (can contain placeholders) |
 
-### Header Resolution Chain
+### Config Resolution Chain
 
-Headers are resolved through an inheritance chain. Later sources override earlier ones.
+MCP server configuration is resolved through an inheritance chain. Later sources override earlier ones.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Header Resolution Chain                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   1. Registry defaults          {"X-Context-Namespace": "default"}          │
-│              │                                                               │
-│              ▼                                                               │
-│   2. Capability headers         {"X-Context-Namespace": "shared-knowledge"} │
-│              │                                                               │
-│              ▼                                                               │
-│   3. Agent headers              {"X-Context-Namespace": "project-alpha"}    │
-│              │                                                               │
-│              ▼                                                               │
-│   4. Run request headers        {"X-Context-Namespace": "project-beta"}     │
-│              │                                                               │
-│              ▼                                                               │
-│   5. Parent session inherit     (child inherits parent's resolved headers)  │
-│              │                                                               │
-│              ▼                                                               │
-│   Final: {"X-Context-Namespace": "project-beta"}                            │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+1. Registry defaults        {"context_id": "default"}
+           │
+           ▼
+2. Capability config        {"context_id": "shared-knowledge"}
+           │
+           ▼
+3. Agent config             {"context_id": "${scope.context_id}"}
+           │
+           ▼
+4. Placeholder resolution   {"context_id": "ctx-123"}  (from run's scope)
 ```
 
 #### Resolution Rules
 
 | Rule | Behavior |
 |------|----------|
-| **Override** | Later value replaces earlier value for same header |
-| **Remove** | Set header to `null` to explicitly remove it |
-| **Merge (objects)** | For `type: "json"` headers, shallow merge by default |
-| **Inherit** | Child sessions inherit parent's final resolved headers |
+| **Override** | Later value replaces earlier value for same key |
+| **Remove** | Set key to `null` to explicitly remove it |
+| **Placeholders** | Resolved after inheritance, using run's params, scope, env, runtime |
 
 #### Example Resolution
 
 ```
 Registry (context-store):
-  default_headers:
-    X-Context-Namespace: "default"
-    X-API-Key: "registry-key"
+  default_config:
+    context_id: "default"
+    api_key: "${env.CONTEXT_STORE_API_KEY}"
 
 Capability (research-tools):
-  headers:
-    X-Context-Namespace: "research"
+  config:
+    context_id: "${scope.context_id}"
 
 Agent (project-researcher):
-  headers:
-    X-Context-Namespace: "project-alpha"
-    X-Context-Scope-Filters: {"department": "engineering"}
+  (no override)
 
-Run request:
-  mcp_headers:
-    context-store:
-      X-Context-Scope-Filters: {"team": "platform"}
+Run:
+  scope:
+    context_id: "project-alpha"
 
 ─────────────────────────────────────────────────
 
-Final resolved headers:
-  X-Context-Namespace: "project-alpha"       (from agent, overrode capability)
-  X-API-Key: "registry-key"                  (from registry default)
-  X-Context-Scope-Filters: {"team": "platform"}  (from run, overrode agent)
+Final resolved config:
+  context_id: "project-alpha"       (from scope, via capability placeholder)
+  api_key: "sk-xxxx-actual-key"     (from Coordinator env)
 ```
 
 ### Architecture
@@ -244,7 +359,7 @@ Final resolved headers:
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                    MCP Server Registry                                 │  │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │  │
-│  │  │context-store│ │  atlassian  │ │   neo4j     │ │orchestrator*│     │  │
+│  │  │context-store│ │  atlassian  │ │   neo4j     │ │orchestrator │     │  │
 │  │  │ URL, Schema │ │ URL, Schema │ │ URL, Schema │ │ (special)   │     │  │
 │  │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘     │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
@@ -253,40 +368,36 @@ Final resolved headers:
 │  │                    Blueprint Resolver                                  │  │
 │  │  1. Load agent + capabilities                                          │  │
 │  │  2. For each MCP ref: lookup registry, get URL                         │  │
-│  │  3. Merge headers: registry → capability → agent                       │  │
-│  │  4. Return blueprint with resolved MCP configs                         │  │
+│  │  3. Merge config: registry → capability → agent                        │  │
+│  │  4. Resolve placeholders (params, scope, env, runtime)                 │  │
+│  │  5. Validate required values present                                   │  │
+│  │  6. Include resolved config in run payload                             │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                    │                                        │
-│                                    │ GET /agents/{name}                     │
-│                                    │ Returns: resolved mcp_servers          │
+│                                    │ Run payload with resolved MCP config   │
 └────────────────────────────────────┼────────────────────────────────────────┘
                                      │
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Agent Runner                                    │
 │                                                                              │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                    Run-Level Resolution                                │  │
-│  │  1. Receive blueprint from Coordinator                                 │  │
-│  │  2. Apply run-level mcp_headers overrides                              │  │
-│  │  3. Apply parent session inheritance (for sub-agents)                  │  │
-│  │  4. Replace placeholders (${AGENT_SESSION_ID}, etc.)                   │  │
-│  │  5. Pass fully resolved config to executor                             │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
+│  Receives run payload with fully resolved MCP configuration.                 │
+│  No additional API calls or resolution needed.                               │
+│  Passes configuration directly to executor.                                  │
 │                                                                              │
-│  * Orchestrator MCP embedded here (special case with Auth0 M2M)             │
+│  * Orchestrator MCP embedded here (special case with Auth0 M2M)              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
-                                     │ Executor invokes Claude Code
-                                     │ with resolved mcp_servers config
+                                     │ Executor invokes agent
+                                     │ with resolved mcp config
                                      ▼
      ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
      │  Context Store   │   │    Atlassian     │   │      Neo4j       │
      │   :9501/mcp      │   │    :9000/mcp     │   │    :9003/mcp     │
      │                  │   │                  │   │                  │
-     │ Headers:         │   │ Headers:         │   │ Headers:         │
-     │ X-Context-*      │   │ X-Jira-Projects  │   │ X-Neo4j-*        │
-     │ X-API-Key        │   │ X-API-Key        │   │ X-API-Key        │
+     │ Config:          │   │ Config:          │   │ Config:          │
+     │ context_id       │   │ jira_projects    │   │ partition        │
+     │ api_key          │   │ api_key          │   │ api_key          │
      └──────────────────┘   └──────────────────┘   └──────────────────┘
 ```
 
@@ -297,23 +408,23 @@ The Agent Orchestrator MCP server is embedded in the Agent Runner and has specia
 | Aspect | Regular MCP Servers | Orchestrator MCP |
 |--------|---------------------|------------------|
 | **Location** | External service | Embedded in Runner |
-| **URL** | Static in registry | Dynamic port, injected via placeholder |
-| **Auth** | Simple headers | Auth0 M2M (shared with Runner) |
-| **Session context** | Via headers | Via `X-Agent-Session-Id` header |
+| **URL** | From registry | Dynamic port, injected via `${runner.orchestrator_mcp_url}` |
+| **Auth** | Via config values | Auth0 M2M (shared with Runner) |
+| **Context** | Via config values | Via run_id config key |
 
-The Orchestrator MCP **can** be in the registry for documentation purposes, but its URL and auth are handled specially:
+#### Minimal Configuration
+
+The Orchestrator MCP only requires the current run ID:
 
 ```json
 {
   "id": "orchestrator",
   "name": "Agent Orchestrator",
-  "description": "Spawn and manage sub-agents",
-  "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
-  "auth_type": "auth0_m2m",
-  "header_schema": {
-    "X-Agent-Session-Id": {
+  "url": "${runner.orchestrator_mcp_url}",
+  "config_schema": {
+    "run_id": {
       "type": "string",
-      "description": "Parent session ID for callback context",
+      "description": "Current run ID for parent context",
       "required": true,
       "internal": true
     }
@@ -321,7 +432,15 @@ The Orchestrator MCP **can** be in the registry for documentation purposes, but 
 }
 ```
 
-The `auth_type: "auth0_m2m"` and `internal: true` flags indicate special framework handling.
+#### Scope Inheritance
+
+When creating a child agent, the Coordinator:
+1. Receives parent `run_id` from Orchestrator MCP
+2. Looks up parent run → retrieves `scope`
+3. Creates child run with same `scope`
+4. Child agent inherits parent's scope without explicit passing
+
+The LLM never sees or manipulates scope values.
 
 ## API Design
 
@@ -344,33 +463,33 @@ POST /mcp-servers
   "name": "Atlassian (Jira + Confluence)",
   "description": "Access Jira issues and Confluence pages",
   "url": "http://localhost:9000/mcp",
-  "header_schema": {
-    "X-Jira-Projects": {
+  "config_schema": {
+    "jira_projects": {
       "type": "string",
       "description": "Comma-separated Jira project keys",
       "required": false,
       "example": "PROJ-A,PROJ-B"
     },
-    "X-Confluence-Spaces": {
+    "confluence_spaces": {
       "type": "string",
       "description": "Comma-separated Confluence space keys",
       "required": false,
       "example": "DEV,DOCS"
     },
-    "X-API-Key": {
+    "api_key": {
       "type": "string",
       "description": "API key for Atlassian access",
       "required": true,
       "sensitive": true
     }
   },
-  "default_headers": {
-    "X-API-Key": "${ATLASSIAN_API_KEY}"
+  "default_config": {
+    "api_key": "${env.ATLASSIAN_API_KEY}"
   }
 }
 ```
 
-### Run Creation with MCP Headers
+### Run Creation
 
 ```json
 POST /runs
@@ -378,48 +497,47 @@ POST /runs
   "type": "start_session",
   "agent_name": "project-researcher",
   "prompt": "Research the API design",
-  "mcp_headers": {
-    "context-store": {
-      "X-Context-Namespace": "project-beta",
-      "X-Context-Scope-Filters": {"sprint": "sprint-5"}
-    },
-    "atlassian": {
-      "X-Jira-Projects": "BETA,BETA-OPS"
-    }
+  "params": {
+    "topic": "authentication"
+  },
+  "scope": {
+    "context_id": "ctx-123",
+    "workflow_id": "wf-456"
   }
 }
 ```
 
-### Resolved Blueprint Response
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Run type (start_session, resume_session) |
+| `agent_name` | string | Agent to run |
+| `prompt` | string | Prompt for the agent |
+| `params` | object | Agent parameters (validated against agent's params_schema, visible to LLM) |
+| `scope` | object | Run scope (not validated, invisible to LLM, inherited by child runs) |
+
+### Run Payload to Runner
+
+The run payload sent to the Runner includes fully resolved MCP configuration:
 
 ```json
-GET /agents/project-researcher
 {
-  "name": "project-researcher",
-  "system_prompt": "...",
-  "mcp_servers": {
+  "run_id": "run-abc-123",
+  "session_id": "session-xyz",
+  "agent_name": "project-researcher",
+  "prompt": "Research the API design",
+  "params": {"topic": "authentication"},
+  "resolved_mcp_servers": {
     "context-store": {
       "type": "http",
       "url": "http://localhost:9501/mcp",
-      "headers": {
-        "X-Context-Namespace": "project-alpha",
-        "X-Context-Scope-Filters": "{\"department\": \"engineering\"}",
-        "X-API-Key": "${CONTEXT_STORE_API_KEY}"
-      }
-    },
-    "atlassian": {
-      "type": "http",
-      "url": "http://localhost:9000/mcp",
-      "headers": {
-        "X-Jira-Projects": "ALPHA",
-        "X-API-Key": "${ATLASSIAN_API_KEY}"
+      "config": {
+        "context_id": "ctx-123",
+        "api_key": "sk-xxxx-actual-key"
       }
     }
   }
 }
 ```
-
-Note: Environment variable placeholders (`${VAR}`) are resolved by the Runner/Executor, not the Coordinator.
 
 ## Configuration Examples
 
@@ -430,12 +548,12 @@ Note: Environment variable placeholders (`${VAR}`) are resolved by the Runner/Ex
 {
   "id": "context-store",
   "url": "http://localhost:9501/mcp",
-  "header_schema": {
-    "X-Context-Namespace": {"type": "string", "required": true},
-    "X-Context-Scope-Filters": {"type": "json", "required": false}
+  "config_schema": {
+    "context_id": {"type": "string", "required": true, "description": "Context for document isolation"},
+    "workflow_id": {"type": "string", "required": false, "description": "Workflow correlation ID"}
   },
-  "default_headers": {
-    "X-Context-Namespace": "default"
+  "default_config": {
+    "context_id": "default"
   }
 }
 ```
@@ -446,8 +564,8 @@ Note: Environment variable placeholders (`${VAR}`) are resolved by the Runner/Ex
   "mcpServers": {
     "docs": {
       "ref": "context-store",
-      "headers": {
-        "X-Context-Namespace": "research-docs"
+      "config": {
+        "context_id": "${scope.context_id}"
       }
     }
   }
@@ -458,78 +576,185 @@ Note: Environment variable placeholders (`${VAR}`) are resolved by the Runner/Ex
 ```json
 {
   "capabilities": ["research-capability"],
-  "mcpServers": {
-    "docs": {
-      "headers": {
-        "X-Context-Scope-Filters": {"type": "sprint-artifact"}
-      }
-    }
+  "params_schema": {
+    "topic": {"type": "string", "required": true}
   }
 }
 ```
 
 **Run request:**
 ```json
+POST /runs
 {
   "agent_name": "sprint-researcher",
-  "mcp_headers": {
-    "docs": {
-      "X-Context-Scope-Filters": {"sprint_id": "sprint-42"}
-    }
-  }
+  "params": {"topic": "API design"},
+  "scope": {"context_id": "sprint-42"}
 }
 ```
 
-**Final resolved:**
-```json
-{
-  "docs": {
-    "type": "http",
-    "url": "http://localhost:9501/mcp",
-    "headers": {
-      "X-Context-Namespace": "research-docs",
-      "X-Context-Scope-Filters": "{\"sprint_id\": \"sprint-42\"}"
-    }
-  }
-}
-```
-
-### Example 2: Atlassian with Project Scoping
-
-**Registry entry:**
-```json
-{
-  "id": "atlassian",
-  "url": "http://localhost:9000/mcp",
-  "header_schema": {
-    "X-Jira-Projects": {"type": "string", "required": false},
-    "X-Confluence-Spaces": {"type": "string", "required": false},
-    "X-API-Key": {"type": "string", "required": true, "sensitive": true}
-  },
-  "default_headers": {
-    "X-API-Key": "${ATLASSIAN_API_KEY}"
-  }
-}
-```
-
-**Agent (alpha-project-assistant):**
+**Resolved config (in run payload to Runner):**
 ```json
 {
   "mcpServers": {
-    "jira": {
-      "ref": "atlassian",
-      "headers": {
-        "X-Jira-Projects": "ALPHA,ALPHA-OPS",
-        "X-Confluence-Spaces": null
+    "docs": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp",
+      "config": {
+        "context_id": "sprint-42"
       }
     }
   }
 }
 ```
 
-This agent can only access ALPHA projects and has no Confluence access (header explicitly removed).
+### Example 2: Atlassian with API Key
 
-### Example 3: Multiple Agents Sharing Same MCP Server
+**Registry entry:**
+```json
+{
+  "id": "atlassian",
+  "url": "http://localhost:9000/mcp",
+  "config_schema": {
+    "api_key": {"type": "string", "required": true, "sensitive": true, "description": "Atlassian API key"},
+    "jira_projects": {"type": "string", "required": false, "description": "Comma-separated project keys"}
+  }
+}
+```
+
+**Capability (jira-access):**
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "ref": "atlassian",
+      "config": {
+        "api_key": "${env.ATLASSIAN_API_KEY}",
+        "jira_projects": "${scope.allowed_projects}"
+      }
+    }
+  }
+}
+```
+
+**Agent (project-assistant):**
+```json
+{
+  "capabilities": ["jira-access"],
+  "params_schema": {
+    "task": {"type": "string", "required": true}
+  }
+}
+```
+
+**Run request:**
+```json
+POST /runs
+{
+  "agent_name": "project-assistant",
+  "params": {"task": "List open bugs"},
+  "scope": {"allowed_projects": "ALPHA,BETA"}
+}
+```
+
+**Resolved config (in run payload to Runner):**
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "type": "http",
+      "url": "http://localhost:9000/mcp",
+      "config": {
+        "api_key": "sk-xxxx-actual-key-from-coordinator-env",
+        "jira_projects": "ALPHA,BETA"
+      }
+    }
+  }
+}
+```
+
+Note: `api_key` resolved from Coordinator's environment variable `ATLASSIAN_API_KEY`. The actual secret never appears in agent configuration.
+
+### Example 3: Orchestrator MCP (Special Case)
+
+The Orchestrator MCP enables agents to spawn sub-agents. It requires special handling.
+
+**Registry entry:**
+```json
+{
+  "id": "orchestrator",
+  "url": "${runner.orchestrator_mcp_url}",
+  "config_schema": {
+    "run_id": {"type": "string", "required": true, "internal": true, "description": "Current run ID"}
+  }
+}
+```
+
+**Capability (orchestration):**
+```json
+{
+  "mcpServers": {
+    "orchestrator": {
+      "ref": "orchestrator",
+      "config": {
+        "run_id": "${runtime.run_id}"
+      }
+    }
+  }
+}
+```
+
+**Agent (lead-researcher) - an orchestrator agent:**
+```json
+{
+  "capabilities": ["orchestration", "research-capability"],
+  "params_schema": {
+    "research_topic": {"type": "string", "required": true}
+  }
+}
+```
+
+**Run request:**
+```json
+POST /runs
+{
+  "agent_name": "lead-researcher",
+  "params": {"research_topic": "Authentication patterns"},
+  "scope": {"context_id": "project-123", "workflow_id": "wf-789"}
+}
+```
+
+**Resolved config (in run payload to Runner):**
+```json
+{
+  "mcpServers": {
+    "orchestrator": {
+      "type": "http",
+      "url": "http://127.0.0.1:54321/mcp",
+      "config": {
+        "run_id": "run-abc-123"
+      }
+    },
+    "docs": {
+      "type": "http",
+      "url": "http://localhost:9501/mcp",
+      "config": {
+        "context_id": "project-123"
+      }
+    }
+  }
+}
+```
+
+**When lead-researcher spawns a sub-agent:**
+
+1. LLM calls Orchestrator MCP tool: `start_agent("detail-researcher", "Research OAuth2")`
+2. Orchestrator MCP sends to Coordinator: `run_id: "run-abc-123"`
+3. Coordinator looks up `run-abc-123` → finds `scope: {context_id: "project-123", workflow_id: "wf-789"}`
+4. Coordinator creates child run with **same scope**
+5. Child agent inherits `context_id` and `workflow_id` - same Context Store documents accessible
+6. LLM never sees or manipulates scope values
+
+### Example 4: Multiple Agents Sharing Same MCP Server
 
 Three agents share the same Neo4j server but with different scopes:
 
@@ -538,8 +763,8 @@ Three agents share the same Neo4j server but with different scopes:
 {
   "id": "neo4j",
   "url": "http://localhost:9003/mcp/",
-  "header_schema": {
-    "X-Neo4j-Partition": {"type": "string", "required": false}
+  "config_schema": {
+    "partition": {"type": "string", "required": false}
   }
 }
 ```
@@ -547,24 +772,57 @@ Three agents share the same Neo4j server but with different scopes:
 **Agents:**
 ```json
 // team-alpha-analyst
-{"mcpServers": {"kg": {"ref": "neo4j", "headers": {"X-Neo4j-Partition": "team-alpha"}}}}
+{
+  "mcpServers": {
+    "kg": {
+      "ref": "neo4j",
+      "config": {"partition": "${scope.team_partition}"}
+    }
+  }
+}
 
-// team-beta-analyst
-{"mcpServers": {"kg": {"ref": "neo4j", "headers": {"X-Neo4j-Partition": "team-beta"}}}}
+// team-beta-analyst (same config, different scope at runtime)
+{
+  "mcpServers": {
+    "kg": {
+      "ref": "neo4j",
+      "config": {"partition": "${scope.team_partition}"}
+    }
+  }
+}
 
-// global-analyst
-{"mcpServers": {"kg": {"ref": "neo4j", "headers": {}}}}  // No partition = full access
+// global-analyst (no partition = full access)
+{
+  "mcpServers": {
+    "kg": {
+      "ref": "neo4j",
+      "config": {}
+    }
+  }
+}
+```
+
+**Run requests:**
+```json
+// Team Alpha run
+{"agent_name": "team-alpha-analyst", "scope": {"team_partition": "team-alpha"}}
+
+// Team Beta run
+{"agent_name": "team-beta-analyst", "scope": {"team_partition": "team-beta"}}
+
+// Global run (no partition)
+{"agent_name": "global-analyst", "scope": {}}
 ```
 
 ## MCP Server Implementation Requirements
 
 For MCP servers to support this pattern, they must:
 
-1. **Read scoping headers** from HTTP request
-2. **Apply filtering** based on header values
-3. **Reject/limit** access when required headers are missing (if enforcing)
+1. **Read config from transport** - HTTP headers, STDIO env vars, etc.
+2. **Apply filtering** based on config values
+3. **Reject/limit** access when required config is missing (if enforcing)
 
-### Example: Context Store MCP Server
+### Example: Context Store MCP Server (HTTP)
 
 ```python
 from mcp.server.fastmcp import FastMCP
@@ -572,25 +830,22 @@ from starlette.requests import Request
 
 mcp = FastMCP("context-store")
 
-def get_scope_from_headers(request: Request) -> dict:
-    """Extract scope from HTTP headers."""
+def get_config_from_request(request: Request) -> dict:
+    """Extract config from HTTP headers."""
     return {
-        "namespace": request.headers.get("x-context-namespace", "default"),
-        "scope_filters": json.loads(
-            request.headers.get("x-context-scope-filters", "{}")
-        )
+        "context_id": request.headers.get("x-context-id", "default"),
+        "workflow_id": request.headers.get("x-workflow-id")
     }
 
 @mcp.tool()
 async def list_documents(tags: list[str] = None):
     request = get_current_request()
-    scope = get_scope_from_headers(request)
+    config = get_config_from_request(request)
 
-    # Query scoped to namespace and filters
+    # Query scoped to context
     docs = await db.query_documents(
-        namespace=scope["namespace"],
-        scope_filters=scope["scope_filters"],
-        tags=tags  # User/LLM-provided filter
+        context_id=config["context_id"],
+        tags=tags
     )
     return docs
 ```
@@ -615,25 +870,26 @@ async def search_issues(jql: str):
 
 ### MCP Servers Management Page
 
-New page for CRUD operations on MCP server registry:
+Page for CRUD operations on MCP server registry:
 
-- **List View**: Table with ID, name, URL, header count
+- **List View**: Table with ID, name, URL, config key count
 - **Create/Edit Form**:
   - ID field (validated, immutable after creation)
   - Name, description
-  - URL field
-  - Header schema editor (add/remove headers with type, description, flags)
-  - Default headers editor
+  - URL field (can contain placeholders)
+  - Config schema editor (add/remove keys with type, description, flags)
+  - Default config editor
 
 ### Capability/Agent Edit Forms
 
-Updated forms with MCP server selection:
+Forms with MCP server selection:
 
 - **MCP Servers Section**:
   - Dropdown to select from registry
-  - For each selected server, show header fields based on schema
-  - Form fields rendered based on header type (string input, JSON editor, checkbox)
+  - For each selected server, show config fields based on schema
+  - Form fields rendered based on config type (string input, JSON editor, checkbox)
   - Sensitive fields shown as password inputs
+  - Placeholder syntax helper (show available sources)
 
 ### Visual Indicator for Resolution
 
@@ -643,70 +899,67 @@ Show inheritance chain in UI:
 ┌─────────────────────────────────────────────────────┐
 │ MCP Server: context-store                           │
 ├─────────────────────────────────────────────────────┤
-│ X-Context-Namespace                                 │
+│ context_id                                          │
 │ ┌─────────────────────────────────────────────────┐ │
-│ │ [project-alpha]                                 │ │
-│ │ ↑ Overrides: capability (research-docs)         │ │
-│ │ ↑ Default: default                             │ │
+│ │ [${scope.context_id}]                           │ │
+│ │ ↑ Overrides: registry default (default)         │ │
 │ └─────────────────────────────────────────────────┘ │
 │                                                     │
-│ X-Context-Scope-Filters                             │
+│ api_key                                             │
 │ ┌─────────────────────────────────────────────────┐ │
-│ │ [{"department": "engineering"}]                │ │
-│ │ ↑ From: this agent                             │ │
+│ │ [${env.CONTEXT_STORE_API_KEY}]                  │ │
+│ │ ↑ From: registry default                        │ │
 │ └─────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```
 
-## Migration Strategy
+## Implementation Notes
 
-### Phase 1: Registry Infrastructure (Backward Compatible)
+### Prerequisite: Centralized Resolution
 
-1. Add `mcp_servers` table to Coordinator database
-2. Add CRUD API endpoints
-3. Add Dashboard page for registry management
-4. Seed registry with current hardcoded MCP servers
+Before implementing the full placeholder system, the following architectural change is required:
 
-Existing agent/capability configs continue to work unchanged.
+1. **Move MCP config resolution to Coordinator** - Currently fragmented across Runner/Executor
+2. **Include resolved config in run payload** - Runner receives self-contained payload
+3. **Use Coordinator's environment** - All `${env.X}` resolved from Coordinator, not Runner
+4. **Runner resolves `${runner.X}` only** - The `${runner.orchestrator_mcp_url}` placeholder is resolved by Runner (not Coordinator) because only the Runner knows the dynamic port of the embedded Orchestrator MCP
 
-### Phase 2: Reference Support
+This foundational change ensures:
+- Single source of truth for resolution logic
+- Immediate validation feedback to callers
+- Simplified Runner (no additional API calls, only resolves `${runner.*}` placeholders)
+- Centralized secret management
 
-1. Update Blueprint Resolver to handle `ref` syntax
-2. Support both old (inline URL) and new (ref) formats
-3. Update Dashboard to offer ref-based configuration
-4. Migrate existing configs to use refs (optional)
+See [MCP Resolution at Coordinator](mcp-resolution-at-coordinator.md) for detailed implementation plan.
 
-### Phase 3: Header Resolution
+### Transport Abstraction
 
-1. Implement header inheritance chain in Blueprint Resolver
-2. Add `mcp_headers` to run creation API
-3. Update Runner to apply run-level headers
-4. Implement parent session inheritance
+The `config` field in MCP server references is transport-agnostic:
+- **HTTP transport**: Config values become HTTP headers
+- **STDIO transport**: Config values become environment variables
 
-### Phase 4: Deprecate Inline URLs
-
-1. Warn when inline URLs used in agent/capability configs
-2. Dashboard defaults to ref-based configuration
-3. Migration tooling to convert inline to refs
+The registry's `config_schema` documents accepted keys. The transport layer maps them appropriately.
 
 ## Limitations
 
 | Limitation | Rationale |
 |------------|-----------|
 | **No per-request scoping** | Session-level scoping is sufficient; per-request adds complexity |
-| **No header validation at runtime** | MCP servers responsible for validating their headers |
-| **No cross-server policies** | Keep it simple; can add policy layer later if needed |
+| **No config validation at runtime** | MCP servers responsible for validating their config |
 | **Simple merge (last wins)** | Complex merge strategies add cognitive load |
-| **Environment vars resolved by Runner** | Coordinator doesn't have access to Runner's env |
+| **Scope not validated** | Scope keys are arbitrary; validation would require schema |
+| **Coordinator env vars only** | Centralized secrets; Runner env not accessible |
 
 ## Security Considerations
 
 | Concern | Mitigation |
 |---------|------------|
-| **Sensitive headers in config** | Mark as `sensitive: true`, UI hides value, not logged |
-| **LLM accessing headers** | Headers injected at HTTP level, not exposed to LLM |
-| **Header spoofing** | Framework controls headers; LLM tool params don't include headers |
-| **Credential exposure** | Use env var placeholders, resolved at runtime |
+| **Sensitive config values** | Mark as `sensitive: true`, UI hides value, not logged |
+| **LLM accessing config** | Config injected at transport level, not exposed to LLM |
+| **Config spoofing** | Framework controls config; LLM tool params don't include config |
+| **Credential exposure** | Use `${env.X}` placeholders, resolved at Coordinator with actual secrets |
+| **Scope manipulation** | LLM cannot see or modify scope; framework-controlled |
+| **Child run scope** | Inherited automatically; LLM cannot change parent's scope |
 
 ## Future Considerations
 
@@ -720,23 +973,9 @@ Extend registry to support dynamic token acquisition:
   "auth": {
     "type": "oauth2_client_credentials",
     "token_url": "https://auth.example.com/token",
-    "client_id": "${EXTERNAL_CLIENT_ID}",
-    "client_secret": "${EXTERNAL_CLIENT_SECRET}",
+    "client_id": "${env.EXTERNAL_CLIENT_ID}",
+    "client_secret": "${env.EXTERNAL_CLIENT_SECRET}",
     "scope": "api:read api:write"
-  }
-}
-```
-
-### Client-Provided Credentials
-
-Allow run endpoint to accept client credentials:
-
-```json
-POST /runs
-{
-  "agent_name": "analyst",
-  "credentials": {
-    "atlassian": {"api_key": "user-provided-key"}
   }
 }
 ```
@@ -747,14 +986,27 @@ Reference secrets by name instead of env vars:
 
 ```json
 {
-  "default_headers": {
-    "X-API-Key": {"$secret": "atlassian-api-key"}
+  "default_config": {
+    "api_key": {"$secret": "atlassian-api-key"}
+  }
+}
+```
+
+### Scope Schema (Optional)
+
+Optional schema for documenting expected scope keys:
+
+```json
+{
+  "scope_schema": {
+    "context_id": {"type": "string", "description": "Context for document scoping"},
+    "workflow_id": {"type": "string", "description": "Workflow correlation"}
   }
 }
 ```
 
 ## Related Documents
 
-- [Context Store Scoping](../context-store-scoping/context-store-scoping.md) - Namespace/scope_filters design for Context Store
-- [External Service Token Architecture](../external-service-auth/external-service-token-architecture-with-scoping.md) - JWT-based alternative (for comparison)
+- [Agent Types](../../architecture/agent-types.md) - Autonomous vs procedural agents
 - [Capabilities System](../../features/capabilities-system.md) - How capabilities reference MCP servers
+- [Auth OIDC](../../architecture/auth-oidc.md) - Authentication with Auth0
