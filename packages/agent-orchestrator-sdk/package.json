@@ -1,0 +1,40 @@
+{
+  "name": "@rawe/agent-orchestrator-sdk",
+  "version": "0.1.0",
+  "description": "SDK for programmatic interaction with the Agent Orchestrator",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "agent",
+    "orchestrator",
+    "sdk",
+    "ai",
+    "automation"
+  ],
+  "author": "rawe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rawe/claude-agent-orchestrator"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}

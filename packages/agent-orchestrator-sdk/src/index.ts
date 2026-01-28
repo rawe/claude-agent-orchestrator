@@ -1,11 +1,11 @@
 /**
- * Coordinator Client SDK
+ * Agent Orchestrator SDK
  *
- * Programmatic interface for interacting with the Agent Coordinator.
+ * Programmatic interface for interacting with the Agent Orchestrator.
  *
  * @example
  * ```typescript
- * import { CoordinatorClient } from '@/lib/coordinator-client';
+ * import { CoordinatorClient } from '@rawe/agent-orchestrator-sdk';
  *
  * const client = new CoordinatorClient({
  *   baseUrl: 'http://localhost:8765'
