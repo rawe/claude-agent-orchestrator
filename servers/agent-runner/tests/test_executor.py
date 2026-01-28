@@ -30,7 +30,7 @@ class TestBuildPayload:
         fake_exec = tmp_path / "test-exec"
         fake_exec.write_text("#!/bin/bash\necho test")
         fake_exec.chmod(0o755)
-        with patch("executor.get_executor_path", return_value=fake_exec):
+        with patch("executor.get_runner_dir", return_value=tmp_path):
             return RunExecutor(default_project_dir="/default/path")
 
     def test_start_payload_minimal(self, executor):
@@ -40,7 +40,7 @@ class TestBuildPayload:
             type="start_session",
             session_id="ses_test123",
             agent_name=None,
-            prompt="Hello world",
+            parameters={"prompt": "Hello world"},
             project_dir=None,
         )
 
@@ -49,7 +49,7 @@ class TestBuildPayload:
         assert payload["schema_version"] == SCHEMA_VERSION
         assert payload["mode"] == "start"
         assert payload["session_id"] == "ses_test123"
-        assert payload["prompt"] == "Hello world"
+        assert payload["parameters"]["prompt"] == "Hello world"
         # Uses default project_dir
         assert payload["project_dir"] == "/default/path"
         # No agent_name when not specified
@@ -62,7 +62,7 @@ class TestBuildPayload:
             type="start_session",
             session_id="ses_test123",
             agent_name="security-auditor",
-            prompt="Hello world",
+            parameters={"prompt": "Hello world"},
             project_dir="/custom/path",
         )
 
@@ -78,7 +78,7 @@ class TestBuildPayload:
             type="resume_session",
             session_id="ses_test123",
             agent_name="should-be-ignored",
-            prompt="Continue please",
+            parameters={"prompt": "Continue please"},
             project_dir="/should/be/ignored",
         )
 
@@ -87,9 +87,9 @@ class TestBuildPayload:
         assert payload["schema_version"] == SCHEMA_VERSION
         assert payload["mode"] == "resume"
         assert payload["session_id"] == "ses_test123"
-        assert payload["prompt"] == "Continue please"
-        # Resume should NOT include agent_name or project_dir
-        assert "agent_name" not in payload
+        assert payload["parameters"]["prompt"] == "Continue please"
+        # Resume DOES include agent_name now (for procedural agents)
+        # but NOT project_dir
         assert "project_dir" not in payload
 
     def test_payload_is_valid_json(self, executor):
@@ -99,7 +99,7 @@ class TestBuildPayload:
             type="start_session",
             session_id="ses_test123",
             agent_name="agent",
-            prompt="Hello 世界! 😀",
+            parameters={"prompt": "Hello 世界! 😀"},
             project_dir="/path",
         )
 
@@ -108,7 +108,7 @@ class TestBuildPayload:
 
         # Should be valid JSON
         parsed = json.loads(json_str)
-        assert parsed["prompt"] == "Hello 世界! 😀"
+        assert parsed["parameters"]["prompt"] == "Hello 世界! 😀"
 
 
 class TestExecuteWithPayload:
@@ -117,11 +117,14 @@ class TestExecuteWithPayload:
     @pytest.fixture
     def executor(self, tmp_path):
         """Create executor with mocked executor path."""
-        fake_exec = tmp_path / "test-exec"
+        # Create fake executor at the default path
+        exec_dir = tmp_path / "executors" / "claude-code"
+        exec_dir.mkdir(parents=True)
+        fake_exec = exec_dir / "ao-claude-code-exec"
         fake_exec.write_text("#!/bin/bash\necho test")
         fake_exec.chmod(0o755)
 
-        with patch("executor.get_executor_path", return_value=fake_exec):
+        with patch("executor.get_runner_dir", return_value=tmp_path):
             return RunExecutor(default_project_dir="/default/path")
 
     def test_execute_calls_executor(self, executor):
@@ -131,7 +134,7 @@ class TestExecuteWithPayload:
             type="start_session",
             session_id="ses_test123",
             agent_name=None,
-            prompt="Hello",
+            parameters={"prompt": "Hello"},
             project_dir=None,
         )
 
@@ -142,11 +145,15 @@ class TestExecuteWithPayload:
 
             executor._execute_with_payload(run, "start")
 
-            # Should call Popen with executor
+            # Should call Popen with executor (via 'uv run --script <executor>')
             mock_popen.assert_called_once()
             call_args = mock_popen.call_args
             cmd = call_args[0][0]
-            assert "test-exec" in cmd[0]
+            # The command is now ["uv", "run", "--script", <executor_path>]
+            assert cmd[0] == "uv"
+            assert cmd[1] == "run"
+            assert cmd[2] == "--script"
+            assert "ao-claude-code-exec" in cmd[3]
 
     def test_execute_writes_json_to_stdin(self, executor):
         """Execute writes JSON payload to subprocess stdin."""
@@ -155,7 +162,7 @@ class TestExecuteWithPayload:
             type="start_session",
             session_id="ses_test123",
             agent_name=None,
-            prompt="Hello",
+            parameters={"prompt": "Hello"},
             project_dir=None,
         )
 
@@ -185,7 +192,7 @@ class TestExecuteWithPayload:
             type="start_session",
             session_id="ses_my123456",
             agent_name=None,
-            prompt="Hello",
+            parameters={"prompt": "Hello"},
             project_dir=None,
         )
 
@@ -212,7 +219,7 @@ class TestExecute:
         fake_exec.write_text("#!/bin/bash\necho test")
         fake_exec.chmod(0o755)
 
-        with patch("executor.get_executor_path", return_value=fake_exec):
+        with patch("executor.get_runner_dir", return_value=tmp_path):
             return RunExecutor(default_project_dir="/default/path")
 
     def test_execute_start_session(self, executor):
@@ -222,7 +229,7 @@ class TestExecute:
             type="start_session",
             session_id="ses_testid1",
             agent_name=None,
-            prompt="Hello",
+            parameters={"prompt": "Hello"},
             project_dir=None,
         )
 
@@ -238,7 +245,7 @@ class TestExecute:
             type="resume_session",
             session_id="ses_testid1",
             agent_name=None,
-            prompt="Hello",
+            parameters={"prompt": "Hello"},
             project_dir=None,
         )
 
@@ -254,9 +261,195 @@ class TestExecute:
             type="unknown_type",
             session_id="ses_testid1",
             agent_name=None,
-            prompt="Hello",
+            parameters={"prompt": "Hello"},
             project_dir=None,
         )
 
         with pytest.raises(ValueError, match="Unknown agent run type: unknown_type"):
             executor.execute_run(run)
+
+
+class TestResolvedAgentBlueprint:
+    """Tests for resolved_agent_blueprint from run payload (mcp-resolution-at-coordinator.md)."""
+
+    @pytest.fixture
+    def executor_with_mcp_url(self, tmp_path):
+        """Create executor with mocked executor path and MCP server URL."""
+        fake_exec = tmp_path / "test-exec"
+        fake_exec.write_text("#!/bin/bash\necho test")
+        fake_exec.chmod(0o755)
+        with patch("executor.get_runner_dir", return_value=tmp_path):
+            return RunExecutor(
+                default_project_dir="/default/path",
+                mcp_server_url="http://localhost:9999/mcp",
+            )
+
+    def test_uses_resolved_blueprint_from_run(self, executor_with_mcp_url):
+        """Uses resolved_agent_blueprint from run payload when available."""
+        resolved_blueprint = {
+            "name": "test-agent",
+            "system_prompt": "You are a test agent.",
+            "mcp_servers": {
+                "api": {
+                    "type": "http",
+                    "url": "http://resolved-api.example.com",
+                }
+            }
+        }
+
+        run = Run(
+            run_id="run-1",
+            type="start_session",
+            session_id="ses_test123",
+            agent_name="test-agent",
+            parameters={"prompt": "Hello"},
+            project_dir=None,
+            resolved_agent_blueprint=resolved_blueprint,
+        )
+
+        payload = executor_with_mcp_url._build_payload(run, "start")
+
+        assert "agent_blueprint" in payload
+        assert payload["agent_blueprint"]["name"] == "test-agent"
+        assert payload["agent_blueprint"]["mcp_servers"]["api"]["url"] == "http://resolved-api.example.com"
+
+    def test_resolves_runner_placeholders(self, executor_with_mcp_url):
+        """Resolves ${runner.orchestrator_mcp_url} in resolved_agent_blueprint."""
+        resolved_blueprint = {
+            "name": "test-agent",
+            "mcp_servers": {
+                "orchestrator": {
+                    "type": "http",
+                    "url": "${runner.orchestrator_mcp_url}",
+                    "config": {
+                        "run_id": "run-123"
+                    }
+                }
+            }
+        }
+
+        run = Run(
+            run_id="run-1",
+            type="start_session",
+            session_id="ses_test123",
+            agent_name="test-agent",
+            parameters={"prompt": "Hello"},
+            project_dir=None,
+            resolved_agent_blueprint=resolved_blueprint,
+        )
+
+        payload = executor_with_mcp_url._build_payload(run, "start")
+
+        # ${runner.orchestrator_mcp_url} should be resolved
+        assert payload["agent_blueprint"]["mcp_servers"]["orchestrator"]["url"] == "http://localhost:9999/mcp"
+        # Other values should be unchanged
+        assert payload["agent_blueprint"]["mcp_servers"]["orchestrator"]["config"]["run_id"] == "run-123"
+
+    def test_preserves_other_placeholders_in_runner_resolution(self, executor_with_mcp_url):
+        """Unknown ${runner.X} placeholders are preserved."""
+        resolved_blueprint = {
+            "value": "${runner.unknown_key}"
+        }
+
+        run = Run(
+            run_id="run-1",
+            type="start_session",
+            session_id="ses_test123",
+            agent_name="test-agent",
+            parameters={"prompt": "Hello"},
+            project_dir=None,
+            resolved_agent_blueprint=resolved_blueprint,
+        )
+
+        payload = executor_with_mcp_url._build_payload(run, "start")
+
+        # Unknown runner placeholders should be preserved
+        assert payload["agent_blueprint"]["value"] == "${runner.unknown_key}"
+
+    def test_does_not_mutate_original_blueprint(self, executor_with_mcp_url):
+        """Original resolved_agent_blueprint is not modified."""
+        original_blueprint = {
+            "mcp_servers": {
+                "orchestrator": {
+                    "url": "${runner.orchestrator_mcp_url}"
+                }
+            }
+        }
+
+        run = Run(
+            run_id="run-1",
+            type="start_session",
+            session_id="ses_test123",
+            agent_name="test-agent",
+            parameters={"prompt": "Hello"},
+            project_dir=None,
+            resolved_agent_blueprint=original_blueprint,
+        )
+
+        executor_with_mcp_url._build_payload(run, "start")
+
+        # Original should be unchanged
+        assert original_blueprint["mcp_servers"]["orchestrator"]["url"] == "${runner.orchestrator_mcp_url}"
+
+
+class TestRunnerPlaceholderResolution:
+    """Tests for _resolve_runner_placeholders method."""
+
+    @pytest.fixture
+    def executor_with_mcp_url(self, tmp_path):
+        """Create executor with MCP server URL."""
+        fake_exec = tmp_path / "test-exec"
+        fake_exec.write_text("#!/bin/bash\necho test")
+        fake_exec.chmod(0o755)
+        with patch("executor.get_runner_dir", return_value=tmp_path):
+            return RunExecutor(
+                default_project_dir="/default/path",
+                mcp_server_url="http://localhost:8888/mcp",
+            )
+
+    def test_resolves_orchestrator_mcp_url(self, executor_with_mcp_url):
+        """Resolves ${runner.orchestrator_mcp_url}."""
+        blueprint = {
+            "url": "${runner.orchestrator_mcp_url}"
+        }
+
+        resolved = executor_with_mcp_url._resolve_runner_placeholders(blueprint)
+
+        assert resolved["url"] == "http://localhost:8888/mcp"
+
+    def test_resolves_in_nested_structures(self, executor_with_mcp_url):
+        """Resolves runner placeholders in nested dicts and lists."""
+        blueprint = {
+            "level1": {
+                "level2": {
+                    "url": "${runner.orchestrator_mcp_url}"
+                }
+            },
+            "urls": ["${runner.orchestrator_mcp_url}", "http://other.com"]
+        }
+
+        resolved = executor_with_mcp_url._resolve_runner_placeholders(blueprint)
+
+        assert resolved["level1"]["level2"]["url"] == "http://localhost:8888/mcp"
+        assert resolved["urls"][0] == "http://localhost:8888/mcp"
+        assert resolved["urls"][1] == "http://other.com"
+
+    def test_handles_no_mcp_url(self, tmp_path):
+        """Handles case where mcp_server_url is None."""
+        fake_exec = tmp_path / "test-exec"
+        fake_exec.write_text("#!/bin/bash\necho test")
+        fake_exec.chmod(0o755)
+        with patch("executor.get_runner_dir", return_value=tmp_path):
+            executor = RunExecutor(
+                default_project_dir="/default/path",
+                mcp_server_url=None,  # No MCP URL
+            )
+
+        blueprint = {
+            "url": "${runner.orchestrator_mcp_url}"
+        }
+
+        resolved = executor._resolve_runner_placeholders(blueprint)
+
+        # Should preserve placeholder when no URL available
+        assert resolved["url"] == "${runner.orchestrator_mcp_url}"

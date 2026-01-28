@@ -1,0 +1,16 @@
+[project]
+name = "agent-runner"
+version = "0.1.0"
+description = "Agent Runner for executing agent sessions"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.25.0",
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["lib"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["lib"]

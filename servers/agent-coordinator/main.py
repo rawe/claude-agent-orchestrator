@@ -54,8 +54,11 @@ init_db()
 # Import run queue types and init function
 from services.run_queue import (
     init_run_queue, RunCreate, Run, RunStatus, RunType,
-    ParameterValidationError, validate_parameters, IMPLICIT_AUTONOMOUS_SCHEMA
+    ParameterValidationError, validate_parameters, IMPLICIT_AUTONOMOUS_SCHEMA,
+    generate_run_id,
 )
+# Import placeholder resolver for MCP resolution at coordinator
+from services.placeholder_resolver import PlaceholderResolver
 # Import runner registry and other services
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError, AgentNameCollisionError
 from services.stop_command_queue import stop_command_queue
@@ -1905,8 +1908,30 @@ async def create_run(run_create: RunCreate):
         except Exception:
             raise
 
+    # Generate run_id early for placeholder resolution (mcp-resolution-at-coordinator.md)
+    run_id = generate_run_id()
+
+    # Resolve agent blueprint with placeholders (mcp-resolution-at-coordinator.md)
+    resolved_agent_blueprint = None
+    if agent:
+        resolver = PlaceholderResolver(
+            params=run_create.parameters,
+            scope=run_create.scope,
+            run_id=run_id,
+            session_id=run_create.session_id,
+        )
+        # Convert agent to dict and resolve placeholders
+        agent_dict = agent.model_dump(exclude_none=True)
+        resolved_agent_blueprint = resolver.resolve(agent_dict)
+        if DEBUG:
+            print(f"[DEBUG] Resolved agent blueprint for run {run_id}", flush=True)
+
     # Create the run (session must exist for FK constraint)
-    run = run_queue.add_run(run_create)
+    run = run_queue.add_run(
+        run_create,
+        resolved_agent_blueprint=resolved_agent_blueprint,
+        run_id=run_id,
+    )
 
     # Broadcast session creation after run is created (so we have run_id)
     if run_create.type == RunType.START_SESSION:

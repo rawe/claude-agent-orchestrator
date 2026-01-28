@@ -218,12 +218,52 @@ class RunExecutor:
 
         return self._execute_with_payload(run, mode)
 
+    def _resolve_runner_placeholders(self, blueprint: dict) -> dict:
+        """Resolve ${runner.*} placeholders in blueprint.
+
+        This is the ONLY placeholder resolution at Runner level.
+        Currently only ${runner.orchestrator_mcp_url} is supported.
+
+        Part of MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md).
+
+        Args:
+            blueprint: Agent blueprint with possible ${runner.*} placeholders
+
+        Returns:
+            New blueprint with runner placeholders resolved
+        """
+        import copy
+        import re
+
+        RUNNER_PLACEHOLDER = re.compile(r'\$\{runner\.([^}]+)\}')
+
+        def resolve_string(s: str) -> str:
+            def replace_match(match: re.Match) -> str:
+                key = match.group(1)
+                if key == 'orchestrator_mcp_url':
+                    return self.mcp_server_url or match.group(0)
+                # Unknown runner.* placeholder - keep as-is
+                return match.group(0)
+            return RUNNER_PLACEHOLDER.sub(replace_match, s)
+
+        def resolve_value(value):
+            if isinstance(value, dict):
+                return {k: resolve_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [resolve_value(item) for item in value]
+            elif isinstance(value, str):
+                return resolve_string(value)
+            else:
+                return value
+
+        return resolve_value(copy.deepcopy(blueprint))
+
     def _build_payload(self, run: Run, mode: str) -> dict:
         """Build JSON payload for ao-*-exec.
 
-        Schema 2.2: If agent_name is specified and blueprint_resolver is configured,
-        fetches and resolves the blueprint, including it as agent_blueprint in the payload.
-        Also includes executor_config from the profile if configured.
+        Schema 2.2+: Uses resolved_agent_blueprint from run payload if available
+        (mcp-resolution-at-coordinator.md). Falls back to blueprint_resolver for
+        backward compatibility.
 
         Args:
             run: The agent run to execute
@@ -252,8 +292,17 @@ class RunExecutor:
         if self.executor_config:
             payload["executor_config"] = self.executor_config
 
-        # Resolve blueprint if resolver is available
-        if run.agent_name and self.blueprint_resolver:
+        # Use resolved_agent_blueprint from run if available (mcp-resolution-at-coordinator.md)
+        # This is the preferred path - blueprint already resolved at Coordinator
+        if run.resolved_agent_blueprint:
+            # Resolve only ${runner.*} placeholders (e.g., ${runner.orchestrator_mcp_url})
+            agent_blueprint = self._resolve_runner_placeholders(run.resolved_agent_blueprint)
+            payload["agent_blueprint"] = agent_blueprint
+            logger.debug(
+                f"Using resolved blueprint from run for session {run.session_id}"
+            )
+        # Fallback: Resolve blueprint using blueprint_resolver (backward compatibility)
+        elif run.agent_name and self.blueprint_resolver:
             try:
                 agent_blueprint = self.blueprint_resolver.resolve(
                     agent_name=run.agent_name,
