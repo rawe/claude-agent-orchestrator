@@ -38,7 +38,7 @@ Claude Code / AI Framework
 ## Project Structure
 
 ```
-├── dashboard/                    # React web UI for monitoring agents
+├── apps/dashboard/               # React web UI for monitoring agents
 ├── servers/
 │   ├── agent-coordinator/            # FastAPI server - sessions, agent runs, runner registry
 │   ├── agent-runner/           # Processes agent runs - polls Agent Coordinator, spawns executors
@@ -117,7 +117,7 @@ Claude Code / AI Framework
 - `doc-push`, `doc-pull` - Sync documents to/from server
 - `doc-read`, `doc-query`, `doc-info`, `doc-delete` - Document operations
 
-### Dashboard (`dashboard/`)
+### Dashboard (`apps/dashboard/`)
 - Real-time session monitoring via SSE
 - Event timeline and tool call visualization
 

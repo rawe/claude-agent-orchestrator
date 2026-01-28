@@ -172,7 +172,7 @@ Changes are pervasive (9 files with imports) but not complex. Estimated 3-4 hour
 
 ### 2.3 Dashboard (React SPA)
 
-**Location:** `dashboard/src/`
+**Location:** `apps/dashboard/src/`
 
 #### What is Already Generic OIDC
 
@@ -213,7 +213,7 @@ Requires replacing Auth0 SDK with generic OIDC library. Estimated 3-4 hours.
 
 ### 2.4 Chat UI (React SPA)
 
-**Location:** `interfaces/chat-ui/src/`
+**Location:** `apps/chat-ui/src/`
 
 #### What is Already Generic OIDC
 
@@ -499,20 +499,20 @@ Recommended new variable names:
 - `servers/agent-runner/agent-runner` (~10 lines)
 
 ### Dashboard
-- `dashboard/package.json` (~2 lines)
-- `dashboard/src/App.tsx` (~15 lines)
-- `dashboard/src/components/auth/Auth0TokenProvider.tsx` → rename (~15 lines)
-- `dashboard/src/components/auth/AuthGuard.tsx` (~15 lines)
-- `dashboard/src/components/layout/Header.tsx` (~20 lines)
-- `dashboard/src/services/auth.ts` (~5 lines)
+- `apps/dashboard/package.json` (~2 lines)
+- `apps/dashboard/src/App.tsx` (~15 lines)
+- `apps/dashboard/src/components/auth/Auth0TokenProvider.tsx` → rename (~15 lines)
+- `apps/dashboard/src/components/auth/AuthGuard.tsx` (~15 lines)
+- `apps/dashboard/src/components/layout/Header.tsx` (~20 lines)
+- `apps/dashboard/src/services/auth.ts` (~5 lines)
 
 ### Chat UI
-- `interfaces/chat-ui/package.json` (~2 lines)
-- `interfaces/chat-ui/src/App.tsx` (~15 lines)
-- `interfaces/chat-ui/src/components/auth/Auth0TokenProvider.tsx` → rename (~15 lines)
-- `interfaces/chat-ui/src/components/auth/AuthGuard.tsx` (~15 lines)
-- `interfaces/chat-ui/src/vite-env.d.ts` (~5 lines)
-- `interfaces/chat-ui/src/services/auth.ts` (~5 lines)
+- `apps/chat-ui/package.json` (~2 lines)
+- `apps/chat-ui/src/App.tsx` (~15 lines)
+- `apps/chat-ui/src/components/auth/Auth0TokenProvider.tsx` → rename (~15 lines)
+- `apps/chat-ui/src/components/auth/AuthGuard.tsx` (~15 lines)
+- `apps/chat-ui/src/vite-env.d.ts` (~5 lines)
+- `apps/chat-ui/src/services/auth.ts` (~5 lines)
 
 ---
 

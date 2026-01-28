@@ -32,7 +32,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { CoordinatorClient, RunHandle } from '@/lib/coordinator-client';
+import { CoordinatorClient, RunHandle } from '@rawe/agent-orchestrator-sdk';
 import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
 import { fetchAccessToken } from '@/services/auth';
 import { agentService } from '@/services/agentService';

@@ -40,7 +40,7 @@ docker build \
   --build-arg VITE_AUTH0_CLIENT_ID=your-client-id \
   --build-arg VITE_AUTH0_AUDIENCE=https://your-api \
   -t my-aof-dashboard:<version> \
-  dashboard/
+  apps/dashboard/
 ```
 
 ## Pre-built Image Configuration
@@ -93,7 +93,7 @@ docker build \
   --build-arg VITE_AUTH0_CLIENT_ID=abc123 \
   --build-arg VITE_AUTH0_AUDIENCE=https://api.aof.example.com \
   -t my-aof-dashboard:<version> \
-  dashboard/
+  apps/dashboard/
 
 # Run production image
 docker run -d \
@@ -122,7 +122,7 @@ services:
 services:
   dashboard:
     build:
-      context: ./dashboard
+      context: ./apps/dashboard
       args:
         VITE_AGENT_ORCHESTRATOR_API_URL: https://api.aof.example.com
         VITE_AUTH0_DOMAIN: example.auth0.com

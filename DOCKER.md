@@ -171,7 +171,7 @@ Run `make help` to see all available commands:
 - **Technology:** Node.js 18 + Vite + React + Tailwind CSS
 - **Purpose:** Unified UI for agent management, session monitoring, and document management
 - **URL:** http://localhost:3000
-- **Code Location:** `./dashboard`
+- **Code Location:** `./apps/dashboard`
 
 **Features:**
 - Agent Sessions (real-time monitoring via SSE)

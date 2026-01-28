@@ -58,7 +58,7 @@ See: `servers/agent-coordinator/database.py` line 80-89 (`update_session_status`
 
 ### Task 1: Update Session Service Response Handling
 
-**File:** `dashboard/src/services/sessionService.ts`
+**File:** `apps/dashboard/src/services/sessionService.ts`
 
 **Current Code (lines 45-57):**
 ```typescript
@@ -123,7 +123,7 @@ To show users which run is running a session, we need to track run-session relat
 
 **Option A: Extend Session Type**
 
-**File:** `dashboard/src/types/session.ts`
+**File:** `apps/dashboard/src/types/session.ts`
 
 Add optional run_id field:
 ```typescript
@@ -154,14 +154,14 @@ Keep session and run separate, only fetch run info when needed (e.g., on stop ac
 
 When a session is being stopped, it transitions through `STOPPING` state. The UI should reflect this.
 
-**File:** `dashboard/src/types/session.ts`
+**File:** `apps/dashboard/src/types/session.ts`
 
 Update status type:
 ```typescript
 export type SessionStatus = 'running' | 'stopping' | 'finished' | 'stopped';
 ```
 
-**File:** `dashboard/src/components/features/sessions/SessionCard.tsx`
+**File:** `apps/dashboard/src/components/features/sessions/SessionCard.tsx`
 
 Update status badge colors:
 - `running` → blue
@@ -177,7 +177,7 @@ Update stop button visibility:
 )}
 ```
 
-**File:** `dashboard/src/hooks/useSessions.ts`
+**File:** `apps/dashboard/src/hooks/useSessions.ts`
 
 Handle `session_updated` SSE messages to update status to 'stopping'.
 
@@ -264,12 +264,12 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
 ### Dashboard Files
 | File | Purpose |
 |------|---------|
-| `dashboard/src/services/sessionService.ts` | API calls - update response handling |
-| `dashboard/src/types/session.ts` | Add 'stopping' status type |
-| `dashboard/src/components/features/sessions/SessionCard.tsx` | Status badge, stop button |
-| `dashboard/src/components/features/sessions/SessionList.tsx` | Filter for stopping status |
-| `dashboard/src/hooks/useSessions.ts` | SSE handling for status updates |
-| `dashboard/src/pages/AgentSessions.tsx` | Stop handler, success messages |
+| `apps/dashboard/src/services/sessionService.ts` | API calls - update response handling |
+| `apps/dashboard/src/types/session.ts` | Add 'stopping' status type |
+| `apps/dashboard/src/components/features/sessions/SessionCard.tsx` | Status badge, stop button |
+| `apps/dashboard/src/components/features/sessions/SessionList.tsx` | Filter for stopping status |
+| `apps/dashboard/src/hooks/useSessions.ts` | SSE handling for status updates |
+| `apps/dashboard/src/pages/AgentSessions.tsx` | Stop handler, success messages |
 
 ### Documentation
 | File | Purpose |

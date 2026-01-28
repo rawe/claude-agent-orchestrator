@@ -547,7 +547,7 @@ Key characteristics:
 The dashboard creates runs when users start or resume sessions:
 
 ```typescript
-// dashboard/src/services/chatService.ts
+// apps/dashboard/src/services/chatService.ts
 const response = await agentOrchestratorApi.post('/runs', {
   type: 'start_session',
   agent_name: agentName,

@@ -190,7 +190,7 @@ CORS_ORIGINS=*
 ## Project Structure
 
 ```
-bug-spotter-browser-extension/
+bug-spotter-extension/
 ├── manifest.json          # Extension manifest (MV3)
 ├── background.js          # Service worker - API communication
 ├── content.js             # Content script - coordinates selection

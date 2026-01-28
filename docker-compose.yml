@@ -6,7 +6,7 @@ services:
   dashboard:
     container_name: agent-orchestrator-dashboard
     build:
-      context: ./dashboard
+      context: ./apps/dashboard
       dockerfile: Dockerfile
       # Vite env vars must be passed as build args (baked at build time)
       args:

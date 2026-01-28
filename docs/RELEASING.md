@@ -22,7 +22,7 @@ Each component also has its own internal version (tracked in `pyproject.toml` or
 |-----------|------------------|
 | Coordinator | `servers/agent-coordinator/pyproject.toml` |
 | Runner | Defined in `Makefile` (RUNNER_VERSION) |
-| Dashboard | `dashboard/package.json` |
+| Dashboard | `apps/dashboard/package.json` |
 
 ## Prerequisites
 
@@ -126,7 +126,7 @@ You can also trigger a release manually from the GitHub Actions UI:
 - [ ] Tests pass (if applicable)
 - [ ] Update component versions if needed:
   - `servers/agent-coordinator/pyproject.toml`
-  - `dashboard/package.json`
+  - `apps/dashboard/package.json`
   - `RUNNER_VERSION` in `Makefile`
 - [ ] Update `CHANGELOG.md` (if you maintain one)
 

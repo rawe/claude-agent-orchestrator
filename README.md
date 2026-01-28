@@ -104,7 +104,7 @@ make stop-all
 │   ├── atlassian/                     # Jira + Confluence MCP
 │   └── ado/                           # Azure DevOps MCP
 │
-├── dashboard/                         # Web UI (React + Vite)
+├── apps/dashboard/                    # Web UI (React + Vite)
 │
 ├── plugins/                           # Claude Code plugins
 │   ├── orchestrator/                  # ao-* orchestration commands

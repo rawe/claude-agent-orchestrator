@@ -308,7 +308,7 @@ This approach:
 
 #### Required Changes
 
-**1. Dashboard MCP Server Schema** (`dashboard/src/types/agent.ts`):
+**1. Dashboard MCP Server Schema** (`apps/dashboard/src/types/agent.ts`):
 ```typescript
 export interface MCPServerHttp {
   type: 'http';
@@ -317,7 +317,7 @@ export interface MCPServerHttp {
 }
 ```
 
-**2. Default MCP Template** (`dashboard/src/utils/mcpTemplates.ts`):
+**2. Default MCP Template** (`apps/dashboard/src/utils/mcpTemplates.ts`):
 ```typescript
 'agent-orchestrator-http': {
   type: 'http',
@@ -850,7 +850,7 @@ All callback triggers are now unified in the Runner API endpoints, providing a c
 
 ### Phase 3: Dashboard Integration
 
-**Files to modify:** `dashboard/`
+**Files to modify:** `apps/dashboard/`
 
 1. **Update Chat tab**
    - Change from Agent Control API to new `/runs` endpoint

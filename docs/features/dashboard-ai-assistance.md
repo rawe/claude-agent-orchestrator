@@ -13,9 +13,9 @@ The Dashboard includes built-in AI assistance features that help users create an
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Coordinator Client SDK | `dashboard/src/lib/coordinator-client/` | Programmatic API interaction |
-| System Agents Registry | `dashboard/src/lib/system-agents/` | Agent definitions and provisioning |
-| AI Assist Hook | `dashboard/src/hooks/useAiAssist.ts` | Reusable React hook for AI interactions |
+| Coordinator Client SDK | `apps/dashboard/src/lib/coordinator-client/` | Programmatic API interaction |
+| System Agents Registry | `apps/dashboard/src/lib/system-agents/` | Agent definitions and provisioning |
+| AI Assist Hook | `apps/dashboard/src/hooks/useAiAssist.ts` | Reusable React hook for AI interactions |
 
 ### Data Flow
 
@@ -50,7 +50,7 @@ System agents are internal agents that the dashboard requires for AI features. T
 ### Registry Structure
 
 ```
-dashboard/src/lib/system-agents/
+apps/dashboard/src/lib/system-agents/
 ├── index.ts              # Main exports
 ├── registry.ts           # Aggregates all agent definitions
 ├── manager.ts            # Provisioning service
@@ -68,19 +68,19 @@ dashboard/src/lib/system-agents/
 
 Lightweight SDK for programmatic interaction with the Coordinator API.
 
-**Location:** `dashboard/src/lib/coordinator-client/`
+**Location:** `apps/dashboard/src/lib/coordinator-client/`
 
 **Key exports:**
 - `CoordinatorClient` - Main client class
 - `RunHandle` - Handle to track/wait for runs
 
-**Documentation:** `dashboard/src/lib/coordinator-client/README.md`
+**Documentation:** `apps/dashboard/src/lib/coordinator-client/README.md`
 
 ## useAiAssist Hook
 
 Reusable React hook that encapsulates AI assist state and interactions.
 
-**Location:** `dashboard/src/hooks/useAiAssist.ts`
+**Location:** `apps/dashboard/src/hooks/useAiAssist.ts`
 
 **Manages:**
 - Input visibility toggle
@@ -90,7 +90,7 @@ Reusable React hook that encapsulates AI assist state and interactions.
 - Error state
 - Cancellation
 
-**Documentation:** `dashboard/src/hooks/README.md`
+**Documentation:** `apps/dashboard/src/hooks/README.md`
 
 ## Cancellation and UI Protection
 
@@ -130,7 +130,7 @@ Users must explicitly click Cancel to abort the AI operation before they can clo
 
 The `cancel()` function sends a stop request to the Coordinator API via `RunHandle.stop()` to terminate the agent run.
 
-**Implementation:** `dashboard/src/hooks/useAiAssist.ts`, inside the `cancel` callback:
+**Implementation:** `apps/dashboard/src/hooks/useAiAssist.ts`, inside the `cancel` callback:
 
 ```typescript
 // Send stop request to Coordinator to terminate the agent run
@@ -152,7 +152,7 @@ if (currentRunRef.current) {
 
 Aggregates multiple `useAiAssist` instances for unified state management.
 
-**Location:** `dashboard/src/hooks/useAiGroup.ts`
+**Location:** `apps/dashboard/src/hooks/useAiGroup.ts`
 
 **Purpose:** When a component has multiple AI buttons (e.g., one for script, one for schema), the group provides unified protection state.
 
@@ -186,7 +186,7 @@ const ai = useAiGroup([scriptAssistantAi, schemaAssistantAi]);
 
 ### Step 1: Create Agent Definition
 
-Create a new file in `dashboard/src/lib/system-agents/agents/`:
+Create a new file in `apps/dashboard/src/lib/system-agents/agents/`:
 
 **Required exports:**
 - TypeScript interfaces for input and output
@@ -199,12 +199,12 @@ Create a new file in `dashboard/src/lib/system-agents/agents/`:
   - `inputSchema` - JSON Schema for input
   - `outputSchema` - JSON Schema for output
 
-**Reference:** `dashboard/src/lib/system-agents/agents/script-assistant.ts`
+**Reference:** `apps/dashboard/src/lib/system-agents/agents/script-assistant.ts`
 
 ### Step 2: Register Agent
 
-1. Export from `dashboard/src/lib/system-agents/index.ts`
-2. Add to `systemAgentRegistry` in `dashboard/src/lib/system-agents/registry.ts`
+1. Export from `apps/dashboard/src/lib/system-agents/index.ts`
+2. Add to `systemAgentRegistry` in `apps/dashboard/src/lib/system-agents/registry.ts`
 
 ### Step 3: Use in Component
 
@@ -213,7 +213,7 @@ Create a new file in `dashboard/src/lib/system-agents/agents/`:
 3. Implement accept handler to apply structured output to form
 4. Render UI using hook state (toggle, input, result, error)
 
-**Reference:** `dashboard/src/components/features/scripts/ScriptEditor.tsx`
+**Reference:** `apps/dashboard/src/components/features/scripts/ScriptEditor.tsx`
 
 ### Step 4: Provision Agent
 
@@ -223,7 +223,7 @@ Navigate to Settings page and click "Provision System Agents" to create/update t
 
 System agents can be provisioned (created or updated) from the Settings page.
 
-**Location:** `dashboard/src/pages/Settings.tsx` (System Agents section)
+**Location:** `apps/dashboard/src/pages/Settings.tsx` (System Agents section)
 
 **Behavior:**
 - Creates agent if it doesn't exist
@@ -254,10 +254,10 @@ System agents can be provisioned (created or updated) from the Settings page.
 
 | File | Description |
 |------|-------------|
-| `dashboard/src/lib/coordinator-client/` | SDK for Coordinator API |
-| `dashboard/src/lib/system-agents/` | System agent definitions and provisioning |
-| `dashboard/src/hooks/useAiAssist.ts` | Reusable AI assist hook |
-| `dashboard/src/hooks/useAiGroup.ts` | Aggregates multiple AI instances |
-| `dashboard/src/hooks/README.md` | Hook documentation |
-| `dashboard/src/components/features/scripts/ScriptEditor.tsx` | Example integration |
-| `dashboard/src/pages/Settings.tsx` | Provisioning UI |
+| `apps/dashboard/src/lib/coordinator-client/` | SDK for Coordinator API |
+| `apps/dashboard/src/lib/system-agents/` | System agent definitions and provisioning |
+| `apps/dashboard/src/hooks/useAiAssist.ts` | Reusable AI assist hook |
+| `apps/dashboard/src/hooks/useAiGroup.ts` | Aggregates multiple AI instances |
+| `apps/dashboard/src/hooks/README.md` | Hook documentation |
+| `apps/dashboard/src/components/features/scripts/ScriptEditor.tsx` | Example integration |
+| `apps/dashboard/src/pages/Settings.tsx` | Provisioning UI |

@@ -44,7 +44,7 @@ BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Component versions (from their respective package files)
 COORDINATOR_VERSION := $(shell grep -m1 'version' servers/agent-coordinator/pyproject.toml | cut -d'"' -f2)
-DASHBOARD_VERSION := $(shell grep -m1 '"version"' dashboard/package.json | cut -d'"' -f4)
+DASHBOARD_VERSION := $(shell grep -m1 '"version"' apps/dashboard/package.json | cut -d'"' -f4)
 RUNNER_VERSION := 0.1.0
 CONTEXT_STORE_VERSION := $(shell grep -m1 'version' servers/context-store/pyproject.toml | cut -d'"' -f2)
 
@@ -588,11 +588,11 @@ stop-all:
 	@echo "============================================"
 
 # ============================================================================
-# Applications using Agent Orchestrator Framework (interfaces/)
+# Applications using Agent Orchestrator Framework (apps/)
 # ============================================================================
 
 # Chat UI (Docker-based)
-CHAT_UI_DIR := interfaces/chat-ui
+CHAT_UI_DIR := apps/chat-ui
 
 start-chat-ui:
 	@echo "Starting Chat UI..."
@@ -731,8 +731,8 @@ release-dashboard: _check-version
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		-t $(IMAGE_DASHBOARD):$(VERSION) \
 		-t $(IMAGE_DASHBOARD):latest \
-		-f dashboard/Dockerfile \
-		dashboard
+		-f apps/dashboard/Dockerfile \
+		apps/dashboard
 ifdef PUSH
 	@echo "Pushing $(IMAGE_DASHBOARD):$(VERSION)..."
 	docker push $(IMAGE_DASHBOARD):$(VERSION)

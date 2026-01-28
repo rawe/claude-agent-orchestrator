@@ -61,23 +61,23 @@ This is a breaking change that requires coordinated updates across all component
 - `servers/agent-runner/executors/test-executor/ao-test-exec` - Test executor
 
 ### Dashboard
-- `dashboard/src/types/event.ts` - TypeScript types
-- `dashboard/src/utils/constants.ts` - Constants
-- `dashboard/src/contexts/SessionsContext.tsx` - Event handling
-- `dashboard/src/contexts/ChatContext.tsx` - Event handling
-- `dashboard/src/components/features/sessions/EventTimeline.tsx` - Display
-- `dashboard/src/components/features/sessions/EventCard.tsx` - Display
-- `dashboard/src/services/unifiedViewService.ts` - Service layer
-- `dashboard/src/services/unifiedViewTypes.ts` - Types
-- `dashboard/src/pages/unified-view/mock-data.ts` - Mock data
-- `dashboard/src/pages/unified-view/utils.ts` - Utilities
+- `apps/dashboard/src/types/event.ts` - TypeScript types
+- `apps/dashboard/src/utils/constants.ts` - Constants
+- `apps/dashboard/src/contexts/SessionsContext.tsx` - Event handling
+- `apps/dashboard/src/contexts/ChatContext.tsx` - Event handling
+- `apps/dashboard/src/components/features/sessions/EventTimeline.tsx` - Display
+- `apps/dashboard/src/components/features/sessions/EventCard.tsx` - Display
+- `apps/dashboard/src/services/unifiedViewService.ts` - Service layer
+- `apps/dashboard/src/services/unifiedViewTypes.ts` - Types
+- `apps/dashboard/src/pages/unified-view/mock-data.ts` - Mock data
+- `apps/dashboard/src/pages/unified-view/utils.ts` - Utilities
 
 ### Plugins
 - `plugins/orchestrator/skills/orchestrator/commands/lib/session_client.py` - Event emission
 
 ### Interfaces
-- `interfaces/chat-ui/src/types/index.ts` - Types
-- `interfaces/chat-ui/src/contexts/ChatContext.tsx` - Event handling
+- `apps/chat-ui/src/types/index.ts` - Types
+- `apps/chat-ui/src/contexts/ChatContext.tsx` - Event handling
 
 ### Documentation
 - `docs/components/agent-coordinator/API.md` - API documentation

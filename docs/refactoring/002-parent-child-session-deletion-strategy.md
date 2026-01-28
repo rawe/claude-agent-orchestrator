@@ -129,9 +129,9 @@ Since SQLite doesn't support `ALTER CONSTRAINT`, options:
   - Lines 597-625: Delete endpoint - report cascaded children count
 
 ### Dashboard
-- `dashboard/src/types/session.ts` - Consider adding orphan detection types
-- `dashboard/src/components/features/sessions/SessionCard.tsx` - Optional: visual indicator for orphaned sessions
-- `dashboard/src/contexts/SessionsContext.tsx` - Handle cascaded deletion SSE events
+- `apps/dashboard/src/types/session.ts` - Consider adding orphan detection types
+- `apps/dashboard/src/components/features/sessions/SessionCard.tsx` - Optional: visual indicator for orphaned sessions
+- `apps/dashboard/src/contexts/SessionsContext.tsx` - Handle cascaded deletion SSE events
 
 ### Documentation
 - `docs/adr/ADR-003-callback-based-async.md` - Clarify cascade behavior
