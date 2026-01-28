@@ -107,15 +107,15 @@ Rename the event types:
 
 | File | What Changes |
 |------|--------------|
-| `dashboard/src/types/event.ts` | `EventType` union type |
-| `dashboard/src/utils/constants.ts` | Event type icon mapping |
-| `dashboard/src/services/unifiedViewTypes.ts` | `EventTypeValues` constants |
-| `dashboard/src/services/unifiedViewService.ts` | Switch cases for event handling |
-| `dashboard/src/contexts/ChatContext.tsx` | SSE event type comparisons |
-| `dashboard/src/contexts/SessionsContext.tsx` | SSE event type comparisons |
-| `dashboard/src/components/features/sessions/EventTimeline.tsx` | Event filtering and styling |
-| `dashboard/src/components/features/sessions/EventCard.tsx` | Event config and rendering |
-| `dashboard/src/pages/unified-view/utils.ts` | Event styling utilities |
+| `apps/dashboard/src/types/event.ts` | `EventType` union type |
+| `apps/dashboard/src/utils/constants.ts` | Event type icon mapping |
+| `apps/dashboard/src/services/unifiedViewTypes.ts` | `EventTypeValues` constants |
+| `apps/dashboard/src/services/unifiedViewService.ts` | Switch cases for event handling |
+| `apps/dashboard/src/contexts/ChatContext.tsx` | SSE event type comparisons |
+| `apps/dashboard/src/contexts/SessionsContext.tsx` | SSE event type comparisons |
+| `apps/dashboard/src/components/features/sessions/EventTimeline.tsx` | Event filtering and styling |
+| `apps/dashboard/src/components/features/sessions/EventCard.tsx` | Event config and rendering |
+| `apps/dashboard/src/pages/unified-view/utils.ts` | Event styling utilities |
 
 ### 3. Chat-UI (Frontend - React/TypeScript)
 
@@ -123,8 +123,8 @@ Rename the event types:
 
 | File | What Changes |
 |------|--------------|
-| `interfaces/chat-ui/src/types/index.ts` | Event type in `SessionEvent` interface |
-| `interfaces/chat-ui/src/contexts/ChatContext.tsx` | Switch cases for event handling |
+| `apps/chat-ui/src/types/index.ts` | Event type in `SessionEvent` interface |
+| `apps/chat-ui/src/contexts/ChatContext.tsx` | Switch cases for event handling |
 
 ### 4. Integration Tests (Markdown)
 
@@ -151,7 +151,7 @@ Files containing `session_start` or `session_stop` string literals:
 - `docs/features/unified-session-run-view.md`
 - `docs/adr/ADR-003-callback-based-async.md`
 - `docs/refactoring/*.md`
-- `dashboard/docs/CHAT-TAB.md`
+- `apps/dashboard/docs/CHAT-TAB.md`
 
 ### 6. Comments Only (No Functional Change)
 
@@ -183,15 +183,15 @@ Files with references in comments only:
 
 ### Phase 2: Dashboard
 
-1. **Update types** in `dashboard/src/types/event.ts`
-2. **Update constants** in `dashboard/src/utils/constants.ts` and `dashboard/src/services/unifiedViewTypes.ts`
+1. **Update types** in `apps/dashboard/src/types/event.ts`
+2. **Update constants** in `apps/dashboard/src/utils/constants.ts` and `apps/dashboard/src/services/unifiedViewTypes.ts`
 3. **Update all event handlers** (contexts, components, utils)
 4. **Build and test**: `npm run build` in dashboard
 
 ### Phase 3: Chat-UI
 
-1. **Update types** in `interfaces/chat-ui/src/types/index.ts`
-2. **Update event handlers** in `interfaces/chat-ui/src/contexts/ChatContext.tsx`
+1. **Update types** in `apps/chat-ui/src/types/index.ts`
+2. **Update event handlers** in `apps/chat-ui/src/contexts/ChatContext.tsx`
 3. **Build and test**
 
 ### Phase 4: Tests & Documentation

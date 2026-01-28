@@ -262,6 +262,6 @@ EventSource API doesn't support custom headers. Two approaches:
 | Component | File |
 |-----------|------|
 | Coordinator Auth | `servers/agent-coordinator/auth.py` |
-| Dashboard Auth | `dashboard/src/App.tsx`, `src/services/auth.ts` |
-| Chat UI Auth | `interfaces/chat-ui/src/App.tsx` |
+| Dashboard Auth | `apps/dashboard/src/App.tsx`, `src/services/auth.ts` |
+| Chat UI Auth | `apps/chat-ui/src/App.tsx` |
 | Runner Auth | `servers/agent-runner/lib/auth0_client.py` |

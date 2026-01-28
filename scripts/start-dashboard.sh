@@ -12,7 +12,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-cd "$PROJECT_ROOT/dashboard"
+cd "$PROJECT_ROOT/apps/dashboard"
 
 VITE_AUTH0_DOMAIN= \
 VITE_AUTH0_CLIENT_ID= \

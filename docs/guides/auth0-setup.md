@@ -148,7 +148,7 @@ RUNNER_CLIENT_SECRET=<keep-secret>
 
 ### 2.1 Environment Variables
 
-Create or update `dashboard/.env.local`:
+Create or update `apps/dashboard/.env.local`:
 
 ```bash
 # Existing configuration
@@ -322,11 +322,11 @@ Obtained new Auth0 access token (expires in 86400s)
 
 ## Part 5: Chat UI Configuration
 
-> **Status**: Implemented in `interfaces/chat-ui/src/`
+> **Status**: Implemented in `apps/chat-ui/src/`
 
 ### 5.1 Environment Variables
 
-Create `interfaces/chat-ui/.env.local`:
+Create `apps/chat-ui/.env.local`:
 
 ```bash
 # Existing configuration

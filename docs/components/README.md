@@ -16,7 +16,7 @@ Document management system (port 8766) for persistent context sharing between ag
 ## Client Components
 
 ### Dashboard
-React web UI for monitoring sessions, runners, and agents. See [dashboard/README.md](../../dashboard/README.md).
+React web UI for monitoring sessions, runners, and agents. See [apps/dashboard/README.md](../../apps/dashboard/README.md).
 
 ## Note on Component Docs
 
