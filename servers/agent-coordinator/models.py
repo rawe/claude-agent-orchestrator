@@ -520,12 +520,8 @@ class ConfigSchemaField(BaseModel):
     default: Optional[Any] = None
 
 
-class MCPServerConfigSchema(BaseModel):
-    """Schema for MCP server configuration values."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    fields: dict[str, ConfigSchemaField] = {}
+# Type alias for config schema - maps field names to their definitions
+MCPServerConfigSchema = dict[str, ConfigSchemaField]
 
 
 class MCPServerRegistryEntry(BaseModel):

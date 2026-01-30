@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models import (
     MCPServerRegistryCreate,
     MCPServerRegistryUpdate,
-    MCPServerConfigSchema,
     ConfigSchemaField,
 )
 from services.mcp_registry import (
@@ -76,20 +75,18 @@ class TestMCPRegistryCRUD:
 
     def test_create_mcp_server_with_schema(self):
         """Test creating an MCP server with config schema."""
-        schema = MCPServerConfigSchema(
-            fields={
-                "context_id": ConfigSchemaField(
-                    type="string",
-                    required=True,
-                    description="Context identifier",
-                ),
-                "timeout": ConfigSchemaField(
-                    type="integer",
-                    required=False,
-                    default=30,
-                ),
-            }
-        )
+        schema = {
+            "context_id": ConfigSchemaField(
+                type="string",
+                required=True,
+                description="Context identifier",
+            ),
+            "timeout": ConfigSchemaField(
+                type="integer",
+                required=False,
+                default=30,
+            ),
+        }
         data = MCPServerRegistryCreate(
             id="context-store",
             name="Context Store",
@@ -100,8 +97,8 @@ class TestMCPRegistryCRUD:
         entry = create_mcp_server(data)
 
         assert entry.config_schema is not None
-        assert "context_id" in entry.config_schema.fields
-        assert entry.config_schema.fields["context_id"].required is True
+        assert "context_id" in entry.config_schema
+        assert entry.config_schema["context_id"].required is True
         assert entry.default_config == {"timeout": 30}
 
     def test_create_duplicate_raises_error(self):
@@ -296,12 +293,10 @@ class TestRequiredConfigValidation:
 
     def test_validate_required_config_passes(self):
         """Test validation passes when all required values are present."""
-        schema = MCPServerConfigSchema(
-            fields={
-                "context_id": ConfigSchemaField(type="string", required=True),
-                "timeout": ConfigSchemaField(type="integer", required=False),
-            }
-        )
+        schema = {
+            "context_id": ConfigSchemaField(type="string", required=True),
+            "timeout": ConfigSchemaField(type="integer", required=False),
+        }
 
         missing = validate_required_config(
             {"context_id": "123", "timeout": 30},
@@ -312,12 +307,10 @@ class TestRequiredConfigValidation:
 
     def test_validate_required_config_fails(self):
         """Test validation fails when required values are missing."""
-        schema = MCPServerConfigSchema(
-            fields={
-                "context_id": ConfigSchemaField(type="string", required=True),
-                "api_key": ConfigSchemaField(type="string", required=True),
-            }
-        )
+        schema = {
+            "context_id": ConfigSchemaField(type="string", required=True),
+            "api_key": ConfigSchemaField(type="string", required=True),
+        }
 
         missing = validate_required_config(
             {"context_id": "123"},
@@ -328,11 +321,9 @@ class TestRequiredConfigValidation:
 
     def test_validate_unresolved_placeholder_is_missing(self):
         """Test that unresolved placeholders are treated as missing."""
-        schema = MCPServerConfigSchema(
-            fields={
-                "context_id": ConfigSchemaField(type="string", required=True),
-            }
-        )
+        schema = {
+            "context_id": ConfigSchemaField(type="string", required=True),
+        }
 
         missing = validate_required_config(
             {"context_id": "${scope.context_id}"},  # Still a placeholder
@@ -343,11 +334,9 @@ class TestRequiredConfigValidation:
 
     def test_resolve_mcp_server_refs_validates_required(self):
         """Test that resolve_mcp_server_refs validates required config."""
-        schema = MCPServerConfigSchema(
-            fields={
-                "api_key": ConfigSchemaField(type="string", required=True),
-            }
-        )
+        schema = {
+            "api_key": ConfigSchemaField(type="string", required=True),
+        }
         create_mcp_server(MCPServerRegistryCreate(
             id="secure-api",
             name="Secure API",

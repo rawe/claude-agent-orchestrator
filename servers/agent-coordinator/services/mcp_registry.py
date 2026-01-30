@@ -124,11 +124,11 @@ def validate_required_config(
     Returns:
         List of missing required field names. Empty list means valid.
     """
-    if not config_schema or not config_schema.fields:
+    if not config_schema:
         return []
 
     missing = []
-    for field_name, field_def in config_schema.fields.items():
+    for field_name, field_def in config_schema.items():
         if field_def.required:
             value = resolved_config.get(field_name)
             # Check if value is missing or still has unresolved placeholder

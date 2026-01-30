@@ -234,23 +234,21 @@ Stored as files in `config/mcp-servers/{id}/mcp-server.json`, managed via API/Da
   "description": "Document storage for agent context",
   "url": "http://localhost:9501/mcp",
   "config_schema": {
-    "fields": {
-      "context_id": {
-        "type": "string",
-        "description": "Context for document isolation",
-        "required": true
-      },
-      "workflow_id": {
-        "type": "string",
-        "description": "Workflow correlation ID",
-        "required": false
-      },
-      "api_key": {
-        "type": "string",
-        "description": "API key for authentication",
-        "required": false,
-        "sensitive": true
-      }
+    "context_id": {
+      "type": "string",
+      "description": "Context for document isolation",
+      "required": true
+    },
+    "workflow_id": {
+      "type": "string",
+      "description": "Workflow correlation ID",
+      "required": false
+    },
+    "api_key": {
+      "type": "string",
+      "description": "API key for authentication",
+      "required": false,
+      "sensitive": true
     }
   },
   "default_config": {

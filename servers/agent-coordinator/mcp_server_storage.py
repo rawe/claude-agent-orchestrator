@@ -17,7 +17,7 @@ from models import (
     MCPServerRegistryEntry,
     MCPServerRegistryCreate,
     MCPServerRegistryUpdate,
-    MCPServerConfigSchema,
+    ConfigSchemaField,
 )
 
 # Debug logging toggle - matches main.py
@@ -82,7 +82,10 @@ def _read_mcp_server_from_dir(server_dir: Path) -> Optional[MCPServerRegistryEnt
         # Parse config_schema if present
         config_schema = None
         if data.get("config_schema"):
-            config_schema = MCPServerConfigSchema(**data["config_schema"])
+            config_schema = {
+                k: ConfigSchemaField(**v)
+                for k, v in data["config_schema"].items()
+            }
 
         # Get timestamps
         created_at, updated_at = _get_file_times(server_dir)
@@ -153,7 +156,10 @@ def create_mcp_server(data: MCPServerRegistryCreate) -> MCPServerRegistryEntry:
     if data.description:
         server_data["description"] = data.description
     if data.config_schema:
-        server_data["config_schema"] = data.config_schema.model_dump(exclude_none=True)
+        server_data["config_schema"] = {
+            k: v.model_dump(exclude_none=True)
+            for k, v in data.config_schema.items()
+        }
     if data.default_config:
         server_data["default_config"] = data.default_config
 
@@ -190,7 +196,10 @@ def update_mcp_server(
     if updates.url is not None:
         server_data["url"] = updates.url
     if updates.config_schema is not None:
-        server_data["config_schema"] = updates.config_schema.model_dump(exclude_none=True)
+        server_data["config_schema"] = {
+            k: v.model_dump(exclude_none=True)
+            for k, v in updates.config_schema.items()
+        }
     if updates.default_config is not None:
         server_data["default_config"] = updates.default_config
 
