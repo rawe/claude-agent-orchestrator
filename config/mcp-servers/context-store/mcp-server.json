@@ -1,0 +1,6 @@
+{
+  "id": "context-store",
+  "name": "Context Store",
+  "description": "Stores and retrieves agent context data",
+  "url": "http://localhost:9501/mcp"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "neo4j",
+  "name": "Neo4j Cypher",
+  "description": "Neo4j graph database queries",
+  "url": "http://localhost:9003/mcp/"
+}

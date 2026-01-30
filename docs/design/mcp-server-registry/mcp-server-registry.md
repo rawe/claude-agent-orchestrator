@@ -225,7 +225,7 @@ config/capabilities/neo4j-knowledge-graph/capability.mcp.json:
 
 #### MCP Server Registry Entry
 
-Stored in Coordinator database, managed via API/Dashboard.
+Stored as files in `config/mcp-servers/{id}/mcp-server.json`, managed via API/Dashboard.
 
 ```json
 {
@@ -234,21 +234,23 @@ Stored in Coordinator database, managed via API/Dashboard.
   "description": "Document storage for agent context",
   "url": "http://localhost:9501/mcp",
   "config_schema": {
-    "context_id": {
-      "type": "string",
-      "description": "Context for document isolation",
-      "required": true
-    },
-    "workflow_id": {
-      "type": "string",
-      "description": "Workflow correlation ID",
-      "required": false
-    },
-    "api_key": {
-      "type": "string",
-      "description": "API key for authentication",
-      "required": false,
-      "sensitive": true
+    "fields": {
+      "context_id": {
+        "type": "string",
+        "description": "Context for document isolation",
+        "required": true
+      },
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow correlation ID",
+        "required": false
+      },
+      "api_key": {
+        "type": "string",
+        "description": "API key for authentication",
+        "required": false,
+        "sensitive": true
+      }
     }
   },
   "default_config": {

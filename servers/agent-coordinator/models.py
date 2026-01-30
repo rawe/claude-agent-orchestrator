@@ -89,9 +89,9 @@ class MCPServerHttp(BaseModel):
     headers: Optional[dict[str, str]] = None
 
 
-# Note: MCPServerRef is added after its definition at the end of this file
-# This union allows both legacy inline format and new ref-based format
-MCPServerConfig = Union[MCPServerStdio, MCPServerHttp]
+# Note: MCPServerRef is the only supported format (mcp-server-registry.md Phase 2)
+# Forward reference resolved via TYPE_CHECKING and rebuild_model at module load
+MCPServerConfig = Union[MCPServerStdio, MCPServerHttp, "MCPServerRef"]
 
 
 class AgentBase(BaseModel):
@@ -576,3 +576,17 @@ class MCPServerRef(BaseModel):
 
     ref: str  # Registry entry ID
     config: Optional[dict[str, Any]] = None  # Config values to merge with defaults
+
+
+# ==============================================================================
+# Rebuild models with forward references
+# ==============================================================================
+# These models use MCPServerConfig which includes a forward reference to MCPServerRef.
+# Now that MCPServerRef is defined, we need to rebuild the models to resolve the
+# forward reference.
+AgentCreate.model_rebuild()
+AgentUpdate.model_rebuild()
+Agent.model_rebuild()
+CapabilityCreate.model_rebuild()
+CapabilityUpdate.model_rebuild()
+Capability.model_rebuild()

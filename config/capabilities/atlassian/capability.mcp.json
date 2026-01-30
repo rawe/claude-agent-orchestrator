@@ -1,8 +1,7 @@
 {
   "mcpServers": {
-    "mcp-atlassian-http": {
-      "type": "http",
-      "url": "http://localhost:9000/mcp"
+    "atlassian": {
+      "ref": "atlassian"
     }
   }
 }

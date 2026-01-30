@@ -1,8 +1,7 @@
 {
   "mcpServers": {
-    "neo4j-http": {
-      "type": "http",
-      "url": "http://localhost:9003/mcp/"
+    "neo4j": {
+      "ref": "neo4j"
     }
   }
 }

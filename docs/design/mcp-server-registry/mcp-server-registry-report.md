@@ -6,28 +6,36 @@ This report documents the implementation of the MCP Server Registry feature (Pha
 
 ## Status
 
-✅ **Complete**
+✅ **Complete** - File-based storage implemented, inline format no longer supported.
 
-## What Will Be Implemented
+## What Was Implemented
 
-### 1. Database Schema & Models
+### 1. File-Based Storage & Models
 
 **Files:**
-- `servers/agent-coordinator/database.py` - Add `mcp_servers` table
-- `servers/agent-coordinator/models.py` - Add registry models
+- `servers/agent-coordinator/mcp_server_storage.py` - File I/O operations for MCP server registry
+- `servers/agent-coordinator/models.py` - Registry models
 
-**Database Table:**
-```sql
-CREATE TABLE mcp_servers (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    url TEXT NOT NULL,
-    config_schema TEXT,  -- JSON
-    default_config TEXT, -- JSON
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-)
+**Storage Structure:**
+```
+config/mcp-servers/{id}/
+    mcp-server.json     # Server configuration
+```
+
+**Example `mcp-server.json`:**
+```json
+{
+  "id": "context-store",
+  "name": "Context Store",
+  "description": "Stores and retrieves agent context data",
+  "url": "http://localhost:9501/mcp",
+  "config_schema": {
+    "fields": {
+      "context_id": {"type": "string", "required": true}
+    }
+  },
+  "default_config": {"timeout": 30}
+}
 ```
 
 **Models:**
@@ -60,11 +68,9 @@ PUT    /mcp-servers/{id}      - Update MCP server
 DELETE /mcp-servers/{id}      - Delete MCP server
 ```
 
-### 4. Reference Syntax (Replaces Inline Format)
+### 4. Reference Syntax (Required Format)
 
-**Decision:** Drop inline format, require registry refs.
-
-All MCP configs must use registry references:
+All MCP configs **must** use registry references for HTTP servers:
 ```json
 {
   "mcpServers": {
@@ -78,7 +84,9 @@ All MCP configs must use registry references:
 }
 ```
 
-The inline format (`type: "http"`, `type: "stdio"`) is no longer supported.
+The inline format (`type: "http"`) is **not supported** and will raise an error.
+
+**Exception:** stdio-based servers (like Playwright) use inline format directly in agent configs since the registry only supports HTTP servers.
 
 ### 5. Blueprint Resolution with Registry Lookups
 
@@ -110,7 +118,56 @@ Test cases:
 - Registry reference resolution
 - Config inheritance chain
 - Required value validation
-- Error cases (missing registry entry, invalid ref, etc.)
+- Inline format rejection (error cases)
+
+## Registry Entries
+
+The following MCP servers are stored in `config/mcp-servers/`:
+
+| ID | Name | URL | Description |
+|----|------|-----|-------------|
+| `context-store` | Context Store | http://localhost:9501/mcp | Stores and retrieves agent context data |
+| `ado` | Azure DevOps | http://localhost:9001/mcp | Azure DevOps work items and pipelines |
+| `atlassian` | Atlassian | http://localhost:9000/mcp | Jira and Confluence integration |
+| `neo4j` | Neo4j Cypher | http://localhost:9003/mcp/ | Neo4j graph database queries |
+| `orchestrator` | Agent Orchestrator | ${runner.orchestrator_mcp_url} | Spawn and manage child agents |
+
+**Note:** Playwright is NOT in the registry (it's stdio-based). The `browser-tester` agent uses inline stdio format:
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}
+```
+
+## Migrated Config Files
+
+### Capabilities (5 files)
+- `config/capabilities/context-store/capability.mcp.json` → `{"ref": "context-store"}`
+- `config/capabilities/ado/capability.mcp.json` → `{"ref": "ado"}`
+- `config/capabilities/atlassian/capability.mcp.json` → `{"ref": "atlassian"}`
+- `config/capabilities/project-knowledge/capability.mcp.json` → `{"ref": "neo4j"}`
+- `config/capabilities/agent-orchestrator/capability.mcp.json` → `{"ref": "orchestrator", "config": {...}}`
+
+### Agents (13 files)
+- `config/agents/ado-agent/agent.mcp.json`
+- `config/agents/agent-orchestrator/agent.mcp.json`
+- `config/agents/agent-orchestrator-external/agent.mcp.json`
+- `config/agents/agent-orchestrator-internal/agent.mcp.json`
+- `config/agents/atlassian-agent/agent.mcp.json`
+- `config/agents/browser-tester/agent.mcp.json` (inline stdio for Playwright)
+- `config/agents/bug-evaluator/agent.mcp.json`
+- `config/agents/context-store-agent/agent.mcp.json`
+- `config/agents/knowledge-coordinator/agent.mcp.json`
+- `config/agents/knowledge-project-context-agent/agent.mcp.json`
+- `config/agents/module-research-coordinator/agent.mcp.json`
+- `config/agents/neo4j-agent/agent.mcp.json`
+- `config/agents/self-improving-agent/agent.mcp.json`
 
 ## What Is Deferred
 
@@ -129,69 +186,36 @@ The following dashboard features are deferred:
 - Agent/capability creation forms need to reference registry instead of inline config
 - This is a required change when dashboard is implemented
 
-## Migration Strategy
-
-### Backward Compatibility
-
-The implementation supports BOTH inline format and ref-based format simultaneously:
-
-**Inline format (legacy):**
-```json
-{
-  "mcpServers": {
-    "context-store-http": {
-      "type": "http",
-      "url": "http://localhost:9501/mcp"
-    }
-  }
-}
-```
-
-**Ref format (new):**
-```json
-{
-  "mcpServers": {
-    "context-store": {
-      "ref": "context-store",
-      "config": {}
-    }
-  }
-}
-```
-
-This allows gradual migration:
-1. Create registry entries for MCP servers as needed
-2. Update agent/capability configs to use refs when convenient
-3. No forced migration - inline format continues to work
-
-### Migration Steps (When Ready)
-
-1. Create registry entry via POST /mcp-servers
-2. Update `.mcp.json` file to use `{"ref": "...", "config": {...}}`
-3. Test the agent/capability works correctly
-
 ## Files Changed Summary
 
 | File | Change Type |
 |------|------------|
-| `servers/agent-coordinator/database.py` | Modified |
+| `servers/agent-coordinator/mcp_server_storage.py` | Created |
 | `servers/agent-coordinator/models.py` | Modified |
-| `servers/agent-coordinator/services/mcp_registry.py` | Created |
+| `servers/agent-coordinator/services/mcp_registry.py` | Modified |
 | `servers/agent-coordinator/services/placeholder_resolver.py` | Modified |
 | `servers/agent-coordinator/main.py` | Modified |
 | `servers/agent-coordinator/agent_storage.py` | Modified |
 | `servers/agent-coordinator/capability_storage.py` | Modified |
-| `servers/agent-coordinator/tests/test_mcp_registry.py` | Created |
+| `servers/agent-coordinator/database.py` | Modified (removed MCP table/functions) |
+| `servers/agent-coordinator/tests/test_mcp_registry.py` | Modified |
+| `config/mcp-servers/*/mcp-server.json` | Created (5 files) |
+| `config/capabilities/*.mcp.json` | Modified (5 files) |
+| `config/agents/*.mcp.json` | Modified (13 files) |
+
+**Deleted:**
+- `servers/agent-coordinator/data/mcp_servers_seed.json` (replaced by file-based storage)
 
 ## Implementation Progress
 
-- [x] Database schema & models
+- [x] File-based storage & models
 - [x] Registry storage service
 - [x] REST API endpoints
 - [x] Reference syntax models (MCPServerRef)
 - [x] Blueprint resolver with registry lookups
 - [x] Required config validation
 - [x] Tests
-- [x] Backward compatibility for inline format
-- [ ] (Optional) Migrate existing configs to ref format
-- [ ] (Optional) Populate registry with existing MCP servers
+- [x] Remove backward compatibility for inline format
+- [x] Migrate existing configs to ref format
+- [x] Create registry config files
+- [x] Handle stdio servers (Playwright) with inline format

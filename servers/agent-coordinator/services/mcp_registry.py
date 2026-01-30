@@ -3,20 +3,19 @@ MCP Server Registry Service.
 
 Part of MCP Server Registry Phase 2 (mcp-server-registry.md).
 
-Provides access to the centralized MCP server registry stored in the database.
+Provides access to the centralized MCP server registry stored as files.
 The registry holds server definitions (URL, config schema, defaults) that are
 referenced by agents and capabilities using the ref-based format.
 """
 
-import json
 from typing import Optional
 
-from database import (
-    create_mcp_server as db_create_mcp_server,
-    get_mcp_server as db_get_mcp_server,
-    list_mcp_servers as db_list_mcp_servers,
-    update_mcp_server as db_update_mcp_server,
-    delete_mcp_server as db_delete_mcp_server,
+from mcp_server_storage import (
+    list_mcp_servers as storage_list_mcp_servers,
+    get_mcp_server as storage_get_mcp_server,
+    create_mcp_server as storage_create_mcp_server,
+    update_mcp_server as storage_update_mcp_server,
+    delete_mcp_server as storage_delete_mcp_server,
 )
 from models import (
     MCPServerRegistryEntry,
@@ -42,16 +41,12 @@ class MCPServerAlreadyExistsError(Exception):
 
 def list_mcp_servers() -> list[MCPServerRegistryEntry]:
     """List all MCP servers in the registry."""
-    rows = db_list_mcp_servers()
-    return [_dict_to_entry(row) for row in rows]
+    return storage_list_mcp_servers()
 
 
 def get_mcp_server(server_id: str) -> Optional[MCPServerRegistryEntry]:
     """Get an MCP server by ID. Returns None if not found."""
-    row = db_get_mcp_server(server_id)
-    if not row:
-        return None
-    return _dict_to_entry(row)
+    return storage_get_mcp_server(server_id)
 
 
 def create_mcp_server(data: MCPServerRegistryCreate) -> MCPServerRegistryEntry:
@@ -60,79 +55,25 @@ def create_mcp_server(data: MCPServerRegistryCreate) -> MCPServerRegistryEntry:
     Raises:
         MCPServerAlreadyExistsError: If server with this ID already exists
     """
-    # Check if already exists
-    if db_get_mcp_server(data.id):
-        raise MCPServerAlreadyExistsError(data.id)
-
-    # Serialize JSON fields
-    config_schema_json = None
-    if data.config_schema:
-        config_schema_json = data.config_schema.model_dump_json()
-
-    default_config_json = None
-    if data.default_config:
-        default_config_json = json.dumps(data.default_config)
-
-    row = db_create_mcp_server(
-        server_id=data.id,
-        name=data.name,
-        url=data.url,
-        description=data.description,
-        config_schema=config_schema_json,
-        default_config=default_config_json,
-    )
-    if not row:
-        raise RuntimeError(f"Failed to create MCP server '{data.id}'")
-    return _dict_to_entry(row)
+    try:
+        return storage_create_mcp_server(data)
+    except ValueError as e:
+        # Storage raises ValueError for duplicates, convert to service error
+        if "already exists" in str(e):
+            raise MCPServerAlreadyExistsError(data.id) from e
+        raise
 
 
 def update_mcp_server(
     server_id: str, updates: MCPServerRegistryUpdate
 ) -> Optional[MCPServerRegistryEntry]:
     """Update an MCP server. Returns updated entry or None if not found."""
-    # Serialize JSON fields if provided
-    config_schema_json = None
-    if updates.config_schema is not None:
-        config_schema_json = updates.config_schema.model_dump_json()
-
-    default_config_json = None
-    if updates.default_config is not None:
-        default_config_json = json.dumps(updates.default_config)
-
-    row = db_update_mcp_server(
-        server_id=server_id,
-        name=updates.name,
-        description=updates.description,
-        url=updates.url,
-        config_schema=config_schema_json,
-        default_config=default_config_json,
-    )
-    if not row:
-        return None
-    return _dict_to_entry(row)
+    return storage_update_mcp_server(server_id, updates)
 
 
 def delete_mcp_server(server_id: str) -> bool:
     """Delete an MCP server. Returns True if deleted, False if not found."""
-    return db_delete_mcp_server(server_id)
-
-
-def _dict_to_entry(row: dict) -> MCPServerRegistryEntry:
-    """Convert database row dict to MCPServerRegistryEntry model."""
-    config_schema = None
-    if row.get("config_schema"):
-        config_schema = MCPServerConfigSchema(**row["config_schema"])
-
-    return MCPServerRegistryEntry(
-        id=row["id"],
-        name=row["name"],
-        description=row.get("description"),
-        url=row["url"],
-        config_schema=config_schema,
-        default_config=row.get("default_config"),
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )
+    return storage_delete_mcp_server(server_id)
 
 
 def resolve_mcp_server_ref(

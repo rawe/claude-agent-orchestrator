@@ -1,0 +1,6 @@
+{
+  "id": "orchestrator",
+  "name": "Agent Orchestrator",
+  "description": "Spawn and manage child agents",
+  "url": "${runner.orchestrator_mcp_url}"
+}

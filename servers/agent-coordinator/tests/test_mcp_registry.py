@@ -41,19 +41,18 @@ from services.placeholder_resolver import (
     MCPRefResolutionError,
     MissingRequiredConfigError,
 )
-from database import init_db, DB_PATH
 
 
 @pytest.fixture(autouse=True)
-def setup_test_db(tmp_path, monkeypatch):
-    """Set up a clean test database for each test."""
-    import database
-    test_db = tmp_path / "test.db"
-    monkeypatch.setattr(database, "DB_PATH", test_db)
-    init_db()
+def setup_test_storage(tmp_path, monkeypatch):
+    """Set up clean test directory for each test."""
+    test_mcp_servers_dir = tmp_path / "mcp-servers"
+    test_mcp_servers_dir.mkdir()
+
+    import mcp_server_storage
+    monkeypatch.setattr(mcp_server_storage, "get_mcp_servers_dir", lambda: test_mcp_servers_dir)
+
     yield
-    if test_db.exists():
-        test_db.unlink()
 
 
 class TestMCPRegistryCRUD:
@@ -421,11 +420,11 @@ class TestBlueprintResolution:
         assert exc_info.value.ref == "nonexistent"
 
 
-class TestLegacyInlineFormat:
-    """Test that legacy inline format is handled gracefully."""
+class TestInlineFormatRejection:
+    """Test that inline format is rejected with clear error."""
 
-    def test_inline_format_passed_through(self):
-        """Test that inline format (type/url) is passed through unchanged."""
+    def test_inline_format_raises_error(self):
+        """Test that inline format raises MCPRefResolutionError."""
         mcp_servers = {
             "legacy-server": {
                 "type": "http",
@@ -433,14 +432,14 @@ class TestLegacyInlineFormat:
             },
         }
 
-        # Should not raise, just pass through
-        result = resolve_mcp_server_refs(mcp_servers, validate_required=False)
+        with pytest.raises(MCPRefResolutionError) as exc_info:
+            resolve_mcp_server_refs(mcp_servers, validate_required=False)
 
-        assert result["legacy-server"]["type"] == "http"
-        assert result["legacy-server"]["url"] == "http://localhost:9501/mcp"
+        assert exc_info.value.server_name == "legacy-server"
+        assert "Inline format not supported" in str(exc_info.value)
 
-    def test_mixed_ref_and_inline(self):
-        """Test blueprint with mixed ref and inline formats."""
+    def test_mixed_ref_and_inline_raises_error(self):
+        """Test that mixed ref and inline raises error on inline entry."""
         create_mcp_server(MCPServerRegistryCreate(
             id="registered",
             name="Registered",
@@ -452,10 +451,8 @@ class TestLegacyInlineFormat:
             "inline": {"type": "http", "url": "http://localhost:9502/mcp"},
         }
 
-        result = resolve_mcp_server_refs(mcp_servers, validate_required=False)
+        with pytest.raises(MCPRefResolutionError) as exc_info:
+            resolve_mcp_server_refs(mcp_servers, validate_required=False)
 
-        # Registry ref resolved
-        assert result["from-registry"]["url"] == "http://localhost:9501/mcp"
-        # Inline passed through
-        assert result["inline"]["type"] == "http"
-        assert result["inline"]["url"] == "http://localhost:9502/mcp"
+        assert exc_info.value.server_name == "inline"
+        assert "Inline format not supported" in str(exc_info.value)

@@ -230,12 +230,11 @@ def resolve_mcp_server_refs(
                 "config": merged_config,
             }
         else:
-            # Legacy inline format or already resolved - pass through
-            # This handles both old inline format and already-resolved configs
-            if placeholder_resolver and isinstance(server_config, dict):
-                resolved[server_name] = placeholder_resolver.resolve(server_config)
-            else:
-                resolved[server_name] = server_config
+            # Inline format not supported - must use ref format
+            raise MCPRefResolutionError(
+                server_name, "(inline)",
+                "Inline format not supported. Use ref format with registry entry."
+            )
 
     return resolved
 

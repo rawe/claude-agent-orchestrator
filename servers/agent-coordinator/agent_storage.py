@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 from models import (
-    Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, MCPServerConfig,
+    Agent, AgentCreate, AgentUpdate, MCPServerConfig,
     MCPServerRef, RunnerDemands, AgentHooks, HookAgentConfig, HookOnError,
 )
 
@@ -92,14 +92,10 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
                 if raw_servers:
                     mcp_servers = {}
                     for k, v in raw_servers.items():
-                        # Phase 2: Support ref-based format (mcp-server-registry.md)
-                        if "ref" in v:
-                            mcp_servers[k] = MCPServerRef(**v)
-                        elif v.get("type") == "http":
-                            mcp_servers[k] = MCPServerHttp(**v)
-                        else:
-                            # Default to stdio (command-based)
-                            mcp_servers[k] = MCPServerStdio(**v)
+                        # MCP servers must use ref format (mcp-server-registry.md)
+                        if "ref" not in v:
+                            raise ValueError(f"MCP server '{k}' must use ref format")
+                        mcp_servers[k] = MCPServerRef(**v)
 
         # Read optional skills from agent.json
         skills = data.get("skills")

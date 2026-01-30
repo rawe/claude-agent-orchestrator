@@ -20,9 +20,7 @@ from models import (
     CapabilitySummary,
     CapabilityType,
     CapabilityUpdate,
-    MCPServerHttp,
     MCPServerRef,
-    MCPServerStdio,
 )
 
 # Debug logging toggle - matches main.py
@@ -105,14 +103,10 @@ def _read_mcp_servers(
 
         mcp_servers = {}
         for k, v in raw_servers.items():
-            # Phase 2: Support ref-based format (mcp-server-registry.md)
-            if "ref" in v:
-                mcp_servers[k] = MCPServerRef(**v)
-            elif v.get("type") == "http":
-                mcp_servers[k] = MCPServerHttp(**v)
-            else:
-                # Default to stdio (command-based)
-                mcp_servers[k] = MCPServerStdio(**v)
+            # MCP servers must use ref format (mcp-server-registry.md)
+            if "ref" not in v:
+                raise ValueError(f"MCP server '{k}' must use ref format")
+            mcp_servers[k] = MCPServerRef(**v)
         return mcp_servers
 
 
