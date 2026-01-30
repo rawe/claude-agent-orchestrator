@@ -61,6 +61,8 @@ class Run:
 
     session_id is coordinator-generated per ADR-010.
     parameters contains input - for AI agents: {"prompt": "..."}.
+    scope contains LLM-invisible context (mcp-resolution-at-coordinator.md).
+    resolved_agent_blueprint contains fully resolved agent config.
     """
     run_id: str
     type: str  # "start_session" or "resume_session"
@@ -69,6 +71,9 @@ class Run:
     parameters: dict  # Unified input - e.g., {"prompt": "..."} for AI agents
     project_dir: Optional[str]
     parent_session_id: Optional[str] = None
+    # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+    scope: Optional[dict] = None  # LLM-invisible context
+    resolved_agent_blueprint: Optional[dict] = None  # Fully resolved agent config
 
     @property
     def prompt(self) -> Optional[str]:
@@ -268,6 +273,9 @@ class CoordinatorAPIClient:
                 parameters=run_data["parameters"],
                 project_dir=run_data.get("project_dir"),
                 parent_session_id=run_data.get("parent_session_id"),
+                # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+                scope=run_data.get("scope"),
+                resolved_agent_blueprint=run_data.get("resolved_agent_blueprint"),
             )
             return PollResult(run=run)
         except httpx.TimeoutException:

@@ -67,7 +67,6 @@ from executor import (
 from poller import RunPoller
 from supervisor import RunSupervisor
 from runner_gateway import RunnerGateway
-from blueprint_resolver import BlueprintResolver
 from agent_orchestrator_mcp import MCPServer
 
 # Configure logging
@@ -186,19 +185,11 @@ class Runner:
                 port=config.mcp_port,  # Optional fixed port from CLI
             )
 
-        # Create blueprint resolver for Schema 2.0
-        # Fetches and resolves blueprints before passing to executor
-        self.blueprint_resolver = BlueprintResolver(
-            coordinator_url=config.agent_coordinator_url,
-            auth0_client=self.auth0_client,
-        )
-
         self.registry = RunningRunsRegistry()
         # Note: mcp_server_url will be set after mcp_server.start() in start()
         self.executor = RunExecutor(
             default_project_dir=config.project_dir,
             profile=config.profile,
-            blueprint_resolver=self.blueprint_resolver,
             mcp_server_url=None,
         )
         self.runner_id: str | None = None

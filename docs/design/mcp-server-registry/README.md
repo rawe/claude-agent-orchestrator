@@ -49,6 +49,30 @@ This design introduces centralized MCP server configuration management with dyna
 |----------|---------|
 | [mcp-resolution-at-coordinator.md](mcp-resolution-at-coordinator.md) | **READ FIRST** - Prerequisite architectural change |
 | [mcp-server-registry.md](mcp-server-registry.md) | Main feature design |
+| [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-report.md) | Implementation report for Phase 1 |
+
+## Implementation Status
+
+### Phase 1: MCP Resolution at Coordinator ✅ Partially Complete
+
+See [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-report.md) for details.
+
+**Completed:**
+- PlaceholderResolver service with `params`, `scope`, `env`, `runtime` sources
+- `${runner.*}` placeholder preservation for Runner-level resolution
+- Run model extended with `scope` and `resolved_agent_blueprint`
+- Coordinator resolves blueprint before storing run
+- Runner uses resolved blueprint, resolves only `${runner.orchestrator_mcp_url}`
+- BlueprintResolver removed from Runner (no backwards compatibility fallback)
+- `_process_mcp_servers()` removed from Claude Code executor
+
+**Not Yet Implemented:**
+- Scope inheritance for child runs
+- Validation of required config values at run creation
+
+### Phase 2: MCP Server Registry ❌ Not Started
+
+Waiting for Phase 1 completion.
 
 ## Quick Reference
 

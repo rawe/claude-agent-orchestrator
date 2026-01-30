@@ -24,9 +24,7 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
 import asyncio
-import copy
 import json
-import os
 import re
 from datetime import datetime, UTC
 
@@ -223,55 +221,6 @@ def get_claude_config(executor_config: Optional[dict]) -> dict:
 
 
 # =============================================================================
-# MCP Config Placeholder Replacement
-# =============================================================================
-
-def _replace_env_placeholders(value: str) -> str:
-    """
-    Replace ${VAR_NAME} placeholders with environment variable values.
-
-    If the environment variable is not set, the placeholder is left unchanged.
-    """
-    def replace_match(match: re.Match) -> str:
-        var_name = match.group(1)
-        return os.environ.get(var_name, match.group(0))
-
-    return re.sub(r'\$\{([^}]+)\}', replace_match, value)
-
-
-def _process_mcp_servers(mcp_servers: dict) -> dict:
-    """
-    Process MCP server config to replace environment variable placeholders.
-
-    Handles ${AGENT_SESSION_ID} and similar placeholders in header values.
-    Creates a deep copy to avoid modifying the original config.
-
-    Example:
-        Input:  {"headers": {"X-Agent-Session-Id": "${AGENT_SESSION_ID}"}}
-        Output: {"headers": {"X-Agent-Session-Id": "ses_abc123def456"}}
-    """
-    result = copy.deepcopy(mcp_servers)
-
-    for server_name, server_config in result.items():
-        if isinstance(server_config, dict):
-            # Process headers if present (HTTP servers)
-            headers = server_config.get('headers')
-            if isinstance(headers, dict):
-                for header_name, header_value in headers.items():
-                    if isinstance(header_value, str):
-                        headers[header_name] = _replace_env_placeholders(header_value)
-
-            # Process env if present (stdio servers)
-            env = server_config.get('env')
-            if isinstance(env, dict):
-                for env_name, env_value in env.items():
-                    if isinstance(env_value, str):
-                        env[env_name] = _replace_env_placeholders(env_value)
-
-    return result
-
-
-# =============================================================================
 # Module-level state for SDK hooks
 # =============================================================================
 _session_client: Optional[SessionClient] = None
@@ -425,7 +374,7 @@ async def run_claude_session(
 
     # Add MCP servers if provided (with placeholder replacement)
     if mcp_servers:
-        options.mcp_servers = _process_mcp_servers(mcp_servers)
+        options.mcp_servers = mcp_servers
 
     # Initialize tracking variables
     executor_session_id = None
