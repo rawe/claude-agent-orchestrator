@@ -31,6 +31,7 @@ from models import (
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary, CapabilityType,
     Script, ScriptCreate, ScriptUpdate, ScriptSummary,
     RunnerAgent, AgentHooks,
+    MCPServerRegistryEntry, MCPServerRegistryCreate, MCPServerRegistryUpdate,
 )
 from openapi_config import (
     API_TITLE, API_DESCRIPTION, API_VERSION, API_CONTACT, API_LICENSE,
@@ -46,6 +47,14 @@ import agent_storage
 from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError, MissingScriptError
 import capability_storage
 import script_storage
+from services.mcp_registry import (
+    list_mcp_servers as registry_list_mcp_servers,
+    get_mcp_server as registry_get_mcp_server,
+    create_mcp_server as registry_create_mcp_server,
+    update_mcp_server as registry_update_mcp_server,
+    delete_mcp_server as registry_delete_mcp_server,
+    MCPServerAlreadyExistsError,
+)
 from validation import validate_agent_name, validate_capability_name, validate_script_name
 from datetime import datetime, timezone
 
@@ -59,7 +68,12 @@ from services.run_queue import (
     generate_run_id,
 )
 # Import placeholder resolver for MCP resolution at coordinator
-from services.placeholder_resolver import PlaceholderResolver
+from services.placeholder_resolver import (
+    PlaceholderResolver,
+    resolve_blueprint_with_registry,
+    MCPRefResolutionError,
+    MissingRequiredConfigError,
+)
 # Import runner registry and other services
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError, AgentNameCollisionError
 from services.stop_command_queue import stop_command_queue
@@ -1171,6 +1185,67 @@ def download_script(name: str):
 
 
 # ==============================================================================
+# MCP Server Registry API Routes (Phase 2: mcp-server-registry.md)
+# ==============================================================================
+
+@app.get("/mcp-servers", tags=["MCP Registry"], response_model=list[MCPServerRegistryEntry])
+def list_mcp_servers_endpoint():
+    """List all MCP servers in the registry.
+
+    Returns all registered MCP servers with their URLs, config schemas, and defaults.
+    """
+    return registry_list_mcp_servers()
+
+
+@app.get("/mcp-servers/{server_id}", tags=["MCP Registry"], response_model=MCPServerRegistryEntry)
+def get_mcp_server_endpoint(server_id: str):
+    """Get an MCP server by ID.
+
+    Returns the full registry entry including URL, config schema, and defaults.
+    """
+    entry = registry_get_mcp_server(server_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"MCP server not found: {server_id}")
+    return entry
+
+
+@app.post("/mcp-servers", tags=["MCP Registry"], response_model=MCPServerRegistryEntry, status_code=201)
+def create_mcp_server_endpoint(data: MCPServerRegistryCreate):
+    """Create a new MCP server registry entry.
+
+    The `id` must be unique. This ID is used as the `ref` value in agent/capability configs.
+    """
+    try:
+        return registry_create_mcp_server(data)
+    except MCPServerAlreadyExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.put("/mcp-servers/{server_id}", tags=["MCP Registry"], response_model=MCPServerRegistryEntry)
+def update_mcp_server_endpoint(server_id: str, updates: MCPServerRegistryUpdate):
+    """Update an MCP server registry entry.
+
+    Only provided fields are updated; others remain unchanged.
+    """
+    entry = registry_update_mcp_server(server_id, updates)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"MCP server not found: {server_id}")
+    return entry
+
+
+@app.delete("/mcp-servers/{server_id}", tags=["MCP Registry"], status_code=204)
+def delete_mcp_server_endpoint(server_id: str):
+    """Delete an MCP server from the registry.
+
+    Warning: Deleting a server that is referenced by agents/capabilities will cause
+    those references to fail at run creation time.
+    """
+    if not registry_delete_mcp_server(server_id):
+        raise HTTPException(status_code=404, detail=f"MCP server not found: {server_id}")
+    return None
+
+
+# ==============================================================================
 # Runner API Routes (for Agent Runner communication)
 # ==============================================================================
 
@@ -1923,18 +1998,44 @@ async def create_run(run_create: RunCreate):
             if DEBUG:
                 print(f"[DEBUG] Inherited scope from parent session {run_create.parent_session_id}", flush=True)
 
-    # Resolve agent blueprint with placeholders (mcp-resolution-at-coordinator.md)
+    # Resolve agent blueprint with placeholders and registry lookups
+    # (mcp-resolution-at-coordinator.md, mcp-server-registry.md)
     resolved_agent_blueprint = None
     if agent:
         resolver = PlaceholderResolver(
             params=run_create.parameters,
             scope=effective_scope,
             run_id=run_id,
-            session_id=run_create.session_id,
+            session_id=run_create.session_id or "",
         )
-        # Convert agent to dict and resolve placeholders
+        # Convert agent to dict and resolve with registry lookups
         agent_dict = agent.model_dump(exclude_none=True)
-        resolved_agent_blueprint = resolver.resolve(agent_dict)
+        try:
+            resolved_agent_blueprint = resolve_blueprint_with_registry(
+                agent_dict,
+                resolver,
+                validate_required=True,
+            )
+        except MCPRefResolutionError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "mcp_ref_resolution_failed",
+                    "message": str(e),
+                    "server_name": e.server_name,
+                    "ref": e.ref,
+                }
+            )
+        except MissingRequiredConfigError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "missing_required_mcp_config",
+                    "message": str(e),
+                    "server_name": e.server_name,
+                    "missing_fields": e.missing_fields,
+                }
+            )
         if DEBUG:
             print(f"[DEBUG] Resolved agent blueprint for run {run_id}", flush=True)
 

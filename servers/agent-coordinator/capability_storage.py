@@ -21,6 +21,7 @@ from models import (
     CapabilityType,
     CapabilityUpdate,
     MCPServerHttp,
+    MCPServerRef,
     MCPServerStdio,
 )
 
@@ -104,7 +105,10 @@ def _read_mcp_servers(
 
         mcp_servers = {}
         for k, v in raw_servers.items():
-            if v.get("type") == "http":
+            # Phase 2: Support ref-based format (mcp-server-registry.md)
+            if "ref" in v:
+                mcp_servers[k] = MCPServerRef(**v)
+            elif v.get("type") == "http":
                 mcp_servers[k] = MCPServerHttp(**v)
             else:
                 # Default to stdio (command-based)

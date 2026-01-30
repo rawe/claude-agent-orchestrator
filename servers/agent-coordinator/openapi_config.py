@@ -104,6 +104,10 @@ OPENAPI_TAGS = [
         "description": "Script management - executable scripts that procedural agents reference for execution.",
     },
     {
+        "name": "MCP Registry",
+        "description": "MCP Server Registry - centralized management of MCP server definitions referenced by agents and capabilities.",
+    },
+    {
         "name": "Health",
         "description": "Service health checks.",
     },

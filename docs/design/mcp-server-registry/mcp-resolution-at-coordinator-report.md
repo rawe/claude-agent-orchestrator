@@ -69,7 +69,30 @@ This report documents the implementation of the MCP Resolution at Coordinator fe
 - Removed `_process_mcp_servers()` function from Claude Code executor (no longer needed)
 - Removed `blueprint_resolver` usage from agent-runner main script
 
-### 5. Tests
+### 5. Scope Inheritance for Child Runs
+
+**Files Modified:**
+- `servers/agent-coordinator/main.py`
+
+**Changes (commit 026dab2):**
+- When a run has `parent_session_id`, look up the parent run's scope
+- Merge parent scope as defaults, child scope overrides
+- Store merged scope for grandchild inheritance
+
+**Merge Semantics:**
+```python
+# Parent scope provides defaults, child scope overrides
+effective_scope = {**parent_scope, **(run_create.scope or {})}
+```
+
+**Example:**
+```
+Parent Run: scope = {context_id: "ctx-123", tenant: "acme"}
+Child Run:  scope = {tenant: "other"}  # overrides tenant
+Result:     scope = {context_id: "ctx-123", tenant: "other"}
+```
+
+### 6. Tests
 
 **Files Created:**
 - `servers/agent-coordinator/tests/test_placeholder_resolver.py` (14 tests)
@@ -84,17 +107,13 @@ This report documents the implementation of the MCP Resolution at Coordinator fe
 
 ## What Was NOT Implemented
 
-### 1. Scope Inheritance for Child Runs
-
-When a parent agent spawns a child agent via the Orchestrator MCP, the child should automatically inherit the parent's `scope`. This requires the Coordinator to look up the parent run and copy its scope to the child run.
-
-**Reason:** Deferred to reduce complexity. Can be added when multi-agent workflows require shared context.
-
-### 2. Validation of Required Config
+### 1. Validation of Required Config
 
 The design specified a `validate_required_config()` function to fail fast at run creation if required placeholder values are missing.
 
-**Reason:** Deferred. Current behavior keeps unresolved placeholders as-is, which allows gradual adoption and debugging.
+**Reason:** Depends on Phase 2 (MCP Server Registry). Validation requires knowing which config values are required, which is defined by the `config_schema` in the registry. Without the registry, there's no way to know which values are mandatory.
+
+This will be implemented in Phase 2 as part of the registry reference resolution.
 
 ### 3. MCP Server Registry
 
@@ -140,3 +159,16 @@ cd servers/agent-runner && uv run --with pytest --with httpx -- python -m pytest
 | `servers/agent-runner/lib/blueprint_resolver.py` | Deleted |
 | `servers/agent-runner/executors/claude-code/lib/claude_client.py` | Modified |
 | `servers/agent-runner/agent-runner` | Modified |
+
+## Phase 1 Status
+
+**Phase 1 is COMPLETE.** All planned features have been implemented:
+
+1. ✅ PlaceholderResolver service
+2. ✅ Run model extension with scope and resolved_agent_blueprint
+3. ✅ Coordinator resolves blueprint before storing run
+4. ✅ Runner uses resolved blueprint, only resolves `${runner.*}`
+5. ✅ Scope inheritance for child runs
+
+**Deferred to Phase 2:**
+- Validation of required config (requires `config_schema` from registry)

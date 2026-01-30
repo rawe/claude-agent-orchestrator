@@ -23,7 +23,7 @@ from typing import Optional
 
 from models import (
     Agent, AgentCreate, AgentUpdate, MCPServerStdio, MCPServerHttp, MCPServerConfig,
-    RunnerDemands, AgentHooks, HookAgentConfig, HookOnError,
+    MCPServerRef, RunnerDemands, AgentHooks, HookAgentConfig, HookOnError,
 )
 
 # Debug logging toggle - matches main.py
@@ -92,7 +92,10 @@ def _read_agent_from_dir(agent_dir: Path) -> Optional[Agent]:
                 if raw_servers:
                     mcp_servers = {}
                     for k, v in raw_servers.items():
-                        if v.get("type") == "http":
+                        # Phase 2: Support ref-based format (mcp-server-registry.md)
+                        if "ref" in v:
+                            mcp_servers[k] = MCPServerRef(**v)
+                        elif v.get("type") == "http":
                             mcp_servers[k] = MCPServerHttp(**v)
                         else:
                             # Default to stdio (command-based)

@@ -50,10 +50,11 @@ This design introduces centralized MCP server configuration management with dyna
 | [mcp-resolution-at-coordinator.md](mcp-resolution-at-coordinator.md) | **READ FIRST** - Prerequisite architectural change |
 | [mcp-server-registry.md](mcp-server-registry.md) | Main feature design |
 | [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-report.md) | Implementation report for Phase 1 |
+| [mcp-server-registry-report.md](mcp-server-registry-report.md) | Implementation report for Phase 2 |
 
 ## Implementation Status
 
-### Phase 1: MCP Resolution at Coordinator ✅ Partially Complete
+### Phase 1: MCP Resolution at Coordinator ✅ Complete
 
 See [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-report.md) for details.
 
@@ -65,14 +66,24 @@ See [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-repo
 - Runner uses resolved blueprint, resolves only `${runner.orchestrator_mcp_url}`
 - BlueprintResolver removed from Runner (no backwards compatibility fallback)
 - `_process_mcp_servers()` removed from Claude Code executor
+- Scope inheritance for child runs (commit 026dab2)
 
-**Not Yet Implemented:**
-- Scope inheritance for child runs
-- Validation of required config values at run creation
+**Deferred to Phase 2:**
+- Validation of required config values (requires `config_schema` from registry)
 
-### Phase 2: MCP Server Registry ❌ Not Started
+### Phase 2: MCP Server Registry ✅ Complete
 
-Waiting for Phase 1 completion.
+See [mcp-server-registry-report.md](mcp-server-registry-report.md) for details.
+
+**Completed:**
+- MCP server registry CRUD API (`/mcp-servers` endpoints)
+- Registry database table with config_schema and default_config support
+- MCPServerRef model for ref-based MCP config format
+- Blueprint resolution with registry lookups
+- Config inheritance: registry defaults → capability → agent
+- Required config validation using config_schema
+- Backward compatibility for legacy inline format
+- Tests (23 test cases)
 
 ## Quick Reference
 

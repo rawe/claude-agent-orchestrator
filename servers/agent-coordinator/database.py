@@ -128,6 +128,20 @@ def init_db():
     """)
 
 
+    # MCP Server Registry table (Phase 2: mcp-server-registry.md)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mcp_servers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            url TEXT NOT NULL,
+            config_schema TEXT,
+            default_config TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("Database initialized successfully")
@@ -994,5 +1008,139 @@ def recover_all_active_runs() -> dict:
     conn.commit()
     conn.close()
     return results
+
+
+# ============================================================================
+# MCP Server Registry CRUD Functions (Phase 2: mcp-server-registry.md)
+# ============================================================================
+
+def create_mcp_server(
+    server_id: str,
+    name: str,
+    url: str,
+    description: str | None = None,
+    config_schema: str | None = None,  # JSON string
+    default_config: str | None = None,  # JSON string
+) -> dict | None:
+    """Create a new MCP server registry entry."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO mcp_servers (id, name, description, url, config_schema, default_config, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (server_id, name, description, url, config_schema, default_config, now, now)
+    )
+    conn.commit()
+    conn.close()
+    return get_mcp_server(server_id)
+
+
+def get_mcp_server(server_id: str) -> dict | None:
+    """Get an MCP server by ID."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT * FROM mcp_servers WHERE id = ?",
+        (server_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    result = dict(row)
+    # Parse JSON fields
+    if result.get("config_schema"):
+        result["config_schema"] = json.loads(result["config_schema"])
+    if result.get("default_config"):
+        result["default_config"] = json.loads(result["default_config"])
+    return result
+
+
+def list_mcp_servers() -> list[dict]:
+    """List all MCP servers, sorted by name."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT * FROM mcp_servers ORDER BY name ASC"
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    results = []
+    for row in rows:
+        entry = dict(row)
+        # Parse JSON fields
+        if entry.get("config_schema"):
+            entry["config_schema"] = json.loads(entry["config_schema"])
+        if entry.get("default_config"):
+            entry["default_config"] = json.loads(entry["default_config"])
+        results.append(entry)
+    return results
+
+
+def update_mcp_server(
+    server_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    url: str | None = None,
+    config_schema: str | None = None,  # JSON string
+    default_config: str | None = None,  # JSON string
+) -> dict | None:
+    """Update an MCP server. Returns updated entry or None if not found."""
+    from datetime import datetime, timezone
+
+    # Check if exists
+    if not get_mcp_server(server_id):
+        return None
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+
+    updates = ["updated_at = ?"]
+    params = [now]
+
+    if name is not None:
+        updates.append("name = ?")
+        params.append(name)
+    if description is not None:
+        updates.append("description = ?")
+        params.append(description)
+    if url is not None:
+        updates.append("url = ?")
+        params.append(url)
+    if config_schema is not None:
+        updates.append("config_schema = ?")
+        params.append(config_schema)
+    if default_config is not None:
+        updates.append("default_config = ?")
+        params.append(default_config)
+
+    params.append(server_id)
+    cursor.execute(
+        f"UPDATE mcp_servers SET {', '.join(updates)} WHERE id = ?",
+        params
+    )
+    conn.commit()
+    conn.close()
+    return get_mcp_server(server_id)
+
+
+def delete_mcp_server(server_id: str) -> bool:
+    """Delete an MCP server. Returns True if deleted, False if not found."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM mcp_servers WHERE id = ?", (server_id,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted
 
 
