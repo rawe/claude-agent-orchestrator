@@ -23,9 +23,9 @@ export const MCP_TEMPLATES: Record<string, MCPServerConfig> = {
   },
   'agent-orchestrator-http': {
     type: 'http',
-    url: '${AGENT_ORCHESTRATOR_MCP_URL}',
+    url: '${runner.orchestrator_mcp_url}',
     headers: {
-      'X-Agent-Session-Id': '${AGENT_SESSION_ID}',
+      'X-Agent-Session-Id': '${runtime.session_id}',
       'X-Agent-Tags': '<your-tags>',
       'X-Additional-Demands': '{"hostname": null, "project_dir": null, "executor_profile": null, "tags": []}',
     },
