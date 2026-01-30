@@ -140,12 +140,12 @@ def claim_run(self, runner_id: str) -> Optional[Run]:
 **Sequence:**
 1. Runner calls `POST /runner/runs/{run_id}/started`
 2. Run status changes: `claimed` → `running`
-3. **Schema 2.0: Blueprint Resolution** (NEW)
-   - If `agent_name` specified, Runner fetches blueprint from Coordinator: `GET /agents/{name}`
-   - Runner resolves placeholders in `mcp_servers` config:
-     - `${AGENT_ORCHESTRATOR_MCP_URL}` → MCP server URL
-     - `${AGENT_SESSION_ID}` → Current session ID
-   - Resolved `agent_blueprint` is included in the executor payload
+3. **Blueprint Resolution at Coordinator**
+   - Coordinator resolves placeholders in `mcp_servers` config at run creation:
+     - `${runtime.session_id}` → Current session ID
+     - `${runner.*}` placeholders preserved for Runner
+   - Resolved `agent_blueprint` included in run payload
+   - Runner only resolves `${runner.orchestrator_mcp_url}` → MCP server URL
 4. `RunExecutor` spawns the appropriate subprocess with JSON payload via stdin:
 
 ```python

@@ -101,7 +101,7 @@ class ExecutorInvocation:
     Structured payload for ao-*-exec unified executor.
 
     The agent_blueprint contains the fully resolved blueprint
-    (with placeholders like ${AGENT_ORCHESTRATOR_MCP_URL} replaced).
+    (with placeholders like ${runner.orchestrator_mcp_url} resolved).
 
     Attributes:
         schema_version: Schema version for forward compatibility

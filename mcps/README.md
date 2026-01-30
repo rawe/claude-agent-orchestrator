@@ -51,8 +51,8 @@ The Agent Orchestrator MCP provides tools for spawning sub-agents, managing sess
 
 The MCP server is **embedded in the Agent Runner**:
 - No separate server needed
-- Agent configurations use `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder
-- The placeholder is dynamically replaced at runtime
+- Agent configurations use `${runner.orchestrator_mcp_url}` placeholder
+- The placeholder is resolved by the Runner at execution time
 
 ### External Clients
 

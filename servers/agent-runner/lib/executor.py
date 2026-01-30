@@ -309,7 +309,7 @@ class RunExecutor:
         # Set AGENT_SESSION_ID so the session knows its own identity.
         # This allows MCP servers to include the session ID in HTTP headers
         # for callback support (X-Agent-Session-Id header).
-        # Flow: Runner sets env -> ao-*-exec replaces ${AGENT_SESSION_ID} in MCP config
+        # Flow: Coordinator resolves ${runtime.session_id} in MCP config
         #       -> Claude sends X-Agent-Session-Id header -> MCP server reads it
         env["AGENT_SESSION_ID"] = run.session_id
 
