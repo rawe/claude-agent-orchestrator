@@ -173,6 +173,7 @@ class RunCreate(BaseModel):
     session_id is optional - coordinator generates it if not provided (ADR-010).
     execution_mode controls callback behavior per ADR-003.
     parameters is the unified input dict - for AI agents, use {"prompt": "..."}.
+    scope is for placeholder resolution (LLM-invisible context).
     """
     type: RunType
     session_id: Optional[str] = None  # Coordinator generates if not provided
@@ -183,6 +184,8 @@ class RunCreate(BaseModel):
     execution_mode: ExecutionMode = ExecutionMode.SYNC
     # Additional demands to merge with blueprint demands (additive only)
     additional_demands: Optional[dict] = None
+    # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+    scope: Optional[dict] = None  # Run scope for placeholder resolution (LLM-invisible)
 
 
 class Run(BaseModel):
@@ -206,6 +209,9 @@ class Run(BaseModel):
     completed_at: Optional[str] = None
     # Timeout for no-match scenarios (ISO timestamp)
     timeout_at: Optional[str] = None
+    # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+    scope: Optional[dict] = None  # Run scope for placeholder resolution (LLM-invisible)
+    resolved_agent_blueprint: Optional[dict] = None  # Fully resolved agent config
 
     @property
     def prompt(self) -> Optional[str]:
@@ -220,6 +226,15 @@ def generate_session_id() -> str:
     Example: ses_abc123def456
     """
     return f"ses_{uuid.uuid4().hex[:12]}"
+
+
+def generate_run_id() -> str:
+    """Generate a run_id.
+
+    Format: run_{12-char-hex}
+    Example: run_abc123def456
+    """
+    return f"run_{uuid.uuid4().hex[:12]}"
 
 
 # Default timeout for runs waiting for a matching runner (5 minutes)
@@ -378,20 +393,33 @@ class RunQueue:
             started_at=d.get("started_at"),
             completed_at=d.get("completed_at"),
             timeout_at=d.get("timeout_at"),
+            # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+            scope=json.loads(d["scope"]) if d.get("scope") else None,
+            resolved_agent_blueprint=json.loads(d["resolved_agent_blueprint"]) if d.get("resolved_agent_blueprint") else None,
         )
 
-    def add_run(self, run_create: RunCreate) -> Run:
+    def add_run(
+        self,
+        run_create: RunCreate,
+        resolved_agent_blueprint: Optional[dict] = None,
+        run_id: Optional[str] = None,
+    ) -> Run:
         """Create a new run. Persists to database, then updates cache.
 
         If session_id is not provided, generates one per ADR-010.
         For resume runs, enriches with agent_name/project_dir via enrich_resume_run_create().
+
+        Args:
+            run_create: Run creation request with parameters, scope, etc.
+            resolved_agent_blueprint: Pre-resolved agent blueprint (mcp-resolution-at-coordinator.md)
+            run_id: Pre-generated run ID (optional, for placeholder resolution)
         """
         # Enrich resume runs with session data (centralized enrichment)
         enrich_resume_run_create(run_create)
 
         with self._lock:
-            # Generate IDs
-            run_id = f"run_{uuid.uuid4().hex[:12]}"
+            # Generate IDs (use pre-generated if provided)
+            run_id = run_id or f"run_{uuid.uuid4().hex[:12]}"
             session_id = run_create.session_id or generate_session_id()
             created_at = datetime.now(timezone.utc).isoformat()
 
@@ -407,6 +435,9 @@ class RunQueue:
                 parent_session_id=run_create.parent_session_id,
                 execution_mode=run_create.execution_mode.value,
                 status=RunStatus.PENDING.value,
+                # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+                scope=json.dumps(run_create.scope) if run_create.scope else None,
+                resolved_agent_blueprint=json.dumps(resolved_agent_blueprint) if resolved_agent_blueprint else None,
             )
 
             # Create Run model for cache
@@ -421,6 +452,9 @@ class RunQueue:
                 execution_mode=run_create.execution_mode,
                 status=RunStatus.PENDING,
                 created_at=created_at,
+                # MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md)
+                scope=run_create.scope,
+                resolved_agent_blueprint=resolved_agent_blueprint,
             )
 
             # Update cache

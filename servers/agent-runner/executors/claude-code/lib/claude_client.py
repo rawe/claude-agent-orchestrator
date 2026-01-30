@@ -231,6 +231,10 @@ def _replace_env_placeholders(value: str) -> str:
     Replace ${VAR_NAME} placeholders with environment variable values.
 
     If the environment variable is not set, the placeholder is left unchanged.
+
+    NOTE: With MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md),
+    this is now a fallback for legacy placeholders only. New code should use
+    ${source.key} syntax which is resolved at the Coordinator level.
     """
     def replace_match(match: re.Match) -> str:
         var_name = match.group(1)
@@ -241,14 +245,14 @@ def _replace_env_placeholders(value: str) -> str:
 
 def _process_mcp_servers(mcp_servers: dict) -> dict:
     """
-    Process MCP server config to replace environment variable placeholders.
+    Process MCP server config for any remaining placeholders.
 
-    Handles ${AGENT_SESSION_ID} and similar placeholders in header values.
+    With MCP Resolution at Coordinator (mcp-resolution-at-coordinator.md),
+    most placeholders should already be resolved. This function handles:
+    1. Legacy ${VAR_NAME} placeholders (env vars)
+    2. Any remaining unresolved placeholders as a safety net
+
     Creates a deep copy to avoid modifying the original config.
-
-    Example:
-        Input:  {"headers": {"X-Agent-Session-Id": "${AGENT_SESSION_ID}"}}
-        Output: {"headers": {"X-Agent-Session-Id": "ses_abc123def456"}}
     """
     result = copy.deepcopy(mcp_servers)
 
@@ -267,6 +271,24 @@ def _process_mcp_servers(mcp_servers: dict) -> dict:
                 for env_name, env_value in env.items():
                     if isinstance(env_value, str):
                         env[env_name] = _replace_env_placeholders(env_value)
+
+            # Process url if present (HTTP servers)
+            url = server_config.get('url')
+            if isinstance(url, str):
+                server_config['url'] = _replace_env_placeholders(url)
+
+            # Process command if present (stdio servers)
+            command = server_config.get('command')
+            if isinstance(command, str):
+                server_config['command'] = _replace_env_placeholders(command)
+
+            # Process args if present (stdio servers)
+            args = server_config.get('args')
+            if isinstance(args, list):
+                server_config['args'] = [
+                    _replace_env_placeholders(arg) if isinstance(arg, str) else arg
+                    for arg in args
+                ]
 
     return result
 
