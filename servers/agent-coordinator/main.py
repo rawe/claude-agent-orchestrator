@@ -21,6 +21,7 @@ from database import (
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
     SessionAlreadyExistsError, fail_runs_on_runner_disconnect,
+    get_run_by_session_id,
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -1911,12 +1912,23 @@ async def create_run(run_create: RunCreate):
     # Generate run_id early for placeholder resolution (mcp-resolution-at-coordinator.md)
     run_id = generate_run_id()
 
+    # Scope inheritance: child runs inherit parent's scope (mcp-resolution-at-coordinator.md)
+    effective_scope = run_create.scope
+    if run_create.parent_session_id:
+        parent_run = get_run_by_session_id(run_create.parent_session_id, active_only=False)
+        if parent_run and parent_run.get("scope"):
+            parent_scope = json.loads(parent_run["scope"]) if isinstance(parent_run["scope"], str) else parent_run["scope"]
+            # Merge: parent scope provides defaults, child scope overrides
+            effective_scope = {**parent_scope, **(run_create.scope or {})}
+            if DEBUG:
+                print(f"[DEBUG] Inherited scope from parent session {run_create.parent_session_id}", flush=True)
+
     # Resolve agent blueprint with placeholders (mcp-resolution-at-coordinator.md)
     resolved_agent_blueprint = None
     if agent:
         resolver = PlaceholderResolver(
             params=run_create.parameters,
-            scope=run_create.scope,
+            scope=effective_scope,
             run_id=run_id,
             session_id=run_create.session_id,
         )
@@ -1925,6 +1937,9 @@ async def create_run(run_create: RunCreate):
         resolved_agent_blueprint = resolver.resolve(agent_dict)
         if DEBUG:
             print(f"[DEBUG] Resolved agent blueprint for run {run_id}", flush=True)
+
+    # Store merged scope for grandchild inheritance
+    run_create.scope = effective_scope
 
     # Create the run (session must exist for FK constraint)
     run = run_queue.add_run(
