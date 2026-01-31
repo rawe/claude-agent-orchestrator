@@ -21,15 +21,17 @@ from database import (
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
     SessionAlreadyExistsError, fail_runs_on_runner_disconnect,
+    get_run_by_session_id,
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
-    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
+    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate,
     ExecutionMode, StreamEventType, SessionEventType, SessionResult,
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary, CapabilityType,
     Script, ScriptCreate, ScriptUpdate, ScriptSummary,
     RunnerAgent, AgentHooks,
+    MCPServerRegistryEntry, MCPServerRegistryCreate, MCPServerRegistryUpdate,
 )
 from openapi_config import (
     API_TITLE, API_DESCRIPTION, API_VERSION, API_CONTACT, API_LICENSE,
@@ -45,6 +47,14 @@ import agent_storage
 from agent_storage import CapabilityResolutionError, MissingCapabilityError, MCPServerConflictError, MissingScriptError
 import capability_storage
 import script_storage
+from services.mcp_registry import (
+    list_mcp_servers as registry_list_mcp_servers,
+    get_mcp_server as registry_get_mcp_server,
+    create_mcp_server as registry_create_mcp_server,
+    update_mcp_server as registry_update_mcp_server,
+    delete_mcp_server as registry_delete_mcp_server,
+    MCPServerAlreadyExistsError,
+)
 from validation import validate_agent_name, validate_capability_name, validate_script_name
 from datetime import datetime, timezone
 
@@ -54,7 +64,15 @@ init_db()
 # Import run queue types and init function
 from services.run_queue import (
     init_run_queue, RunCreate, Run, RunStatus, RunType,
-    ParameterValidationError, validate_parameters, IMPLICIT_AUTONOMOUS_SCHEMA
+    ParameterValidationError, validate_parameters, IMPLICIT_AUTONOMOUS_SCHEMA,
+    generate_run_id,
+)
+# Import placeholder resolver for MCP resolution at coordinator
+from services.placeholder_resolver import (
+    PlaceholderResolver,
+    resolve_blueprint_with_registry,
+    MCPRefResolutionError,
+    MissingRequiredConfigError,
 )
 # Import runner registry and other services
 from services.runner_registry import runner_registry, RunnerInfo, DuplicateRunnerError, AgentNameCollisionError
@@ -62,6 +80,7 @@ from services.stop_command_queue import stop_command_queue
 from services.script_sync_queue import script_sync_queue
 from services.sse_manager import sse_manager, SSEConnection
 from services import callback_processor
+from services.run_demands import compute_and_set_run_demands
 from services.hook_executor import (
     execute_on_run_start_hook, execute_on_run_finish_hook,
     HookAction, HookResult,
@@ -1167,6 +1186,67 @@ def download_script(name: str):
 
 
 # ==============================================================================
+# MCP Server Registry API Routes (Phase 2: mcp-server-registry.md)
+# ==============================================================================
+
+@app.get("/mcp-servers", tags=["MCP Registry"], response_model=list[MCPServerRegistryEntry])
+def list_mcp_servers_endpoint():
+    """List all MCP servers in the registry.
+
+    Returns all registered MCP servers with their URLs, config schemas, and defaults.
+    """
+    return registry_list_mcp_servers()
+
+
+@app.get("/mcp-servers/{server_id}", tags=["MCP Registry"], response_model=MCPServerRegistryEntry)
+def get_mcp_server_endpoint(server_id: str):
+    """Get an MCP server by ID.
+
+    Returns the full registry entry including URL, config schema, and defaults.
+    """
+    entry = registry_get_mcp_server(server_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"MCP server not found: {server_id}")
+    return entry
+
+
+@app.post("/mcp-servers", tags=["MCP Registry"], response_model=MCPServerRegistryEntry, status_code=201)
+def create_mcp_server_endpoint(data: MCPServerRegistryCreate):
+    """Create a new MCP server registry entry.
+
+    The `id` must be unique. This ID is used as the `ref` value in agent/capability configs.
+    """
+    try:
+        return registry_create_mcp_server(data)
+    except MCPServerAlreadyExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.put("/mcp-servers/{server_id}", tags=["MCP Registry"], response_model=MCPServerRegistryEntry)
+def update_mcp_server_endpoint(server_id: str, updates: MCPServerRegistryUpdate):
+    """Update an MCP server registry entry.
+
+    Only provided fields are updated; others remain unchanged.
+    """
+    entry = registry_update_mcp_server(server_id, updates)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"MCP server not found: {server_id}")
+    return entry
+
+
+@app.delete("/mcp-servers/{server_id}", tags=["MCP Registry"], status_code=204)
+def delete_mcp_server_endpoint(server_id: str):
+    """Delete an MCP server from the registry.
+
+    Warning: Deleting a server that is referenced by agents/capabilities will cause
+    those references to fail at run creation time.
+    """
+    if not registry_delete_mcp_server(server_id):
+        raise HTTPException(status_code=404, detail=f"MCP server not found: {server_id}")
+    return None
+
+
+# ==============================================================================
 # Runner API Routes (for Agent Runner communication)
 # ==============================================================================
 
@@ -1905,8 +1985,70 @@ async def create_run(run_create: RunCreate):
         except Exception:
             raise
 
+    # Generate run_id early for placeholder resolution (mcp-resolution-at-coordinator.md)
+    run_id = generate_run_id()
+
+    # Scope inheritance: child runs inherit parent's scope (mcp-resolution-at-coordinator.md)
+    effective_scope = run_create.scope
+    if run_create.parent_session_id:
+        parent_run = get_run_by_session_id(run_create.parent_session_id, active_only=False)
+        if parent_run and parent_run.get("scope"):
+            parent_scope = json.loads(parent_run["scope"]) if isinstance(parent_run["scope"], str) else parent_run["scope"]
+            # Merge: parent scope provides defaults, child scope overrides
+            effective_scope = {**parent_scope, **(run_create.scope or {})}
+            if DEBUG:
+                print(f"[DEBUG] Inherited scope from parent session {run_create.parent_session_id}", flush=True)
+
+    # Resolve agent blueprint with placeholders and registry lookups
+    # (mcp-resolution-at-coordinator.md, mcp-server-registry.md)
+    resolved_agent_blueprint = None
+    if agent:
+        resolver = PlaceholderResolver(
+            params=run_create.parameters,
+            scope=effective_scope,
+            run_id=run_id,
+            session_id=run_create.session_id or "",
+        )
+        # Convert agent to dict and resolve with registry lookups
+        agent_dict = agent.model_dump(exclude_none=True)
+        try:
+            resolved_agent_blueprint = resolve_blueprint_with_registry(
+                agent_dict,
+                resolver,
+                validate_required=True,
+            )
+        except MCPRefResolutionError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "mcp_ref_resolution_failed",
+                    "message": str(e),
+                    "server_name": e.server_name,
+                    "ref": e.ref,
+                }
+            )
+        except MissingRequiredConfigError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "missing_required_mcp_config",
+                    "message": str(e),
+                    "server_name": e.server_name,
+                    "missing_fields": e.missing_fields,
+                }
+            )
+        if DEBUG:
+            print(f"[DEBUG] Resolved agent blueprint for run {run_id}", flush=True)
+
+    # Store merged scope for grandchild inheritance
+    run_create.scope = effective_scope
+
     # Create the run (session must exist for FK constraint)
-    run = run_queue.add_run(run_create)
+    run = run_queue.add_run(
+        run_create,
+        resolved_agent_blueprint=resolved_agent_blueprint,
+        run_id=run_id,
+    )
 
     # Broadcast session creation after run is created (so we have run_id)
     if run_create.type == RunType.START_SESSION:
@@ -1914,97 +2056,13 @@ async def create_run(run_create: RunCreate):
             print(f"[DEBUG] Created run {run.run_id} for session {run.session_id}", flush=True)
         await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)
 
-    # Merge demands from blueprint, affinity, and additional_demands (ADR-011)
-    merged_demands = None
-    affinity_demands = RunnerDemands()  # Empty defaults - populated for resume runs
-    blueprint_demands = RunnerDemands()  # Empty defaults
-    additional_demands = RunnerDemands()  # Empty defaults
-    runner_owner_demands = RunnerDemands()  # Empty defaults - for runner-owned agents
-
-    # For RESUME_SESSION, use affinity from existing_session (looked up earlier)
-    # This ensures resume runs go to the same runner that owns the session
-    if run_create.type == RunType.RESUME_SESSION and existing_session:
-        # Use existing_session instead of separate get_session_affinity() call
-        affinity_demands = RunnerDemands(
-            hostname=existing_session.get('hostname'),
-            executor_profile=existing_session.get('executor_profile'),
-        )
-        if DEBUG:
-            print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
-                  f"hostname={existing_session.get('hostname')}, executor_profile={existing_session.get('executor_profile')}", flush=True)
-
-    # Phase 4: For runner-owned agents, route to the owning runner
-    if agent and agent.runner_id:
-        runner = runner_registry.get_runner(agent.runner_id)
-        if runner:
-            runner_owner_demands = RunnerDemands(
-                hostname=runner.hostname,
-                project_dir=runner.project_dir,
-                executor_profile=runner.executor_profile,
-            )
-            if DEBUG:
-                print(f"[DEBUG] Run {run.run_id}: routing to runner {agent.runner_id} "
-                      f"(procedural agent '{agent.name}')", flush=True)
-        else:
-            # Runner is offline - run will fail after timeout
-            if DEBUG:
-                print(f"[DEBUG] Run {run.run_id}: runner {agent.runner_id} not online "
-                      f"(procedural agent '{agent.name}')", flush=True)
-
-    # Load blueprint demands from agent (already loaded for validation)
-    if agent and agent.demands:
-        blueprint_demands = agent.demands
-
-    # Load script demands and merge with blueprint demands (script + agent tags combined)
-    script_demands = RunnerDemands()
-    if script and script.demands:
-        script_demands = script.demands
-        if DEBUG:
-            print(f"[DEBUG] Run {run.run_id}: script '{script.name}' has demands: "
-                  f"{script.demands.model_dump(exclude_none=True)}", flush=True)
-
-    # Merge script demands into blueprint demands (combined tags)
-    blueprint_demands = RunnerDemands.merge(script_demands, blueprint_demands)
-
-    # Parse additional_demands from request
-    if run_create.additional_demands:
-        additional_demands = RunnerDemands(**run_create.additional_demands)
-
-    # Determine required executor type based on agent type
-    # This ensures procedural runners only claim procedural agent runs
-    # and autonomous runners only claim autonomous agent runs (or runs without agent_name)
-    if agent:
-        required_executor_type = agent.type  # "autonomous" or "procedural"
-    else:
-        # No agent specified - default to autonomous (AI agents)
-        required_executor_type = "autonomous"
-
-    # Create executor_type demand
-    executor_type_demands = RunnerDemands(executor_type=required_executor_type)
-
-    # Merge demands: runner_owner (highest priority) + affinity + blueprint + executor_type + additional
-    # Runner owner demands take precedence for procedural agents
-    # Affinity takes precedence for resume runs
-    merged_demands = RunnerDemands.merge(
-        RunnerDemands.merge(
-            RunnerDemands.merge(
-                RunnerDemands.merge(runner_owner_demands, affinity_demands),
-                blueprint_demands
-            ),
-            executor_type_demands
-        ),
-        additional_demands
+    # Compute and set demands for proper runner routing (ADR-011)
+    # This handles executor type, session affinity, blueprint demands, etc.
+    compute_and_set_run_demands(
+        run=run,
+        additional_demands=run_create.additional_demands,
+        timeout_seconds=RUN_NO_MATCH_TIMEOUT,
     )
-
-    # Only store and set timeout if there are actual demands
-    if not merged_demands.is_empty():
-        run_queue.set_run_demands(
-            run.run_id,
-            merged_demands.model_dump(exclude_none=True),
-            timeout_seconds=RUN_NO_MATCH_TIMEOUT,
-        )
-        if DEBUG:
-            print(f"[DEBUG] Run {run.run_id} has demands: {merged_demands.model_dump(exclude_none=True)}", flush=True)
 
     if DEBUG:
         print(f"[DEBUG] Created run {run.run_id}: type={run.type}, session={run.session_id}", flush=True)

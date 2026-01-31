@@ -7,6 +7,7 @@ Quick-reference documentation for schemas, formats, and specifications.
 | Document | Description |
 |----------|-------------|
 | [Parameters Schema](./parameters-schema.md) | JSON Schema for agent input parameters |
+| [Placeholder Reference](./placeholder-reference.md) | Placeholder syntax for MCP server configuration |
 
 ## See Also
 

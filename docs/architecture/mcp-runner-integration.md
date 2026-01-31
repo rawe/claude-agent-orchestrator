@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented** - The MCP server is now embedded in the Agent Runner.
+**Implemented** - The MCP server is embedded in the Agent Runner. Placeholder resolution happens at Coordinator (except `${runner.*}` which is resolved at Runner).
 
 ## Context
 
@@ -241,7 +241,10 @@ The executor shouldn't know or care whether the blueprint was resolved by the Ru
    Notes:
    - `executor_session_id`: Required for resume. The ID the executor uses to find the session in its own storage (e.g., Claude SDK's session UUID). **Open question:** How this is provided to the executor (in Run object, separate fetch, etc.) needs to be decided. Currently, the executor fetches it itself via session API.
    - `agent_blueprint`: Same for start and resume. Executor decides which fields to use based on `mode`.
-   - `mcp_servers`: Placeholders like `${AGENT_ORCHESTRATOR_MCP_URL}` are already resolved by the Runner before passing to executor. See Phase 2 for details.
+   - `mcp_servers`: Placeholders are resolved in two stages:
+     - **Coordinator** resolves `${runtime.*}`, `${params.*}`, `${scope.*}`, `${env.*}` at run creation
+     - **Runner** resolves `${runner.orchestrator_mcp_url}` (dynamic port known only at Runner)
+   - See [Placeholder Reference](../../reference/placeholder-reference.md) for details.
 
 2. **Runner resolves blueprint before spawning**
 
@@ -348,34 +351,43 @@ The executor shouldn't know or care whether the blueprint was resolved by the Ru
        # URL is injected into agent_blueprint via adjust_mcp_config()
    ```
 
-3. **Placeholder replacement in MCP config**
+3. **Placeholder resolution (two-stage)**
 
-   Agent blueprints use placeholders that the Runner recognizes and replaces:
+   Placeholders are resolved at two levels:
 
-   | Placeholder | Replaced With | Purpose |
-   |-------------|---------------|---------|
-   | `${AGENT_ORCHESTRATOR_MCP_URL}` | Runner's MCP server URL | Identifies orchestrator MCP |
-   | `${AGENT_SESSION_ID}` | Current session ID | Session context for MCP calls |
+   | Stage | Placeholder | Resolved By | Example |
+   |-------|-------------|-------------|---------|
+   | 1 | `${runtime.session_id}` | Coordinator | Session ID for MCP headers |
+   | 1 | `${params.*}`, `${scope.*}`, `${env.*}` | Coordinator | Config values |
+   | 2 | `${runner.orchestrator_mcp_url}` | Runner | Dynamic MCP server URL |
 
-   Blueprint config (before):
+   Blueprint config (before Coordinator resolution):
    ```json
    "mcp_servers": {
      "orchestrator": {
        "type": "http",
-       "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
+       "url": "${runner.orchestrator_mcp_url}",
        "headers": {
-         "X-Agent-Session-Id": "${AGENT_SESSION_ID}"
+         "X-Agent-Session-Id": "${runtime.session_id}"
        }
-     },
-     "jira": {
-       "type": "http",
-       "url": "https://jira-mcp.company.com",
-       "headers": {...}
      }
    }
    ```
 
-   After `adjust_mcp_config()`:
+   After Coordinator resolution (in run payload):
+   ```json
+   "mcp_servers": {
+     "orchestrator": {
+       "type": "http",
+       "url": "${runner.orchestrator_mcp_url}",
+       "headers": {
+         "X-Agent-Session-Id": "ses_abc123"
+       }
+     }
+   }
+   ```
+
+   After Runner resolution (passed to executor):
    ```json
    "mcp_servers": {
      "orchestrator": {
@@ -384,42 +396,15 @@ The executor shouldn't know or care whether the blueprint was resolved by the Ru
        "headers": {
          "X-Agent-Session-Id": "ses_abc123"
        }
-     },
-     "jira": {
-       "type": "http",
-       "url": "https://jira-mcp.company.com",
-       "headers": {...}
      }
    }
    ```
 
-   The placeholder `${AGENT_ORCHESTRATOR_MCP_URL}` tells the Runner: "this is the orchestrator MCP - point it to myself." Other MCP servers are left unchanged.
+   **Why `${runner.orchestrator_mcp_url}` is resolved at Runner:**
 
-   ```python
-   def adjust_mcp_config(self, blueprint: dict, session_id: str) -> dict:
-       mcp_servers = blueprint.get("mcp_servers", {})
+   The Orchestrator MCP server is embedded in the Runner (not a standalone service). The Runner assigns a dynamic port at startup, so only the Runner knows its own MCP URL. The `${runner.*}` prefix signals: "this value is Runner-specific - preserve it for Runner-level resolution."
 
-       for name, config in mcp_servers.items():
-           if config.get("type") == "http":
-               # Replace orchestrator MCP placeholder with Runner's URL
-               url = config.get("url", "")
-               if "${AGENT_ORCHESTRATOR_MCP_URL}" in url:
-                   config["url"] = url.replace(
-                       "${AGENT_ORCHESTRATOR_MCP_URL}",
-                       self.mcp_server.url
-                   )
-
-               # Replace session ID placeholder in headers
-               headers = config.get("headers", {})
-               for key, value in headers.items():
-                   if isinstance(value, str) and "${AGENT_SESSION_ID}" in value:
-                       headers[key] = value.replace(
-                           "${AGENT_SESSION_ID}",
-                           session_id
-                       )
-
-       return blueprint
-   ```
+   See [Placeholder Reference](../../reference/placeholder-reference.md) for full details.
 
 **Files to create/modify:**
 - `servers/agent-runner/lib/mcp_server.py` - New MCP server component
@@ -454,40 +439,15 @@ Runner
 4. **Centralized logging/monitoring** - Observe all MCP usage
 5. **Distributed load** - Each Runner handles only its 4-5 executors (not centralized bottleneck)
 
-**Placeholder expansion (extended):**
+**Runner placeholder:**
 
-| Placeholder | Replacement | Notes |
+| Placeholder | Resolved By | Notes |
 |-------------|-------------|-------|
-| `${AGENT_ORCHESTRATOR_MCP_URL}` | Runner's MCP URL | Native handler (orchestrator) |
-| `${CONTEXT_STORE_MCP_URL}` | Runner's proxy URL | Proxied to Context Store |
-| `${MCP:<name>}` | Runner's proxy URL for `<name>` | Generic pattern for any MCP |
+| `${runner.orchestrator_mcp_url}` | Runner | Orchestrator MCP embedded in Runner |
 
-**Implementation approach:**
+The Runner resolves only `${runner.orchestrator_mcp_url}` - all other placeholders are resolved by Coordinator at run creation.
 
-The Runner's `adjust_mcp_config()` rewrites ALL MCP URLs to point to Runner's proxy endpoints. The proxy then routes to the actual MCP servers based on the path.
-
-```python
-def adjust_mcp_config(self, blueprint: dict, session_id: str) -> dict:
-    mcp_servers = blueprint.get("mcp_servers", {})
-
-    for name, config in mcp_servers.items():
-        if config.get("type") == "http":
-            original_url = config.get("url", "")
-
-            # Orchestrator MCP: native handling
-            if "${AGENT_ORCHESTRATOR_MCP_URL}" in original_url:
-                config["url"] = f"{self.mcp_server.url}/orchestrator"
-            else:
-                # All other MCPs: proxy through Runner
-                # Store original URL for routing, rewrite to Runner
-                config["_original_url"] = original_url  # For proxy routing
-                config["url"] = f"{self.mcp_server.url}/proxy/{name}"
-
-            # Replace session ID placeholder in headers
-            # ... (same as before)
-
-    return blueprint
-```
+See `servers/agent-runner/lib/executor.py:210` for implementation.
 
 **Open questions for Phase 2b:**
 
@@ -605,15 +565,16 @@ async def handle_mcp_request(self, request, session_id: str):
 
 ## Summary
 
-| Aspect | Current | Proposed |
-|--------|---------|----------|
-| Blueprint resolution | Executor | Runner |
+| Aspect | Before | Now |
+|--------|--------|-----|
+| Blueprint resolution | Executor | Coordinator (at run creation) |
+| Placeholder resolution | Executor | Coordinator + Runner (`${runner.*}` only) |
 | Orchestrator MCP | Standalone | Native in Runner |
 | Other MCPs | Direct executor connection | Proxied through Runner |
 | Authentication | None (or separate M2M) | Uses Runner's M2M |
 | Context passing | Env vars, limited | Centralized, extensible |
 | Executor complexity | High | Low (thin wrapper) |
-| Adding new context | Requires executor changes | Runner-only changes |
+| Adding new context | Requires executor changes | Coordinator/Runner changes |
 | MCP interception | Not possible | Single point in Runner |
 
 This architecture aligns with the principle established in the auth cleanup: **the Runner is the authentication and orchestration boundary; executors are framework-specific adapters that don't handle infrastructure concerns.**

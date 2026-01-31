@@ -1,0 +1,6 @@
+{
+  "id": "ado",
+  "name": "Azure DevOps",
+  "description": "Azure DevOps work items and pipelines",
+  "url": "http://localhost:9001/mcp"
+}

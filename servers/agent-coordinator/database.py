@@ -92,6 +92,15 @@ def init_db():
         ON runs(status, created_at)
     """)
 
+    # Migration: Add scope and resolved_agent_blueprint columns if they don't exist
+    # (mcp-resolution-at-coordinator.md)
+    cursor = conn.execute("PRAGMA table_info(runs)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    if "scope" not in existing_columns:
+        conn.execute("ALTER TABLE runs ADD COLUMN scope TEXT")
+    if "resolved_agent_blueprint" not in existing_columns:
+        conn.execute("ALTER TABLE runs ADD COLUMN resolved_agent_blueprint TEXT")
+
     # Events table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS events (
@@ -117,7 +126,6 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_events_session
         ON events(session_id, timestamp DESC)
     """)
-
 
     conn.commit()
     conn.close()
@@ -508,6 +516,8 @@ def create_run(
     demands: str = None,  # JSON string
     status: str = "pending",
     timeout_at: str = None,
+    scope: str = None,  # JSON string (mcp-resolution-at-coordinator.md)
+    resolved_agent_blueprint: str = None,  # JSON string (mcp-resolution-at-coordinator.md)
 ) -> None:
     """Create a new run in the database."""
     conn = sqlite3.connect(DB_PATH)
@@ -518,13 +528,15 @@ def create_run(
         INSERT INTO runs (
             run_id, session_id, type, parameters, created_at,
             agent_name, project_dir, parent_session_id,
-            execution_mode, demands, status, timeout_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            execution_mode, demands, status, timeout_at,
+            scope, resolved_agent_blueprint
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id, session_id, run_type, parameters, created_at,
             agent_name, project_dir, parent_session_id,
-            execution_mode, demands, status, timeout_at
+            execution_mode, demands, status, timeout_at,
+            scope, resolved_agent_blueprint
         )
     )
     conn.commit()
@@ -981,5 +993,4 @@ def recover_all_active_runs() -> dict:
     conn.commit()
     conn.close()
     return results
-
 

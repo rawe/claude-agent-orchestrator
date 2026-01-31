@@ -89,7 +89,9 @@ class MCPServerHttp(BaseModel):
     headers: Optional[dict[str, str]] = None
 
 
-MCPServerConfig = Union[MCPServerStdio, MCPServerHttp]
+# Note: MCPServerRef is the only supported format (mcp-server-registry.md Phase 2)
+# Forward reference resolved via TYPE_CHECKING and rebuild_model at module load
+MCPServerConfig = Union[MCPServerStdio, MCPServerHttp, "MCPServerRef"]
 
 
 class AgentBase(BaseModel):
@@ -500,3 +502,87 @@ class ScriptSummary(ScriptBase):
     demand_tags: list[str]  # Quick access to demand tags
     created_at: str
     modified_at: str
+
+
+# ==============================================================================
+# MCP Server Registry Models (Phase 2: mcp-server-registry.md)
+# ==============================================================================
+
+class ConfigSchemaField(BaseModel):
+    """Schema definition for a single config field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = "string"  # string, integer, boolean
+    description: Optional[str] = None
+    required: bool = False
+    sensitive: bool = False  # If true, value should be masked in logs/UI
+    default: Optional[Any] = None
+
+
+# Type alias for config schema - maps field names to their definitions
+MCPServerConfigSchema = dict[str, ConfigSchemaField]
+
+
+class MCPServerRegistryEntry(BaseModel):
+    """Full MCP server registry entry."""
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    url: str
+    config_schema: Optional[MCPServerConfigSchema] = None
+    default_config: Optional[dict[str, Any]] = None
+    created_at: str
+    updated_at: str
+
+
+class MCPServerRegistryCreate(BaseModel):
+    """Request body for creating an MCP server registry entry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    url: str
+    config_schema: Optional[MCPServerConfigSchema] = None
+    default_config: Optional[dict[str, Any]] = None
+
+
+class MCPServerRegistryUpdate(BaseModel):
+    """Request body for updating an MCP server registry entry (partial)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    url: Optional[str] = None
+    config_schema: Optional[MCPServerConfigSchema] = None
+    default_config: Optional[dict[str, Any]] = None
+
+
+class MCPServerRef(BaseModel):
+    """Reference to an MCP server in the registry.
+
+    Used in agent/capability mcp_servers config instead of inline type/url.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref: str  # Registry entry ID
+    config: Optional[dict[str, Any]] = None  # Config values to merge with defaults
+
+
+# ==============================================================================
+# Rebuild models with forward references
+# ==============================================================================
+# These models use MCPServerConfig which includes a forward reference to MCPServerRef.
+# Now that MCPServerRef is defined, we need to rebuild the models to resolve the
+# forward reference.
+AgentCreate.model_rebuild()
+AgentUpdate.model_rebuild()
+Agent.model_rebuild()
+CapabilityCreate.model_rebuild()
+CapabilityUpdate.model_rebuild()
+Capability.model_rebuild()

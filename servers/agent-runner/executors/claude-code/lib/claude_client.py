@@ -24,9 +24,7 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
 import asyncio
-import copy
 import json
-import os
 import re
 from datetime import datetime, UTC
 
@@ -177,6 +175,43 @@ Please provide output matching the schema exactly. Output ONLY valid JSON.
 
 
 # =============================================================================
+# MCP Server Format Transformation
+# =============================================================================
+
+def transform_mcp_servers_for_claude_code(mcp_servers: dict) -> dict:
+    """Transform MCP servers from coordinator format to Claude Code format.
+
+    The coordinator resolves MCP server refs and produces:
+        {"server_name": {"url": "...", "config": {...}}}
+
+    Claude Code expects:
+        {"server_name": {"type": "http", "url": "...", "headers": {...}}}
+
+    This transformation:
+    - Renames 'config' to 'headers' (config values become HTTP headers)
+    - Adds 'type': 'http' (only HTTP MCP servers are supported via registry)
+
+    Args:
+        mcp_servers: Dict of server_name -> {url, config} from coordinator
+
+    Returns:
+        Dict of server_name -> {type, url, headers} for Claude Code SDK
+    """
+    if not mcp_servers:
+        return {}
+
+    transformed = {}
+    for server_name, server_config in mcp_servers.items():
+        transformed[server_name] = {
+            "type": "http",
+            "url": server_config.get("url", ""),
+            "headers": server_config.get("config", {}),
+        }
+
+    return transformed
+
+
+# =============================================================================
 # Claude Code Executor Config
 # =============================================================================
 
@@ -220,55 +255,6 @@ def get_claude_config(executor_config: Optional[dict]) -> dict:
             EXECUTOR_CONFIG_DEFAULTS[ClaudeConfigKey.MODEL]
         ),
     }
-
-
-# =============================================================================
-# MCP Config Placeholder Replacement
-# =============================================================================
-
-def _replace_env_placeholders(value: str) -> str:
-    """
-    Replace ${VAR_NAME} placeholders with environment variable values.
-
-    If the environment variable is not set, the placeholder is left unchanged.
-    """
-    def replace_match(match: re.Match) -> str:
-        var_name = match.group(1)
-        return os.environ.get(var_name, match.group(0))
-
-    return re.sub(r'\$\{([^}]+)\}', replace_match, value)
-
-
-def _process_mcp_servers(mcp_servers: dict) -> dict:
-    """
-    Process MCP server config to replace environment variable placeholders.
-
-    Handles ${AGENT_SESSION_ID} and similar placeholders in header values.
-    Creates a deep copy to avoid modifying the original config.
-
-    Example:
-        Input:  {"headers": {"X-Agent-Session-Id": "${AGENT_SESSION_ID}"}}
-        Output: {"headers": {"X-Agent-Session-Id": "ses_abc123def456"}}
-    """
-    result = copy.deepcopy(mcp_servers)
-
-    for server_name, server_config in result.items():
-        if isinstance(server_config, dict):
-            # Process headers if present (HTTP servers)
-            headers = server_config.get('headers')
-            if isinstance(headers, dict):
-                for header_name, header_value in headers.items():
-                    if isinstance(header_value, str):
-                        headers[header_name] = _replace_env_placeholders(header_value)
-
-            # Process env if present (stdio servers)
-            env = server_config.get('env')
-            if isinstance(env, dict):
-                for env_name, env_value in env.items():
-                    if isinstance(env_value, str):
-                        env[env_name] = _replace_env_placeholders(env_value)
-
-    return result
 
 
 # =============================================================================
@@ -423,9 +409,9 @@ async def run_claude_session(
     if resume_executor_session_id:
         options.resume = resume_executor_session_id
 
-    # Add MCP servers if provided (with placeholder replacement)
+    # Transform and add MCP servers (coordinator format → Claude Code format)
     if mcp_servers:
-        options.mcp_servers = _process_mcp_servers(mcp_servers)
+        options.mcp_servers = transform_mcp_servers_for_claude_code(mcp_servers)
 
     # Initialize tracking variables
     executor_session_id = None

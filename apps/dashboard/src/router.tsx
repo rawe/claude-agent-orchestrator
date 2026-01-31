@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from '@/components/layout';
-import { Home, AgentSessions, Documents, AgentManager, Capabilities, Scripts, Runners, Chat, Runs, UnifiedView, Settings } from '@/pages';
+import { Home, AgentSessions, Documents, AgentManager, Capabilities, McpServers, Scripts, Runners, Chat, Runs, UnifiedView, Settings } from '@/pages';
 
 export const router = createBrowserRouter([
   {
@@ -34,6 +34,10 @@ export const router = createBrowserRouter([
       {
         path: 'capabilities',
         element: <Capabilities />,
+      },
+      {
+        path: 'mcp-servers',
+        element: <McpServers />,
       },
       {
         path: 'scripts',

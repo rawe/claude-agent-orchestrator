@@ -4,11 +4,8 @@ Run Executor - spawns ao-*-exec subprocess with JSON payload via stdin.
 Maps agent run types to execution modes and handles subprocess spawning.
 Uses unified ao-*-exec entrypoint with structured JSON payloads.
 
-Schema 2.1: Runner fetches and resolves blueprints before spawning executor.
-The executor receives a fully resolved agent_blueprint with placeholders replaced,
-and executor_config from the profile (if configured).
-
-Note: Uses session_id (coordinator-generated) per ADR-010.
+Blueprints are resolved at Coordinator level. Runner only resolves
+${runner.*} placeholders (e.g., ${runner.orchestrator_mcp_url}).
 """
 
 import json
@@ -16,14 +13,11 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional
 import logging
 
 from api_client import Run
 from invocation import SCHEMA_VERSION
-
-if TYPE_CHECKING:
-    from blueprint_resolver import BlueprintResolver
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +163,6 @@ class RunExecutor:
         self,
         default_project_dir: str,
         profile: Optional[ExecutorProfile] = None,
-        blueprint_resolver: Optional["BlueprintResolver"] = None,
         mcp_server_url: Optional[str] = None,
     ):
         """Initialize executor.
@@ -177,11 +170,9 @@ class RunExecutor:
         Args:
             default_project_dir: Default project directory if agent run doesn't specify one
             profile: Optional executor profile with command and config (None = use defaults)
-            blueprint_resolver: Optional resolver for fetching and resolving blueprints
-            mcp_server_url: Optional MCP server URL for placeholder resolution
+            mcp_server_url: MCP server URL for ${runner.orchestrator_mcp_url} resolution
         """
         self.default_project_dir = default_project_dir
-        self.blueprint_resolver = blueprint_resolver
         self.mcp_server_url = mcp_server_url
 
         # Resolve executor path and config from profile or defaults
@@ -195,8 +186,6 @@ class RunExecutor:
         logger.debug(f"Executor path: {self.executor_path}")
         if self.executor_config:
             logger.debug(f"Executor config: {self.executor_config}")
-        if blueprint_resolver:
-            logger.debug("Blueprint resolver enabled")
 
     def execute_run(self, run: Run, parent_session_id: Optional[str] = None) -> subprocess.Popen:
         """Execute an agent run by spawning ao-*-exec with JSON payload via stdin.
@@ -218,12 +207,46 @@ class RunExecutor:
 
         return self._execute_with_payload(run, mode)
 
+    def _resolve_runner_placeholders(self, blueprint: dict) -> dict:
+        """Resolve ${runner.*} placeholders in blueprint.
+
+        Only ${runner.orchestrator_mcp_url} is resolved at Runner level.
+        All other placeholders are resolved at Coordinator.
+
+        Args:
+            blueprint: Agent blueprint with possible ${runner.*} placeholders
+
+        Returns:
+            New blueprint with runner placeholders resolved
+        """
+        import copy
+        import re
+
+        RUNNER_PLACEHOLDER = re.compile(r'\$\{runner\.([^}]+)\}')
+
+        def resolve_string(s: str) -> str:
+            def replace_match(match: re.Match) -> str:
+                key = match.group(1)
+                if key == 'orchestrator_mcp_url':
+                    return self.mcp_server_url or match.group(0)
+                # Unknown runner.* placeholder - keep as-is
+                return match.group(0)
+            return RUNNER_PLACEHOLDER.sub(replace_match, s)
+
+        def resolve_value(value):
+            if isinstance(value, dict):
+                return {k: resolve_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [resolve_value(item) for item in value]
+            elif isinstance(value, str):
+                return resolve_string(value)
+            else:
+                return value
+
+        return resolve_value(copy.deepcopy(blueprint))
+
     def _build_payload(self, run: Run, mode: str) -> dict:
         """Build JSON payload for ao-*-exec.
-
-        Schema 2.2: If agent_name is specified and blueprint_resolver is configured,
-        fetches and resolves the blueprint, including it as agent_blueprint in the payload.
-        Also includes executor_config from the profile if configured.
 
         Args:
             run: The agent run to execute
@@ -252,22 +275,13 @@ class RunExecutor:
         if self.executor_config:
             payload["executor_config"] = self.executor_config
 
-        # Resolve blueprint if resolver is available
-        if run.agent_name and self.blueprint_resolver:
-            try:
-                agent_blueprint = self.blueprint_resolver.resolve(
-                    agent_name=run.agent_name,
-                    session_id=run.session_id,
-                    mcp_server_url=self.mcp_server_url,
-                )
-                payload["agent_blueprint"] = agent_blueprint
-                logger.debug(
-                    f"Resolved blueprint '{run.agent_name}' for session {run.session_id}:\n"
-                    f"{json.dumps(agent_blueprint, indent=2)}"
-                )
-            except Exception as e:
-                logger.error(f"Failed to resolve blueprint '{run.agent_name}': {e}")
-                raise
+        # Blueprint is resolved at Coordinator; Runner only resolves ${runner.*} placeholders
+        if run.resolved_agent_blueprint:
+            agent_blueprint = self._resolve_runner_placeholders(run.resolved_agent_blueprint)
+            payload["agent_blueprint"] = agent_blueprint
+            logger.debug(
+                f"Using resolved blueprint from run for session {run.session_id}"
+            )
 
         return payload
 
@@ -295,7 +309,7 @@ class RunExecutor:
         # Set AGENT_SESSION_ID so the session knows its own identity.
         # This allows MCP servers to include the session ID in HTTP headers
         # for callback support (X-Agent-Session-Id header).
-        # Flow: Runner sets env -> ao-*-exec replaces ${AGENT_SESSION_ID} in MCP config
+        # Flow: Coordinator resolves ${runtime.session_id} in MCP config
         #       -> Claude sends X-Agent-Session-Id header -> MCP server reads it
         env["AGENT_SESSION_ID"] = run.session_id
 

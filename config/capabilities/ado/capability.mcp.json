@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "ado": {
-      "type": "http",
-      "url": "http://localhost:9001/mcp"
+      "ref": "ado"
     }
   }
 }

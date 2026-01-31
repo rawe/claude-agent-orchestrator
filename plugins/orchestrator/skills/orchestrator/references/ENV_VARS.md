@@ -57,11 +57,11 @@ export AGENT_ORCHESTRATOR_ENABLE_LOGGING="true"
 **Purpose:** Enable real-time event streaming to an observability backend. Captures session lifecycle events, tool calls, and assistant messages for monitoring and analysis.
 
 **Events Tracked:**
-- `session_start` - Session initialization
+- `run_start` - Run execution started
 - `message` - User prompts and assistant responses
 - `pre_tool` - Before tool execution
 - `post_tool` - After tool execution (includes errors)
-- `session_stop` - Session completion
+- `run_completed` - Run execution completed
 
 **Example:**
 ```bash

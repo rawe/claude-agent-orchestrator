@@ -193,6 +193,10 @@ async def execute_on_run_start_hook(
 
         hook_run = run_queue.add_run(hook_run_create)
 
+        # Compute and set demands to ensure proper runner routing
+        from services.run_demands import compute_and_set_run_demands
+        compute_and_set_run_demands(hook_run)
+
         if DEBUG:
             print(f"[DEBUG] Created hook run {hook_run.run_id} for session {hook_session_id}", flush=True)
 
@@ -480,6 +484,10 @@ async def execute_on_run_finish_hook(
         )
 
         hook_run = run_queue.add_run(hook_run_create)
+
+        # Compute and set demands to ensure proper runner routing
+        from services.run_demands import compute_and_set_run_demands
+        compute_and_set_run_demands(hook_run)
 
         if DEBUG:
             print(f"[DEBUG] Created fire-and-forget hook run {hook_run.run_id} for session {hook_session_id}", flush=True)

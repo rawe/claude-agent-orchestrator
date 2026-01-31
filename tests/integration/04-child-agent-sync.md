@@ -79,7 +79,7 @@ Note: The child session has `parent_session_id` set to the parent's `session_id`
 ### MCP server not reachable
 - The MCP server is embedded in the Agent Runner - ensure the runner is running
 - Check the runner logs for the MCP server port (assigned dynamically or via `--mcp-port`)
-- Verify the `agent.mcp.json` uses `${AGENT_ORCHESTRATOR_MCP_URL}` placeholder (replaced at runtime)
+- Verify the `agent.mcp.json` uses `${runner.orchestrator_mcp_url}` placeholder (resolved by Runner)
 
 ### Agent blueprint not found
 - Verify blueprint is copied (see `tests/README.md` → "Agent Blueprints")
@@ -87,4 +87,4 @@ Note: The child session has `parent_session_id` set to the parent's `session_id`
 
 ### Child agent not starting
 - Check MCP server logs for errors
-- Verify `AGENT_SESSION_ID` header is passed correctly (replaces `${AGENT_SESSION_ID}`)
+- Verify `X-Agent-Session-Id` header is set correctly (from `${runtime.session_id}`)

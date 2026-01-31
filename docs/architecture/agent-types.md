@@ -193,7 +193,7 @@ Autonomous agents are AI-powered sessions using Claude or other LLMs.
   "mcp_servers": {
     "orchestrator": {
       "type": "http",
-      "url": "${AGENT_ORCHESTRATOR_MCP_URL}"
+      "url": "${runner.orchestrator_mcp_url}"
     }
   }
 }

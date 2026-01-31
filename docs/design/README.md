@@ -6,14 +6,6 @@ Once implemented, features are documented in [features/](../features/README.md) 
 
 ## Planned
 
-### MCP Server Registry
-
-Centralized management of MCP server definitions with framework-controlled HTTP header injection for scoping and authentication.
-
-| Document | Description |
-|----------|-------------|
-| [MCP Server Registry](./mcp-server-registry/mcp-server-registry.md) | Registry design with header inheritance chain |
-
 ### Context Store Scoping
 
 Namespace and scope-based isolation for document visibility.

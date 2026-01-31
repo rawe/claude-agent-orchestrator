@@ -369,10 +369,9 @@ When a run is received, the Runner spawns an executor subprocess:
 │   ┌─────────────────────────────────────────────────────────────────┐           │
 │   │  RUN EXECUTOR                                                    │           │
 │   │                                                                  │           │
-│   │  1. Fetch blueprint from Coordinator (via Auth0 client)         │           │
-│   │  2. Resolve placeholders:                                        │           │
-│   │     • ${AGENT_ORCHESTRATOR_MCP_URL} → http://127.0.0.1:<mcp>    │           │
-│   │     • ${AGENT_SESSION_ID} → ses_abc123                          │           │
+│   │  1. Use resolved blueprint from run payload                     │           │
+│   │  2. Resolve Runner-specific placeholder:                        │           │
+│   │     • ${runner.orchestrator_mcp_url} → http://127.0.0.1:<mcp>  │           │
 │   │  3. Build Schema 2.1 JSON payload (with executor_config)          │           │
 │   │  4. Spawn executor subprocess                                    │           │
 │   └─────────────────────────────────────────────────────────────────┘           │
@@ -462,10 +461,10 @@ When a run is received, the Runner spawns an executor subprocess:
 │  2. RUN ASSIGNMENT                                                               │
 │     Coordinator ──[Run JSON]──► Runner (via long-poll response)                 │
 │                                                                                  │
-│  3. BLUEPRINT RESOLUTION                                                         │
-│     Runner ──[GET /agents/{name}]──► Coordinator                                │
-│     Runner resolves ${AGENT_ORCHESTRATOR_MCP_URL} → MCP server URL              │
-│     Runner resolves ${AGENT_SESSION_ID} → session ID                            │
+│  3. BLUEPRINT RESOLUTION (at Coordinator)                                        │
+│     Coordinator resolves placeholders at run creation                           │
+│     Runner receives resolved blueprint in run payload                           │
+│     Runner only resolves ${runner.orchestrator_mcp_url} → MCP server URL        │
 │                                                                                  │
 │  4. EXECUTOR SPAWNING                                                            │
 │     Runner ──[stdin JSON]──► Executor subprocess                                │

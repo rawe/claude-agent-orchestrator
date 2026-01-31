@@ -1,14 +1,11 @@
 {
   "mcpServers": {
-    "context-store-http": {
-      "type": "http",
-      "url": "http://localhost:9501/mcp"
+    "context-store": {
+      "ref": "context-store"
     },
-    "agent-orchestrator-http": {
-      "type": "http",
-      "url": "${AGENT_ORCHESTRATOR_MCP_URL}",
-      "headers": {
-        "X-Agent-Session-Id": "${AGENT_SESSION_ID}",
+    "orchestrator": {
+      "ref": "orchestrator",
+      "config": {
         "X-Agent-Tags": "internal"
       }
     }

@@ -1,8 +1,7 @@
 {
   "mcpServers": {
-    "context-store-http": {
-      "type": "http",
-      "url": "http://context-store:9501/mcp"
+    "context-store": {
+      "ref": "context-store"
     }
   }
 }

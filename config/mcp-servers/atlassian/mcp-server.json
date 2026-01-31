@@ -1,0 +1,6 @@
+{
+  "id": "atlassian",
+  "name": "Atlassian",
+  "description": "Jira and Confluence integration",
+  "url": "http://localhost:9000/mcp"
+}

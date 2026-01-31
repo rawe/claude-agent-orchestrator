@@ -1,0 +1,29 @@
+{
+  "id": "orchestrator",
+  "name": "Agent Orchestrator",
+  "description": "Spawn and manage child agents via the orchestrator MCP interface",
+  "url": "${runner.orchestrator_mcp_url}",
+  "config_schema": {
+    "X-Agent-Session-Id": {
+      "type": "string",
+      "description": "Session ID for the parent agent run",
+      "required": true,
+      "sensitive": false
+    },
+    "X-Agent-Tags": {
+      "type": "string",
+      "description": "Comma-separated tags for filtering available child agents",
+      "required": false,
+      "sensitive": false
+    },
+    "X-Additional-Demands": {
+      "type": "string",
+      "description": "JSON object with additional demands for child run selection (hostname, project_dir, etc.)",
+      "required": false,
+      "sensitive": false
+    }
+  },
+  "default_config": {
+    "X-Agent-Session-Id": "${runtime.session_id}"
+  }
+}

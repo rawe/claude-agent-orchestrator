@@ -18,9 +18,8 @@ Two execution modes need different propagation mechanisms:
 
 **Two-mechanism approach:**
 
-1. **Environment Variable** (`AGENT_SESSION_ID`): For stdio execution
-2. **HTTP Header** (`X-Agent-Session-Id`): For HTTP MCP servers
-3. **Placeholder** (`${AGENT_SESSION_ID}`): Template pattern in config
+1. **HTTP Header** (`X-Agent-Session-Id`): For HTTP MCP servers
+2. **Placeholder** (`${runtime.session_id}`): Resolved by Coordinator at run creation
 
 ### Flow
 
