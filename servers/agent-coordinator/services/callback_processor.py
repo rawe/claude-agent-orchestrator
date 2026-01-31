@@ -235,6 +235,7 @@ def _create_resume_run(
     when add_run() creates the resume run, so we don't need to pass them here.
     """
     from services.run_queue import run_queue, RunCreate, RunType
+    from services.run_demands import compute_and_set_run_demands
 
     # Build the callback prompt
     if len(children) == 1:
@@ -275,6 +276,11 @@ def _create_resume_run(
             session_id=parent_session_id,
             parameters={"prompt": prompt},
         ))
+
+        # Compute and set demands to ensure proper runner routing
+        # This is critical for callback-created runs to go to the correct runner
+        compute_and_set_run_demands(run)
+
         logger.info(f"Created callback resume run {run.run_id} for parent '{parent_session_id}' with {len(children)} child result(s)")
         return run.run_id
     except Exception as e:

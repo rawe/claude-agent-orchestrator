@@ -26,7 +26,7 @@ from database import (
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
     Event, SessionMetadataUpdate, SessionCreate, SessionBind,
-    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate, RunnerDemands,
+    Agent, AgentCreate, AgentUpdate, AgentStatusUpdate,
     ExecutionMode, StreamEventType, SessionEventType, SessionResult,
     Capability, CapabilityCreate, CapabilityUpdate, CapabilitySummary, CapabilityType,
     Script, ScriptCreate, ScriptUpdate, ScriptSummary,
@@ -80,6 +80,7 @@ from services.stop_command_queue import stop_command_queue
 from services.script_sync_queue import script_sync_queue
 from services.sse_manager import sse_manager, SSEConnection
 from services import callback_processor
+from services.run_demands import compute_and_set_run_demands
 from services.hook_executor import (
     execute_on_run_start_hook, execute_on_run_finish_hook,
     HookAction, HookResult,
@@ -2055,97 +2056,13 @@ async def create_run(run_create: RunCreate):
             print(f"[DEBUG] Created run {run.run_id} for session {run.session_id}", flush=True)
         await sse_manager.broadcast(StreamEventType.SESSION_CREATED, {"session": new_session}, session_id=run.session_id)
 
-    # Merge demands from blueprint, affinity, and additional_demands (ADR-011)
-    merged_demands = None
-    affinity_demands = RunnerDemands()  # Empty defaults - populated for resume runs
-    blueprint_demands = RunnerDemands()  # Empty defaults
-    additional_demands = RunnerDemands()  # Empty defaults
-    runner_owner_demands = RunnerDemands()  # Empty defaults - for runner-owned agents
-
-    # For RESUME_SESSION, use affinity from existing_session (looked up earlier)
-    # This ensures resume runs go to the same runner that owns the session
-    if run_create.type == RunType.RESUME_SESSION and existing_session:
-        # Use existing_session instead of separate get_session_affinity() call
-        affinity_demands = RunnerDemands(
-            hostname=existing_session.get('hostname'),
-            executor_profile=existing_session.get('executor_profile'),
-        )
-        if DEBUG:
-            print(f"[DEBUG] Resume run {run.run_id}: enforcing affinity demands "
-                  f"hostname={existing_session.get('hostname')}, executor_profile={existing_session.get('executor_profile')}", flush=True)
-
-    # Phase 4: For runner-owned agents, route to the owning runner
-    if agent and agent.runner_id:
-        runner = runner_registry.get_runner(agent.runner_id)
-        if runner:
-            runner_owner_demands = RunnerDemands(
-                hostname=runner.hostname,
-                project_dir=runner.project_dir,
-                executor_profile=runner.executor_profile,
-            )
-            if DEBUG:
-                print(f"[DEBUG] Run {run.run_id}: routing to runner {agent.runner_id} "
-                      f"(procedural agent '{agent.name}')", flush=True)
-        else:
-            # Runner is offline - run will fail after timeout
-            if DEBUG:
-                print(f"[DEBUG] Run {run.run_id}: runner {agent.runner_id} not online "
-                      f"(procedural agent '{agent.name}')", flush=True)
-
-    # Load blueprint demands from agent (already loaded for validation)
-    if agent and agent.demands:
-        blueprint_demands = agent.demands
-
-    # Load script demands and merge with blueprint demands (script + agent tags combined)
-    script_demands = RunnerDemands()
-    if script and script.demands:
-        script_demands = script.demands
-        if DEBUG:
-            print(f"[DEBUG] Run {run.run_id}: script '{script.name}' has demands: "
-                  f"{script.demands.model_dump(exclude_none=True)}", flush=True)
-
-    # Merge script demands into blueprint demands (combined tags)
-    blueprint_demands = RunnerDemands.merge(script_demands, blueprint_demands)
-
-    # Parse additional_demands from request
-    if run_create.additional_demands:
-        additional_demands = RunnerDemands(**run_create.additional_demands)
-
-    # Determine required executor type based on agent type
-    # This ensures procedural runners only claim procedural agent runs
-    # and autonomous runners only claim autonomous agent runs (or runs without agent_name)
-    if agent:
-        required_executor_type = agent.type  # "autonomous" or "procedural"
-    else:
-        # No agent specified - default to autonomous (AI agents)
-        required_executor_type = "autonomous"
-
-    # Create executor_type demand
-    executor_type_demands = RunnerDemands(executor_type=required_executor_type)
-
-    # Merge demands: runner_owner (highest priority) + affinity + blueprint + executor_type + additional
-    # Runner owner demands take precedence for procedural agents
-    # Affinity takes precedence for resume runs
-    merged_demands = RunnerDemands.merge(
-        RunnerDemands.merge(
-            RunnerDemands.merge(
-                RunnerDemands.merge(runner_owner_demands, affinity_demands),
-                blueprint_demands
-            ),
-            executor_type_demands
-        ),
-        additional_demands
+    # Compute and set demands for proper runner routing (ADR-011)
+    # This handles executor type, session affinity, blueprint demands, etc.
+    compute_and_set_run_demands(
+        run=run,
+        additional_demands=run_create.additional_demands,
+        timeout_seconds=RUN_NO_MATCH_TIMEOUT,
     )
-
-    # Only store and set timeout if there are actual demands
-    if not merged_demands.is_empty():
-        run_queue.set_run_demands(
-            run.run_id,
-            merged_demands.model_dump(exclude_none=True),
-            timeout_seconds=RUN_NO_MATCH_TIMEOUT,
-        )
-        if DEBUG:
-            print(f"[DEBUG] Run {run.run_id} has demands: {merged_demands.model_dump(exclude_none=True)}", flush=True)
 
     if DEBUG:
         print(f"[DEBUG] Created run {run.run_id}: type={run.type}, session={run.session_id}", flush=True)
