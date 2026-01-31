@@ -39,6 +39,8 @@ Each ADR follows this structure:
 | [ADR-015](./ADR-015-autonomous-agent-input-schema.md) | Autonomous Agent Input Schema Handling | 2026-01-10 | |
 | [ADR-016](./ADR-016-autonomous-agent-output-schema.md) | Autonomous Agent Output Schema | 2026-01-18 | |
 | [ADR-017](./ADR-017-procedural-agent-ownership.md) | Procedural Agent Ownership Model | 2026-01-25 | |
+| [ADR-018](./ADR-018-centralized-placeholder-resolution.md) | Centralized Placeholder Resolution | 2026-01-27 | |
+| [ADR-019](./ADR-019-mcp-server-registry.md) | MCP Server Registry | 2026-01-27 | |
 
 ### Superseded
 

@@ -631,6 +631,101 @@ Delete a capability.
 
 ---
 
+### MCP Servers API
+
+Manage MCP server registry entries. See [MCP Server Registry](../../features/mcp-server-registry.md) for usage details.
+
+#### GET /mcp-servers
+
+List all MCP server definitions.
+
+**Response:**
+```json
+[
+  {
+    "id": "context-store",
+    "name": "Context Store",
+    "url": "http://localhost:9501/mcp",
+    "config_schema": {
+      "context_id": {"type": "string", "required": true}
+    },
+    "default_config": {"context_id": "default"}
+  }
+]
+```
+
+#### GET /mcp-servers/{id}
+
+Get a specific MCP server definition.
+
+**Response:**
+```json
+{
+  "id": "context-store",
+  "name": "Context Store",
+  "description": "Document storage for agent context",
+  "url": "http://localhost:9501/mcp",
+  "config_schema": {
+    "context_id": {"type": "string", "required": true, "description": "Context for document isolation"},
+    "workflow_id": {"type": "string", "required": false}
+  },
+  "default_config": {"context_id": "default"}
+}
+```
+
+**Error:** `404 Not Found` if MCP server doesn't exist.
+
+#### POST /mcp-servers
+
+Create a new MCP server definition.
+
+**Request Body:**
+```json
+{
+  "id": "context-store",
+  "name": "Context Store",
+  "description": "Document storage",
+  "url": "http://localhost:9501/mcp",
+  "config_schema": {},      // optional
+  "default_config": {}      // optional
+}
+```
+
+**Response:** `201 Created` with MCP server object.
+
+**Errors:**
+- `400 Bad Request` - Invalid ID format
+- `409 Conflict` - MCP server already exists
+
+#### PUT /mcp-servers/{id}
+
+Update an existing MCP server definition (full replace).
+
+**Request Body:**
+```json
+{
+  "name": "Context Store",
+  "description": "Updated description",
+  "url": "http://localhost:9501/mcp",
+  "config_schema": {},
+  "default_config": {}
+}
+```
+
+**Response:** MCP server object.
+
+**Error:** `404 Not Found` if MCP server doesn't exist.
+
+#### DELETE /mcp-servers/{id}
+
+Delete an MCP server definition.
+
+**Response:** `204 No Content`
+
+**Error:** `404 Not Found` if MCP server doesn't exist.
+
+---
+
 ### Runs API
 
 Queue and manage runs for runners to execute. See [RUNS_API.md](./RUNS_API.md) for comprehensive documentation.
@@ -651,6 +746,10 @@ Create a new run for a runner to execute.
   "execution_mode": "sync",                  // optional: sync, async_poll, async_callback
   "additional_demands": {                    // optional
     "tags": ["research"]
+  },
+  "scope": {                                 // optional
+    "context_id": "ctx-123",
+    "workflow_id": "wf-456"
   }
 }
 ```
@@ -668,6 +767,8 @@ Create a new run for a runner to execute.
 - For `start_session`, creates a pending session and broadcasts `session_created`
 - Demands from agent blueprint are merged with `additional_demands`
 - Runs with demands get a 5-minute timeout for matching
+- `scope` provides LLM-invisible values for MCP server configuration (see [MCP Server Registry](../../features/mcp-server-registry.md))
+- Scope is automatically inherited by child runs spawned via Orchestrator MCP
 
 #### GET /runs/{run_id}
 
