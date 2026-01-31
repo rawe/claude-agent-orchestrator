@@ -18,7 +18,7 @@
     }
   },
   "default_config": {
-    "X-Context-Store-Partition": "${scope.partition}",
-    "X-Context-Store-Partition-Auto-Create": "${scope.partition_auto_create}"
+    "X-Context-Store-Partition": "${runtime.session_id}",
+    "X-Context-Store-Partition-Auto-Create": "true"
   }
 }
