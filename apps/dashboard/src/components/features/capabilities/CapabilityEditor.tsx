@@ -3,10 +3,9 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal, Button, Spinner } from '@/components/common';
-import { MCPJsonEditor } from '../agents/MCPJsonEditor';
+import { MCPServerSelector } from '../agents/MCPServerSelector';
 import { Capability, CapabilityCreate, CapabilityType } from '@/types/capability';
 import { MCPServerConfig } from '@/types';
-import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { Eye, Code, FileCode, Server, FileText, Settings, X, FlaskConical } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -123,7 +122,6 @@ export function CapabilityEditor({
     register,
     handleSubmit,
     watch,
-    setValue,
     reset,
     control,
     getValues,
@@ -143,7 +141,6 @@ export function CapabilityEditor({
   });
 
   const watchedType = watch(F.type);
-  const watchedMcpServers = watch(F.mcp_servers);
 
   // Determine which tabs to show based on type
   const visibleTabs = TABS.filter((tab) => {
@@ -194,11 +191,6 @@ export function CapabilityEditor({
     } finally {
       setCheckingName(false);
     }
-  };
-
-  const handleAddTemplate = (templateName: string) => {
-    const updated = addTemplate(watchedMcpServers as Record<string, MCPServerConfig> | null, templateName);
-    setValue(F.mcp_servers, updated);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -424,35 +416,21 @@ export function CapabilityEditor({
     <div className="h-full flex flex-col">
       <div className="flex-shrink-0 mb-3">
         <label className="label mb-1">MCP Servers</label>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-gray-500">
           MCP server configurations that will be available to agents using this capability.
+          Add servers from the MCP Server Registry or create custom stdio-based servers.
         </p>
-
-        {/* Template Quick Add Buttons */}
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-gray-500 py-1">Quick add:</span>
-          {TEMPLATE_NAMES.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => handleAddTemplate(name)}
-              className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200"
-            >
-              + {name}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* JSON Editor - fills remaining space */}
+      {/* MCP Server Selector - fills remaining space */}
       <Controller
         name={F.mcp_servers}
         control={control}
         render={({ field }) => (
-          <MCPJsonEditor
+          <MCPServerSelector
             value={(field.value as Record<string, MCPServerConfig>) ?? null}
             onChange={field.onChange}
-            className="flex-1 min-h-0"
+            className="flex-1 min-h-0 overflow-y-auto"
           />
         )}
       />

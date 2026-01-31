@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home, Zap, GitMerge, Puzzle, FileCode, FlaskConical, Sliders } from 'lucide-react';
+import { Activity, Database, Settings, ChevronLeft, ChevronRight, MessageSquare, Server, Home, Zap, GitMerge, Puzzle, FileCode, FlaskConical, Sliders, Plug } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { to: '/context-store', icon: <Database className="w-5 h-5" />, label: 'Context Store' },
   { to: '/agents', icon: <Settings className="w-5 h-5" />, label: 'Agent Blueprints' },
   { to: '/capabilities', icon: <Puzzle className="w-5 h-5" />, label: 'Capabilities' },
+  { to: '/mcp-servers', icon: <Plug className="w-5 h-5" />, label: 'MCP Servers' },
   { to: '/scripts', icon: <FileCode className="w-5 h-5" />, label: 'Scripts' },
   { to: '/runners', icon: <Server className="w-5 h-5" />, label: 'Agent Runners' },
   { to: '/settings', icon: <Sliders className="w-5 h-5" />, label: 'Settings' },

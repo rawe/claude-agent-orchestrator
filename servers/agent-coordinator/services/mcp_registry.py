@@ -8,7 +8,11 @@ The registry holds server definitions (URL, config schema, defaults) that are
 referenced by agents and capabilities using the ref-based format.
 """
 
+import re
 from typing import Optional
+
+# Pattern to detect unresolved placeholders
+UNRESOLVED_PLACEHOLDER_PATTERN = re.compile(r'\$\{[^}]+\}')
 
 from mcp_server_storage import (
     list_mcp_servers as storage_list_mcp_servers,
@@ -132,7 +136,10 @@ def validate_required_config(
         if field_def.required:
             value = resolved_config.get(field_name)
             # Check if value is missing or still has unresolved placeholder
-            if value is None or (isinstance(value, str) and value.startswith("${")):
+            # Use regex to detect any ${...} pattern (e.g., "${scope.xyz}" or "Bearer ${scope.token}")
+            if value is None:
+                missing.append(field_name)
+            elif isinstance(value, str) and UNRESOLVED_PLACEHOLDER_PATTERN.search(value):
                 missing.append(field_name)
 
     return missing

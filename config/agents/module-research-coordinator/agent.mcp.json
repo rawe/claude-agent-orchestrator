@@ -1,12 +1,7 @@
 {
   "mcpServers": {
     "orchestrator": {
-      "ref": "orchestrator",
-      "config": {
-        "headers": {
-          "X-Agent-Session-Id": "${runtime.session_id}"
-        }
-      }
+      "ref": "orchestrator"
     },
     "context-store": {
       "ref": "context-store"

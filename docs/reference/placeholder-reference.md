@@ -62,29 +62,53 @@ Agent Blueprint (with placeholders)
     Executor (fully resolved config)
 ```
 
-## Files Updated
+## MCP Server Configuration
 
-The following configuration files use placeholders for the Orchestrator MCP server:
+MCP servers are configured using registry references and flat config structures. The config keys map directly to HTTP headers.
 
-- `config/agents/agent-orchestrator/agent.mcp.json`
-- `config/agents/agent-orchestrator-external/agent.mcp.json`
-- `config/agents/agent-orchestrator-internal/agent.mcp.json`
-- `config/agents/knowledge-coordinator/agent.mcp.json`
-- `config/agents/module-research-coordinator/agent.mcp.json`
-- `config/agents/self-improving-agent/agent.mcp.json`
-- `config/capabilities/agent-orchestrator/capability.mcp.json`
+### Registry Entry (defines schema and defaults)
 
-Each uses:
+```json
+{
+  "id": "orchestrator",
+  "name": "Agent Orchestrator",
+  "url": "${runner.orchestrator_mcp_url}",
+  "config_schema": {
+    "X-Agent-Session-Id": {
+      "type": "string",
+      "description": "Session ID for the parent agent run",
+      "required": true
+    },
+    "X-Agent-Tags": {
+      "type": "string",
+      "description": "Comma-separated tags for filtering",
+      "required": false
+    }
+  },
+  "default_config": {
+    "X-Agent-Session-Id": "${runtime.session_id}"
+  }
+}
+```
+
+### Agent/Capability Config (overrides defaults)
+
 ```json
 {
   "mcpServers": {
-    "agent-orchestrator-http": {
-      "type": "http",
-      "url": "${runner.orchestrator_mcp_url}",
-      "headers": {
-        "X-Agent-Session-Id": "${runtime.session_id}"
+    "orchestrator": {
+      "ref": "orchestrator",
+      "config": {
+        "X-Agent-Tags": "internal"
       }
     }
   }
 }
 ```
+
+Notes:
+- `config` keys are flat
+- Config keys map directly to HTTP header names
+- Registry `default_config` provides common defaults (e.g., `X-Agent-Session-Id`)
+- Agent configs only need to specify overrides and to access the `${params.*}` placeholders
+

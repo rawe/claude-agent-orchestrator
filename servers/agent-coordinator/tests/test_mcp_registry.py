@@ -332,6 +332,20 @@ class TestRequiredConfigValidation:
 
         assert "context_id" in missing
 
+    def test_validate_embedded_unresolved_placeholder_is_missing(self):
+        """Test that embedded unresolved placeholders are caught."""
+        schema = {
+            "auth_header": ConfigSchemaField(type="string", required=True),
+        }
+
+        # Embedded placeholder like "Bearer ${scope.token}"
+        missing = validate_required_config(
+            {"auth_header": "Bearer ${scope.token}"},
+            schema
+        )
+
+        assert "auth_header" in missing
+
     def test_resolve_mcp_server_refs_validates_required(self):
         """Test that resolve_mcp_server_refs validates required config."""
         schema = {

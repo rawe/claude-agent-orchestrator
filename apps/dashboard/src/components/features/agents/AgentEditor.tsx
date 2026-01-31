@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Modal, Button, Badge, Spinner, TagSelector, InfoPopover } from '@/components/common';
-import { MCPJsonEditor } from './MCPJsonEditor';
+import { MCPServerSelector } from './MCPServerSelector';
 import { InputSchemaEditor } from './InputSchemaEditor';
 import { OutputSchemaEditor } from './OutputSchemaEditor';
 import { SchemaAiAssistantCard, SchemaAiAssistantResultModal } from './SchemaAiAssistant';
 import { PromptAiAssistantCard, PromptAiAssistantResultModal } from './PromptAiAssistant';
 import { ScriptSelector } from '../scripts';
 import { Agent, AgentCreate, AgentType, AgentDemands, MCPServerConfig, AgentHooks, HookConfig, HookOnError } from '@/types';
-import { TEMPLATE_NAMES, addTemplate } from '@/utils/mcpTemplates';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAgents } from '@/hooks/useAgents';
 import { useScripts } from '@/hooks/useScripts';
@@ -351,11 +350,6 @@ export function AgentEditor({
     } finally {
       setCheckingName(false);
     }
-  };
-
-  const handleAddTemplate = (templateName: string) => {
-    const updated = addTemplate(watchedMcpServers, templateName);
-    setValue('mcp_servers', updated);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -960,38 +954,22 @@ export function AgentEditor({
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
         <label className="text-sm font-medium text-gray-700">MCP Servers</label>
         <InfoPopover title="MCP Servers">
-          <p>Direct MCP server configurations for this agent.</p>
-          <p className="mt-2 text-amber-600">
-            Note: This will be deprecated in favor of capabilities. Consider using capabilities
-            instead for better reusability.
+          <p>MCP server configurations for this agent.</p>
+          <p className="mt-2">
+            Add servers from the MCP Server Registry or create custom stdio-based servers.
           </p>
         </InfoPopover>
       </div>
 
-      {/* Template Quick Add Buttons */}
-      <div className="flex flex-wrap gap-2 mb-3 flex-shrink-0">
-        <span className="text-xs text-gray-500 py-1">Quick add:</span>
-        {TEMPLATE_NAMES.map((name) => (
-          <button
-            key={name}
-            type="button"
-            onClick={() => handleAddTemplate(name)}
-            className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200"
-          >
-            + {name}
-          </button>
-        ))}
-      </div>
-
-      {/* JSON Editor */}
+      {/* MCP Server Selector */}
       <Controller
         name="mcp_servers"
         control={control}
         render={({ field }) => (
-          <MCPJsonEditor
+          <MCPServerSelector
             value={field.value ?? null}
             onChange={field.onChange}
-            className="flex-1 min-h-0"
+            className="flex-1 min-h-0 overflow-y-auto"
           />
         )}
       />

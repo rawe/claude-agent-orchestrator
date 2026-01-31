@@ -6,10 +6,7 @@
     "orchestrator": {
       "ref": "orchestrator",
       "config": {
-        "headers": {
-          "X-Agent-Session-Id": "${runtime.session_id}",
-          "X-Agent-Tags": "internal"
-        }
+        "X-Agent-Tags": "internal"
       }
     }
   }

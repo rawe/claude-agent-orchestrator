@@ -68,22 +68,28 @@ See [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-repo
 - `_process_mcp_servers()` removed from Claude Code executor
 - Scope inheritance for child runs (commit 026dab2)
 
-**Deferred to Phase 2:**
-- Validation of required config values (requires `config_schema` from registry)
-
 ### Phase 2: MCP Server Registry ✅ Complete
 
 See [mcp-server-registry-report.md](mcp-server-registry-report.md) for details.
 
 **Completed:**
 - MCP server registry CRUD API (`/mcp-servers` endpoints)
-- Registry database table with config_schema and default_config support
+- Registry file-based storage with config_schema and default_config support
 - MCPServerRef model for ref-based MCP config format
 - Blueprint resolution with registry lookups
 - Config inheritance: registry defaults → capability → agent
-- Required config validation using config_schema
-- Backward compatibility for legacy inline format
-- Tests (23 test cases)
+- Required config validation using config_schema (with unresolved placeholder detection)
+- Flat config structure (keys map directly to HTTP headers)
+- Tests (24 test cases)
+- Dashboard integration:
+  - MCP Servers management page (`/mcp-servers`)
+  - Config schema editor in MCP server forms
+  - MCPServerSelector component replacing JSON editor
+  - Ref-based server selection in agent/capability editors
+  - PlaceholderInfo popover for available placeholders
+- Executor integration:
+  - `transform_mcp_servers_for_claude_code()` converts config → headers format
+  - Adds `type: "http"` automatically (no type field needed in registry)
 
 ## Quick Reference
 
@@ -130,9 +136,8 @@ Parent Run (scope: {context_id: "ctx-123"})
         Child Run (inherits scope: {context_id: "ctx-123"})
 ```
 
-## Starting Implementation
+## Implementation Complete
 
-1. Read [mcp-resolution-at-coordinator.md](mcp-resolution-at-coordinator.md) completely
-2. Implement Phase 1 changes (see "Changes Required" section)
-3. Test that resolved blueprint appears in run payload
-4. Then proceed to [mcp-server-registry.md](mcp-server-registry.md) for Phase 2
+Both phases are fully implemented. See the implementation reports for details:
+- [mcp-resolution-at-coordinator-report.md](mcp-resolution-at-coordinator-report.md) - Phase 1
+- [mcp-server-registry-report.md](mcp-server-registry-report.md) - Phase 2

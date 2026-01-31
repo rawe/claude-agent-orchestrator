@@ -37,6 +37,14 @@ export interface AgentDemands {
   tags?: string[];            // Must have ALL these capability tags
 }
 
+// ==============================================================================
+// MCP Server Config Types
+// ==============================================================================
+
+/**
+ * MCP server configuration for stdio transport (command-based).
+ * Used for local MCP servers like Playwright.
+ */
 export interface MCPServerStdio {
   type?: 'stdio';
   command: string;
@@ -44,13 +52,36 @@ export interface MCPServerStdio {
   env?: Record<string, string>;
 }
 
-export interface MCPServerHttp {
-  type: 'http';
-  url: string;
-  headers?: Record<string, string>;
+/**
+ * Reference to an MCP server in the registry.
+ * Used in agent/capability mcp_servers config instead of inline type/url.
+ * This is the preferred format for HTTP-based MCP servers.
+ */
+export interface MCPServerRef {
+  ref: string;  // Registry entry ID
+  config?: Record<string, unknown>;  // Config values to merge with defaults
 }
 
-export type MCPServerConfig = MCPServerStdio | MCPServerHttp;
+/**
+ * MCP server configuration - can be either:
+ * - MCPServerStdio: For local command-based servers (e.g., Playwright)
+ * - MCPServerRef: Reference to a server in the registry (preferred for HTTP servers)
+ */
+export type MCPServerConfig = MCPServerStdio | MCPServerRef;
+
+/**
+ * Type guard to check if an MCP server config is a registry reference.
+ */
+export function isMCPServerRef(config: MCPServerConfig): config is MCPServerRef {
+  return 'ref' in config;
+}
+
+/**
+ * Type guard to check if an MCP server config is a stdio server.
+ */
+export function isMCPServerStdio(config: MCPServerConfig): config is MCPServerStdio {
+  return 'command' in config;
+}
 
 export interface Agent {
   name: string;
