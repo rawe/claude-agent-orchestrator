@@ -27,6 +27,13 @@ Environment Variables:
     CONTEXT_STORE_HOST: Context Store server hostname (default: localhost)
     CONTEXT_STORE_PORT: Context Store server port (default: 8766)
     CONTEXT_STORE_SCHEME: URL scheme (default: http)
+    CONTEXT_STORE_PARTITION: Partition name for stdio mode (default: global partition)
+
+Partition Routing:
+    - stdio mode: Uses CONTEXT_STORE_PARTITION environment variable
+    - HTTP mode: Uses X-Context-Store-Partition header per-request
+
+The partition is transparent to the LLM agent - it's configured by the orchestrator.
 """
 
 import argparse
@@ -67,7 +74,7 @@ Workflow for agent-generated content:
 # Create client and register tools
 config = Config()
 client = ContextStoreClient(config)
-register_tools(mcp, client)
+register_tools(mcp, client, config)
 
 
 def run_server(
@@ -87,9 +94,12 @@ def run_server(
     print(f"Transport: {transport}", file=sys.stderr)
 
     if transport == "stdio":
+        partition_info = config.partition if config.partition else "(global)"
+        print(f"Partition: {partition_info}", file=sys.stderr)
         print("Running via stdio", file=sys.stderr)
         mcp.run(transport="stdio")
     elif transport == "streamable-http":
+        print("Partition: via X-Context-Store-Partition header", file=sys.stderr)
         print(f"Running via HTTP at http://{host}:{port}/mcp", file=sys.stderr)
         mcp.run(transport="streamable-http", host=host, port=port)
     else:
@@ -116,9 +126,14 @@ Examples:
   uv run context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 
 Environment:
-  CONTEXT_STORE_HOST    Server hostname (default: localhost)
-  CONTEXT_STORE_PORT    Server port (default: 8766)
-  CONTEXT_STORE_SCHEME  URL scheme (default: http)
+  CONTEXT_STORE_HOST       Server hostname (default: localhost)
+  CONTEXT_STORE_PORT       Server port (default: 8766)
+  CONTEXT_STORE_SCHEME     URL scheme (default: http)
+  CONTEXT_STORE_PARTITION  Partition name for stdio mode (default: global)
+
+Partition Routing:
+  - stdio mode: Uses CONTEXT_STORE_PARTITION env var (set at startup)
+  - HTTP mode: Uses X-Context-Store-Partition header (per-request)
         """,
     )
 

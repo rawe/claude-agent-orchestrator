@@ -17,6 +17,15 @@ for verification and follow-up operations.
 References:
 - FastMCP Tool Operations: https://gofastmcp.com/clients/tools
 - ToolResult allows full control over content vs structured_content
+
+Partition Handling
+------------------
+All tools transparently route to the configured partition. The partition is
+determined by:
+- HTTP mode: X-Context-Store-Partition header (per-request)
+- stdio mode: CONTEXT_STORE_PARTITION environment variable (session-wide)
+
+The LLM agent does not see or control partitions - this is an orchestration concern.
 """
 
 import json
@@ -28,17 +37,23 @@ from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 from pydantic import Field
 
+from .config import Config, get_partition_from_context
 from .http_client import ContextStoreClient
 from .exceptions import ContextStoreError
 
 
-def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
+def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> None:
     """Register all Context Store tools with the MCP server.
 
     Args:
         mcp: FastMCP server instance
         client: ContextStoreClient instance for HTTP operations
+        config: Config instance for partition resolution
     """
+
+    def _get_partition() -> Optional[str]:
+        """Get current partition from HTTP headers or config."""
+        return get_partition_from_context(config)
 
     @mcp.tool()
     async def doc_push(
@@ -83,6 +98,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 name=name,
                 tags=tags_list,
                 description=description,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except FileNotFoundError as e:
@@ -121,6 +137,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 filename=filename,
                 tags=tags_list,
                 description=description,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -150,6 +167,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             result = await client.write_document_content(
                 document_id=document_id,
                 content=content,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -217,6 +235,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 replace_all=replace_all,
                 offset=offset,
                 length=length,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -262,6 +281,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 tags=tags_list,
                 limit=limit,
                 include_relations=include_relations,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -300,6 +320,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 query=query,
                 limit=limit,
                 include_relations=include_relations,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -321,7 +342,10 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             Plus relations object with parent/child/related document links
         """
         try:
-            result = await client.get_document_info(document_id=document_id)
+            result = await client.get_document_info(
+                document_id=document_id,
+                partition=_get_partition(),
+            )
             return json.dumps(result)
         except ContextStoreError as e:
             return f"Error: {e}"
@@ -363,6 +387,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 document_id=document_id,
                 offset=offset,
                 limit=limit,
+                partition=_get_partition(),
             )
             return ToolResult(content=[TextContent(type="text", text=content)])
         except ContextStoreError as e:
@@ -396,7 +421,10 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             return "Error: output_path must be an absolute path"
 
         try:
-            content, filename = await client.pull_document(document_id=document_id)
+            content, filename = await client.pull_document(
+                document_id=document_id,
+                partition=_get_partition(),
+            )
 
             # Write to file
             output_file = Path(output_path)
@@ -429,7 +457,10 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
         # Implementation note: Server also removes document from semantic search
         # index if enabled. This is transparent to the caller.
         try:
-            result = await client.delete_document(document_id=document_id)
+            result = await client.delete_document(
+                document_id=document_id,
+                partition=_get_partition(),
+            )
             return json.dumps(result)
         except ContextStoreError as e:
             return f"Error: {e}"
@@ -487,9 +518,10 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
         Returns:
             JSON with operation result
         """
+        partition = _get_partition()
         try:
             if types:
-                result = await client.get_relation_definitions()
+                result = await client.get_relation_definitions(partition=partition)
                 return json.dumps(result)
 
             elif create_from and create_to:
@@ -501,6 +533,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                     definition=relation_type,
                     from_to_note=from_to_note,
                     to_from_note=to_from_note,
+                    partition=partition,
                 )
                 return json.dumps(result)
 
@@ -508,11 +541,15 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 result = await client.update_relation(
                     relation_id=update_id,
                     note=note,
+                    partition=partition,
                 )
                 return json.dumps(result)
 
             elif remove_id:
-                result = await client.delete_relation(relation_id=remove_id)
+                result = await client.delete_relation(
+                    relation_id=remove_id,
+                    partition=partition,
+                )
                 return json.dumps(result)
 
             else:
