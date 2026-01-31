@@ -10,6 +10,7 @@ This folder contains design documentation for partition-based isolation in the C
 | [implementation-report.md](implementation-report.md) | Server and HTTP client implementation report |
 | [mcp-server-partition-support.md](mcp-server-partition-support.md) | MCP server partition routing design |
 | [mcp-server-partition-implementation-report.md](mcp-server-partition-implementation-report.md) | MCP server implementation report |
+| [mcp-partition-auto-create.md](mcp-partition-auto-create.md) | Auto-create partition on first use (draft) |
 | [doc-todo.md](doc-todo.md) | Documentation update checklist (pending) |
 
 ## Overview

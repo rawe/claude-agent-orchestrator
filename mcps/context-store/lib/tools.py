@@ -37,9 +37,9 @@ from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 from pydantic import Field
 
-from .config import Config, get_partition_from_context
+from .config import Config, get_partition_from_context, get_partition_auto_create_from_context
 from .http_client import ContextStoreClient
-from .exceptions import ContextStoreError
+from .exceptions import ContextStoreError, PartitionNotFoundError
 
 
 def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> None:
@@ -50,10 +50,37 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
         client: ContextStoreClient instance for HTTP operations
         config: Config instance for partition resolution
     """
+    # Track ensured partitions to avoid repeated checks
+    _ensured_partitions: set[str] = set()
 
     def _get_partition() -> Optional[str]:
         """Get current partition from HTTP headers or config."""
         return get_partition_from_context(config)
+
+    async def _ensure_partition_if_needed() -> None:
+        """Ensure partition exists if configured.
+
+        In strict mode (default), fails if partition doesn't exist.
+        In auto-create mode, creates the partition if missing.
+        """
+        partition = _get_partition()
+        if partition is None:
+            return  # Global partition, no check needed
+
+        if partition in _ensured_partitions:
+            return  # Already ensured
+
+        auto_create = get_partition_auto_create_from_context(config)
+
+        if auto_create:
+            await client.ensure_partition_exists(partition)
+        else:
+            # Strict mode: verify partition exists
+            partitions = await client.list_partitions()
+            if not any(p["name"] == partition for p in partitions):
+                raise PartitionNotFoundError(partition)
+
+        _ensured_partitions.add(partition)
 
     @mcp.tool()
     async def doc_push(
@@ -92,6 +119,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             return "Error: file_path must be an absolute path"
 
         try:
+            await _ensure_partition_if_needed()
             tags_list = [t.strip() for t in tags.split(",")] if tags else None
             result = await client.push_document(
                 file_path=file_path,
@@ -132,6 +160,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             doc_create(filename="architecture.md", tags="design,mvp", description="System overview")
         """
         try:
+            await _ensure_partition_if_needed()
             tags_list = [t.strip() for t in tags.split(",")] if tags else None
             result = await client.create_document(
                 filename=filename,
@@ -164,6 +193,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             doc_write(document_id="doc_abc123", content="# My Document\\n\\nContent here...")
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.write_document_content(
                 document_id=document_id,
                 content=content,
@@ -228,6 +258,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             doc_edit(document_id="doc_abc", offset=100, length=50, new_string="")
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.edit_document_content(
                 document_id=document_id,
                 new_string=new_string,
@@ -275,6 +306,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             doc_query(include_relations=True)  # List all with relations
         """
         try:
+            await _ensure_partition_if_needed()
             tags_list = [t.strip() for t in tags.split(",")] if tags else None
             result = await client.query_documents(
                 name=name,
@@ -316,6 +348,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
         Note: Requires semantic search to be enabled on the server.
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.search_documents(
                 query=query,
                 limit=limit,
@@ -342,6 +375,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             Plus relations object with parent/child/related document links
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.get_document_info(
                 document_id=document_id,
                 partition=_get_partition(),
@@ -383,6 +417,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
         # automatic JSON wrapping ({"result": "..."}). See module docstring for
         # full rationale on raw content vs JSON responses.
         try:
+            await _ensure_partition_if_needed()
             content, _, _ = await client.read_document(
                 document_id=document_id,
                 offset=offset,
@@ -421,6 +456,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
             return "Error: output_path must be an absolute path"
 
         try:
+            await _ensure_partition_if_needed()
             content, filename = await client.pull_document(
                 document_id=document_id,
                 partition=_get_partition(),
@@ -457,6 +493,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
         # Implementation note: Server also removes document from semantic search
         # index if enabled. This is transparent to the caller.
         try:
+            await _ensure_partition_if_needed()
             result = await client.delete_document(
                 document_id=document_id,
                 partition=_get_partition(),
@@ -520,6 +557,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> 
         """
         partition = _get_partition()
         try:
+            await _ensure_partition_if_needed()
             if types:
                 result = await client.get_relation_definitions(partition=partition)
                 return json.dumps(result)

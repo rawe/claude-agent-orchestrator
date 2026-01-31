@@ -28,6 +28,7 @@ Environment Variables:
     CONTEXT_STORE_PORT: Context Store server port (default: 8766)
     CONTEXT_STORE_SCHEME: URL scheme (default: http)
     CONTEXT_STORE_PARTITION: Partition name for stdio mode (default: global partition)
+    CONTEXT_STORE_PARTITION_AUTO_CREATE: Auto-create partition if missing (default: false)
 
 Partition Routing:
     - stdio mode: Uses CONTEXT_STORE_PARTITION environment variable
@@ -130,6 +131,7 @@ Environment:
   CONTEXT_STORE_PORT       Server port (default: 8766)
   CONTEXT_STORE_SCHEME     URL scheme (default: http)
   CONTEXT_STORE_PARTITION  Partition name for stdio mode (default: global)
+  CONTEXT_STORE_PARTITION_AUTO_CREATE  Auto-create partition if missing (default: false)
 
 Partition Routing:
   - stdio mode: Uses CONTEXT_STORE_PARTITION env var (set at startup)

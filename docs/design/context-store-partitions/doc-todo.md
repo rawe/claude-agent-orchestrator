@@ -92,6 +92,29 @@ Add section explaining partition routing for both modes.
 - No fallback between modes - HTTP mode ignores env var
 - Missing partition = global partition (no special handling needed)
 
+## Additional Configuration Options (Partition Auto-Create)
+
+The following configuration options were added for partition auto-create functionality:
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CONTEXT_STORE_PARTITION_AUTO_CREATE` | Auto-create partition if it doesn't exist (stdio mode) | `false` |
+
+### HTTP Headers
+
+| Header | Description | Default |
+|--------|-------------|---------|
+| `X-Context-Store-Partition-Auto-Create` | Set to `true` to auto-create partition if missing (HTTP mode) | `false` |
+
+### Documentation Updates Needed
+
+- Add `CONTEXT_STORE_PARTITION_AUTO_CREATE` env var to environment variable tables
+- Add `X-Context-Store-Partition-Auto-Create` header to HTTP mode documentation
+- Document auto-create behavior in partition routing section
+- Note that default is strict mode (fail if partition doesn't exist)
+
 ## References
 
 - Implementation: `mcps/context-store/lib/config.py`

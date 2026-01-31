@@ -936,6 +936,29 @@ class ContextStoreClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
 
+    async def ensure_partition_exists(self, partition: str) -> bool:
+        """Create partition if it doesn't exist (handles 409 gracefully).
+
+        Returns True if partition exists or was created.
+
+        Args:
+            partition: Partition name to ensure exists
+
+        Returns:
+            True if partition exists or was created
+
+        Raises:
+            ConnectionError: On network errors
+            ContextStoreError: On HTTP errors (except 409)
+        """
+        try:
+            await self.create_partition(partition)
+            return True
+        except ContextStoreError as e:
+            if "already exists" in str(e):
+                return True
+            raise
+
     async def delete_partition(self, name: str) -> dict:
         """Delete a partition and all its documents.
 
