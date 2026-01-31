@@ -17,8 +17,9 @@ Implemented partition-based isolation for the Context Store, enabling controlled
 | `servers/context-store/src/main.py` | Added partition lifecycle endpoints, all partitioned document endpoints, partitioned relation endpoints, partitioned search endpoint, refactored global endpoints as thin wrappers |
 | `servers/context-store/src/semantic/indexer.py` | Added `partition` field to Elasticsearch index mapping, updated `index_document()` to accept partition parameter |
 | `servers/context-store/src/semantic/search.py` | Added partition filter to KNN query in `search_documents()` |
-| `mcps/context-store/lib/http_client.py` | Added `create_partition()`, `list_partitions()`, `delete_partition()` methods, added `push_document_partitioned()`, `query_documents_partitioned()`, `search_documents_partitioned()` methods |
-| `plugins/context-store/.../lib/client.py` | Added same partition methods as MCP client |
+| `mcps/context-store/lib/http_client.py` | Added resource constants (`RESOURCE_DOCUMENTS`, etc.), unified `_build_url()` method, partition parameter to all document/relation/search methods, partition lifecycle methods |
+| `plugins/context-store/.../lib/client.py` | Same refactoring as MCP client, plus client-level default partition from `DOC_SYNC_PARTITION` environment variable |
+| `plugins/context-store/.../lib/config.py` | Added `DOC_SYNC_PARTITION` environment variable support |
 
 ## New API Endpoints
 
@@ -106,6 +107,56 @@ New indexes:
 
 Added field to index mapping:
 - `partition: {"type": "keyword"}` - enables filtering by partition in KNN search
+
+## Client Architecture
+
+Both HTTP clients (MCP and plugin) use a unified approach for partition support:
+
+### Resource Constants
+
+```python
+RESOURCE_DOCUMENTS = "documents"
+RESOURCE_RELATIONS = "relations"
+RESOURCE_SEARCH = "search"
+RESOURCE_PARTITIONS = "partitions"
+```
+
+### URL Building
+
+Single `_build_url()` method handles all endpoint construction:
+
+```python
+def _build_url(self, resource, partition=None, resource_id=None, suffix=None):
+    if partition:
+        path = f"/{RESOURCE_PARTITIONS}/{partition}/{resource}"
+    else:
+        path = f"/{resource}"
+    if resource_id:
+        path = f"{path}/{resource_id}"
+    if suffix:
+        path = f"{path}/{suffix}"
+    return f"{self.base_url}{path}"
+```
+
+### Partition Parameter
+
+All document, relation, and search methods accept an optional `partition` parameter:
+- `partition=None` (default): Uses global partition endpoint
+- `partition="my-project"`: Uses partitioned endpoint `/partitions/my-project/...`
+
+### Plugin Client Environment Variable
+
+The plugin client supports a client-level default partition via `DOC_SYNC_PARTITION`:
+
+```bash
+export DOC_SYNC_PARTITION=my-project  # All operations use my-project partition
+export DOC_SYNC_PARTITION=             # Empty/unset = global partition
+```
+
+Partition resolution order:
+1. Method `partition` parameter (if provided)
+2. Client default from `DOC_SYNC_PARTITION` environment variable
+3. Global partition (no partition in URL path)
 
 ## Key Design Decisions
 
