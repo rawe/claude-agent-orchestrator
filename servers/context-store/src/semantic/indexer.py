@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from ..database import GLOBAL_PARTITION
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ def _ensure_index_exists():
         logger.info(f"Created Elasticsearch index: {config.elasticsearch_index}")
 
 
-def index_document(document_id: str, content: str, partition: str = "_global") -> bool:
+def index_document(document_id: str, content: str, partition: str = GLOBAL_PARTITION) -> bool:
     """
     Index a document for semantic search.
 

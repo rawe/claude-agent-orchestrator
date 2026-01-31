@@ -4,13 +4,14 @@ import logging
 from collections import defaultdict
 from typing import Optional
 
+from ..database import GLOBAL_PARTITION
 from .config import config
 from .indexer import _get_embeddings, _get_es_client
 
 logger = logging.getLogger(__name__)
 
 
-def search_documents(query: str, partition: str = "_global", limit: int = 10) -> list[dict]:
+def search_documents(query: str, partition: str = GLOBAL_PARTITION, limit: int = 10) -> list[dict]:
     """
     Search for documents semantically similar to the query within a partition.
 
