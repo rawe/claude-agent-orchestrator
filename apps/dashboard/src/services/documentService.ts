@@ -17,34 +17,49 @@ export interface SemanticSearchResponse {
   results: SemanticSearchResult[];
 }
 
+/**
+ * Build path with optional partition prefix
+ * Global partition (_global) uses global endpoints without /partitions prefix
+ * Other partitions use /partitions/{name} prefix
+ */
+const buildPath = (basePath: string, partition: string | null): string => {
+  if (!partition || partition === '_global') {
+    return basePath;
+  }
+  return `/partitions/${partition}${basePath}`;
+};
+
 export const documentService = {
   /**
    * Get all documents with optional filtering
    */
-  async getDocuments(query?: DocumentQuery): Promise<Document[]> {
+  async getDocuments(query?: DocumentQuery, partition: string | null = null): Promise<Document[]> {
     const params = new URLSearchParams();
     if (query?.filename) params.append('filename', query.filename);
     if (query?.tags?.length) params.append('tags', query.tags.join(','));
     if (query?.limit) params.append('limit', query.limit.toString());
     if (query?.offset) params.append('offset', query.offset.toString());
 
-    const response = await documentApi.get<Document[]>('/documents', { params });
+    const path = buildPath('/documents', partition);
+    const response = await documentApi.get<Document[]>(path, { params });
     return response.data;
   },
 
   /**
    * Get a single document's metadata
    */
-  async getDocumentMetadata(id: string): Promise<Document> {
-    const response = await documentApi.get<Document>(`/documents/${id}/metadata`);
+  async getDocumentMetadata(id: string, partition: string | null = null): Promise<Document> {
+    const path = buildPath(`/documents/${id}/metadata`, partition);
+    const response = await documentApi.get<Document>(path);
     return response.data;
   },
 
   /**
    * Get document content (download)
    */
-  async getDocumentContent(id: string): Promise<Blob> {
-    const response = await documentApi.get(`/documents/${id}`, {
+  async getDocumentContent(id: string, partition: string | null = null): Promise<Blob> {
+    const path = buildPath(`/documents/${id}`, partition);
+    const response = await documentApi.get(path, {
       responseType: 'blob',
     });
     return response.data;
@@ -57,7 +72,8 @@ export const documentService = {
     file: File,
     tags?: string[],
     metadata?: Record<string, string>,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    partition: string | null = null
   ): Promise<Document> {
     const formData = new FormData();
     formData.append('file', file);
@@ -68,7 +84,8 @@ export const documentService = {
       formData.append('metadata', JSON.stringify(metadata));
     }
 
-    const response = await documentApi.post<Document>('/documents', formData, {
+    const path = buildPath('/documents', partition);
+    const response = await documentApi.post<Document>(path, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -85,8 +102,9 @@ export const documentService = {
   /**
    * Delete a document
    */
-  async deleteDocument(id: string): Promise<void> {
-    await documentApi.delete(`/documents/${id}`);
+  async deleteDocument(id: string, partition: string | null = null): Promise<void> {
+    const path = buildPath(`/documents/${id}`, partition);
+    await documentApi.delete(path);
   },
 
   /**
@@ -94,14 +112,15 @@ export const documentService = {
    * NOTE: This endpoint is not yet implemented in the backend
    * Will compute tags client-side for now
    */
-  async getTags(): Promise<DocumentTag[]> {
+  async getTags(partition: string | null = null): Promise<DocumentTag[]> {
     try {
-      const response = await documentApi.get<{ tags: DocumentTag[] }>('/documents/tags');
+      const path = buildPath('/documents/tags', partition);
+      const response = await documentApi.get<{ tags: DocumentTag[] }>(path);
       return response.data.tags;
     } catch {
       // Fallback: fetch all documents and compute tags client-side
       console.warn('Tags endpoint not implemented, computing client-side');
-      const documents = await this.getDocuments();
+      const documents = await this.getDocuments(undefined, partition);
       const tagCounts = new Map<string, number>();
 
       documents.forEach((doc) => {
@@ -122,24 +141,26 @@ export const documentService = {
    */
   async updateDocument(
     id: string,
-    _update: { tags?: string[]; description?: string }
+    _update: { tags?: string[]; description?: string },
+    partition: string | null = null
   ): Promise<Document> {
     // This will fail until backend implements it
     // For now, just return the existing document
     console.warn('Update document endpoint not implemented');
-    return this.getDocumentMetadata(id);
+    return this.getDocumentMetadata(id, partition);
   },
 
   /**
    * Semantic search - find documents by natural language query
    * Returns document IDs of matching documents
    */
-  async semanticSearch(query: string, limit = 20): Promise<SemanticSearchResponse> {
+  async semanticSearch(query: string, limit = 20, partition: string | null = null): Promise<SemanticSearchResponse> {
     const params = new URLSearchParams();
     params.append('q', query);
     params.append('limit', limit.toString());
 
-    const response = await documentApi.get<SemanticSearchResponse>('/search', { params });
+    const path = buildPath('/search', partition);
+    const response = await documentApi.get<SemanticSearchResponse>(path, { params });
     return response.data;
   },
 
@@ -147,8 +168,9 @@ export const documentService = {
    * Get document relations
    * Returns all relations for a document grouped by relation type
    */
-  async getDocumentRelations(id: string): Promise<DocumentRelationsResponse> {
-    const response = await documentApi.get<DocumentRelationsResponse>(`/documents/${id}/relations`);
+  async getDocumentRelations(id: string, partition: string | null = null): Promise<DocumentRelationsResponse> {
+    const path = buildPath(`/documents/${id}/relations`, partition);
+    const response = await documentApi.get<DocumentRelationsResponse>(path);
     return response.data;
   },
 };

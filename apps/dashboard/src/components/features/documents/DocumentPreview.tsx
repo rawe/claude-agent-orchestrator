@@ -14,10 +14,11 @@ interface DocumentPreviewProps {
   onClose: () => void;
   onDelete: () => void;
   onNavigateToDocument?: (doc: Document) => void;
+  partition?: string | null;
 }
 
-export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigateToDocument }: DocumentPreviewProps) {
-  const { content, loading } = useDocumentContent(document?.id || null);
+export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigateToDocument, partition = null }: DocumentPreviewProps) {
+  const { content, loading } = useDocumentContent(document?.id || null, partition);
   const [viewMode, setViewMode] = useState<'rendered' | 'raw'>('rendered');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -31,7 +32,7 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
     if (document?.id && isOpen) {
       setRelationsLoading(true);
       setRelatedDocs({});
-      documentService.getDocumentRelations(document.id)
+      documentService.getDocumentRelations(document.id, partition)
         .then(async (response) => {
           setRelations(response.relations);
 
@@ -46,7 +47,7 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
           await Promise.all(
             Array.from(relatedIds).map(async (id) => {
               try {
-                const doc = await documentService.getDocumentMetadata(id);
+                const doc = await documentService.getDocumentMetadata(id, partition);
                 docsMap[id] = doc;
               } catch (e) {
                 console.error(`Failed to fetch metadata for ${id}:`, e);
@@ -66,7 +67,7 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
       setRelations({});
       setRelatedDocs({});
     }
-  }, [document?.id, isOpen]);
+  }, [document?.id, isOpen, partition]);
 
   // Handle fullscreen toggle
   const toggleFullscreen = () => {

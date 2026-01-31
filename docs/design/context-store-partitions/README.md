@@ -11,6 +11,7 @@ This folder contains design documentation for partition-based isolation in the C
 | [mcp-server-partition-support.md](mcp-server-partition-support.md) | MCP server partition routing design |
 | [mcp-server-partition-implementation-report.md](mcp-server-partition-implementation-report.md) | MCP server implementation report |
 | [mcp-partition-auto-create.md](mcp-partition-auto-create.md) | Auto-create partition on first use (draft) |
+| [dashboard-partition-ui.md](dashboard-partition-ui.md) | Dashboard UI for partition management (draft) |
 | [doc-todo.md](doc-todo.md) | Documentation update checklist (pending) |
 
 ## Overview

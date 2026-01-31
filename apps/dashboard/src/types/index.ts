@@ -6,3 +6,4 @@ export * from './capability';
 export * from './runner';
 export * from './run';
 export * from './mcpServer';
+export * from './partition';

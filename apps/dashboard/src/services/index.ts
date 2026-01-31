@@ -1,5 +1,6 @@
 export { sessionService } from './sessionService';
 export { documentService } from './documentService';
+export { partitionService } from './partitionService';
 export { agentService } from './agentService';
 export { capabilityService } from './capabilityService';
 export { chatService } from './chatService';

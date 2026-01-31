@@ -143,7 +143,14 @@ async def create_partition(request: PartitionCreate):
 
 @app.get("/partitions", response_model=PartitionListResponse)
 async def list_partitions():
-    """List all partitions."""
+    """List all user-created partitions.
+
+    Note: The internal '_global' partition is excluded from this listing.
+    The global partition is an implementation detail - clients access it via
+    the non-partitioned endpoints (e.g., /documents instead of /partitions/_global/documents).
+    This keeps the partition concept transparent: clients see partitions as optional
+    namespaces, with the default/global space accessed through standard endpoints.
+    """
     partitions = db.list_partitions()
     return PartitionListResponse(
         partitions=[
@@ -153,6 +160,7 @@ async def list_partitions():
                 created_at=p["created_at"]
             )
             for p in partitions
+            if p["name"] != GLOBAL_PARTITION
         ]
     )
 
@@ -342,7 +350,7 @@ async def _search_documents_impl(
                 SearchResultItem(
                     document_id=result["document_id"],
                     filename=doc_metadata.filename,
-                    document_url=get_document_url(result["document_id"], partition),
+                    document_url=get_document_url(result["document_id"], doc_metadata.partition),
                     sections=[SectionInfo(**s) for s in result["sections"]],
                     relations=relations
                 )
@@ -521,8 +529,8 @@ async def _get_document_metadata_impl(document_id: str, partition: str = GLOBAL_
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
         metadata=doc_metadata.metadata,
-        url=get_document_url(doc_metadata.id, partition),
-        partition=partition if partition != GLOBAL_PARTITION else None
+        url=get_document_url(doc_metadata.id, doc_metadata.partition),
+        partition=doc_metadata.partition if doc_metadata.partition and doc_metadata.partition != GLOBAL_PARTITION else None
     )
 
 
@@ -665,8 +673,8 @@ async def _write_document_content_impl(document_id: str, request: Request, parti
         updated_at=updated_metadata.updated_at,
         tags=updated_metadata.tags,
         metadata=updated_metadata.metadata,
-        url=get_document_url(updated_metadata.id, partition),
-        partition=partition if partition != GLOBAL_PARTITION else None
+        url=get_document_url(updated_metadata.id, updated_metadata.partition),
+        partition=updated_metadata.partition if updated_metadata.partition and updated_metadata.partition != GLOBAL_PARTITION else None
     )
 
 
@@ -761,10 +769,10 @@ async def _edit_document_content_impl(document_id: str, request: Request, partit
         "updated_at": updated_metadata.updated_at.isoformat() if hasattr(updated_metadata.updated_at, 'isoformat') else str(updated_metadata.updated_at),
         "tags": updated_metadata.tags,
         "metadata": updated_metadata.metadata,
-        "url": get_document_url(updated_metadata.id, partition),
+        "url": get_document_url(updated_metadata.id, updated_metadata.partition),
     }
-    if partition != GLOBAL_PARTITION:
-        response_data["partition"] = partition
+    if updated_metadata.partition and updated_metadata.partition != GLOBAL_PARTITION:
+        response_data["partition"] = updated_metadata.partition
     # Add edit-specific info
     response_data.update(edit_info)
 
@@ -835,9 +843,9 @@ async def _list_documents_impl(
             updated_at=doc.updated_at,
             tags=doc.tags,
             metadata=doc.metadata,
-            url=get_document_url(doc.id, partition),
+            url=get_document_url(doc.id, doc.partition),
             relations=relations,
-            partition=partition if partition != GLOBAL_PARTITION else None
+            partition=doc.partition if doc.partition and doc.partition != GLOBAL_PARTITION else None
         ))
 
     return responses

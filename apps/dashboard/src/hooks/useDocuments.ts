@@ -3,7 +3,7 @@ import { useNotification } from '@/contexts';
 import { documentService } from '@/services';
 import type { Document, DocumentTag } from '@/types';
 
-export function useDocuments() {
+export function useDocuments(partition: string | null = null) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const { showError } = useNotification();
@@ -11,7 +11,7 @@ export function useDocuments() {
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await documentService.getDocuments();
+      const data = await documentService.getDocuments(undefined, partition);
       setDocuments(data);
     } catch (err) {
       showError('Failed to load documents');
@@ -19,7 +19,7 @@ export function useDocuments() {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [showError, partition]);
 
   useEffect(() => {
     fetchDocuments();
@@ -27,17 +27,17 @@ export function useDocuments() {
 
   const uploadDocument = useCallback(
     async (file: File, tags?: string[], onProgress?: (progress: number) => void) => {
-      const newDoc = await documentService.uploadDocument(file, tags, undefined, onProgress);
+      const newDoc = await documentService.uploadDocument(file, tags, undefined, onProgress, partition);
       setDocuments((prev) => [newDoc, ...prev]);
       return newDoc;
     },
-    []
+    [partition]
   );
 
   const deleteDocument = useCallback(async (id: string) => {
-    await documentService.deleteDocument(id);
+    await documentService.deleteDocument(id, partition);
     setDocuments((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+  }, [partition]);
 
   return {
     documents,
@@ -48,31 +48,31 @@ export function useDocuments() {
   };
 }
 
-export function useTags() {
+export function useTags(partition: string | null = null) {
   const [tags, setTags] = useState<DocumentTag[]>([]);
   const [loading, setLoading] = useState(true);
   const { showError } = useNotification();
 
+  const fetchTags = useCallback(async () => {
+    try {
+      const data = await documentService.getTags(partition);
+      setTags(data);
+    } catch (err) {
+      showError('Failed to load tags');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [showError, partition]);
+
   useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        const data = await documentService.getTags();
-        setTags(data);
-      } catch (err) {
-        showError('Failed to load tags');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchTags();
-  }, [showError]);
+  }, [fetchTags]);
 
-  return { tags, loading };
+  return { tags, loading, refetch: fetchTags };
 }
 
-export function useDocumentContent(documentId: string | null) {
+export function useDocumentContent(documentId: string | null, partition: string | null = null) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { showError } = useNotification();
@@ -86,7 +86,7 @@ export function useDocumentContent(documentId: string | null) {
     const fetchContent = async () => {
       setLoading(true);
       try {
-        const blob = await documentService.getDocumentContent(documentId);
+        const blob = await documentService.getDocumentContent(documentId, partition);
         const text = await blob.text();
         setContent(text);
       } catch (err) {
@@ -98,7 +98,7 @@ export function useDocumentContent(documentId: string | null) {
     };
 
     fetchContent();
-  }, [documentId, showError]);
+  }, [documentId, partition, showError]);
 
   return { content, loading };
 }
