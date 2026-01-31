@@ -6,7 +6,10 @@
         "run",
         "--script",
         "${PROJECT_ROOT}/mcps/context-store/context-store-mcp.py"
-      ]
+      ],
+      "env": {
+        "CONTEXT_STORE_PARTITION": "test-partition"
+      }
     }
   }
 }
