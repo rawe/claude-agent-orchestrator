@@ -42,7 +42,6 @@ Each item follows a standard format:
 
 | ID | Title | Status | Priority |
 |----|-------|--------|----------|
-| 001 | [Event Type Naming Consistency](./001-event-type-naming-consistency.md) | Open | Medium |
 | 002 | [Parent-Child Session Deletion Strategy](./002-parent-child-session-deletion-strategy.md) | Open | High |
 
 ## When to Add Items
