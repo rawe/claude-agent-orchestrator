@@ -646,3 +646,180 @@ class DocumentClient:
             raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
+
+    # =====================
+    # Partition Operations
+    # =====================
+
+    def create_partition(
+        self,
+        name: str,
+        description: Optional[str] = None
+    ) -> dict:
+        """Create a new partition.
+
+        Args:
+            name: Partition name (unique identifier)
+            description: Optional description
+
+        Returns:
+            Dict with name, description, created_at
+
+        Raises:
+            Exception: On network/HTTP errors, 400 for invalid name, 409 if exists
+        """
+        payload = {"name": name}
+        if description:
+            payload["description"] = description
+
+        try:
+            response = httpx.post(
+                f"{self.base_url}/partitions",
+                json=payload,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                raise Exception(f"Invalid partition name: {e.response.text}")
+            if e.response.status_code == 409:
+                raise Exception(f"Partition already exists: {name}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def list_partitions(self) -> list[dict]:
+        """List all partitions.
+
+        Returns:
+            List of partition dicts with name, description, created_at
+
+        Raises:
+            Exception: On network or HTTP errors
+        """
+        try:
+            response = httpx.get(
+                f"{self.base_url}/partitions",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("partitions", [])
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def delete_partition(self, name: str) -> dict:
+        """Delete a partition and all its documents.
+
+        Args:
+            name: Partition name to delete
+
+        Returns:
+            Dict with success, message, deleted_document_count
+
+        Raises:
+            Exception: On HTTP errors (403 for _global, 404 if not found)
+        """
+        try:
+            response = httpx.delete(
+                f"{self.base_url}/partitions/{name}",
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                raise Exception("Cannot delete the global partition")
+            if e.response.status_code == 404:
+                raise Exception(f"Partition not found: {name}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    # =====================
+    # Partitioned Document Operations
+    # =====================
+
+    def push_document_partitioned(
+        self,
+        partition: str,
+        file_path: str | Path,
+        name: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        description: Optional[str] = None
+    ) -> dict:
+        """Upload a document to a specific partition."""
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        content = file_path.read_bytes()
+        filename = name if name else file_path.name
+
+        content_type, _ = mimetypes.guess_type(str(file_path))
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        files = {"file": (filename, content, content_type)}
+        data = {}
+
+        if tags:
+            data["tags"] = ",".join(tags)
+
+        if description:
+            import json
+            data["metadata"] = json.dumps({"description": description})
+
+        try:
+            response = httpx.post(
+                f"{self.base_url}/partitions/{partition}/documents",
+                files=files,
+                data=data,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def query_documents_partitioned(
+        self,
+        partition: str,
+        name: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        limit: Optional[int] = None,
+        include_relations: bool = False
+    ) -> list[dict]:
+        """Query documents from a specific partition."""
+        params = {}
+
+        if name:
+            params["filename"] = name
+
+        if tags:
+            params["tags"] = ",".join(tags)
+
+        if limit:
+            params["limit"] = limit
+
+        if include_relations:
+            params["include_relations"] = "true"
+
+        try:
+            response = httpx.get(
+                f"{self.base_url}/partitions/{partition}/documents",
+                params=params,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")

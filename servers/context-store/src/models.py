@@ -1,7 +1,30 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
+import re
+
+
+# Partition name validation pattern: alphanumeric, hyphens, underscores
+# Must start with letter or underscore, 1-64 chars
+PARTITION_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$')
+
+
+def validate_partition_name(name: str) -> bool:
+    """Validate partition name format.
+
+    Rules:
+    - Must start with letter or underscore
+    - Can contain letters, numbers, hyphens, underscores
+    - Length: 1-64 characters
+
+    Args:
+        name: Partition name to validate
+
+    Returns:
+        True if valid, False otherwise
+    """
+    return bool(PARTITION_NAME_PATTERN.match(name))
 
 
 class DocumentMetadata(BaseModel):
@@ -16,6 +39,7 @@ class DocumentMetadata(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
+    partition: Optional[str] = None  # Partition this document belongs to
 
 
 class DocumentUploadRequest(BaseModel):
@@ -62,6 +86,7 @@ class DocumentResponse(BaseModel):
     metadata: dict[str, str]
     url: str  # Fully qualified URL to retrieve the document
     relations: dict[str, list[RelationInfo]] | None = None  # Grouped by relation_type, optional
+    partition: Optional[str] = None  # Partition the document belongs to (omitted in global endpoints)
 
 
 class DeleteResponse(BaseModel):
@@ -252,3 +277,40 @@ class DeleteResponseWithCascade(BaseModel):
     success: bool
     message: str
     deleted_document_ids: list[str]  # All deleted documents including children
+
+
+# ==================== Partition Models ====================
+
+class PartitionCreate(BaseModel):
+    """Request to create a new partition."""
+    name: str
+    description: Optional[str] = None
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not validate_partition_name(v):
+            raise ValueError(
+                "Invalid partition name. Must start with letter or underscore, "
+                "contain only letters, numbers, hyphens, underscores, and be 1-64 characters."
+            )
+        return v
+
+
+class PartitionResponse(BaseModel):
+    """Response for partition operations."""
+    name: str
+    description: Optional[str]
+    created_at: str  # ISO format string
+
+
+class PartitionListResponse(BaseModel):
+    """Response for listing partitions."""
+    partitions: list[PartitionResponse]
+
+
+class PartitionDeleteResponse(BaseModel):
+    """Response for partition deletion."""
+    success: bool
+    message: str
+    deleted_document_count: int

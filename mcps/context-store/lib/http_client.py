@@ -758,3 +758,229 @@ class ContextStoreClient:
             )
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
+
+    # =====================
+    # Partition Operations
+    # =====================
+
+    def _partition_base_url(self, partition: Optional[str]) -> str:
+        """Get base URL for partition-scoped operations."""
+        if partition:
+            return f"{self.base_url}/partitions/{partition}"
+        return self.base_url
+
+    async def create_partition(
+        self,
+        name: str,
+        description: Optional[str] = None,
+    ) -> dict:
+        """Create a new partition.
+
+        Args:
+            name: Partition name (unique identifier)
+            description: Optional description
+
+        Returns:
+            Dict with name, description, created_at
+
+        Raises:
+            ValidationError: If partition name is invalid
+            ContextStoreError: On HTTP errors (including 409 if exists)
+            ConnectionError: On network errors
+        """
+        payload = {"name": name}
+        if description:
+            payload["description"] = description
+
+        try:
+            client = self._get_client()
+            response = await client.post(
+                f"{self.base_url}/partitions",
+                json=payload,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                raise ValidationError(f"Invalid partition name: {e.response.text}")
+            if e.response.status_code == 409:
+                raise ContextStoreError(f"Partition already exists: {name}")
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    async def list_partitions(self) -> list[dict]:
+        """List all partitions.
+
+        Returns:
+            List of partition dicts with name, description, created_at
+
+        Raises:
+            ConnectionError: On network errors
+            ContextStoreError: On HTTP errors
+        """
+        try:
+            client = self._get_client()
+            response = await client.get(f"{self.base_url}/partitions")
+            response.raise_for_status()
+            data = response.json()
+            return data.get("partitions", [])
+        except httpx.HTTPStatusError as e:
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    async def delete_partition(self, name: str) -> dict:
+        """Delete a partition and all its documents.
+
+        Args:
+            name: Partition name to delete
+
+        Returns:
+            Dict with success, message, deleted_document_count
+
+        Raises:
+            ContextStoreError: On HTTP errors (403 for _global, 404 if not found)
+            ConnectionError: On network errors
+        """
+        try:
+            client = self._get_client()
+            response = await client.delete(f"{self.base_url}/partitions/{name}")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                raise ContextStoreError("Cannot delete the global partition")
+            if e.response.status_code == 404:
+                raise ContextStoreError(f"Partition not found: {name}")
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    # =====================
+    # Partitioned Document Operations
+    # =====================
+
+    async def push_document_partitioned(
+        self,
+        partition: str,
+        file_path: str | Path,
+        name: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        description: Optional[str] = None,
+    ) -> dict:
+        """Upload a document to a specific partition."""
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        content = file_path.read_bytes()
+        filename = name if name else file_path.name
+
+        content_type, _ = mimetypes.guess_type(str(file_path))
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        files = {"file": (filename, content, content_type)}
+        data: dict[str, str] = {}
+
+        if tags:
+            data["tags"] = ",".join(tags)
+
+        if description:
+            import json
+            data["metadata"] = json.dumps({"description": description})
+
+        try:
+            client = self._get_client()
+            response = await client.post(
+                f"{self.base_url}/partitions/{partition}/documents",
+                files=files,
+                data=data,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    async def query_documents_partitioned(
+        self,
+        partition: str,
+        name: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        limit: Optional[int] = None,
+        include_relations: bool = False,
+    ) -> list[dict]:
+        """Query documents from a specific partition."""
+        params: dict[str, Any] = {}
+
+        if name:
+            params["filename"] = name
+
+        if tags:
+            params["tags"] = ",".join(tags)
+
+        if limit:
+            params["limit"] = limit
+
+        if include_relations:
+            params["include_relations"] = "true"
+
+        try:
+            client = self._get_client()
+            response = await client.get(
+                f"{self.base_url}/partitions/{partition}/documents",
+                params=params,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    async def search_documents_partitioned(
+        self,
+        partition: str,
+        query: str,
+        limit: Optional[int] = None,
+        include_relations: bool = False,
+    ) -> dict:
+        """Semantic search within a specific partition."""
+        params: dict[str, Any] = {"q": query}
+
+        if limit:
+            params["limit"] = limit
+
+        if include_relations:
+            params["include_relations"] = "true"
+
+        try:
+            client = self._get_client()
+            response = await client.get(
+                f"{self.base_url}/partitions/{partition}/search",
+                params=params,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise SemanticSearchDisabledError()
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
