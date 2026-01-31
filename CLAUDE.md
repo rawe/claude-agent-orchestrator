@@ -43,8 +43,10 @@ See `tests/README.md`.
 Use scripts in `scripts/` to start services (see script comments for details):
 
 ```bash
-./scripts/start-coordinator.sh        # Agent Coordinator
-./scripts/start-dashboard.sh          # Dashboard
-./scripts/start-runner-claude-code.sh # Runner with Claude Code executor
-./scripts/start-runner-procedural.sh  # Runner with procedural executor
+./scripts/start-coordinator.sh            # Agent Coordinator
+./scripts/start-dashboard.sh              # Dashboard
+./scripts/start-runner-claude-code.sh     # Runner with Claude Code executor
+./scripts/start-runner-procedural.sh      # Runner with procedural executor
+./scripts/start-context-store.sh          # Context Store
+./scripts/start-context-store.sh --with-mcp  # Context Store + MCP Server
 ```
