@@ -43,7 +43,7 @@ export function usePartitions() {
     async (name: string) => {
       const result = await partitionService.deletePartition(name);
       setPartitions((prev) => prev.filter((p) => p.name !== name));
-      showSuccess(`Deleted partition "${name}" (${result.deleted_document_count} documents removed)`);
+      showSuccess(`Deleted partition "${name}" (${result.deletedDocumentCount} documents removed)`);
       return result;
     },
     [showSuccess]

@@ -39,7 +39,7 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
           // Collect unique related document IDs
           const relatedIds = new Set<string>();
           Object.values(response.relations).forEach(items => {
-            items.forEach(rel => relatedIds.add(rel.related_document_id));
+            items.forEach(rel => relatedIds.add(rel.relatedDocumentId));
           });
 
           // Fetch metadata for each related document
@@ -135,10 +135,10 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
     }
   };
 
-  const isMarkdown = document.content_type.includes('markdown') || document.filename.endsWith('.md');
-  const isJson = document.content_type.includes('json') || document.filename.endsWith('.json');
-  const isImage = document.content_type.startsWith('image/');
-  const canPreview = isMarkdown || isJson || isImage || document.content_type.includes('text');
+  const isMarkdown = document.contentType.includes('markdown') || document.filename.endsWith('.md');
+  const isJson = document.contentType.includes('json') || document.filename.endsWith('.json');
+  const isImage = document.contentType.startsWith('image/');
+  const canPreview = isMarkdown || isJson || isImage || document.contentType.includes('text');
 
   const renderContent = () => {
     // Images don't need text content loading - render directly from URL
@@ -382,15 +382,15 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-1">MIME Type</p>
-            <span className="text-sm">{document.content_type}</span>
+            <span className="text-sm">{document.contentType}</span>
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-1">Created At</p>
-            <span className="text-sm">{formatAbsoluteTime(document.created_at)}</span>
+            <span className="text-sm">{formatAbsoluteTime(document.createdAt)}</span>
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-1">Size</p>
-            <span className="text-sm">{formatFileSize(document.size_bytes)}</span>
+            <span className="text-sm">{formatFileSize(document.sizeBytes)}</span>
           </div>
           <div className="col-span-2">
             <p className="text-xs text-gray-500 mb-1">Tags</p>
@@ -448,7 +448,7 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
                     </div>
                     <div className="space-y-2">
                       {items.map((rel) => {
-                        const relatedDoc = relatedDocs[rel.related_document_id];
+                        const relatedDoc = relatedDocs[rel.relatedDocumentId];
                         const description = relatedDoc?.metadata?.description;
                         const truncatedDesc = description && description.length > 80
                           ? description.slice(0, 80) + '...'
@@ -494,9 +494,9 @@ export function DocumentPreview({ document, isOpen, onClose, onDelete, onNavigat
                             {/* Tertiary: Document ID */}
                             <div className="flex items-center gap-1 mt-1">
                               <span className="font-mono text-[10px] text-gray-400 truncate">
-                                {rel.related_document_id}
+                                {rel.relatedDocumentId}
                               </span>
-                              <CopyButton text={rel.related_document_id} />
+                              <CopyButton text={rel.relatedDocumentId} />
                             </div>
                           </div>
                         );

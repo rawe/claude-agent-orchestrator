@@ -7,9 +7,9 @@ interface CreatePartitionModalProps {
   onCreate: (name: string, description?: string) => Promise<void>;
 }
 
-// Validate partition name: alphanumeric and hyphens only, must start with letter
+// Validate partition name: must start with letter or underscore, then letters/numbers/underscores
 const isValidPartitionName = (name: string): boolean => {
-  return /^[a-z][a-z0-9-]*$/.test(name);
+  return /^[a-z_][a-z0-9_]*$/.test(name);
 };
 
 export function CreatePartitionModal({ isOpen, onClose, onCreate }: CreatePartitionModalProps) {
@@ -29,7 +29,7 @@ export function CreatePartitionModal({ isOpen, onClose, onCreate }: CreatePartit
     }
 
     if (!isValidPartitionName(trimmedName)) {
-      setError('Name must start with a letter and contain only lowercase letters, numbers, and hyphens');
+      setError('Must start with letter or underscore, then letters, numbers, or underscores');
       return;
     }
 
@@ -77,7 +77,7 @@ export function CreatePartitionModal({ isOpen, onClose, onCreate }: CreatePartit
               type="text"
               value={name}
               onChange={handleNameChange}
-              placeholder="my-partition"
+              placeholder="my_partition"
               className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 ${
                 error
                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
@@ -87,7 +87,7 @@ export function CreatePartitionModal({ isOpen, onClose, onCreate }: CreatePartit
               disabled={loading}
             />
             <p className="mt-1 text-xs text-gray-500">
-              Lowercase letters, numbers, and hyphens only
+              Starts with letter or underscore; letters, numbers, underscores allowed
             </p>
             {error && (
               <p className="mt-1 text-xs text-red-600">{error}</p>

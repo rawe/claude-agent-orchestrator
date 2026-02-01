@@ -1,10 +1,10 @@
-import { documentApi } from './api';
+import { contextStoreClient } from './contextStoreClient';
 import type { Document, DocumentTag, DocumentQuery, DocumentRelationsResponse } from '@/types';
 
 export interface SemanticSearchResult {
-  document_id: string;
+  documentId: string;
   filename: string;
-  document_url: string;
+  documentUrl: string;
   sections: Array<{
     score: number;
     offset: number;
@@ -18,15 +18,12 @@ export interface SemanticSearchResponse {
 }
 
 /**
- * Build path with optional partition prefix
- * Global partition (_global) uses global endpoints without /partitions prefix
- * Other partitions use /partitions/{name} prefix
+ * Convert dashboard partition string to SDK partition (undefined for global)
+ * Dashboard uses '_global' string, SDK uses undefined for global partition
  */
-const buildPath = (basePath: string, partition: string | null): string => {
-  if (!partition || partition === '_global') {
-    return basePath;
-  }
-  return `/partitions/${partition}${basePath}`;
+const toSdkPartition = (partition: string | null): string | undefined => {
+  if (!partition || partition === '_global') return undefined;
+  return partition;
 };
 
 export const documentService = {
@@ -34,77 +31,60 @@ export const documentService = {
    * Get all documents with optional filtering
    */
   async getDocuments(query?: DocumentQuery, partition: string | null = null): Promise<Document[]> {
-    const params = new URLSearchParams();
-    if (query?.filename) params.append('filename', query.filename);
-    if (query?.tags?.length) params.append('tags', query.tags.join(','));
-    if (query?.limit) params.append('limit', query.limit.toString());
-    if (query?.offset) params.append('offset', query.offset.toString());
-
-    const path = buildPath('/documents', partition);
-    const response = await documentApi.get<Document[]>(path, { params });
-    return response.data;
+    return contextStoreClient.documents.list({
+      filename: query?.filename,
+      tags: query?.tags,
+      limit: query?.limit,
+      partition: toSdkPartition(partition),
+    });
   },
 
   /**
    * Get a single document's metadata
    */
   async getDocumentMetadata(id: string, partition: string | null = null): Promise<Document> {
-    const path = buildPath(`/documents/${id}/metadata`, partition);
-    const response = await documentApi.get<Document>(path);
-    return response.data;
+    return contextStoreClient.documents.getMetadata(id, {
+      partition: toSdkPartition(partition),
+    });
   },
 
   /**
    * Get document content (download)
    */
   async getDocumentContent(id: string, partition: string | null = null): Promise<Blob> {
-    const path = buildPath(`/documents/${id}`, partition);
-    const response = await documentApi.get(path, {
+    const result = await contextStoreClient.documents.download(id, {
       responseType: 'blob',
+      partition: toSdkPartition(partition),
     });
-    return response.data;
+    return result as Blob;
   },
 
   /**
    * Upload a new document
+   * Note: SDK uses fetch which doesn't support progress callbacks, so onProgress is ignored
    */
   async uploadDocument(
     file: File,
     tags?: string[],
     metadata?: Record<string, string>,
-    onProgress?: (progress: number) => void,
+    _onProgress?: (progress: number) => void,
     partition: string | null = null
   ): Promise<Document> {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (tags?.length) {
-      formData.append('tags', tags.join(','));
-    }
-    if (metadata) {
-      formData.append('metadata', JSON.stringify(metadata));
-    }
-
-    const path = buildPath('/documents', partition);
-    const response = await documentApi.post<Document>(path, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.total && onProgress) {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onProgress(progress);
-        }
-      },
+    return contextStoreClient.documents.upload(file, {
+      filename: file.name,
+      tags,
+      description: metadata?.description,
+      partition: toSdkPartition(partition),
     });
-    return response.data;
   },
 
   /**
    * Delete a document
    */
   async deleteDocument(id: string, partition: string | null = null): Promise<void> {
-    const path = buildPath(`/documents/${id}`, partition);
-    await documentApi.delete(path);
+    await contextStoreClient.documents.delete(id, {
+      partition: toSdkPartition(partition),
+    });
   },
 
   /**
@@ -113,26 +93,21 @@ export const documentService = {
    * Will compute tags client-side for now
    */
   async getTags(partition: string | null = null): Promise<DocumentTag[]> {
-    try {
-      const path = buildPath('/documents/tags', partition);
-      const response = await documentApi.get<{ tags: DocumentTag[] }>(path);
-      return response.data.tags;
-    } catch {
-      // Fallback: fetch all documents and compute tags client-side
-      console.warn('Tags endpoint not implemented, computing client-side');
-      const documents = await this.getDocuments(undefined, partition);
-      const tagCounts = new Map<string, number>();
+    // Fallback: fetch all documents and compute tags client-side
+    // SDK doesn't have a tags endpoint
+    console.warn('Tags endpoint not implemented, computing client-side');
+    const documents = await this.getDocuments(undefined, partition);
+    const tagCounts = new Map<string, number>();
 
-      documents.forEach((doc) => {
-        doc.tags.forEach((tag) => {
-          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-        });
+    documents.forEach((doc) => {
+      doc.tags.forEach((tag) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
       });
+    });
 
-      return Array.from(tagCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count);
-    }
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
   },
 
   /**
@@ -155,13 +130,20 @@ export const documentService = {
    * Returns document IDs of matching documents
    */
   async semanticSearch(query: string, limit = 20, partition: string | null = null): Promise<SemanticSearchResponse> {
-    const params = new URLSearchParams();
-    params.append('q', query);
-    params.append('limit', limit.toString());
+    const results = await contextStoreClient.documents.search(query, {
+      limit,
+      partition: toSdkPartition(partition),
+    });
 
-    const path = buildPath('/search', partition);
-    const response = await documentApi.get<SemanticSearchResponse>(path, { params });
-    return response.data;
+    return {
+      query,
+      results: results.map((r) => ({
+        documentId: r.documentId,
+        filename: r.filename,
+        documentUrl: r.documentUrl,
+        sections: r.sections,
+      })),
+    };
   },
 
   /**
@@ -169,8 +151,13 @@ export const documentService = {
    * Returns all relations for a document grouped by relation type
    */
   async getDocumentRelations(id: string, partition: string | null = null): Promise<DocumentRelationsResponse> {
-    const path = buildPath(`/documents/${id}/relations`, partition);
-    const response = await documentApi.get<DocumentRelationsResponse>(path);
-    return response.data;
+    const result = await contextStoreClient.relations.list(id, {
+      partition: toSdkPartition(partition),
+    });
+
+    return {
+      documentId: result.documentId,
+      relations: result.relations as unknown as Record<string, DocumentRelationsResponse['relations'][string]>,
+    };
   },
 };

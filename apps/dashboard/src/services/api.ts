@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AGENT_ORCHESTRATOR_API_URL, DOCUMENT_SERVER_URL } from '@/utils/constants';
+import { AGENT_ORCHESTRATOR_API_URL } from '@/utils/constants';
 import { fetchAccessToken, isOidcConfigured } from './auth';
 
 // Axios instance for Agent Orchestrator API (sessions, events, agent blueprints, runs)
@@ -22,14 +22,6 @@ agentOrchestratorApi.interceptors.request.use(async (config) => {
   // When OIDC is not configured, requests go without auth
   // (for local development with AUTH_ENABLED=false on coordinator)
   return config;
-});
-
-// Axios instance for context store server
-export const documentApi = axios.create({
-  baseURL: DOCUMENT_SERVER_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Add response interceptors for error handling with auth-specific messages
@@ -66,4 +58,3 @@ const handleError = (error: unknown) => {
 };
 
 agentOrchestratorApi.interceptors.response.use((response) => response, handleError);
-documentApi.interceptors.response.use((response) => response, handleError);

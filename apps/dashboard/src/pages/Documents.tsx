@@ -105,7 +105,7 @@ export function Documents() {
     setSemanticSearching(true);
     try {
       const response = await documentService.semanticSearch(semanticQuery.trim(), 20, selectedPartition);
-      setSemanticResultIds(response.results.map((r) => r.document_id));
+      setSemanticResultIds(response.results.map((r) => r.documentId));
       setActiveSemanticQuery(semanticQuery.trim());
     } catch (err) {
       showError('Semantic search failed. Is the search service available?');
@@ -129,7 +129,7 @@ export function Documents() {
       setSemanticSearching(true);
       try {
         const response = await documentService.semanticSearch(activeSemanticQuery, 20, selectedPartition);
-        setSemanticResultIds(response.results.map((r) => r.document_id));
+        setSemanticResultIds(response.results.map((r) => r.documentId));
       } catch (err) {
         showError('Failed to refresh semantic search');
         console.error(err);
@@ -186,6 +186,12 @@ export function Documents() {
                 ? 'Global partition - shared across all sessions'
                 : `Partition: ${selectedPartition}`}
             </p>
+            {selectedPartition !== GLOBAL_PARTITION_NAME && (() => {
+              const partition = partitions.find(p => p.name === selectedPartition);
+              return partition?.description ? (
+                <p className="text-sm text-gray-400 italic">{partition.description}</p>
+              ) : null;
+            })()}
           </div>
           <div className="flex items-center gap-2">
             <Button

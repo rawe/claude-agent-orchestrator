@@ -89,13 +89,11 @@ export function PartitionSidebar({
           >
             <Globe className="w-4 h-4 flex-shrink-0" />
             <span className="flex-1 text-left truncate">Global</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              selectedPartition === GLOBAL_PARTITION_NAME
-                ? 'bg-primary-100 text-primary-600'
-                : 'bg-gray-200 text-gray-600'
-            }`}>
-              {globalDocCount}
-            </span>
+            {selectedPartition === GLOBAL_PARTITION_NAME && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-600">
+                {globalDocCount}
+              </span>
+            )}
           </button>
 
           {/* Other Partitions */}
@@ -122,13 +120,11 @@ export function PartitionSidebar({
                     <span className="flex-1 text-left truncate" title={partition.name}>
                       {partition.name}
                     </span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                      isSelected
-                        ? 'bg-primary-100 text-primary-600'
-                        : 'bg-gray-200 text-gray-600'
-                    }`}>
-                      {docCount}
-                    </span>
+                    {isSelected && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-600">
+                        {docCount}
+                      </span>
+                    )}
                   </button>
                   <button
                     onClick={(e) => {
