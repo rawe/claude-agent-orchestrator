@@ -2,7 +2,11 @@
   "mcpServers": {
     "context-store-http": {
       "type": "http",
-      "url": "http://localhost:9501/mcp"
+      "url": "http://localhost:9501/mcp",
+      "headers": {
+        "X-Context-Store-Partition": "test-partition",
+        "X-Context-Store-Partition-Auto-Create": "true"
+      }
     }
   }
 }

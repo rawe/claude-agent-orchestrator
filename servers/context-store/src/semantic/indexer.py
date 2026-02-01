@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from ..database import GLOBAL_PARTITION
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ def _ensure_index_exists():
             "mappings": {
                 "properties": {
                     "context_store_document_id": {"type": "keyword"},
+                    "partition": {"type": "keyword"},
                     "char_start": {"type": "integer"},
                     "char_end": {"type": "integer"},
                     "embedding": {
@@ -90,12 +92,19 @@ def _ensure_index_exists():
         logger.info(f"Created Elasticsearch index: {config.elasticsearch_index}")
 
 
-def index_document(document_id: str, content: str) -> bool:
+def index_document(document_id: str, content: str, partition: str = GLOBAL_PARTITION) -> bool:
     """
     Index a document for semantic search.
 
     Chunks the content, generates embeddings, and stores in Elasticsearch.
-    Returns True if indexing succeeded, False otherwise.
+
+    Args:
+        document_id: Document ID
+        content: Document content to index
+        partition: Partition the document belongs to
+
+    Returns:
+        True if indexing succeeded, False otherwise.
     """
     if not config.enabled:
         return False
@@ -117,13 +126,14 @@ def index_document(document_id: str, content: str) -> bool:
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             doc = {
                 "context_store_document_id": document_id,
+                "partition": partition,
                 "char_start": chunk["char_start"],
                 "char_end": chunk["char_end"],
                 "embedding": embedding,
             }
             es.index(index=config.elasticsearch_index, document=doc)
 
-        logger.info(f"Indexed {len(chunks)} chunks for document {document_id}")
+        logger.info(f"Indexed {len(chunks)} chunks for document {document_id} in partition {partition}")
         return True
 
     except Exception as e:

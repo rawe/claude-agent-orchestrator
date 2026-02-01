@@ -4,21 +4,23 @@ import logging
 from collections import defaultdict
 from typing import Optional
 
+from ..database import GLOBAL_PARTITION
 from .config import config
 from .indexer import _get_embeddings, _get_es_client
 
 logger = logging.getLogger(__name__)
 
 
-def search_documents(query: str, limit: int = 10) -> list[dict]:
+def search_documents(query: str, partition: str = GLOBAL_PARTITION, limit: int = 10) -> list[dict]:
     """
-    Search for documents semantically similar to the query.
+    Search for documents semantically similar to the query within a partition.
 
     Returns a list of results aggregated by document, with multiple
     matching sections per document.
 
     Args:
         query: Natural language search query
+        partition: Partition to search within
         limit: Maximum number of documents to return
 
     Returns:
@@ -35,13 +37,16 @@ def search_documents(query: str, limit: int = 10) -> list[dict]:
         # Search Elasticsearch
         es = _get_es_client()
 
-        # KNN search for similar vectors
+        # KNN search for similar vectors with partition filter
         search_body = {
             "knn": {
                 "field": "embedding",
                 "query_vector": query_embedding,
                 "k": limit * 3,  # Get more chunks to aggregate by document
-                "num_candidates": 100
+                "num_candidates": 100,
+                "filter": {
+                    "term": {"partition": partition}
+                }
             },
             "_source": ["context_store_document_id", "char_start", "char_end"]
         }

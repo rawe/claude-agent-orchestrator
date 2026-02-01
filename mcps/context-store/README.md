@@ -53,6 +53,8 @@ make stop-cs-mcp
 | `CONTEXT_STORE_SCHEME` | URL scheme for Context Store server | http |
 | `CONTEXT_STORE_MCP_PORT` | HTTP mode port (Makefile) | 9501 |
 | `CONTEXT_STORE_MCP_HOST` | HTTP mode host (Makefile) | 127.0.0.1 |
+| `CONTEXT_STORE_PARTITION` | Partition name for document isolation (stdio mode) | (none) |
+| `CONTEXT_STORE_PARTITION_AUTO_CREATE` | Auto-create partition if missing (stdio mode) | `false` |
 
 ### .env Configuration (for Makefile)
 
@@ -63,6 +65,33 @@ Copy `.env.template` to `.env` in the project root and configure:
 CONTEXT_STORE_MCP_PORT=9501
 CONTEXT_STORE_MCP_HOST=127.0.0.1
 ```
+
+## Partition Routing
+
+Partitions provide document isolation. Configuration differs by mode:
+
+### stdio Mode
+
+Set at startup via environment variables:
+
+```bash
+# With partition
+CONTEXT_STORE_PARTITION=my-project uv run --script context-store-mcp.py
+
+# With auto-create
+CONTEXT_STORE_PARTITION=my-project CONTEXT_STORE_PARTITION_AUTO_CREATE=true uv run --script context-store-mcp.py
+```
+
+### HTTP Mode
+
+Set per-request via HTTP headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-Context-Store-Partition` | Partition name |
+| `X-Context-Store-Partition-Auto-Create` | `true` to auto-create |
+
+> **Note:** HTTP mode ignores environment variables. Modes are independent.
 
 ## MCP Tools
 

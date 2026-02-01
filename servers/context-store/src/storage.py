@@ -3,8 +3,10 @@
 import hashlib
 import secrets
 import mimetypes
+import shutil
 from pathlib import Path
 from .models import DocumentMetadata
+from .database import GLOBAL_PARTITION
 
 
 def _init_custom_mime_types():
@@ -50,12 +52,46 @@ class DocumentStorage:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def store_document(self, content: bytes, filename: str, content_type: str | None = None) -> DocumentMetadata:
+    def ensure_partition_directory(self, partition: str) -> Path:
+        """Ensure partition directory exists.
+
+        Args:
+            partition: Partition name
+
+        Returns:
+            Path to partition directory
+        """
+        partition_dir = self.base_dir / partition
+        partition_dir.mkdir(parents=True, exist_ok=True)
+        return partition_dir
+
+    def delete_partition_directory(self, partition: str) -> bool:
+        """Delete partition directory and all its contents.
+
+        Args:
+            partition: Partition name
+
+        Returns:
+            True if directory was deleted, False if it didn't exist
+        """
+        partition_dir = self.base_dir / partition
+
+        # Safety check - don't delete base dir
+        if partition_dir == self.base_dir:
+            return False
+
+        if partition_dir.exists():
+            shutil.rmtree(partition_dir)
+            return True
+        return False
+
+    def store_document(self, content: bytes, filename: str, partition: str = GLOBAL_PARTITION, content_type: str | None = None) -> DocumentMetadata:
         """Store document and return metadata with checksum.
 
         Args:
             content: File content as bytes
             filename: Original filename
+            partition: Partition to store document in
             content_type: Optional MIME type from client. If not provided, will detect from filename.
 
         Returns:
@@ -74,8 +110,11 @@ class DocumentStorage:
         # Calculate file size
         size_bytes = len(content)
 
-        # Write file to storage (flat structure)
-        file_path = self.base_dir / doc_id
+        # Ensure partition directory exists
+        partition_dir = self.ensure_partition_directory(partition)
+
+        # Write file to storage (partition/doc_id structure)
+        file_path = partition_dir / doc_id
         file_path.write_bytes(content)
 
         # Return metadata
@@ -88,9 +127,14 @@ class DocumentStorage:
             storage_path=str(file_path)
         )
 
-    def get_document_path(self, doc_id: str) -> Path:
-        """Get document path with path traversal protection."""
-        file_path = self.base_dir / doc_id
+    def get_document_path(self, doc_id: str, partition: str = GLOBAL_PARTITION) -> Path:
+        """Get document path with path traversal protection.
+
+        Args:
+            doc_id: Document ID
+            partition: Partition the document is in
+        """
+        file_path = self.base_dir / partition / doc_id
         resolved = file_path.resolve()
 
         # Path traversal protection
@@ -99,10 +143,15 @@ class DocumentStorage:
 
         return resolved
 
-    def delete_document(self, doc_id: str) -> bool:
-        """Delete document from filesystem. Returns True if deleted, False if not found."""
+    def delete_document(self, doc_id: str, partition: str = GLOBAL_PARTITION) -> bool:
+        """Delete document from filesystem. Returns True if deleted, False if not found.
+
+        Args:
+            doc_id: Document ID
+            partition: Partition the document is in
+        """
         try:
-            file_path = self.get_document_path(doc_id)
+            file_path = self.get_document_path(doc_id, partition)
             if file_path.exists():
                 file_path.unlink()
                 return True
@@ -111,11 +160,12 @@ class DocumentStorage:
             # Path traversal attempt
             return False
 
-    def create_placeholder(self, filename: str, content_type: str | None = None) -> DocumentMetadata:
+    def create_placeholder(self, filename: str, partition: str = GLOBAL_PARTITION, content_type: str | None = None) -> DocumentMetadata:
         """Create an empty placeholder document.
 
         Args:
             filename: Document filename (used for content-type inference if not provided)
+            partition: Partition to create document in
             content_type: Optional MIME type (inferred from filename if not provided)
 
         Returns:
@@ -128,8 +178,11 @@ class DocumentStorage:
         if not content_type:
             content_type = infer_content_type(filename)
 
+        # Ensure partition directory exists
+        partition_dir = self.ensure_partition_directory(partition)
+
         # Create empty file (0 bytes)
-        file_path = self.base_dir / doc_id
+        file_path = partition_dir / doc_id
         file_path.touch()
 
         # Return metadata with checksum=None to indicate placeholder
@@ -142,11 +195,12 @@ class DocumentStorage:
             storage_path=str(file_path)
         )
 
-    def write_document_content(self, doc_id: str, content: bytes) -> tuple[int, str]:
+    def write_document_content(self, doc_id: str, partition: str = GLOBAL_PARTITION, content: bytes = b"") -> tuple[int, str]:
         """Write content to an existing document file.
 
         Args:
             doc_id: Document ID
+            partition: Partition the document is in
             content: Content bytes to write
 
         Returns:
@@ -156,7 +210,7 @@ class DocumentStorage:
             ValueError: If document path is invalid (path traversal)
             FileNotFoundError: If document file doesn't exist
         """
-        file_path = self.get_document_path(doc_id)
+        file_path = self.get_document_path(doc_id, partition)
 
         if not file_path.exists():
             raise FileNotFoundError(f"Document file not found: {doc_id}")
@@ -173,6 +227,7 @@ class DocumentStorage:
     def edit_document_content(
         self,
         doc_id: str,
+        partition: str = GLOBAL_PARTITION,
         old_string: str | None = None,
         new_string: str = "",
         replace_all: bool = False,
@@ -187,6 +242,7 @@ class DocumentStorage:
 
         Args:
             doc_id: Document ID
+            partition: Partition the document is in
             old_string: Text to find and replace (string mode)
             new_string: Replacement text or text to insert
             replace_all: Replace all occurrences (string mode only)
@@ -202,7 +258,7 @@ class DocumentStorage:
                        string not found, or ambiguous match
             FileNotFoundError: If document file doesn't exist
         """
-        file_path = self.get_document_path(doc_id)
+        file_path = self.get_document_path(doc_id, partition)
 
         if not file_path.exists():
             raise FileNotFoundError(f"Document file not found: {doc_id}")

@@ -1,15 +1,27 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useDocuments, useTags } from '@/hooks/useDocuments';
-import { DocumentTable, DocumentPreview, UploadModal, TagOverflowDropdown } from '@/components/features/documents';
+import { usePartitions } from '@/hooks/usePartitions';
+import { DocumentTable, DocumentPreview, UploadModal, TagOverflowDropdown, PartitionSidebar, CreatePartitionModal } from '@/components/features/documents';
 import { Button, Badge, ConfirmModal } from '@/components/common';
 import { useNotification } from '@/contexts';
-import { Document } from '@/types';
+import { Document, GLOBAL_PARTITION_NAME } from '@/types';
 import { documentService } from '@/services/documentService';
 import { Upload, X, Sparkles, RefreshCw, Tag } from 'lucide-react';
 
 export function Documents() {
-  const { documents, loading, uploadDocument, deleteDocument, refetch } = useDocuments();
-  const { tags } = useTags();
+  // Partition state
+  const [selectedPartition, setSelectedPartition] = useState<string>(GLOBAL_PARTITION_NAME);
+  const [showCreatePartitionModal, setShowCreatePartitionModal] = useState(false);
+
+  // Pass partition to hooks
+  const { documents, loading, uploadDocument, deleteDocument, refetch } = useDocuments(selectedPartition);
+  const { tags, refetch: refetchTags } = useTags(selectedPartition);
+  const {
+    partitions,
+    loading: partitionsLoading,
+    createPartition,
+    deletePartition,
+  } = usePartitions();
   const { showSuccess, showError } = useNotification();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +39,14 @@ export function Documents() {
   const [semanticResultIds, setSemanticResultIds] = useState<string[] | null>(null);
   const [semanticSearching, setSemanticSearching] = useState(false);
   const [activeSemanticQuery, setActiveSemanticQuery] = useState<string | null>(null);
+
+  // Compute document counts per partition for sidebar
+  const documentCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    // Current partition's count from loaded documents
+    counts[selectedPartition] = documents.length;
+    return counts;
+  }, [selectedPartition, documents.length]);
 
   // Compute visible documents and their tags (filtered by semantic search if active)
   const visibleTags = useMemo(() => {
@@ -84,8 +104,8 @@ export function Documents() {
     if (!semanticQuery.trim()) return;
     setSemanticSearching(true);
     try {
-      const response = await documentService.semanticSearch(semanticQuery.trim());
-      setSemanticResultIds(response.results.map((r) => r.document_id));
+      const response = await documentService.semanticSearch(semanticQuery.trim(), 20, selectedPartition);
+      setSemanticResultIds(response.results.map((r) => r.documentId));
       setActiveSemanticQuery(semanticQuery.trim());
     } catch (err) {
       showError('Semantic search failed. Is the search service available?');
@@ -108,8 +128,8 @@ export function Documents() {
     if (activeSemanticQuery) {
       setSemanticSearching(true);
       try {
-        const response = await documentService.semanticSearch(activeSemanticQuery);
-        setSemanticResultIds(response.results.map((r) => r.document_id));
+        const response = await documentService.semanticSearch(activeSemanticQuery, 20, selectedPartition);
+        setSemanticResultIds(response.results.map((r) => r.documentId));
       } catch (err) {
         showError('Failed to refresh semantic search');
         console.error(err);
@@ -119,153 +139,200 @@ export function Documents() {
     }
   };
 
+  const handlePartitionChange = useCallback((partitionName: string) => {
+    setSelectedPartition(partitionName);
+    // Clear search state when switching partitions
+    clearSemanticSearch();
+    setSelectedTags([]);
+    setSearchQuery('');
+    setSelectedDocument(null);
+  }, []);
+
+  const handleCreatePartition = async (name: string, description?: string) => {
+    await createPartition(name, description);
+    // Optionally select the new partition
+    setSelectedPartition(name);
+  };
+
+  const handleDeletePartition = async (name: string) => {
+    await deletePartition(name);
+    // If the deleted partition was selected, switch to global
+    if (selectedPartition === name) {
+      setSelectedPartition(GLOBAL_PARTITION_NAME);
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header: Title + Actions */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">Context Store</h1>
-          <p className="text-sm text-gray-500">Share documents between isolated agent sessions</p>
+    <div className="h-full flex bg-white">
+      {/* Partition Sidebar */}
+      <PartitionSidebar
+        partitions={partitions}
+        selectedPartition={selectedPartition}
+        onSelectPartition={handlePartitionChange}
+        onCreatePartition={() => setShowCreatePartitionModal(true)}
+        onDeletePartition={handleDeletePartition}
+        documentCounts={documentCounts}
+        loading={partitionsLoading}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header: Title + Actions */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Context Store</h1>
+            <p className="text-sm text-gray-500">
+              {selectedPartition === GLOBAL_PARTITION_NAME
+                ? 'Global partition - shared across all sessions'
+                : `Partition: ${selectedPartition}`}
+            </p>
+            {selectedPartition !== GLOBAL_PARTITION_NAME && (() => {
+              const partition = partitions.find(p => p.name === selectedPartition);
+              return partition?.description ? (
+                <p className="text-sm text-gray-400 italic">{partition.description}</p>
+              ) : null;
+            })()}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowUploadModal(true)}
+              icon={<Upload className="w-4 h-4" />}
+            >
+              Upload
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              variant="secondary"
+              icon={<RefreshCw className={`w-4 h-4 ${loading || semanticSearching ? 'animate-spin' : ''}`} />}
+              disabled={loading || semanticSearching}
+              title="Refresh"
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setShowUploadModal(true)}
-            icon={<Upload className="w-4 h-4" />}
-          >
-            Upload
-          </Button>
-          <Button
-            onClick={handleRefresh}
-            variant="secondary"
-            icon={<RefreshCw className={`w-4 h-4 ${loading || semanticSearching ? 'animate-spin' : ''}`} />}
-            disabled={loading || semanticSearching}
-            title="Refresh"
+
+        {/* Filter Section */}
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 space-y-3">
+          {/* Semantic Search */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              Semantic Search
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Ask a question about your documents..."
+                value={semanticQuery}
+                onChange={(e) => setSemanticQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch()}
+                disabled={semanticSearching}
+                className="flex-1 max-w-xl px-3 py-2 text-sm border border-gray-300 rounded-md
+                           focus:outline-none focus:ring-1 focus:ring-purple-500
+                           focus:border-purple-500 disabled:opacity-50"
+              />
+              <Button
+                onClick={handleSemanticSearch}
+                disabled={!semanticQuery.trim() || semanticSearching}
+                variant="secondary"
+              >
+                {semanticSearching ? 'Searching...' : 'Search'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+              <Tag className="w-4 h-4 text-gray-500" />
+              Tags
+              {visibleTags.length > 8 && (
+                <span className="text-xs text-gray-400 font-normal">
+                  ({visibleTags.length} total)
+                </span>
+              )}
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {visibleTags.slice(0, 8).map((tag) => (
+                <button
+                  key={tag.name}
+                  onClick={() => toggleTag(tag.name)}
+                  className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                    selectedTags.includes(tag.name)
+                      ? 'bg-primary-100 text-primary-700 font-medium'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {tag.name} ({tag.count})
+                </button>
+              ))}
+
+              {/* Overflow dropdown */}
+              {visibleTags.length > 8 && (
+                <TagOverflowDropdown
+                  tags={visibleTags.slice(8)}
+                  selectedTags={selectedTags}
+                  onToggle={toggleTag}
+                />
+              )}
+
+              {visibleTags.length === 0 && (
+                <span className="text-xs text-gray-400 italic">No tags available</span>
+              )}
+            </div>
+          </div>
+
+          {/* Active Filters */}
+          {(selectedTags.length > 0 || activeSemanticQuery) && (
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+              <span className="text-xs text-gray-500">Active:</span>
+
+              {activeSemanticQuery && (
+                <Badge size="sm" variant="info">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  {activeSemanticQuery.length > 30
+                    ? activeSemanticQuery.slice(0, 30) + '...'
+                    : activeSemanticQuery}
+                  <button onClick={clearSemanticSearch} className="ml-1.5 hover:text-gray-700">
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+
+              {selectedTags.map((tag) => (
+                <Badge key={tag} size="sm" variant="info">
+                  {tag}
+                  <button onClick={() => toggleTag(tag)} className="ml-1.5 hover:text-gray-700">
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+
+              <button
+                onClick={() => {
+                  setSelectedTags([]);
+                  clearSemanticSearch();
+                }}
+                className="ml-auto text-xs text-gray-500 hover:text-gray-700"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-hidden">
+          <DocumentTable
+            documents={documents}
+            loading={loading}
+            onSelectDocument={setSelectedDocument}
+            onDeleteDocument={(id) => setDeleteConfirm({ isOpen: true, documentId: id })}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedTags={selectedTags}
+            semanticResultIds={semanticResultIds}
           />
         </div>
-      </div>
-
-      {/* Filter Section */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 space-y-3">
-        {/* Semantic Search */}
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-            <Sparkles className="w-4 h-4 text-purple-500" />
-            Semantic Search
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Ask a question about your documents..."
-              value={semanticQuery}
-              onChange={(e) => setSemanticQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSemanticSearch()}
-              disabled={semanticSearching}
-              className="flex-1 max-w-xl px-3 py-2 text-sm border border-gray-300 rounded-md
-                         focus:outline-none focus:ring-1 focus:ring-purple-500
-                         focus:border-purple-500 disabled:opacity-50"
-            />
-            <Button
-              onClick={handleSemanticSearch}
-              disabled={!semanticQuery.trim() || semanticSearching}
-              variant="secondary"
-            >
-              {semanticSearching ? 'Searching...' : 'Search'}
-            </Button>
-          </div>
-        </div>
-
-        {/* Tags */}
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-            <Tag className="w-4 h-4 text-gray-500" />
-            Tags
-            {visibleTags.length > 8 && (
-              <span className="text-xs text-gray-400 font-normal">
-                ({visibleTags.length} total)
-              </span>
-            )}
-          </label>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {visibleTags.slice(0, 8).map((tag) => (
-              <button
-                key={tag.name}
-                onClick={() => toggleTag(tag.name)}
-                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                  selectedTags.includes(tag.name)
-                    ? 'bg-primary-100 text-primary-700 font-medium'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                {tag.name} ({tag.count})
-              </button>
-            ))}
-
-            {/* Overflow dropdown */}
-            {visibleTags.length > 8 && (
-              <TagOverflowDropdown
-                tags={visibleTags.slice(8)}
-                selectedTags={selectedTags}
-                onToggle={toggleTag}
-              />
-            )}
-
-            {visibleTags.length === 0 && (
-              <span className="text-xs text-gray-400 italic">No tags available</span>
-            )}
-          </div>
-        </div>
-
-        {/* Active Filters */}
-        {(selectedTags.length > 0 || activeSemanticQuery) && (
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
-            <span className="text-xs text-gray-500">Active:</span>
-
-            {activeSemanticQuery && (
-              <Badge size="sm" variant="info">
-                <Sparkles className="w-3 h-3 mr-1" />
-                {activeSemanticQuery.length > 30
-                  ? activeSemanticQuery.slice(0, 30) + '...'
-                  : activeSemanticQuery}
-                <button onClick={clearSemanticSearch} className="ml-1.5 hover:text-gray-700">
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            )}
-
-            {selectedTags.map((tag) => (
-              <Badge key={tag} size="sm" variant="info">
-                {tag}
-                <button onClick={() => toggleTag(tag)} className="ml-1.5 hover:text-gray-700">
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            ))}
-
-            <button
-              onClick={() => {
-                setSelectedTags([]);
-                clearSemanticSearch();
-              }}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-700"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="flex-1 overflow-hidden">
-        <DocumentTable
-          documents={documents}
-          loading={loading}
-          onSelectDocument={setSelectedDocument}
-          onDeleteDocument={(id) => setDeleteConfirm({ isOpen: true, documentId: id })}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          selectedTags={selectedTags}
-          semanticResultIds={semanticResultIds}
-        />
       </div>
 
       {/* Preview Modal */}
@@ -279,6 +346,7 @@ export function Documents() {
           }
         }}
         onNavigateToDocument={setSelectedDocument}
+        partition={selectedPartition}
       />
 
       {/* Upload Modal */}
@@ -287,9 +355,17 @@ export function Documents() {
         onClose={() => {
           setShowUploadModal(false);
           refetch();
+          refetchTags();
         }}
         onUpload={handleUpload}
         existingTags={tags.map((t) => t.name)}
+      />
+
+      {/* Create Partition Modal */}
+      <CreatePartitionModal
+        isOpen={showCreatePartitionModal}
+        onClose={() => setShowCreatePartitionModal(false)}
+        onCreate={handleCreatePartition}
       />
 
       {/* Delete Confirm Modal */}

@@ -51,3 +51,11 @@ class SemanticSearchDisabledError(ContextStoreError):
 
     def __init__(self):
         super().__init__("Semantic search is not enabled on the server")
+
+
+class PartitionNotFoundError(ContextStoreError):
+    """Raised when a partition does not exist and auto-create is disabled."""
+
+    def __init__(self, partition: str):
+        self.partition = partition
+        super().__init__(f"Partition '{partition}' does not exist")

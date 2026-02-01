@@ -47,6 +47,12 @@ SUPPORTED_TEXT_MIME_TYPES = [
     "application/xml",
 ]
 
+# API resource paths
+RESOURCE_DOCUMENTS = "documents"
+RESOURCE_RELATIONS = "relations"
+RESOURCE_SEARCH = "search"
+RESOURCE_PARTITIONS = "partitions"
+
 
 def _is_text_mime_type(mime_type: str) -> bool:
     """Check if a MIME type is supported for text reading."""
@@ -110,6 +116,7 @@ class ContextStoreClient:
         name: Optional[str] = None,
         tags: Optional[list[str]] = None,
         description: Optional[str] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Upload a document to the Context Store.
 
@@ -118,6 +125,7 @@ class ContextStoreClient:
             name: Custom name for the document (defaults to filename)
             tags: List of tags to associate with the document
             description: Description of the document
+            partition: Partition name (None = global partition)
 
         Returns:
             JSON response from server with document metadata
@@ -153,7 +161,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.post(
-                f"{self.base_url}/documents",
+                self._build_url(RESOURCE_DOCUMENTS, partition),
                 files=files,
                 data=data,
             )
@@ -171,6 +179,7 @@ class ContextStoreClient:
         filename: str,
         tags: Optional[list[str]] = None,
         description: Optional[str] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Create a placeholder document without content.
 
@@ -178,6 +187,7 @@ class ContextStoreClient:
             filename: Document filename (used for content-type inference)
             tags: List of tags for categorization
             description: Human-readable description
+            partition: Partition name (None = global partition)
 
         Returns:
             JSON response with document metadata including generated ID
@@ -198,7 +208,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.post(
-                f"{self.base_url}/documents",
+                self._build_url(RESOURCE_DOCUMENTS, partition),
                 json=payload,
                 headers={"Content-Type": "application/json"},
             )
@@ -215,12 +225,14 @@ class ContextStoreClient:
         self,
         document_id: str,
         content: str | bytes,
+        partition: Optional[str] = None,
     ) -> dict:
         """Write content to an existing document.
 
         Args:
             document_id: ID of the document to write to
             content: Content to write (string or bytes)
+            partition: Partition name (None = global partition)
 
         Returns:
             JSON response with updated document metadata
@@ -236,7 +248,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.put(
-                f"{self.base_url}/documents/{document_id}/content",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "content"),
                 content=content,
                 headers={"Content-Type": "application/octet-stream"},
                 timeout=60.0,
@@ -260,6 +272,7 @@ class ContextStoreClient:
         replace_all: bool = False,
         offset: Optional[int] = None,
         length: Optional[int] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Edit document content surgically without full replacement.
 
@@ -274,6 +287,7 @@ class ContextStoreClient:
             replace_all: Replace all occurrences (string mode only)
             offset: Character position for offset mode
             length: Characters to replace at offset (0 = insert)
+            partition: Partition name (None = global partition)
 
         Returns:
             JSON response with updated document metadata and edit details
@@ -297,7 +311,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.patch(
-                f"{self.base_url}/documents/{document_id}/content",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "content"),
                 json=payload,
                 timeout=60.0,
             )
@@ -324,6 +338,7 @@ class ContextStoreClient:
         tags: Optional[list[str]] = None,
         limit: Optional[int] = None,
         include_relations: bool = False,
+        partition: Optional[str] = None,
     ) -> list[dict]:
         """Query documents from the Context Store.
 
@@ -332,6 +347,7 @@ class ContextStoreClient:
             tags: Filter by tags (AND logic - document must have all tags)
             limit: Maximum number of results to return
             include_relations: Include document relations in response
+            partition: Partition name (None = global partition)
 
         Returns:
             List of document metadata dictionaries
@@ -357,7 +373,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/documents",
+                self._build_url(RESOURCE_DOCUMENTS, partition),
                 params=params,
             )
             response.raise_for_status()
@@ -374,6 +390,7 @@ class ContextStoreClient:
         query: str,
         limit: Optional[int] = None,
         include_relations: bool = False,
+        partition: Optional[str] = None,
     ) -> dict:
         """Semantic search for documents by meaning.
 
@@ -381,6 +398,7 @@ class ContextStoreClient:
             query: Natural language search query
             limit: Maximum number of results
             include_relations: Include document relations in response
+            partition: Partition name (None = global partition)
 
         Returns:
             Search results with documents ranked by similarity
@@ -401,7 +419,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/search",
+                self._build_url(RESOURCE_SEARCH, partition),
                 params=params,
             )
             response.raise_for_status()
@@ -415,11 +433,16 @@ class ContextStoreClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
 
-    async def get_document_info(self, document_id: str) -> dict:
+    async def get_document_info(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Get metadata for a document without downloading content.
 
         Args:
             document_id: ID of the document
+            partition: Partition name (None = global partition)
 
         Returns:
             Document metadata (id, filename, content_type, size_bytes, etc.)
@@ -432,7 +455,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/documents/{document_id}/metadata",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "metadata"),
             )
             response.raise_for_status()
             return response.json()
@@ -450,6 +473,7 @@ class ContextStoreClient:
         document_id: str,
         offset: Optional[int] = None,
         limit: Optional[int] = None,
+        partition: Optional[str] = None,
     ) -> tuple[str, Optional[int], Optional[str]]:
         """Read text document content directly.
 
@@ -460,6 +484,7 @@ class ContextStoreClient:
             document_id: ID of the document to read
             offset: Starting character position (0-indexed)
             limit: Number of characters to return
+            partition: Partition name (None = global partition)
 
         Returns:
             Tuple of (content, total_chars, char_range)
@@ -479,7 +504,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/documents/{document_id}",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id),
                 params=params if params else None,
             )
             response.raise_for_status()
@@ -511,11 +536,16 @@ class ContextStoreClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
 
-    async def pull_document(self, document_id: str) -> tuple[bytes, str]:
+    async def pull_document(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> tuple[bytes, str]:
         """Download a document from the Context Store.
 
         Args:
             document_id: ID of the document to download
+            partition: Partition name (None = global partition)
 
         Returns:
             Tuple of (content_bytes, filename)
@@ -528,7 +558,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/documents/{document_id}",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id),
             )
             response.raise_for_status()
 
@@ -550,11 +580,16 @@ class ContextStoreClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
 
-    async def delete_document(self, document_id: str) -> dict:
+    async def delete_document(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Delete a document from the Context Store.
 
         Args:
             document_id: ID of the document to delete
+            partition: Partition name (None = global partition)
 
         Returns:
             JSON response confirming deletion
@@ -567,7 +602,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.delete(
-                f"{self.base_url}/documents/{document_id}",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id),
             )
             response.raise_for_status()
             return response.json()
@@ -584,8 +619,14 @@ class ContextStoreClient:
     # Relation Operations
     # =====================
 
-    async def get_relation_definitions(self) -> list[dict]:
+    async def get_relation_definitions(
+        self,
+        partition: Optional[str] = None,
+    ) -> list[dict]:
         """Get available relation definitions.
+
+        Args:
+            partition: Partition name (None = global partition)
 
         Returns:
             List of relation definitions with name, description, etc.
@@ -597,7 +638,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/relations/definitions",
+                self._build_url(RESOURCE_RELATIONS, partition, suffix="definitions"),
             )
             response.raise_for_status()
             return response.json()
@@ -608,11 +649,16 @@ class ContextStoreClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
 
-    async def get_document_relations(self, document_id: str) -> dict:
+    async def get_document_relations(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Get all relations for a document.
 
         Args:
             document_id: ID of the document
+            partition: Partition name (None = global partition)
 
         Returns:
             Dictionary with relations grouped by type
@@ -625,7 +671,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.get(
-                f"{self.base_url}/documents/{document_id}/relations",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "relations"),
             )
             response.raise_for_status()
             return response.json()
@@ -645,6 +691,7 @@ class ContextStoreClient:
         definition: str,
         from_to_note: Optional[str] = None,
         to_from_note: Optional[str] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Create a bidirectional relation between documents.
 
@@ -654,6 +701,7 @@ class ContextStoreClient:
             definition: Relation type (e.g., 'parent-child', 'related')
             from_to_note: Note on edge from source to target
             to_from_note: Note on edge from target to source
+            partition: Partition name (None = global partition)
 
         Returns:
             Dictionary with created relation details
@@ -675,7 +723,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.post(
-                f"{self.base_url}/relations",
+                self._build_url(RESOURCE_RELATIONS, partition),
                 json=payload,
             )
             response.raise_for_status()
@@ -697,12 +745,14 @@ class ContextStoreClient:
         self,
         relation_id: str,
         note: Optional[str],
+        partition: Optional[str] = None,
     ) -> dict:
         """Update a relation's note.
 
         Args:
             relation_id: ID of the relation to update
             note: New note text (can be None to clear)
+            partition: Partition name (None = global partition)
 
         Returns:
             Updated relation details
@@ -715,7 +765,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.patch(
-                f"{self.base_url}/relations/{relation_id}",
+                self._build_url(RESOURCE_RELATIONS, partition, relation_id),
                 json={"note": note},
             )
             response.raise_for_status()
@@ -729,11 +779,16 @@ class ContextStoreClient:
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
 
-    async def delete_relation(self, relation_id: str) -> dict:
+    async def delete_relation(
+        self,
+        relation_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Delete a relation (removes both directions).
 
         Args:
             relation_id: ID of the relation to delete
+            partition: Partition name (None = global partition)
 
         Returns:
             Dictionary with success status
@@ -746,7 +801,7 @@ class ContextStoreClient:
         try:
             client = self._get_client()
             response = await client.delete(
-                f"{self.base_url}/relations/{relation_id}",
+                self._build_url(RESOURCE_RELATIONS, partition, relation_id),
             )
             response.raise_for_status()
             return response.json()
@@ -758,3 +813,180 @@ class ContextStoreClient:
             )
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error: {str(e)}")
+
+    # =====================
+    # URL Building
+    # =====================
+
+    def _build_url(
+        self,
+        resource: str,
+        partition: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        suffix: Optional[str] = None,
+    ) -> str:
+        """Build URL for any endpoint.
+
+        Args:
+            resource: Resource type (use RESOURCE_* constants)
+            partition: Partition name (None = global endpoint)
+            resource_id: Resource ID (e.g., document_id, relation_id)
+            suffix: Additional path suffix (e.g., "metadata", "content")
+
+        Returns:
+            Full URL for the endpoint
+
+        Examples:
+            # Global endpoints (partition=None):
+            _build_url(RESOURCE_DOCUMENTS)
+                -> http://localhost:8200/documents
+            _build_url(RESOURCE_DOCUMENTS, resource_id="doc_abc123")
+                -> http://localhost:8200/documents/doc_abc123
+            _build_url(RESOURCE_DOCUMENTS, resource_id="doc_abc123", suffix="metadata")
+                -> http://localhost:8200/documents/doc_abc123/metadata
+            _build_url(RESOURCE_RELATIONS, suffix="definitions")
+                -> http://localhost:8200/relations/definitions
+
+            # Partitioned endpoints:
+            _build_url(RESOURCE_DOCUMENTS, partition="my-project")
+                -> http://localhost:8200/partitions/my-project/documents
+            _build_url(RESOURCE_DOCUMENTS, partition="my-project", resource_id="doc_abc123")
+                -> http://localhost:8200/partitions/my-project/documents/doc_abc123
+            _build_url(RESOURCE_SEARCH, partition="my-project")
+                -> http://localhost:8200/partitions/my-project/search
+        """
+        if partition:
+            path = f"/{RESOURCE_PARTITIONS}/{partition}/{resource}"
+        else:
+            path = f"/{resource}"
+
+        if resource_id:
+            path = f"{path}/{resource_id}"
+        if suffix:
+            path = f"{path}/{suffix}"
+
+        return f"{self.base_url}{path}"
+
+    # =====================
+    # Partition Operations
+    # =====================
+
+    async def create_partition(
+        self,
+        name: str,
+        description: Optional[str] = None,
+    ) -> dict:
+        """Create a new partition.
+
+        Args:
+            name: Partition name (unique identifier)
+            description: Optional description
+
+        Returns:
+            Dict with name, description, created_at
+
+        Raises:
+            ValidationError: If partition name is invalid
+            ContextStoreError: On HTTP errors (including 409 if exists)
+            ConnectionError: On network errors
+        """
+        payload = {"name": name}
+        if description:
+            payload["description"] = description
+
+        try:
+            client = self._get_client()
+            response = await client.post(
+                self._build_url(RESOURCE_PARTITIONS),
+                json=payload,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                raise ValidationError(f"Invalid partition name: {e.response.text}")
+            if e.response.status_code == 409:
+                raise ContextStoreError(f"Partition already exists: {name}")
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    async def list_partitions(self) -> list[dict]:
+        """List all partitions.
+
+        Returns:
+            List of partition dicts with name, description, created_at
+
+        Raises:
+            ConnectionError: On network errors
+            ContextStoreError: On HTTP errors
+        """
+        try:
+            client = self._get_client()
+            response = await client.get(self._build_url(RESOURCE_PARTITIONS))
+            response.raise_for_status()
+            data = response.json()
+            return data.get("partitions", [])
+        except httpx.HTTPStatusError as e:
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+
+    async def ensure_partition_exists(self, partition: str) -> bool:
+        """Create partition if it doesn't exist (handles 409 gracefully).
+
+        Returns True if partition exists or was created.
+
+        Args:
+            partition: Partition name to ensure exists
+
+        Returns:
+            True if partition exists or was created
+
+        Raises:
+            ConnectionError: On network errors
+            ContextStoreError: On HTTP errors (except 409)
+        """
+        try:
+            await self.create_partition(partition)
+            return True
+        except ContextStoreError as e:
+            if "already exists" in str(e):
+                return True
+            raise
+
+    async def delete_partition(self, name: str) -> dict:
+        """Delete a partition and all its documents.
+
+        Args:
+            name: Partition name to delete
+
+        Returns:
+            Dict with success, message, deleted_document_count
+
+        Raises:
+            ContextStoreError: On HTTP errors (403 for _global, 404 if not found)
+            ConnectionError: On network errors
+        """
+        try:
+            client = self._get_client()
+            response = await client.delete(
+                self._build_url(RESOURCE_PARTITIONS, resource_id=name)
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                raise ContextStoreError("Cannot delete the global partition")
+            if e.response.status_code == 404:
+                raise ContextStoreError(f"Partition not found: {name}")
+            raise ContextStoreError(
+                f"HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise ConnectionError(f"Network error: {str(e)}")
+

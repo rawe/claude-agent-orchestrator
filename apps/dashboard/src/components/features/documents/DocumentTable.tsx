@@ -37,7 +37,7 @@ export function DocumentTable({
   semanticResultIds,
 }: DocumentTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
-    { id: 'created_at', desc: true },
+    { id: 'createdAt', desc: true },
   ]);
 
   const filteredData = useMemo(() => {
@@ -68,7 +68,7 @@ export function DocumentTable({
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor('content_type', {
+      columnHelper.accessor('contentType', {
         header: '',
         cell: (info) => (
           <span className="text-xl" title={info.getValue()}>
@@ -144,7 +144,7 @@ export function DocumentTable({
         },
         enableSorting: false,
       }),
-      columnHelper.accessor('created_at', {
+      columnHelper.accessor('createdAt', {
         header: ({ column }) => (
           <button
             onClick={() => column.toggleSorting()}
@@ -160,7 +160,7 @@ export function DocumentTable({
           </span>
         ),
       }),
-      columnHelper.accessor('size_bytes', {
+      columnHelper.accessor('sizeBytes', {
         header: ({ column }) => (
           <button
             onClick={() => column.toggleSorting()}

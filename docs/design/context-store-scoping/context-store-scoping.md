@@ -1,7 +1,9 @@
 # Context Store Scoping and Namespace Isolation
 
-**Status:** Draft
+**Status:** Partially Implemented
 **Date:** 2026-01-11
+
+> **Note:** A simpler single-tier partition model has been implemented instead of the two-tier namespace/scope_filters approach described here. See [Context Store Partitions](../../features/context-store-partitions.md) for the implemented feature. This document is retained for reference on potential future enhancements (e.g., scope_filters within partitions).
 
 ## Overview
 

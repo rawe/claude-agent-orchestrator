@@ -1,10 +1,10 @@
 export interface Document {
   id: string;
   filename: string;
-  content_type: string;
-  size_bytes: number;
-  created_at: string;
-  updated_at: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+  updatedAt: string;
   tags: string[];
   metadata: Record<string, string>;
   url: string;
@@ -36,15 +36,15 @@ export interface DocumentQuery {
 
 export interface DocumentRelation {
   id: string;
-  document_id: string;
-  related_document_id: string;
-  relation_type: string;
+  documentId: string;
+  relatedDocumentId: string;
+  relationType: string;
   note: string | null;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DocumentRelationsResponse {
-  document_id: string;
+  documentId: string;
   relations: Record<string, DocumentRelation[]>;
 }

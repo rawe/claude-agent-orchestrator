@@ -17,6 +17,15 @@ for verification and follow-up operations.
 References:
 - FastMCP Tool Operations: https://gofastmcp.com/clients/tools
 - ToolResult allows full control over content vs structured_content
+
+Partition Handling
+------------------
+All tools transparently route to the configured partition. The partition is
+determined by:
+- HTTP mode: X-Context-Store-Partition header (per-request)
+- stdio mode: CONTEXT_STORE_PARTITION environment variable (session-wide)
+
+The LLM agent does not see or control partitions - this is an orchestration concern.
 """
 
 import json
@@ -28,17 +37,50 @@ from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 from pydantic import Field
 
+from .config import Config, get_partition_from_context, get_partition_auto_create_from_context
 from .http_client import ContextStoreClient
-from .exceptions import ContextStoreError
+from .exceptions import ContextStoreError, PartitionNotFoundError
 
 
-def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
+def register_tools(mcp: FastMCP, client: ContextStoreClient, config: Config) -> None:
     """Register all Context Store tools with the MCP server.
 
     Args:
         mcp: FastMCP server instance
         client: ContextStoreClient instance for HTTP operations
+        config: Config instance for partition resolution
     """
+    # Track ensured partitions to avoid repeated checks
+    _ensured_partitions: set[str] = set()
+
+    def _get_partition() -> Optional[str]:
+        """Get current partition from HTTP headers or config."""
+        return get_partition_from_context(config)
+
+    async def _ensure_partition_if_needed() -> None:
+        """Ensure partition exists if configured.
+
+        In strict mode (default), fails if partition doesn't exist.
+        In auto-create mode, creates the partition if missing.
+        """
+        partition = _get_partition()
+        if partition is None:
+            return  # Global partition, no check needed
+
+        if partition in _ensured_partitions:
+            return  # Already ensured
+
+        auto_create = get_partition_auto_create_from_context(config)
+
+        if auto_create:
+            await client.ensure_partition_exists(partition)
+        else:
+            # Strict mode: verify partition exists
+            partitions = await client.list_partitions()
+            if not any(p["name"] == partition for p in partitions):
+                raise PartitionNotFoundError(partition)
+
+        _ensured_partitions.add(partition)
 
     @mcp.tool()
     async def doc_push(
@@ -77,12 +119,14 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             return "Error: file_path must be an absolute path"
 
         try:
+            await _ensure_partition_if_needed()
             tags_list = [t.strip() for t in tags.split(",")] if tags else None
             result = await client.push_document(
                 file_path=file_path,
                 name=name,
                 tags=tags_list,
                 description=description,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except FileNotFoundError as e:
@@ -116,11 +160,13 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             doc_create(filename="architecture.md", tags="design,mvp", description="System overview")
         """
         try:
+            await _ensure_partition_if_needed()
             tags_list = [t.strip() for t in tags.split(",")] if tags else None
             result = await client.create_document(
                 filename=filename,
                 tags=tags_list,
                 description=description,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -147,9 +193,11 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             doc_write(document_id="doc_abc123", content="# My Document\\n\\nContent here...")
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.write_document_content(
                 document_id=document_id,
                 content=content,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -210,6 +258,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             doc_edit(document_id="doc_abc", offset=100, length=50, new_string="")
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.edit_document_content(
                 document_id=document_id,
                 new_string=new_string,
@@ -217,6 +266,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 replace_all=replace_all,
                 offset=offset,
                 length=length,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -256,12 +306,14 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             doc_query(include_relations=True)  # List all with relations
         """
         try:
+            await _ensure_partition_if_needed()
             tags_list = [t.strip() for t in tags.split(",")] if tags else None
             result = await client.query_documents(
                 name=name,
                 tags=tags_list,
                 limit=limit,
                 include_relations=include_relations,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -296,10 +348,12 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
         Note: Requires semantic search to be enabled on the server.
         """
         try:
+            await _ensure_partition_if_needed()
             result = await client.search_documents(
                 query=query,
                 limit=limit,
                 include_relations=include_relations,
+                partition=_get_partition(),
             )
             return json.dumps(result)
         except ContextStoreError as e:
@@ -321,7 +375,11 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             Plus relations object with parent/child/related document links
         """
         try:
-            result = await client.get_document_info(document_id=document_id)
+            await _ensure_partition_if_needed()
+            result = await client.get_document_info(
+                document_id=document_id,
+                partition=_get_partition(),
+            )
             return json.dumps(result)
         except ContextStoreError as e:
             return f"Error: {e}"
@@ -359,10 +417,12 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
         # automatic JSON wrapping ({"result": "..."}). See module docstring for
         # full rationale on raw content vs JSON responses.
         try:
+            await _ensure_partition_if_needed()
             content, _, _ = await client.read_document(
                 document_id=document_id,
                 offset=offset,
                 limit=limit,
+                partition=_get_partition(),
             )
             return ToolResult(content=[TextContent(type="text", text=content)])
         except ContextStoreError as e:
@@ -396,7 +456,11 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
             return "Error: output_path must be an absolute path"
 
         try:
-            content, filename = await client.pull_document(document_id=document_id)
+            await _ensure_partition_if_needed()
+            content, filename = await client.pull_document(
+                document_id=document_id,
+                partition=_get_partition(),
+            )
 
             # Write to file
             output_file = Path(output_path)
@@ -429,7 +493,11 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
         # Implementation note: Server also removes document from semantic search
         # index if enabled. This is transparent to the caller.
         try:
-            result = await client.delete_document(document_id=document_id)
+            await _ensure_partition_if_needed()
+            result = await client.delete_document(
+                document_id=document_id,
+                partition=_get_partition(),
+            )
             return json.dumps(result)
         except ContextStoreError as e:
             return f"Error: {e}"
@@ -487,9 +555,11 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
         Returns:
             JSON with operation result
         """
+        partition = _get_partition()
         try:
+            await _ensure_partition_if_needed()
             if types:
-                result = await client.get_relation_definitions()
+                result = await client.get_relation_definitions(partition=partition)
                 return json.dumps(result)
 
             elif create_from and create_to:
@@ -501,6 +571,7 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                     definition=relation_type,
                     from_to_note=from_to_note,
                     to_from_note=to_from_note,
+                    partition=partition,
                 )
                 return json.dumps(result)
 
@@ -508,11 +579,15 @@ def register_tools(mcp: FastMCP, client: ContextStoreClient) -> None:
                 result = await client.update_relation(
                     relation_id=update_id,
                     note=note,
+                    partition=partition,
                 )
                 return json.dumps(result)
 
             elif remove_id:
-                result = await client.delete_relation(relation_id=remove_id)
+                result = await client.delete_relation(
+                    relation_id=remove_id,
+                    partition=partition,
+                )
                 return json.dumps(result)
 
             else:

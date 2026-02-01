@@ -5,6 +5,9 @@ from datetime import datetime
 from typing import List, Optional
 from .models import DocumentMetadata
 
+# Global partition constant - used for backward compatibility
+GLOBAL_PARTITION = "_global"
+
 
 class DocumentDatabase:
     """Manages document metadata in SQLite database."""
@@ -19,10 +22,20 @@ class DocumentDatabase:
         """Create database schema if it doesn't exist."""
         cursor = self.conn.cursor()
 
-        # Create documents table
+        # Create partitions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS partitions (
+                name TEXT PRIMARY KEY,
+                description TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Create documents table with partition column
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 id TEXT PRIMARY KEY,
+                partition TEXT NOT NULL,
                 filename TEXT NOT NULL,
                 content_type TEXT NOT NULL,
                 size_bytes INTEGER NOT NULL,
@@ -30,7 +43,8 @@ class DocumentDatabase:
                 storage_path TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                metadata TEXT
+                metadata TEXT,
+                FOREIGN KEY (partition) REFERENCES partitions(name)
             )
         """)
 
@@ -47,6 +61,8 @@ class DocumentDatabase:
         # Create indexes for better query performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags ON document_tags(tag)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_filename ON documents(filename)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_partition ON documents(partition)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_partition_filename ON documents(partition, filename)")
 
         # Create document_relations table for bidirectional document linking
         cursor.execute("""
@@ -71,7 +87,10 @@ class DocumentDatabase:
 
         self.conn.commit()
 
-    def insert_document(self, metadata: DocumentMetadata):
+        # Ensure global partition exists
+        self.ensure_global_partition()
+
+    def insert_document(self, metadata: DocumentMetadata, partition: str = GLOBAL_PARTITION):
         """Insert document metadata and tags into database."""
         import json
         cursor = self.conn.cursor()
@@ -82,11 +101,12 @@ class DocumentDatabase:
         # Insert into documents table
         cursor.execute("""
             INSERT INTO documents (
-                id, filename, content_type, size_bytes, checksum,
+                id, partition, filename, content_type, size_bytes, checksum,
                 storage_path, created_at, updated_at, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             metadata.id,
+            partition,
             metadata.filename,
             metadata.content_type,
             metadata.size_bytes,
@@ -106,13 +126,21 @@ class DocumentDatabase:
 
         self.conn.commit()
 
-    def get_document(self, doc_id: str) -> Optional[DocumentMetadata]:
-        """Retrieve document metadata by ID."""
+    def get_document(self, doc_id: str, partition: Optional[str] = None) -> Optional[DocumentMetadata]:
+        """Retrieve document metadata by ID.
+
+        Args:
+            doc_id: Document ID
+            partition: Optional partition filter. If provided, only returns document if it's in that partition.
+        """
         import json
         cursor = self.conn.cursor()
 
         # Get document metadata
-        cursor.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
+        if partition is not None:
+            cursor.execute("SELECT * FROM documents WHERE id = ? AND partition = ?", (doc_id, partition))
+        else:
+            cursor.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
         row = cursor.fetchone()
 
         if not row:
@@ -141,27 +169,35 @@ class DocumentDatabase:
             created_at=datetime.fromisoformat(row['created_at']),
             updated_at=datetime.fromisoformat(row['updated_at']),
             tags=tags,
-            metadata=metadata_dict
+            metadata=metadata_dict,
+            partition=row['partition']
         )
 
     def query_documents(
         self,
+        partition: str = GLOBAL_PARTITION,
         filename: Optional[str] = None,
         tags: Optional[List[str]] = None
     ) -> List[DocumentMetadata]:
-        """Query documents with optional filters. Multiple tags use AND logic."""
+        """Query documents with optional filters. Multiple tags use AND logic.
+
+        Args:
+            partition: Partition to query (defaults to global partition)
+            filename: Filter by filename pattern
+            tags: Filter by tags (AND logic)
+        """
         cursor = self.conn.cursor()
 
-        # Build query based on filters
+        # Build query based on filters - always include partition filter
         if tags and len(tags) > 0:
             # Tag filtering with AND logic (document must have ALL tags)
             placeholders = ','.join(['?' for _ in tags])
             query = f"""
                 SELECT DISTINCT d.* FROM documents d
                 JOIN document_tags dt ON d.id = dt.document_id
-                WHERE dt.tag IN ({placeholders})
+                WHERE d.partition = ? AND dt.tag IN ({placeholders})
             """
-            params = list(tags)
+            params: list = [partition] + list(tags)
 
             # Add filename filter if provided
             if filename:
@@ -176,14 +212,14 @@ class DocumentDatabase:
             params.append(len(tags))
 
         elif filename:
-            # Filename-only filtering
-            query = "SELECT * FROM documents WHERE filename LIKE ?"
-            params = [f"%{filename}%"]
+            # Filename-only filtering with partition
+            query = "SELECT * FROM documents WHERE partition = ? AND filename LIKE ?"
+            params = [partition, f"%{filename}%"]
 
         else:
-            # No filters - return all
-            query = "SELECT * FROM documents"
-            params = []
+            # Partition only - return all in partition
+            query = "SELECT * FROM documents WHERE partition = ?"
+            params = [partition]
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -214,7 +250,8 @@ class DocumentDatabase:
                 created_at=datetime.fromisoformat(row['created_at']),
                 updated_at=datetime.fromisoformat(row['updated_at']),
                 tags=tags_list,
-                metadata=metadata_dict
+                metadata=metadata_dict,
+                partition=row['partition']
             ))
 
         return results
@@ -430,8 +467,158 @@ class DocumentDatabase:
         rows = cursor.fetchall()
         return [row["related_document_id"] for row in rows]
 
-    def document_exists(self, document_id: str) -> bool:
-        """Check if a document exists."""
+    def document_exists(self, document_id: str, partition: Optional[str] = None) -> bool:
+        """Check if a document exists.
+
+        Args:
+            document_id: Document ID to check
+            partition: Optional partition filter
+        """
         cursor = self.conn.cursor()
-        cursor.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,))
+        if partition is not None:
+            cursor.execute("SELECT 1 FROM documents WHERE id = ? AND partition = ?", (document_id, partition))
+        else:
+            cursor.execute("SELECT 1 FROM documents WHERE id = ?", (document_id,))
         return cursor.fetchone() is not None
+
+    def get_document_partition(self, document_id: str) -> Optional[str]:
+        """Get the partition for a document.
+
+        Args:
+            document_id: Document ID
+
+        Returns:
+            Partition name, or None if document not found
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT partition FROM documents WHERE id = ?", (document_id,))
+        row = cursor.fetchone()
+        return row["partition"] if row else None
+
+    # ==================== Partition Methods ====================
+
+    def create_partition(self, name: str, description: Optional[str] = None) -> dict:
+        """Create a new partition.
+
+        Args:
+            name: Partition name (unique identifier)
+            description: Optional description
+
+        Returns:
+            Dict with name, description, created_at
+
+        Raises:
+            sqlite3.IntegrityError: If partition already exists
+        """
+        cursor = self.conn.cursor()
+        created_at = datetime.now().isoformat()
+        cursor.execute("""
+            INSERT INTO partitions (name, description, created_at)
+            VALUES (?, ?, ?)
+        """, (name, description, created_at))
+        self.conn.commit()
+
+        return {
+            "name": name,
+            "description": description,
+            "created_at": created_at
+        }
+
+    def get_partition(self, name: str) -> Optional[dict]:
+        """Get a partition by name.
+
+        Args:
+            name: Partition name
+
+        Returns:
+            Dict with name, description, created_at, or None if not found
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT name, description, created_at FROM partitions WHERE name = ?", (name,))
+        row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "name": row["name"],
+            "description": row["description"],
+            "created_at": row["created_at"]
+        }
+
+    def list_partitions(self) -> List[dict]:
+        """List all partitions.
+
+        Returns:
+            List of dicts with name, description, created_at
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT name, description, created_at FROM partitions ORDER BY created_at")
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "name": row["name"],
+                "description": row["description"],
+                "created_at": row["created_at"]
+            }
+            for row in rows
+        ]
+
+    def delete_partition(self, name: str) -> int:
+        """Delete a partition and all its documents.
+
+        Args:
+            name: Partition name
+
+        Returns:
+            Number of documents deleted
+
+        Note:
+            Does NOT delete files from storage - caller must handle that.
+        """
+        cursor = self.conn.cursor()
+
+        # Count documents to delete
+        cursor.execute("SELECT COUNT(*) FROM documents WHERE partition = ?", (name,))
+        doc_count = cursor.fetchone()[0]
+
+        # Delete all documents in partition (cascade deletes tags/relations)
+        cursor.execute("DELETE FROM documents WHERE partition = ?", (name,))
+
+        # Delete the partition
+        cursor.execute("DELETE FROM partitions WHERE name = ?", (name,))
+
+        self.conn.commit()
+        return doc_count
+
+    def partition_exists(self, name: str) -> bool:
+        """Check if a partition exists.
+
+        Args:
+            name: Partition name
+
+        Returns:
+            True if partition exists
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT 1 FROM partitions WHERE name = ?", (name,))
+        return cursor.fetchone() is not None
+
+    def ensure_global_partition(self) -> None:
+        """Ensure the global partition exists. Called during initialization."""
+        if not self.partition_exists(GLOBAL_PARTITION):
+            self.create_partition(GLOBAL_PARTITION, description="Global partition (default)")
+
+    def get_partition_document_ids(self, partition: str) -> List[str]:
+        """Get all document IDs in a partition.
+
+        Args:
+            partition: Partition name
+
+        Returns:
+            List of document IDs
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM documents WHERE partition = ?", (partition,))
+        return [row["id"] for row in cursor.fetchall()]

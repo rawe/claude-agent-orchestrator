@@ -2,5 +2,23 @@
   "id": "context-store",
   "name": "Context Store",
   "description": "Stores and retrieves agent context data",
-  "url": "http://localhost:9501/mcp"
+  "url": "http://localhost:9501/mcp",
+  "config_schema": {
+    "X-Context-Store-Partition": {
+      "type": "string",
+      "description": "Partition name for document isolation. Documents in different partitions are completely isolated.",
+      "required": false,
+      "sensitive": false
+    },
+    "X-Context-Store-Partition-Auto-Create": {
+      "type": "string",
+      "description": "Set to 'true' to auto-create partition if it doesn't exist",
+      "required": false,
+      "sensitive": false
+    }
+  },
+  "default_config": {
+    "X-Context-Store-Partition": "${runtime.session_id}",
+    "X-Context-Store-Partition-Auto-Create": "true"
+  }
 }

@@ -10,10 +10,20 @@ class Config:
     DEFAULT_SCHEME = "http"
 
     def __init__(self):
-        """Initialize configuration from environment variables or defaults."""
+        """Initialize configuration from environment variables or defaults.
+
+        Environment Variables:
+            DOC_SYNC_HOST: Server hostname (default: localhost)
+            DOC_SYNC_PORT: Server port (default: 8766)
+            DOC_SYNC_SCHEME: URL scheme (default: http)
+            DOC_SYNC_PARTITION: Default partition name (default: None = global partition)
+        """
         self.host = os.getenv("DOC_SYNC_HOST", self.DEFAULT_HOST)
         self.port = int(os.getenv("DOC_SYNC_PORT", str(self.DEFAULT_PORT)))
         self.scheme = os.getenv("DOC_SYNC_SCHEME", self.DEFAULT_SCHEME)
+        # Partition: empty string or unset -> None (global partition)
+        partition_env = os.getenv("DOC_SYNC_PARTITION", "")
+        self.partition = partition_env if partition_env else None
 
     @property
     def base_url(self) -> str:

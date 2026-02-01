@@ -34,6 +34,12 @@ SUPPORTED_TEXT_MIME_TYPES = [
     "application/xml",
 ]
 
+# API resource paths
+RESOURCE_DOCUMENTS = "documents"
+RESOURCE_RELATIONS = "relations"
+RESOURCE_SEARCH = "search"
+RESOURCE_PARTITIONS = "partitions"
+
 
 def _is_text_mime_type(mime_type: str) -> bool:
     """Check if a MIME type is supported for text reading.
@@ -66,17 +72,67 @@ class DocumentClient:
         """Initialize the client with configuration.
 
         Args:
-            config: Config instance with base_url property
+            config: Config instance with base_url and partition properties
         """
         self.config = config
         self.base_url = config.base_url
+        self.partition = config.partition  # Default partition from DOC_SYNC_PARTITION env var
+
+    def _build_url(
+        self,
+        resource: str,
+        partition: Optional[str] = None,
+        resource_id: Optional[str] = None,
+        suffix: Optional[str] = None,
+    ) -> str:
+        """Build URL for any endpoint.
+
+        Args:
+            resource: Resource type (use RESOURCE_* constants)
+            partition: Partition name (None = use client's default partition)
+            resource_id: Resource ID (e.g., document_id, relation_id)
+            suffix: Additional path suffix (e.g., "metadata", "content")
+
+        Returns:
+            Full URL for the endpoint
+
+        Examples:
+            # Global endpoints (partition=None, self.partition=None):
+            _build_url(RESOURCE_DOCUMENTS)
+                -> http://localhost:8766/documents
+            _build_url(RESOURCE_DOCUMENTS, resource_id="doc_abc123")
+                -> http://localhost:8766/documents/doc_abc123
+            _build_url(RESOURCE_DOCUMENTS, resource_id="doc_abc123", suffix="metadata")
+                -> http://localhost:8766/documents/doc_abc123/metadata
+
+            # Partitioned endpoints (partition="my-project" or self.partition="my-project"):
+            _build_url(RESOURCE_DOCUMENTS, partition="my-project")
+                -> http://localhost:8766/partitions/my-project/documents
+            _build_url(RESOURCE_SEARCH, partition="my-project")
+                -> http://localhost:8766/partitions/my-project/search
+        """
+        # Use provided partition, fall back to client's default partition
+        effective_partition = partition if partition is not None else self.partition
+
+        if effective_partition:
+            path = f"/{RESOURCE_PARTITIONS}/{effective_partition}/{resource}"
+        else:
+            path = f"/{resource}"
+
+        if resource_id:
+            path = f"{path}/{resource_id}"
+        if suffix:
+            path = f"{path}/{suffix}"
+
+        return f"{self.base_url}{path}"
 
     def push_document(
         self,
         file_path: str | Path,
         name: Optional[str] = None,
         tags: Optional[list[str]] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Upload a document to the server.
 
@@ -85,6 +141,7 @@ class DocumentClient:
             name: Custom name for the document (defaults to filename)
             tags: List of tags to associate with the document
             description: Description of the document
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             JSON response from server with document metadata
@@ -123,7 +180,7 @@ class DocumentClient:
 
         try:
             response = httpx.post(
-                f"{self.base_url}/documents",
+                self._build_url(RESOURCE_DOCUMENTS, partition),
                 files=files,
                 data=data,
                 timeout=30.0
@@ -142,7 +199,8 @@ class DocumentClient:
         name: Optional[str] = None,
         tags: Optional[list[str]] = None,
         limit: Optional[int] = None,
-        include_relations: bool = False
+        include_relations: bool = False,
+        partition: Optional[str] = None,
     ) -> list[dict]:
         """Query documents from the server.
 
@@ -151,6 +209,7 @@ class DocumentClient:
             tags: Filter by tags (AND logic - document must have all tags)
             limit: Maximum number of results to return
             include_relations: Include document relations in response
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             List of document metadata dictionaries
@@ -174,7 +233,7 @@ class DocumentClient:
 
         try:
             response = httpx.get(
-                f"{self.base_url}/documents",
+                self._build_url(RESOURCE_DOCUMENTS, partition),
                 params=params,
                 timeout=30.0
             )
@@ -185,11 +244,16 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def pull_document(self, document_id: str) -> tuple[bytes, str]:
+    def pull_document(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> tuple[bytes, str]:
         """Download a document from the server.
 
         Args:
             document_id: ID of the document to download
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Tuple of (content_bytes, filename)
@@ -199,7 +263,7 @@ class DocumentClient:
         """
         try:
             response = httpx.get(
-                f"{self.base_url}/documents/{document_id}",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id),
                 timeout=30.0
             )
             response.raise_for_status()
@@ -222,11 +286,16 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def delete_document(self, document_id: str) -> dict:
+    def delete_document(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Delete a document from the server.
 
         Args:
             document_id: ID of the document to delete
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             JSON response confirming deletion
@@ -236,7 +305,7 @@ class DocumentClient:
         """
         try:
             response = httpx.delete(
-                f"{self.base_url}/documents/{document_id}",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id),
                 timeout=30.0
             )
             response.raise_for_status()
@@ -248,11 +317,16 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def get_document_info(self, document_id: str) -> dict:
+    def get_document_info(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Get metadata for a document without downloading the file.
 
         Args:
             document_id: ID of the document to get info for
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Dictionary with document metadata (id, filename, content_type,
@@ -263,7 +337,7 @@ class DocumentClient:
         """
         try:
             response = httpx.get(
-                f"{self.base_url}/documents/{document_id}/metadata",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "metadata"),
                 timeout=30.0
             )
             response.raise_for_status()
@@ -279,7 +353,8 @@ class DocumentClient:
         self,
         document_id: str,
         offset: Optional[int] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        partition: Optional[str] = None,
     ) -> tuple[str, Optional[int], Optional[str]]:
         """Read text document content directly without downloading to file.
 
@@ -290,6 +365,7 @@ class DocumentClient:
             document_id: ID of the document to read
             offset: Starting character position (0-indexed)
             limit: Number of characters to return
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Tuple of (content, total_chars, char_range):
@@ -312,7 +388,7 @@ class DocumentClient:
                 params["limit"] = limit
 
             response = httpx.get(
-                f"{self.base_url}/documents/{document_id}",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id),
                 params=params if params else None,
                 timeout=30.0
             )
@@ -354,8 +430,14 @@ class DocumentClient:
     # Document Relations API
     # =====================
 
-    def get_relation_definitions(self) -> list[dict]:
+    def get_relation_definitions(
+        self,
+        partition: Optional[str] = None,
+    ) -> list[dict]:
         """Get available relation definitions.
+
+        Args:
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             List of relation definitions with name, description, from_document_is, to_document_is
@@ -365,7 +447,7 @@ class DocumentClient:
         """
         try:
             response = httpx.get(
-                f"{self.base_url}/relations/definitions",
+                self._build_url(RESOURCE_RELATIONS, partition, suffix="definitions"),
                 timeout=30.0
             )
             response.raise_for_status()
@@ -375,11 +457,16 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def get_document_relations(self, document_id: str) -> dict:
+    def get_document_relations(
+        self,
+        document_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Get all relations for a document.
 
         Args:
             document_id: ID of the document to get relations for
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Dictionary with 'relations' key containing grouped relations by type
@@ -389,7 +476,7 @@ class DocumentClient:
         """
         try:
             response = httpx.get(
-                f"{self.base_url}/documents/{document_id}/relations",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "relations"),
                 timeout=30.0
             )
             response.raise_for_status()
@@ -407,7 +494,8 @@ class DocumentClient:
         to_document_id: str,
         definition: str,
         from_to_note: Optional[str] = None,
-        to_from_note: Optional[str] = None
+        to_from_note: Optional[str] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Create a bidirectional relation between documents.
 
@@ -417,6 +505,7 @@ class DocumentClient:
             definition: Relation type - 'parent-child' or 'related' (required)
             from_to_note: Note on edge from source to target (source's note about target)
             to_from_note: Note on edge from target to source (target's note about source)
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Dictionary with created relation details (from_relation, to_relation)
@@ -433,7 +522,7 @@ class DocumentClient:
         }
         try:
             response = httpx.post(
-                f"{self.base_url}/relations",
+                self._build_url(RESOURCE_RELATIONS, partition),
                 json=payload,
                 timeout=30.0
             )
@@ -450,12 +539,18 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def update_relation(self, relation_id: str, note: Optional[str]) -> dict:
+    def update_relation(
+        self,
+        relation_id: str,
+        note: Optional[str],
+        partition: Optional[str] = None,
+    ) -> dict:
         """Update a relation's note.
 
         Args:
             relation_id: ID of the relation to update (string)
             note: New note text (can be None to clear)
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Updated relation details
@@ -465,7 +560,7 @@ class DocumentClient:
         """
         try:
             response = httpx.patch(
-                f"{self.base_url}/relations/{relation_id}",
+                self._build_url(RESOURCE_RELATIONS, partition, relation_id),
                 json={"note": note},
                 timeout=30.0
             )
@@ -478,11 +573,16 @@ class DocumentClient:
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
 
-    def delete_relation(self, relation_id: str) -> dict:
+    def delete_relation(
+        self,
+        relation_id: str,
+        partition: Optional[str] = None,
+    ) -> dict:
         """Delete a relation (removes both sides of bidirectional relation).
 
         Args:
             relation_id: ID of the relation to delete (string)
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             Dictionary with success status and deleted relation IDs
@@ -492,7 +592,7 @@ class DocumentClient:
         """
         try:
             response = httpx.delete(
-                f"{self.base_url}/relations/{relation_id}",
+                self._build_url(RESOURCE_RELATIONS, partition, relation_id),
                 timeout=30.0
             )
             response.raise_for_status()
@@ -512,7 +612,8 @@ class DocumentClient:
         self,
         filename: str,
         tags: Optional[list[str]] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Create a placeholder document without content.
 
@@ -520,6 +621,7 @@ class DocumentClient:
             filename: Document filename (used for content-type inference)
             tags: List of tags for categorization
             description: Human-readable description
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             JSON response with document metadata including generated ID
@@ -538,7 +640,7 @@ class DocumentClient:
 
         try:
             response = httpx.post(
-                f"{self.base_url}/documents",
+                self._build_url(RESOURCE_DOCUMENTS, partition),
                 json=payload,
                 headers={"Content-Type": "application/json"},
                 timeout=30.0
@@ -553,13 +655,15 @@ class DocumentClient:
     def write_document_content(
         self,
         document_id: str,
-        content: str | bytes
+        content: str | bytes,
+        partition: Optional[str] = None,
     ) -> dict:
         """Write content to an existing document.
 
         Args:
             document_id: ID of the document to write to
             content: Content to write (string or bytes)
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             JSON response with updated document metadata
@@ -572,7 +676,7 @@ class DocumentClient:
 
         try:
             response = httpx.put(
-                f"{self.base_url}/documents/{document_id}/content",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "content"),
                 content=content,
                 headers={"Content-Type": "application/octet-stream"},
                 timeout=60.0  # Longer timeout for large content
@@ -593,7 +697,8 @@ class DocumentClient:
         old_string: Optional[str] = None,
         replace_all: bool = False,
         offset: Optional[int] = None,
-        length: Optional[int] = None
+        length: Optional[int] = None,
+        partition: Optional[str] = None,
     ) -> dict:
         """Edit document content surgically without full replacement.
 
@@ -608,6 +713,7 @@ class DocumentClient:
             replace_all: Replace all occurrences (string mode only)
             offset: Character position for offset mode
             length: Characters to replace at offset (0 = insert)
+            partition: Partition name (None = use client's default partition)
 
         Returns:
             JSON response with updated document metadata and edit details
@@ -627,7 +733,7 @@ class DocumentClient:
 
         try:
             response = httpx.patch(
-                f"{self.base_url}/documents/{document_id}/content",
+                self._build_url(RESOURCE_DOCUMENTS, partition, document_id, "content"),
                 json=payload,
                 timeout=60.0
             )
@@ -646,3 +752,96 @@ class DocumentClient:
             raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
+
+    # =====================
+    # Partition Operations
+    # =====================
+
+    def create_partition(
+        self,
+        name: str,
+        description: Optional[str] = None,
+    ) -> dict:
+        """Create a new partition.
+
+        Args:
+            name: Partition name (unique identifier)
+            description: Optional description
+
+        Returns:
+            Dict with name, description, created_at
+
+        Raises:
+            Exception: On network/HTTP errors, 400 for invalid name, 409 if exists
+        """
+        payload = {"name": name}
+        if description:
+            payload["description"] = description
+
+        try:
+            response = httpx.post(
+                self._build_url(RESOURCE_PARTITIONS),
+                json=payload,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                raise Exception(f"Invalid partition name: {e.response.text}")
+            if e.response.status_code == 409:
+                raise Exception(f"Partition already exists: {name}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def list_partitions(self) -> list[dict]:
+        """List all partitions.
+
+        Returns:
+            List of partition dicts with name, description, created_at
+
+        Raises:
+            Exception: On network or HTTP errors
+        """
+        try:
+            response = httpx.get(
+                self._build_url(RESOURCE_PARTITIONS),
+                timeout=30.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("partitions", [])
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+
+    def delete_partition(self, name: str) -> dict:
+        """Delete a partition and all its documents.
+
+        Args:
+            name: Partition name to delete
+
+        Returns:
+            Dict with success, message, deleted_document_count
+
+        Raises:
+            Exception: On HTTP errors (403 for _global, 404 if not found)
+        """
+        try:
+            response = httpx.delete(
+                self._build_url(RESOURCE_PARTITIONS, resource_id=name),
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                raise Exception("Cannot delete the global partition")
+            if e.response.status_code == 404:
+                raise Exception(f"Partition not found: {name}")
+            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
+        except httpx.RequestError as e:
+            raise Exception(f"Network error: {str(e)}")
+

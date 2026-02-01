@@ -13,10 +13,13 @@ from .models import (
     # Relation models
     RelationDefinitions, RelationDefinitionResponse, RelationCreateRequest,
     RelationResponse, RelationCreateResponse, RelationUpdateRequest,
-    DocumentRelationsResponse, RelationDeleteResponse, DeleteResponseWithCascade
+    DocumentRelationsResponse, RelationDeleteResponse, DeleteResponseWithCascade,
+    # Partition models
+    PartitionCreate, PartitionResponse, PartitionListResponse, PartitionDeleteResponse,
+    validate_partition_name
 )
 from .storage import DocumentStorage
-from .database import DocumentDatabase
+from .database import DocumentDatabase, GLOBAL_PARTITION
 from .semantic.config import config as semantic_config
 
 # Configuration
@@ -61,7 +64,7 @@ app.add_middleware(
 )
 
 
-def get_document_url(document_id: str) -> str:
+def get_document_url(document_id: str, partition: str | None = None) -> str:
     """
     Construct the full URL for retrieving a document.
 
@@ -70,13 +73,35 @@ def get_document_url(document_id: str) -> str:
 
     Args:
         document_id: The unique document identifier
+        partition: Optional partition (if provided, uses partitioned URL)
 
     Returns:
         Fully qualified URL (e.g., "http://localhost:8766/documents/doc_123")
     """
     # Remove trailing slash if present to avoid double slashes
     base_url = DOCUMENT_SERVER_PUBLIC_URL.rstrip('/')
+    if partition and partition != GLOBAL_PARTITION:
+        return f"{base_url}/partitions/{partition}/documents/{document_id}"
     return f"{base_url}/documents/{document_id}"
+
+
+async def validate_partition(partition: str) -> None:
+    """Validate partition exists and name is valid.
+
+    Args:
+        partition: Partition name to validate
+
+    Raises:
+        HTTPException: 404 if partition not found, 400 if invalid name
+    """
+    if not validate_partition_name(partition):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid partition name: {partition}. Must start with letter or underscore, "
+                   "contain only letters, numbers, hyphens, underscores, and be 1-64 characters."
+        )
+    if not db.partition_exists(partition):
+        raise HTTPException(status_code=404, detail=f"Partition not found: {partition}")
 
 
 @app.get("/health")
@@ -85,18 +110,213 @@ async def health_check():
     return {"status": "healthy", "service": "context-store"}
 
 
-@app.get("/search", response_model=SearchResponse)
-async def search_documents_endpoint(
+# ==================== Partition Endpoints ====================
+
+@app.post("/partitions", response_model=PartitionResponse, status_code=201)
+async def create_partition(request: PartitionCreate):
+    """Create a new partition.
+
+    Args:
+        request: PartitionCreate with name and optional description
+
+    Returns:
+        201: PartitionResponse with created partition details
+        400: Invalid partition name
+        409: Partition already exists
+    """
+    # Check if partition already exists
+    if db.partition_exists(request.name):
+        raise HTTPException(status_code=409, detail=f"Partition already exists: {request.name}")
+
+    # Create partition
+    partition = db.create_partition(request.name, request.description)
+
+    # Ensure partition directory exists
+    storage.ensure_partition_directory(request.name)
+
+    return PartitionResponse(
+        name=partition["name"],
+        description=partition["description"],
+        created_at=partition["created_at"]
+    )
+
+
+@app.get("/partitions", response_model=PartitionListResponse)
+async def list_partitions():
+    """List all user-created partitions.
+
+    Note: The internal '_global' partition is excluded from this listing.
+    The global partition is an implementation detail - clients access it via
+    the non-partitioned endpoints (e.g., /documents instead of /partitions/_global/documents).
+    This keeps the partition concept transparent: clients see partitions as optional
+    namespaces, with the default/global space accessed through standard endpoints.
+    """
+    partitions = db.list_partitions()
+    return PartitionListResponse(
+        partitions=[
+            PartitionResponse(
+                name=p["name"],
+                description=p["description"],
+                created_at=p["created_at"]
+            )
+            for p in partitions
+            if p["name"] != GLOBAL_PARTITION
+        ]
+    )
+
+
+@app.delete("/partitions/{partition}", response_model=PartitionDeleteResponse)
+async def delete_partition(partition: str):
+    """Delete a partition and all its documents.
+
+    Args:
+        partition: Partition name to delete
+
+    Returns:
+        200: PartitionDeleteResponse with deleted document count
+        403: Cannot delete _global partition
+        404: Partition not found
+    """
+    # Cannot delete global partition
+    if partition == GLOBAL_PARTITION:
+        raise HTTPException(status_code=403, detail="Cannot delete the global partition")
+
+    # Check if partition exists
+    if not db.partition_exists(partition):
+        raise HTTPException(status_code=404, detail=f"Partition not found: {partition}")
+
+    # Delete all document indices from semantic search
+    if semantic_config.enabled:
+        from .semantic.indexer import delete_document_index
+        doc_ids = db.get_partition_document_ids(partition)
+        for doc_id in doc_ids:
+            delete_document_index(doc_id)
+
+    # Delete partition and documents from database
+    deleted_count = db.delete_partition(partition)
+
+    # Delete partition directory from storage
+    storage.delete_partition_directory(partition)
+
+    return PartitionDeleteResponse(
+        success=True,
+        message=f"Partition '{partition}' deleted",
+        deleted_document_count=deleted_count
+    )
+
+
+# ==================== Partitioned Document Endpoints ====================
+
+@app.post("/partitions/{partition}/documents", response_model=DocumentResponse, status_code=201)
+async def create_document_partitioned(partition: str, request: Request):
+    """Create a new document in a specific partition."""
+    await validate_partition(partition)
+    content_type_header = request.headers.get("content-type", "")
+
+    if "application/json" in content_type_header:
+        return await _create_placeholder_document(request, partition)
+    else:
+        return await _upload_document_file(request, partition)
+
+
+@app.get("/partitions/{partition}/documents", response_model=list[DocumentResponse])
+async def list_documents_partitioned(
+    partition: str,
+    filename: Optional[str] = Query(None),
+    tags: Optional[str] = Query(None),
+    limit: int = Query(100),
+    offset: int = Query(0),
+    include_relations: bool = Query(False, description="Include document relations in response")
+):
+    """List all documents in a specific partition."""
+    await validate_partition(partition)
+    return await _list_documents_impl(partition, filename, tags, limit, offset, include_relations)
+
+
+@app.get("/partitions/{partition}/documents/{document_id}")
+async def get_document_partitioned(
+    partition: str,
+    document_id: str,
+    offset: Optional[int] = Query(None, description="Starting character position (0-indexed)"),
+    limit: Optional[int] = Query(None, description="Number of characters to return")
+):
+    """Retrieve a specific document by ID from a partition."""
+    await validate_partition(partition)
+    return await _get_document_content_impl(document_id, partition, offset, limit)
+
+
+@app.get("/partitions/{partition}/documents/{document_id}/metadata", response_model=DocumentResponse)
+async def get_document_metadata_partitioned(partition: str, document_id: str):
+    """Retrieve metadata for a specific document in a partition."""
+    await validate_partition(partition)
+    return await _get_document_metadata_impl(document_id, partition)
+
+
+@app.put("/partitions/{partition}/documents/{document_id}/content", response_model=DocumentResponse)
+async def write_document_content_partitioned(partition: str, document_id: str, request: Request):
+    """Write or replace content of an existing document in a partition."""
+    await validate_partition(partition)
+    return await _write_document_content_impl(document_id, request, partition)
+
+
+@app.patch("/partitions/{partition}/documents/{document_id}/content")
+async def edit_document_content_partitioned(partition: str, document_id: str, request: Request):
+    """Edit content of an existing document in a partition."""
+    await validate_partition(partition)
+    return await _edit_document_content_impl(document_id, request, partition)
+
+
+@app.delete("/partitions/{partition}/documents/{document_id}", response_model=DeleteResponseWithCascade)
+async def delete_document_partitioned(partition: str, document_id: str):
+    """Delete a document by ID from a specific partition."""
+    await validate_partition(partition)
+    return await _delete_document_impl(document_id, partition)
+
+
+@app.get("/partitions/{partition}/documents/{document_id}/relations", response_model=DocumentRelationsResponse)
+async def get_document_relations_partitioned(partition: str, document_id: str):
+    """Get all relations for a document in a partition."""
+    await validate_partition(partition)
+    # Validate document exists in partition
+    if not db.document_exists(document_id, partition):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Get all relations
+    relations = db.get_document_relations(document_id)
+
+    # Group by relation_type
+    grouped: dict[str, list[RelationResponse]] = {}
+    for rel in relations:
+        rel_type = rel["relation_type"]
+        if rel_type not in grouped:
+            grouped[rel_type] = []
+        grouped[rel_type].append(_relation_dict_to_response(rel))
+
+    return DocumentRelationsResponse(
+        document_id=document_id,
+        relations=grouped
+    )
+
+
+@app.get("/partitions/{partition}/search", response_model=SearchResponse)
+async def search_documents_partitioned(
+    partition: str,
     q: str = Query(..., description="Natural language search query"),
     limit: int = Query(10, description="Maximum documents to return", ge=1, le=100),
     include_relations: bool = Query(False, description="Include document relations in response")
 ):
-    """
-    Semantic search across indexed documents.
+    """Semantic search within a specific partition."""
+    await validate_partition(partition)
+    return await _search_documents_impl(q, partition, limit, include_relations)
 
-    Only available when SEMANTIC_SEARCH_ENABLED=true.
-    Returns documents ranked by semantic similarity to the query.
-    """
+
+async def _search_documents_impl(
+    q: str,
+    partition: str = GLOBAL_PARTITION,
+    limit: int = 10,
+    include_relations: bool = False
+) -> SearchResponse:
+    """Internal implementation for semantic search."""
     if not semantic_config.enabled:
         raise HTTPException(
             status_code=404,
@@ -105,8 +325,8 @@ async def search_documents_endpoint(
 
     from .semantic.search import search_documents
 
-    # Perform semantic search
-    results = search_documents(q, limit=limit)
+    # Perform semantic search with partition filter
+    results = search_documents(q, partition=partition, limit=limit)
 
     # Collect document IDs for batch relation fetching
     doc_ids = [result["document_id"] for result in results]
@@ -119,7 +339,7 @@ async def search_documents_endpoint(
     # Enrich results with document metadata
     enriched_results = []
     for result in results:
-        doc_metadata = db.get_document(result["document_id"])
+        doc_metadata = db.get_document(result["document_id"], partition)
         if doc_metadata:
             relations = None
             if include_relations:
@@ -130,13 +350,23 @@ async def search_documents_endpoint(
                 SearchResultItem(
                     document_id=result["document_id"],
                     filename=doc_metadata.filename,
-                    document_url=get_document_url(result["document_id"]),
+                    document_url=get_document_url(result["document_id"], doc_metadata.partition),
                     sections=[SectionInfo(**s) for s in result["sections"]],
                     relations=relations
                 )
             )
 
     return SearchResponse(query=q, results=enriched_results)
+
+
+@app.get("/search", response_model=SearchResponse)
+async def search_documents_endpoint(
+    q: str = Query(..., description="Natural language search query"),
+    limit: int = Query(10, description="Maximum documents to return", ge=1, le=100),
+    include_relations: bool = Query(False, description="Include document relations in response")
+):
+    """Semantic search across indexed documents in global partition."""
+    return await _search_documents_impl(q, GLOBAL_PARTITION, limit, include_relations)
 
 
 @app.post("/documents", response_model=DocumentResponse, status_code=201)
@@ -161,7 +391,7 @@ async def create_document(request: Request):
         return await _upload_document_file(request)
 
 
-async def _create_placeholder_document(request: Request) -> JSONResponse:
+async def _create_placeholder_document(request: Request, partition: str = GLOBAL_PARTITION) -> JSONResponse:
     """Create a placeholder document without content."""
     try:
         body = await request.json()
@@ -185,14 +415,14 @@ async def _create_placeholder_document(request: Request) -> JSONResponse:
         raise HTTPException(status_code=400, detail="metadata must be an object")
 
     # Create placeholder document in storage
-    doc_metadata = storage.create_placeholder(filename)
+    doc_metadata = storage.create_placeholder(filename, partition)
 
     # Add tags and metadata
     doc_metadata.tags = tags
     doc_metadata.metadata = metadata
 
     # Insert into database
-    db.insert_document(doc_metadata)
+    db.insert_document(doc_metadata, partition)
 
     # Do NOT index for semantic search - placeholder has no content
 
@@ -207,13 +437,14 @@ async def _create_placeholder_document(request: Request) -> JSONResponse:
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
         metadata=doc_metadata.metadata,
-        url=get_document_url(doc_metadata.id)
+        url=get_document_url(doc_metadata.id, partition),
+        partition=partition if partition != GLOBAL_PARTITION else None
     )
 
     return JSONResponse(status_code=201, content=response.model_dump(mode="json"))
 
 
-async def _upload_document_file(request: Request) -> JSONResponse:
+async def _upload_document_file(request: Request, partition: str = GLOBAL_PARTITION) -> JSONResponse:
     """Upload a document file with content (original behavior)."""
     form = await request.form()
 
@@ -244,6 +475,7 @@ async def _upload_document_file(request: Request) -> JSONResponse:
     doc_metadata = storage.store_document(
         content,
         file.filename or "unknown",
+        partition,
         content_type=file.content_type
     )
 
@@ -252,13 +484,13 @@ async def _upload_document_file(request: Request) -> JSONResponse:
     doc_metadata.metadata = parsed_metadata
 
     # Insert into database
-    db.insert_document(doc_metadata)
+    db.insert_document(doc_metadata, partition)
 
     # Index for semantic search if enabled (only for text content)
     if semantic_config.enabled and doc_metadata.content_type.startswith("text/"):
         from .semantic.indexer import index_document
         text_content = content.decode("utf-8", errors="ignore")
-        index_document(doc_metadata.id, text_content)
+        index_document(doc_metadata.id, text_content, partition)
 
     # Return response
     response = DocumentResponse(
@@ -271,23 +503,23 @@ async def _upload_document_file(request: Request) -> JSONResponse:
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
         metadata=doc_metadata.metadata,
-        url=get_document_url(doc_metadata.id)
+        url=get_document_url(doc_metadata.id, partition),
+        partition=partition if partition != GLOBAL_PARTITION else None
     )
 
     return JSONResponse(status_code=201, content=response.model_dump(mode="json"))
 
 
-@app.get("/documents/{document_id}/metadata", response_model=DocumentResponse)
-async def get_document_metadata(document_id: str):
-    """Retrieve metadata for a specific document by ID."""
-    # Get metadata from database
-    doc_metadata = db.get_document(document_id)
+async def _get_document_metadata_impl(document_id: str, partition: str = GLOBAL_PARTITION) -> DocumentResponse:
+    """Internal implementation for getting document metadata."""
+    # Get metadata from database with partition filter
+    doc_metadata = db.get_document(document_id, partition)
 
     if not doc_metadata:
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Return metadata response
-    response = DocumentResponse(
+    return DocumentResponse(
         id=doc_metadata.id,
         filename=doc_metadata.filename,
         content_type=doc_metadata.content_type,
@@ -297,35 +529,33 @@ async def get_document_metadata(document_id: str):
         updated_at=doc_metadata.updated_at,
         tags=doc_metadata.tags,
         metadata=doc_metadata.metadata,
-        url=get_document_url(doc_metadata.id)
+        url=get_document_url(doc_metadata.id, doc_metadata.partition),
+        partition=doc_metadata.partition if doc_metadata.partition and doc_metadata.partition != GLOBAL_PARTITION else None
     )
 
-    return response
+
+@app.get("/documents/{document_id}/metadata", response_model=DocumentResponse)
+async def get_document_metadata(document_id: str):
+    """Retrieve metadata for a specific document by ID (global partition)."""
+    return await _get_document_metadata_impl(document_id, GLOBAL_PARTITION)
 
 
-@app.get("/documents/{document_id}")
-async def get_document(
+async def _get_document_content_impl(
     document_id: str,
-    offset: Optional[int] = Query(None, description="Starting character position (0-indexed)"),
-    limit: Optional[int] = Query(None, description="Number of characters to return")
+    partition: str = GLOBAL_PARTITION,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None
 ):
-    """
-    Retrieve a specific document by ID.
-
-    For text content types, supports partial retrieval with offset and limit parameters.
-    Returns 206 Partial Content with X-Total-Chars and X-Char-Range headers.
-
-    For binary content types, offset/limit parameters are not supported (returns 400).
-    """
-    # Get metadata from database
-    doc_metadata = db.get_document(document_id)
+    """Internal implementation for getting document content."""
+    # Get metadata from database with partition filter
+    doc_metadata = db.get_document(document_id, partition)
 
     if not doc_metadata:
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Get file path from storage
     try:
-        file_path = storage.get_document_path(document_id)
+        file_path = storage.get_document_path(document_id, partition)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -380,22 +610,20 @@ async def get_document(
     )
 
 
-@app.put("/documents/{document_id}/content", response_model=DocumentResponse)
-async def write_document_content(document_id: str, request: Request):
-    """Write or replace content of an existing document.
+@app.get("/documents/{document_id}")
+async def get_document(
+    document_id: str,
+    offset: Optional[int] = Query(None, description="Starting character position (0-indexed)"),
+    limit: Optional[int] = Query(None, description="Number of characters to return")
+):
+    """Retrieve a specific document by ID (global partition)."""
+    return await _get_document_content_impl(document_id, GLOBAL_PARTITION, offset, limit)
 
-    The request body is the raw content to write (full replacement).
-    Use after doc-create to fill placeholder documents, or to update existing content.
 
-    Returns:
-        Updated document metadata including new size_bytes and checksum
-
-    Raises:
-        404: Document not found
-        500: Storage write failure
-    """
-    # 1. Verify document exists
-    doc_metadata = db.get_document(document_id)
+async def _write_document_content_impl(document_id: str, request: Request, partition: str = GLOBAL_PARTITION) -> DocumentResponse:
+    """Internal implementation for writing document content."""
+    # 1. Verify document exists in partition
+    doc_metadata = db.get_document(document_id, partition)
     if not doc_metadata:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -404,7 +632,7 @@ async def write_document_content(document_id: str, request: Request):
 
     # 3. Write to storage
     try:
-        size_bytes, checksum = storage.write_document_content(document_id, content)
+        size_bytes, checksum = storage.write_document_content(document_id, partition, content)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -429,10 +657,12 @@ async def write_document_content(document_id: str, request: Request):
         # Index new content (only for text types with content)
         if doc_metadata.content_type.startswith("text/") and len(content) > 0:
             text_content = content.decode("utf-8", errors="ignore")
-            index_document(document_id, text_content)
+            index_document(document_id, text_content, partition)
 
     # 6. Fetch and return updated metadata
-    updated_metadata = db.get_document(document_id)
+    updated_metadata = db.get_document(document_id, partition)
+    if not updated_metadata:
+        raise HTTPException(status_code=404, detail="Document not found after update")
     return DocumentResponse(
         id=updated_metadata.id,
         filename=updated_metadata.filename,
@@ -443,32 +673,21 @@ async def write_document_content(document_id: str, request: Request):
         updated_at=updated_metadata.updated_at,
         tags=updated_metadata.tags,
         metadata=updated_metadata.metadata,
-        url=get_document_url(updated_metadata.id)
+        url=get_document_url(updated_metadata.id, updated_metadata.partition),
+        partition=updated_metadata.partition if updated_metadata.partition and updated_metadata.partition != GLOBAL_PARTITION else None
     )
 
 
-@app.patch("/documents/{document_id}/content")
-async def edit_document_content(document_id: str, request: Request):
-    """Edit content of an existing document (surgical updates).
+@app.put("/documents/{document_id}/content", response_model=DocumentResponse)
+async def write_document_content(document_id: str, request: Request):
+    """Write or replace content of an existing document (global partition)."""
+    return await _write_document_content_impl(document_id, request, GLOBAL_PARTITION)
 
-    Two modes based on request body:
-    1. String replacement: {"old_string": "...", "new_string": "...", "replace_all": false}
-    2. Offset-based: {"offset": N, "length": M, "new_string": "..."}
 
-    String replacement follows Claude Edit semantics:
-    - old_string must be found in document
-    - old_string must be unique unless replace_all=true
-
-    Returns:
-        Updated document metadata with edit details (replacements_made or edit_range)
-
-    Raises:
-        400: Invalid request (mode validation, string not found, ambiguous match, offset bounds)
-        404: Document not found
-        500: Storage write failure
-    """
-    # 1. Verify document exists
-    doc_metadata = db.get_document(document_id)
+async def _edit_document_content_impl(document_id: str, request: Request, partition: str = GLOBAL_PARTITION) -> JSONResponse:
+    """Internal implementation for editing document content."""
+    # 1. Verify document exists in partition
+    doc_metadata = db.get_document(document_id, partition)
     if not doc_metadata:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -500,6 +719,7 @@ async def edit_document_content(document_id: str, request: Request):
     try:
         size_bytes, checksum, edit_info = storage.edit_document_content(
             document_id,
+            partition,
             old_string=old_string,
             new_string=new_string,
             replace_all=replace_all,
@@ -531,12 +751,14 @@ async def edit_document_content(document_id: str, request: Request):
 
         # Index new content (only if non-empty)
         if size_bytes > 0:
-            file_path = storage.get_document_path(document_id)
+            file_path = storage.get_document_path(document_id, partition)
             text_content = file_path.read_text(encoding="utf-8")
-            index_document(document_id, text_content)
+            index_document(document_id, text_content, partition)
 
     # 9. Fetch and return updated metadata with edit info
-    updated_metadata = db.get_document(document_id)
+    updated_metadata = db.get_document(document_id, partition)
+    if not updated_metadata:
+        raise HTTPException(status_code=404, detail="Document not found after update")
     response_data = {
         "id": updated_metadata.id,
         "filename": updated_metadata.filename,
@@ -547,12 +769,20 @@ async def edit_document_content(document_id: str, request: Request):
         "updated_at": updated_metadata.updated_at.isoformat() if hasattr(updated_metadata.updated_at, 'isoformat') else str(updated_metadata.updated_at),
         "tags": updated_metadata.tags,
         "metadata": updated_metadata.metadata,
-        "url": get_document_url(updated_metadata.id),
+        "url": get_document_url(updated_metadata.id, updated_metadata.partition),
     }
+    if updated_metadata.partition and updated_metadata.partition != GLOBAL_PARTITION:
+        response_data["partition"] = updated_metadata.partition
     # Add edit-specific info
     response_data.update(edit_info)
 
     return JSONResponse(content=response_data)
+
+
+@app.patch("/documents/{document_id}/content")
+async def edit_document_content(document_id: str, request: Request):
+    """Edit content of an existing document (global partition)."""
+    return await _edit_document_content_impl(document_id, request, GLOBAL_PARTITION)
 
 
 def _group_relations_for_response(relations: list[dict]) -> dict[str, list[RelationInfo]]:
@@ -571,20 +801,20 @@ def _group_relations_for_response(relations: list[dict]) -> dict[str, list[Relat
     return grouped
 
 
-@app.get("/documents", response_model=list[DocumentResponse])
-async def list_documents(
-    filename: Optional[str] = Query(None),
-    tags: Optional[str] = Query(None),
-    limit: int = Query(100),
-    offset: int = Query(0),
-    include_relations: bool = Query(False, description="Include document relations in response")
-):
-    """List all documents with optional filtering by filename and/or tags."""
+async def _list_documents_impl(
+    partition: str = GLOBAL_PARTITION,
+    filename: Optional[str] = None,
+    tags: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    include_relations: bool = False
+) -> list[DocumentResponse]:
+    """Internal implementation for listing documents."""
     # Parse tags if provided
     parsed_tags = [tag.strip() for tag in tags.split(",")] if tags else None
 
-    # Query database
-    documents = db.query_documents(filename=filename, tags=parsed_tags)
+    # Query database with partition
+    documents = db.query_documents(partition, filename=filename, tags=parsed_tags)
 
     # Apply pagination first (before fetching relations)
     paginated_docs = documents[offset:offset + limit]
@@ -613,11 +843,24 @@ async def list_documents(
             updated_at=doc.updated_at,
             tags=doc.tags,
             metadata=doc.metadata,
-            url=get_document_url(doc.id),
-            relations=relations
+            url=get_document_url(doc.id, doc.partition),
+            relations=relations,
+            partition=doc.partition if doc.partition and doc.partition != GLOBAL_PARTITION else None
         ))
 
     return responses
+
+
+@app.get("/documents", response_model=list[DocumentResponse])
+async def list_documents(
+    filename: Optional[str] = Query(None),
+    tags: Optional[str] = Query(None),
+    limit: int = Query(100),
+    offset: int = Query(0),
+    include_relations: bool = Query(False, description="Include document relations in response")
+):
+    """List all documents with optional filtering (global partition)."""
+    return await _list_documents_impl(GLOBAL_PARTITION, filename, tags, limit, offset, include_relations)
 
 
 # ==================== Relation Endpoints ====================
@@ -810,7 +1053,162 @@ async def delete_relation(relation_id: str):
     )
 
 
-def _delete_document_with_cascade(doc_id: str) -> list[str]:
+# ==================== Partitioned Relation Endpoints ====================
+
+@app.post("/partitions/{partition}/relations", response_model=RelationCreateResponse, status_code=201)
+async def create_relation_partitioned(partition: str, request: RelationCreateRequest):
+    """Create a bidirectional relation between two documents in a partition.
+
+    Both documents must be in the same partition (cross-partition relations not allowed).
+    """
+    await validate_partition(partition)
+
+    # Validate definition
+    definition = RelationDefinitions.get_by_name(request.definition)
+    if not definition:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid relation definition: {request.definition}. "
+                   f"Valid options: {[d.name for d in RelationDefinitions.get_all()]}"
+        )
+
+    # Validate both documents exist in the same partition
+    if not db.document_exists(request.from_document_id, partition):
+        raise HTTPException(status_code=404, detail=f"Document not found in partition: {request.from_document_id}")
+    if not db.document_exists(request.to_document_id, partition):
+        raise HTTPException(status_code=404, detail=f"Document not found in partition: {request.to_document_id}")
+
+    # Check if relation already exists
+    existing = db.find_relation(
+        request.from_document_id,
+        request.to_document_id,
+        definition.from_type
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Relation already exists between these documents with type '{definition.name}'"
+        )
+
+    # Create both relation rows
+    from_relation_id = db.create_relation(
+        request.from_document_id,
+        request.to_document_id,
+        definition.from_type,
+        request.from_to_note
+    )
+    to_relation_id = db.create_relation(
+        request.to_document_id,
+        request.from_document_id,
+        definition.to_type,
+        request.to_from_note
+    )
+
+    # Retrieve created relations for response
+    from_relation = db.get_relation(from_relation_id)
+    to_relation = db.get_relation(to_relation_id)
+    if not from_relation or not to_relation:
+        raise HTTPException(status_code=500, detail="Failed to retrieve created relations")
+
+    return RelationCreateResponse(
+        success=True,
+        message="Relation created",
+        from_relation=_relation_dict_to_response(from_relation),
+        to_relation=_relation_dict_to_response(to_relation)
+    )
+
+
+@app.get("/partitions/{partition}/relations/definitions", response_model=list[RelationDefinitionResponse])
+async def list_relation_definitions_partitioned(partition: str):
+    """List all available relation definitions (same for all partitions)."""
+    await validate_partition(partition)
+    definitions = RelationDefinitions.get_all()
+    return [
+        RelationDefinitionResponse(
+            name=d.name,
+            description=d.description,
+            from_document_is=d.to_type,
+            to_document_is=d.from_type
+        )
+        for d in definitions
+    ]
+
+
+@app.patch("/partitions/{partition}/relations/{relation_id}", response_model=RelationResponse)
+async def update_relation_note_partitioned(partition: str, relation_id: str, request: RelationUpdateRequest):
+    """Update the note for an existing relation in a partition."""
+    await validate_partition(partition)
+
+    # Convert string ID to int for internal use
+    try:
+        internal_id = int(relation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid relation ID format")
+
+    # Check if relation exists
+    relation = db.get_relation(internal_id)
+    if not relation:
+        raise HTTPException(status_code=404, detail="Relation not found")
+
+    # Verify the related document is in the partition
+    if not db.document_exists(relation["document_id"], partition):
+        raise HTTPException(status_code=404, detail="Relation not found in partition")
+
+    # Update the note
+    db.update_relation_note(internal_id, request.note)
+
+    # Return updated relation
+    updated = db.get_relation(internal_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Relation not found after update")
+    return _relation_dict_to_response(updated)
+
+
+@app.delete("/partitions/{partition}/relations/{relation_id}", response_model=RelationDeleteResponse)
+async def delete_relation_partitioned(partition: str, relation_id: str):
+    """Delete a relation and its bidirectional counterpart from a partition."""
+    await validate_partition(partition)
+
+    # Convert string ID to int for internal use
+    try:
+        internal_id = int(relation_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid relation ID format")
+
+    # Get the relation being deleted
+    relation = db.get_relation(internal_id)
+    if not relation:
+        raise HTTPException(status_code=404, detail="Relation not found")
+
+    # Verify the related document is in the partition
+    if not db.document_exists(relation["document_id"], partition):
+        raise HTTPException(status_code=404, detail="Relation not found in partition")
+
+    deleted_ids = [str(internal_id)]
+
+    # Find and delete the counterpart relation
+    inverse_type = RelationDefinitions.get_inverse_type(relation["relation_type"])
+    if inverse_type:
+        counterpart = db.find_relation(
+            relation["related_document_id"],
+            relation["document_id"],
+            inverse_type
+        )
+        if counterpart:
+            db.delete_relation(counterpart["id"])
+            deleted_ids.append(str(counterpart["id"]))
+
+    # Delete the original relation
+    db.delete_relation(internal_id)
+
+    return RelationDeleteResponse(
+        success=True,
+        message="Relation removed",
+        deleted_relation_ids=deleted_ids
+    )
+
+
+def _delete_document_with_cascade(doc_id: str, partition: str = GLOBAL_PARTITION) -> list[str]:
     """
     Delete a document with cascade deletion of children (parent-child relations).
 
@@ -826,10 +1224,10 @@ def _delete_document_with_cascade(doc_id: str) -> list[str]:
 
     # Recursively delete children first
     for child_id in children:
-        deleted_ids.extend(_delete_document_with_cascade(child_id))
+        deleted_ids.extend(_delete_document_with_cascade(child_id, partition))
 
     # Delete this document's resources
-    storage.delete_document(doc_id)
+    storage.delete_document(doc_id, partition)
 
     # Delete from semantic search index if enabled
     if semantic_config.enabled:
@@ -843,27 +1241,26 @@ def _delete_document_with_cascade(doc_id: str) -> list[str]:
     return deleted_ids
 
 
-@app.delete("/documents/{document_id}", response_model=DeleteResponseWithCascade)
-async def delete_document(document_id: str):
-    """
-    Delete a document by ID from storage, database, and search index.
-
-    For documents with parent-child relations:
-    - If the document is a parent, all children are recursively deleted first
-    - Related documents (non-hierarchical) are NOT deleted, only their relations are removed
-    """
-    # Check if document exists
-    if not db.document_exists(document_id):
+async def _delete_document_impl(document_id: str, partition: str = GLOBAL_PARTITION) -> DeleteResponseWithCascade:
+    """Internal implementation for deleting a document."""
+    # Check if document exists in partition
+    if not db.document_exists(document_id, partition):
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Delete with cascade
-    deleted_ids = _delete_document_with_cascade(document_id)
+    deleted_ids = _delete_document_with_cascade(document_id, partition)
 
     return DeleteResponseWithCascade(
         success=True,
         message=f"Deleted {len(deleted_ids)} document(s)",
         deleted_document_ids=deleted_ids
     )
+
+
+@app.delete("/documents/{document_id}", response_model=DeleteResponseWithCascade)
+async def delete_document(document_id: str):
+    """Delete a document by ID (global partition)."""
+    return await _delete_document_impl(document_id, GLOBAL_PARTITION)
 
 
 if __name__ == "__main__":

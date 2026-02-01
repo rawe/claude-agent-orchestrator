@@ -102,6 +102,35 @@ uv run --script context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 
 **Lifecycle:** The server runs until manually stopped. Clients connect to `http://host:port/mcp`.
 
+## Partition Routing
+
+Partitions isolate documents into separate namespaces. The partition setting is transparent to the LLM - agents cannot see or control which partition is used.
+
+See [Context Store Partitions](../../features/context-store-partitions.md) for complete partition documentation.
+
+### stdio Mode
+
+Set partition via environment variable at startup (immutable for session):
+
+```bash
+# With partition
+CONTEXT_STORE_PARTITION=my-project uv run --script context-store-mcp.py
+
+# With auto-create (creates partition if it doesn't exist)
+CONTEXT_STORE_PARTITION=my-project CONTEXT_STORE_PARTITION_AUTO_CREATE=true uv run --script context-store-mcp.py
+```
+
+### HTTP Mode
+
+Clients specify partition via HTTP headers per-request:
+
+| Header | Description |
+|--------|-------------|
+| `X-Context-Store-Partition` | Partition name |
+| `X-Context-Store-Partition-Auto-Create` | Set to `true` to create partition if missing |
+
+> **Note:** HTTP mode ignores environment variables. Each mode is independent.
+
 ## MCP Tools
 
 | Tool | Description |
@@ -213,6 +242,8 @@ See agent configuration documentation for MCP capability setup.
 | `CONTEXT_STORE_SCHEME` | URL scheme for Context Store server | http |
 | `CONTEXT_STORE_MCP_PORT` | HTTP mode port (Makefile) | 9501 |
 | `CONTEXT_STORE_MCP_HOST` | HTTP mode host (Makefile) | 127.0.0.1 |
+| `CONTEXT_STORE_PARTITION` | Partition name for document isolation (stdio mode) | (none) |
+| `CONTEXT_STORE_PARTITION_AUTO_CREATE` | Auto-create partition if missing (stdio mode) | `false` |
 
 ## Related Documentation
 
