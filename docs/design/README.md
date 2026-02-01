@@ -12,7 +12,7 @@ Namespace and scope-based isolation for document visibility.
 
 | Document | Description |
 |----------|-------------|
-| [Context Store Scoping](./context-store-scoping/context-store-scoping.md) | Namespace and scope_filters design (Approach 1: Explicit API) |
+| [Context Store Scoping](./context-store-scoping/context-store-scoping.md) | Two-tier namespace/scope_filters design (partially implemented via [Partitions](../features/context-store-partitions.md)) |
 
 ### External Service Auth
 
