@@ -724,6 +724,8 @@ release-dashboard: _check-version
 	@echo "  Component version: $(DASHBOARD_VERSION)"
 	@echo "  Git commit: $(GIT_COMMIT)"
 	@echo ""
+	@# Build context is repo root (not apps/dashboard) because the dashboard
+	@# depends on workspace packages in packages/ that must be copied into the build
 	docker build \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMPONENT_VERSION=$(DASHBOARD_VERSION) \
@@ -732,7 +734,7 @@ release-dashboard: _check-version
 		-t $(IMAGE_DASHBOARD):$(VERSION) \
 		-t $(IMAGE_DASHBOARD):latest \
 		-f apps/dashboard/Dockerfile \
-		apps/dashboard
+		.
 ifdef PUSH
 	@echo "Pushing $(IMAGE_DASHBOARD):$(VERSION)..."
 	docker push $(IMAGE_DASHBOARD):$(VERSION)

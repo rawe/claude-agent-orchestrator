@@ -1,31 +1,43 @@
+# =============================================================================
+# Dashboard Docker Build
+# =============================================================================
+# This is a multi-stage build that produces a minimal nginx image serving
+# only the compiled static files.
+#
+# MONOREPO BUILD CONTEXT
+# ----------------------
+# The dashboard depends on workspace packages (@rawe/agent-orchestrator-sdk,
+# @rawe/context-store-sdk) that are part of this monorepo. To resolve these
+# dependencies during Docker build, we must:
+#   1. Use the repository root as the Docker build context (not apps/dashboard/)
+#   2. Copy the root package.json and package-lock.json (defines workspaces)
+#   3. Copy the packages/ directory (contains the SDK source code)
+#   4. Copy the dashboard source (apps/dashboard/)
+#   5. Run npm ci from the root to install all workspace dependencies
+#
+# This ensures the Docker build uses the exact same SDK code as local development,
+# without requiring the packages to be published to npm first.
+#
+# Build command (from repo root):
+#   docker build -f apps/dashboard/Dockerfile .
+# =============================================================================
+
 # Build arguments for versioning and labels
 ARG VERSION=dev
 ARG COMPONENT_VERSION=unknown
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
 
-# SDK versions for production builds
-# In local development, the dashboard uses npm workspace references ("*") to resolve
-# @rawe packages from the monorepo. In Docker builds, we replace these with published
-# npm package versions since the workspace context is not available.
-ARG AGENT_ORCHESTRATOR_SDK_VERSION=0.1.0
-ARG CONTEXT_STORE_SDK_VERSION=0.1.0
-
-FROM node:18-alpine AS build
-
-# Re-declare SDK version ARGs (ARGs before FROM are not available in build stages)
-ARG AGENT_ORCHESTRATOR_SDK_VERSION
-ARG CONTEXT_STORE_SDK_VERSION
-
+FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json ./
 
-# Replace workspace references with published npm package versions
-RUN sed -i "s|\"@rawe/agent-orchestrator-sdk\": \"\*\"|\"@rawe/agent-orchestrator-sdk\": \"^${AGENT_ORCHESTRATOR_SDK_VERSION}\"|g" package.json && \
-    sed -i "s|\"@rawe/context-store-sdk\": \"\*\"|\"@rawe/context-store-sdk\": \"^${CONTEXT_STORE_SDK_VERSION}\"|g" package.json
+# Copy monorepo structure required for workspace resolution
+COPY package.json package-lock.json ./
+COPY packages/ ./packages/
+COPY apps/dashboard/ ./apps/dashboard/
 
-RUN npm install
-COPY . .
+# Install all workspace dependencies from root
+RUN npm ci
 
 # Vite env vars must be available at build time
 ARG VITE_AGENT_ORCHESTRATOR_API_URL
@@ -40,8 +52,13 @@ ENV VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN
 ENV VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID
 ENV VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE
 
+# Build the dashboard
+WORKDIR /app/apps/dashboard
 RUN npm run build
 
+# =============================================================================
+# Production image - nginx serving static files only
+# =============================================================================
 FROM nginx:alpine
 
 # Re-declare ARGs after FROM (they don't persist across stages)
@@ -62,7 +79,9 @@ LABEL org.opencontainers.image.title="AOF Dashboard" \
       aof.component="dashboard" \
       aof.component.version="${COMPONENT_VERSION}"
 
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy only the built static files from the build stage
+COPY --from=build /app/apps/dashboard/dist /usr/share/nginx/html
+COPY apps/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
