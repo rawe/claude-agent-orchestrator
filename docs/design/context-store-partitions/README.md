@@ -2,10 +2,15 @@
 
 This folder contains design documentation for partition-based isolation in the Context Store.
 
+> **Start here:** Read the **[OVERVIEW.md](OVERVIEW.md)** first for a concise summary of what was accomplished in this development phase.
+
+---
+
 ## Documents
 
 | Document | Description |
 |----------|-------------|
+| **[OVERVIEW.md](OVERVIEW.md)** | **Summary of accomplishments - read first** |
 | [context-store-partitions.md](context-store-partitions.md) | Core design for partition-based document isolation |
 | [implementation-report.md](implementation-report.md) | Server and HTTP client implementation report |
 | [mcp-server-partition-support.md](mcp-server-partition-support.md) | MCP server partition routing design |
