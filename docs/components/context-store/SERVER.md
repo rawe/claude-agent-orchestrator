@@ -108,6 +108,16 @@ For text content types, retrieve document sections:
 - `GET /documents/{id}?offset=2000&limit=1000`
 - Returns HTTP 206 with `X-Total-Chars` and `X-Char-Range` headers
 
+### Partitions
+
+Documents are organized into isolated partitions. Each partition has its own document space with no cross-partition visibility.
+
+- **Partition endpoints:** `/partitions/{partition}/documents/...`
+- **Default endpoints:** `/documents/...` endpoints operate on the internal `_global` partition
+- **Storage:** Files stored in `document-data/files/{partition}/`
+
+See [Context Store Partitions](../../features/context-store-partitions.md) for details.
+
 ### Semantic Search (Optional)
 
 When enabled, provides meaning-based document search:

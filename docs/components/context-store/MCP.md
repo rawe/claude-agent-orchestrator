@@ -106,6 +106,8 @@ uv run --script context-store-mcp.py --http-mode --host 0.0.0.0 --port 9501
 
 Partitions isolate documents into separate namespaces. The partition setting is transparent to the LLM - agents cannot see or control which partition is used.
 
+See [Context Store Partitions](../../features/context-store-partitions.md) for complete partition documentation.
+
 ### stdio Mode
 
 Set partition via environment variable at startup (immutable for session):

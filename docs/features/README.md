@@ -18,6 +18,7 @@ Documentation for implemented features of the Agent Orchestrator.
 | [Dashboard AI Assistance](./dashboard-ai-assistance.md) | Built-in AI features powered by system agents |
 | [Centralized Script Management](./centralized-script-management.md) | Scripts as first-class primitives with automatic sync |
 | [MCP Server Registry](./mcp-server-registry.md) | Centralized MCP server management with placeholder resolution |
+| [Context Store Partitions](./context-store-partitions.md) | Partition-based document isolation in Context Store |
 
 ## Work in Progress
 
