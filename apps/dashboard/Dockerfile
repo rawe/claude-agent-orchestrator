@@ -4,10 +4,27 @@ ARG COMPONENT_VERSION=unknown
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
 
+# SDK versions for production builds
+# In local development, the dashboard uses npm workspace references ("*") to resolve
+# @rawe packages from the monorepo. In Docker builds, we replace these with published
+# npm package versions since the workspace context is not available.
+ARG AGENT_ORCHESTRATOR_SDK_VERSION=0.1.0
+ARG CONTEXT_STORE_SDK_VERSION=0.1.0
+
 FROM node:18-alpine AS build
+
+# Re-declare SDK version ARGs (ARGs before FROM are not available in build stages)
+ARG AGENT_ORCHESTRATOR_SDK_VERSION
+ARG CONTEXT_STORE_SDK_VERSION
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json ./
+
+# Replace workspace references with published npm package versions
+RUN sed -i "s|\"@rawe/agent-orchestrator-sdk\": \"\*\"|\"@rawe/agent-orchestrator-sdk\": \"^${AGENT_ORCHESTRATOR_SDK_VERSION}\"|g" package.json && \
+    sed -i "s|\"@rawe/context-store-sdk\": \"\*\"|\"@rawe/context-store-sdk\": \"^${CONTEXT_STORE_SDK_VERSION}\"|g" package.json
+
+RUN npm install
 COPY . .
 
 # Vite env vars must be available at build time
