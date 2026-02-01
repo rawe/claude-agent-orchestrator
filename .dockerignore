@@ -1,0 +1,78 @@
+# =============================================================================
+# Docker Build Context Exclusions
+# =============================================================================
+# This file reduces the Docker build context size by excluding files that are
+# not needed inside containers. Multiple Dockerfiles use the repo root as
+# build context (dashboard, context-store, agent-runner), so be careful when
+# adding exclusions - they affect all builds.
+# =============================================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node.js - dependencies are installed fresh in Docker
+node_modules
+**/node_modules
+
+# Python cache
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+**/.pytest_cache
+.mypy_cache
+**/.mypy_cache
+*.egg-info
+**/*.egg-info
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Logs
+*.log
+logs
+**/logs
+
+# Test coverage
+coverage
+**/coverage
+.coverage
+**/.coverage
+htmlcov
+**/htmlcov
+
+# Documentation (not needed in runtime images)
+docs
+**/docs
+*.md
+!README.md
+
+# Development/local files
+.agent-orchestrator
+workspace
+.claude
+**/.claude
+
+# OS files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Docker files (prevent recursive copying)
+Dockerfile*
+docker-compose*.yml
+!**/Dockerfile

@@ -6,8 +6,12 @@ services:
   dashboard:
     container_name: agent-orchestrator-dashboard
     build:
-      context: ./apps/dashboard
-      dockerfile: Dockerfile
+      # Context must be repo root (not ./apps/dashboard) because the dashboard
+      # depends on npm workspace packages (@rawe/agent-orchestrator-sdk,
+      # @rawe/context-store-sdk). The Dockerfile copies these from packages/
+      # to resolve workspace dependencies during the build.
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
       # Vite env vars must be passed as build args (baked at build time)
       args:
         - VITE_AGENT_ORCHESTRATOR_API_URL=http://localhost:8765

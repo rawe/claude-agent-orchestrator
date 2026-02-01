@@ -39,6 +39,11 @@ COPY apps/dashboard/ ./apps/dashboard/
 # Install all workspace dependencies from root
 RUN npm ci
 
+# Build SDK packages first - they must be compiled before the dashboard
+# because the dashboard imports from their dist/ directories.
+# Order matters: SDKs first, then dashboard (which depends on them).
+RUN npm run build -w @rawe/agent-orchestrator-sdk -w @rawe/context-store-sdk
+
 # Vite env vars must be available at build time
 ARG VITE_AGENT_ORCHESTRATOR_API_URL
 ARG VITE_DOCUMENT_SERVER_URL
