@@ -12,6 +12,8 @@ This folder contains design documentation for partition-based isolation in the C
 | [mcp-server-partition-implementation-report.md](mcp-server-partition-implementation-report.md) | MCP server implementation report |
 | [mcp-partition-auto-create.md](mcp-partition-auto-create.md) | Auto-create partition on first use (draft) |
 | [dashboard-partition-ui.md](dashboard-partition-ui.md) | Dashboard UI for partition management (draft) |
+| [context-store-typescript-sdk.md](context-store-typescript-sdk.md) | TypeScript SDK for Context Store API |
+| [sdk-implementation/](sdk-implementation/) | Implementation phases, prompts, and reports |
 | [doc-todo.md](doc-todo.md) | Documentation update checklist (pending) |
 
 ## Overview
