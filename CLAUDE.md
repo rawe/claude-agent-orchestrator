@@ -48,5 +48,7 @@ Use scripts in `scripts/` to start services (see script comments for details):
 ./scripts/start-runner-claude-code.sh     # Runner with Claude Code executor
 ./scripts/start-runner-procedural.sh      # Runner with procedural executor
 ./scripts/start-context-store.sh          # Context Store (port 8766)
+# With semantic search (requires Elasticsearch on :9200 and Ollama on :11434)
+./scripts/start-context-store.sh --semantic
 ./scripts/start-context-store-mcp.sh      # Context Store MCP (port 9501, requires Context Store)
 ```
