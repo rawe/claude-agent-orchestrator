@@ -26,6 +26,9 @@ Typical workflow:
 4. Read, edit, or search documents
 5. Clean up by deleting documents or the entire partition
 
+> **Note:** If you specify a `partition`, it must exist before performing document or relation operations.
+> Either create it first with `client.partitions.create()`, or omit the partition to use the global namespace.
+
 ## Installation
 
 ```bash

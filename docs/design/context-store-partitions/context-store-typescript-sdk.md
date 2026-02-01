@@ -1,6 +1,6 @@
 # Context Store TypeScript SDK
 
-**Status:** Draft
+**Status:** Implemented
 **Date:** 2026-02-01
 
 ## 1. Overview
@@ -27,7 +27,6 @@ import { ContextStoreClient } from '@rawe/context-store-sdk';
 const client = new ContextStoreClient({
   baseUrl: 'http://localhost:8766',
   partition?: string,              // Optional default partition
-  partitionAutoCreate?: boolean    // Optional, default false
 });
 ```
 
@@ -37,7 +36,6 @@ const client = new ContextStoreClient({
 |--------|------|----------|---------|-------------|
 | `baseUrl` | `string` | Yes | - | Full URL to Context Store server |
 | `partition` | `string` | No | `undefined` | Default partition for all operations |
-| `partitionAutoCreate` | `boolean` | No | `false` | Auto-create partition if it doesn't exist |
 
 ### Partition Resolution
 
@@ -315,7 +313,6 @@ try {
 interface ContextStoreClientConfig {
   baseUrl: string;
   partition?: string;
-  partitionAutoCreate?: boolean;
 }
 
 // Document
@@ -375,17 +372,18 @@ interface RelatedDocument {
   note?: string;
 }
 
-// Search result
+// Search result - matches server response structure
 interface SearchResult {
-  document: Document;
-  score: number;
+  documentId: string;
+  filename: string;
+  documentUrl: string;
   sections: SearchSection[];
 }
 
 interface SearchSection {
-  charStart: number;
-  charEnd: number;
   score: number;
+  offset: number;
+  limit: number;
 }
 ```
 

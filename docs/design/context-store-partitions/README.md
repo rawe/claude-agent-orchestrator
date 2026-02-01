@@ -10,11 +10,12 @@ This folder contains design documentation for partition-based isolation in the C
 | [implementation-report.md](implementation-report.md) | Server and HTTP client implementation report |
 | [mcp-server-partition-support.md](mcp-server-partition-support.md) | MCP server partition routing design |
 | [mcp-server-partition-implementation-report.md](mcp-server-partition-implementation-report.md) | MCP server implementation report |
-| [mcp-partition-auto-create.md](mcp-partition-auto-create.md) | Auto-create partition on first use (draft) |
-| [dashboard-partition-ui.md](dashboard-partition-ui.md) | Dashboard UI for partition management (draft) |
+| [mcp-partition-auto-create.md](mcp-partition-auto-create.md) | Auto-create partition on first use |
+| [mcp-partition-auto-create-implementation-report.md](mcp-partition-auto-create-implementation-report.md) | Auto-create implementation report |
+| [dashboard-partition-ui.md](dashboard-partition-ui.md) | Dashboard UI for partition management |
 | [context-store-typescript-sdk.md](context-store-typescript-sdk.md) | TypeScript SDK for Context Store API |
-| [sdk-implementation/](sdk-implementation/) | Implementation phases, prompts, and reports |
-| [doc-todo.md](doc-todo.md) | Documentation update checklist (pending) |
+| [sdk-implementation/](sdk-implementation/) | SDK implementation phases, prompts, and reports |
+| [doc-todo.md](doc-todo.md) | Documentation update checklist (completed) |
 
 ## Overview
 

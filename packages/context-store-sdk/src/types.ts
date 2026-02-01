@@ -2,7 +2,6 @@
 export interface ContextStoreClientConfig {
   baseUrl: string;
   partition?: string;
-  partitionAutoCreate?: boolean;
 }
 
 // Document
