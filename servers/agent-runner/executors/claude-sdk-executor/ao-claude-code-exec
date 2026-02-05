@@ -189,7 +189,7 @@ def run_start(inv: ExecutorInvocation):
     - With custom schema: ALL parameters formatted as <inputs> block
     """
     from executor_config import load_config
-    from claude_client import run_session_sync
+    from sdk_client import run_session_sync
     from utils import debug_log, format_autonomous_inputs
 
     # 1. Load configuration
@@ -271,7 +271,7 @@ def run_resume(inv: ExecutorInvocation):
     """
     from executor_config import get_api_url
     from session_client import SessionClient, SessionClientError, SessionNotFoundError
-    from claude_client import run_session_sync
+    from sdk_client import run_session_sync
     from utils import debug_log, format_autonomous_inputs
 
     # 1. Get API URL (auth handled by Agent Coordinator Proxy)

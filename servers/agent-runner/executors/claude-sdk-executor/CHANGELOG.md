@@ -4,6 +4,18 @@ Concise log of refactoring changes. Each entry includes test status.
 
 ## [Unreleased]
 
+### 2026-02-05: Extract modules and rename sdk_client
+
+**Split monolithic `claude_client.py` into focused modules**
+
+- Extracted: `mcp_transform.py` — `transform_mcp_servers_for_claude_code()`
+- Extracted: `claude_config.py` — `ClaudeConfigKey`, `EXECUTOR_CONFIG_DEFAULTS`, `get_claude_config()`
+- Extracted: `session_events.py` — `SessionEventEmitter` class, `post_tool_hook()`, `set_hook_emitter()`
+- Renamed: `claude_client.py` → `sdk_client.py` (now contains only SDK session logic)
+- Updated: `ao-claude-code-exec` imports from `sdk_client`
+
+**Tests**: All 49 tests pass (full suite)
+
 ### 2026-02-05: Use SDK native structured outputs
 
 **Replace ~140 lines of custom output schema code with SDK built-in support**
