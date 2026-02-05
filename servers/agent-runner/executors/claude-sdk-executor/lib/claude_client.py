@@ -360,7 +360,7 @@ async def run_claude_session(
 
     # Import SDK here to give better error message if not installed
     try:
-        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage, SystemMessage
+        from claude_agent_sdk import query as sdk_query, ClaudeAgentOptions, ResultMessage, SystemMessage
     except ImportError as e:
         raise ImportError(
             "claude-agent-sdk is not installed. "
@@ -421,12 +421,12 @@ async def run_claude_session(
     # Helper function to process message stream and extract result
     # skip_assistant_message: When True, don't emit assistant message events.
     # Used for structured output agents where only the result event matters.
-    async def process_message_stream(client, current_prompt: str, skip_assistant_message: bool = False):
+    async def process_message_stream(messages, current_prompt: str, skip_assistant_message: bool = False):
         nonlocal executor_session_id, result, session_bound
 
         stream_result = None
 
-        async for message in client.receive_response():
+        async for message in messages:
             # Extract session_id from FIRST SystemMessage (arrives early!)
             # Only do binding on first query, not retries
             if isinstance(message, SystemMessage) and executor_session_id is None:
@@ -497,76 +497,91 @@ async def run_claude_session(
 
         return stream_result
 
-    # Stream session using ClaudeSDKClient
+    # Run session using sdk query() function (uses --print mode, not streaming)
     try:
-        async with ClaudeSDKClient(options=options) as client:
-            # Send the initial query and process response
-            # For structured output agents, skip assistant message events - only result matters
-            skip_messages = output_schema is not None
-            await client.query(prompt)
-            result = await process_message_stream(client, prompt, skip_assistant_message=skip_messages)
+        # Send the initial query and process response
+        skip_messages = output_schema is not None
+        result = await process_message_stream(
+            sdk_query(prompt=prompt, options=options),
+            prompt,
+            skip_assistant_message=skip_messages,
+        )
 
-            # Output schema validation (if schema defined)
-            if output_schema:
+        # Output schema validation (if schema defined)
+        if output_schema:
+            if not result:
+                raise OutputSchemaValidationError(
+                    "No result received but output_schema requires structured output",
+                    [{"path": "$", "message": "No result received from agent"}]
+                )
+
+            output_json = extract_json_from_response(result)
+            validation = validate_against_schema(output_json, output_schema)
+
+            if not validation.valid:
+                # First attempt failed - retry once by resuming the session
+                retry_prompt = build_validation_error_prompt(validation.errors, output_schema)
+                retry_options = ClaudeAgentOptions(
+                    cwd=str(project_dir.resolve()),
+                    permission_mode=claude_config[ClaudeConfigKey.PERMISSION_MODE],
+                    setting_sources=claude_config[ClaudeConfigKey.SETTING_SOURCES],
+                    resume=executor_session_id,
+                )
+                if claude_config[ClaudeConfigKey.MODEL]:
+                    retry_options.model = claude_config[ClaudeConfigKey.MODEL]
+                if mcp_servers:
+                    retry_options.mcp_servers = transform_mcp_servers_for_claude_code(mcp_servers)
+
+                result = await process_message_stream(
+                    sdk_query(prompt=retry_prompt, options=retry_options),
+                    retry_prompt,
+                    skip_assistant_message=True,
+                )
+
+                # Validate retry response
                 if not result:
                     raise OutputSchemaValidationError(
-                        "No result received but output_schema requires structured output",
-                        [{"path": "$", "message": "No result received from agent"}]
+                        "Output validation failed after 1 retry",
+                        [{"path": "$", "message": "No result received from retry attempt"}]
                     )
 
                 output_json = extract_json_from_response(result)
                 validation = validate_against_schema(output_json, output_schema)
 
                 if not validation.valid:
-                    # First attempt failed - retry once
-                    retry_prompt = build_validation_error_prompt(validation.errors, output_schema)
-                    await client.query(retry_prompt)
-                    result = await process_message_stream(client, retry_prompt, skip_assistant_message=True)
+                    # Retry exhausted - report failure
+                    raise OutputSchemaValidationError(
+                        "Output validation failed after 1 retry",
+                        validation.errors
+                    )
 
-                    # Validate retry response
-                    if not result:
-                        raise OutputSchemaValidationError(
-                            "Output validation failed after 1 retry",
-                            [{"path": "$", "message": "No result received from retry attempt"}]
-                        )
+            # Validation passed - send result event with structured data
+            try:
+                session_client.add_event(session_id, {
+                    "event_type": "result",
+                    "session_id": session_id,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "result_text": None,
+                    "result_data": output_json,
+                })
+            except SessionClientError:
+                pass  # Silent failure
 
-                    output_json = extract_json_from_response(result)
-                    validation = validate_against_schema(output_json, output_schema)
+        elif result and session_id:
+            # No output schema - send result event with text
+            try:
+                session_client.add_event(session_id, {
+                    "event_type": "result",
+                    "session_id": session_id,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "result_text": result,
+                    "result_data": None,
+                })
+            except SessionClientError:
+                pass  # Silent failure
 
-                    if not validation.valid:
-                        # Retry exhausted - report failure
-                        raise OutputSchemaValidationError(
-                            "Output validation failed after 1 retry",
-                            validation.errors
-                        )
-
-                # Validation passed - send result event with structured data
-                try:
-                    session_client.add_event(session_id, {
-                        "event_type": "result",
-                        "session_id": session_id,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "result_text": None,
-                        "result_data": output_json,
-                    })
-                except SessionClientError:
-                    pass  # Silent failure
-
-            elif result and session_id:
-                # No output schema - send result event with text
-                try:
-                    session_client.add_event(session_id, {
-                        "event_type": "result",
-                        "session_id": session_id,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "result_text": result,
-                        "result_data": None,
-                    })
-                except SessionClientError:
-                    pass  # Silent failure
-
-            # NOTE: Session completion is signaled by the agent runner's supervisor
-            # via POST /runner/runs/{run_id}/completed when this process exits.
+        # NOTE: Session completion is signaled by the agent runner's supervisor
+        # via POST /runner/runs/{run_id}/completed when this process exits.
 
     except OutputSchemaValidationError:
         # Re-raise validation errors directly (don't wrap them)
