@@ -28,4 +28,5 @@ Completed design documents kept for historical reference.
 
 | Document | Implemented | Description |
 |----------|-------------|-------------|
+| [Executor Integration Testing](./executor-integration-testing/README.md) | 2026-02-05 | Black-box testing infrastructure for executor refactoring |
 | [Rename Session Events to Run Events](./archive/rename-session-events-to-run-events.md) | 2026-01-06 | Event type naming refactoring |
