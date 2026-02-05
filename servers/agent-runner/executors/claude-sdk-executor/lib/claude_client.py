@@ -22,156 +22,13 @@ Note: Uses session_id (coordinator-generated) per ADR-010.
 
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, field
 import asyncio
 import json
-import re
 from datetime import datetime, UTC
 
 from enum import StrEnum
 
 from session_client import SessionClient, SessionClientError
-
-
-# =============================================================================
-# Output Schema Validation
-# =============================================================================
-
-class OutputSchemaValidationError(Exception):
-    """Raised when output validation fails after retries."""
-    def __init__(self, message: str, errors: list[dict]):
-        super().__init__(message)
-        self.errors = errors
-
-
-@dataclass
-class ValidationResult:
-    """Result of validating agent output against JSON Schema."""
-    valid: bool
-    errors: list[dict] = field(default_factory=list)
-
-
-def validate_against_schema(output: dict | None, schema: dict) -> ValidationResult:
-    """Validate agent output against JSON Schema.
-
-    Args:
-        output: The extracted JSON output from the agent
-        schema: The JSON Schema to validate against
-
-    Returns:
-        ValidationResult with valid=True if valid, or valid=False with errors
-    """
-    from jsonschema import Draft7Validator
-
-    if output is None:
-        return ValidationResult(
-            valid=False,
-            errors=[{"path": "$", "message": "No JSON output found but output_schema requires structured output"}]
-        )
-
-    validator = Draft7Validator(schema)
-    errors = list(validator.iter_errors(output))
-
-    if not errors:
-        return ValidationResult(valid=True)
-
-    return ValidationResult(
-        valid=False,
-        errors=[
-            {
-                "path": f"$.{'.'.join(str(p) for p in e.absolute_path)}" if e.absolute_path else "$",
-                "message": e.message,
-            }
-            for e in errors
-        ]
-    )
-
-
-def extract_json_from_response(text: str) -> dict | None:
-    """Extract JSON object from AI response text.
-
-    Tries to find JSON in code blocks first, then raw JSON objects.
-
-    Args:
-        text: The AI response text
-
-    Returns:
-        Extracted JSON dict or None if no valid JSON found
-    """
-    # Try to find JSON in code blocks first
-    code_block_match = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
-    if code_block_match:
-        try:
-            return json.loads(code_block_match.group(1).strip())
-        except json.JSONDecodeError:
-            pass
-
-    # Try to find raw JSON object
-    json_match = re.search(r'\{[\s\S]*\}', text)
-    if json_match:
-        try:
-            return json.loads(json_match.group(0))
-        except json.JSONDecodeError:
-            pass
-
-    return None
-
-
-def enrich_system_prompt_with_output_schema(system_prompt: str | None, output_schema: dict | None) -> str | None:
-    """Append output schema instructions to system prompt.
-
-    Args:
-        system_prompt: The original system prompt (may be None)
-        output_schema: The JSON Schema for output validation (may be None)
-
-    Returns:
-        Enriched system prompt or None if no schema
-    """
-    if not output_schema:
-        return system_prompt
-
-    base_prompt = system_prompt or ""
-
-    output_instructions = f"""
-
-## Required Output Format
-
-You MUST provide structured output as JSON conforming to this schema:
-
-```json
-{json.dumps(output_schema, indent=2)}
-```
-
-Your final response MUST be valid JSON that matches this schema exactly. Output ONLY the JSON, no additional text."""
-
-    return base_prompt + output_instructions
-
-
-def build_validation_error_prompt(errors: list[dict], schema: dict) -> str:
-    """Build prompt for schema validation retry.
-
-    Args:
-        errors: List of validation errors
-        schema: The JSON Schema that failed validation
-
-    Returns:
-        Prompt instructing the agent to correct its output
-    """
-    error_lines = "\n".join(f"- {e['path']}: {e['message']}" for e in errors)
-
-    return f"""<output-validation-error>
-Your output did not match the required schema.
-
-## Validation Errors
-{error_lines}
-
-## Required Schema
-```json
-{json.dumps(schema, indent=2)}
-```
-
-Please provide output matching the schema exactly. Output ONLY valid JSON.
-</output-validation-error>"""
 
 
 # =============================================================================
@@ -334,17 +191,16 @@ async def run_claude_session(
         agent_name: Agent name (optional, for session metadata)
         executor_config: Executor-specific config (permission_mode, setting_sources, model)
         system_prompt: System prompt for Claude (only used for new sessions, not resume)
-        output_schema: JSON Schema for output validation. If provided, the agent's
-            output will be validated against this schema and retried once on failure.
+        output_schema: JSON Schema for structured output. If provided, uses SDK
+            native output_format for validated JSON responses.
 
     Returns:
         Tuple of (executor_session_id, result) where executor_session_id is
         the Claude SDK's session UUID
 
     Raises:
-        ValueError: If session_id or result not found in messages
+        ValueError: If session_id or result not found, or structured output fails
         ImportError: If claude-agent-sdk is not installed
-        OutputSchemaValidationError: If output validation fails after retry
         Exception: SDK errors are propagated
 
     Example:
@@ -383,10 +239,12 @@ async def run_claude_session(
         options.model = claude_config[ClaudeConfigKey.MODEL]
 
     # Set system prompt if provided (only for new sessions, not resume)
-    # Enrich with output schema instructions if output_schema is defined
-    enriched_system_prompt = enrich_system_prompt_with_output_schema(system_prompt, output_schema)
-    if enriched_system_prompt:
-        options.system_prompt = enriched_system_prompt
+    if system_prompt:
+        options.system_prompt = system_prompt
+
+    # Use SDK native structured outputs (handles validation and retries internally)
+    if output_schema:
+        options.output_format = {"type": "json_schema", "schema": output_schema}
 
     # Add programmatic hooks for post_tool events
     try:
@@ -416,13 +274,14 @@ async def run_claude_session(
     # Initialize tracking variables
     executor_session_id = None
     result = None
+    structured_output = None  # SDK structured output (when output_format is set)
     session_bound = False  # Track if we've bound the session
 
     # Helper function to process message stream and extract result
     # skip_assistant_message: When True, don't emit assistant message events.
     # Used for structured output agents where only the result event matters.
     async def process_message_stream(messages, current_prompt: str, skip_assistant_message: bool = False):
-        nonlocal executor_session_id, result, session_bound
+        nonlocal executor_session_id, result, structured_output, session_bound
 
         stream_result = None
 
@@ -481,6 +340,10 @@ async def run_claude_session(
 
                 stream_result = message.result
 
+                # Capture SDK structured output (available when output_format is set)
+                if getattr(message, 'structured_output', None) is not None:
+                    structured_output = message.structured_output
+
                 # Send assistant message event to API (for conversation history)
                 # Skip for structured output agents - they only emit result events
                 if message.result and session_id and not skip_assistant_message:
@@ -507,65 +370,27 @@ async def run_claude_session(
             skip_assistant_message=skip_messages,
         )
 
-        # Output schema validation (if schema defined)
+        # Send result event based on output type
         if output_schema:
-            if not result:
-                raise OutputSchemaValidationError(
-                    "No result received but output_schema requires structured output",
-                    [{"path": "$", "message": "No result received from agent"}]
+            # Structured output: SDK handles validation and retries internally
+            if structured_output is not None:
+                try:
+                    session_client.add_event(session_id, {
+                        "event_type": "result",
+                        "session_id": session_id,
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "result_text": None,
+                        "result_data": structured_output,
+                    })
+                except SessionClientError:
+                    pass  # Silent failure
+                # Return structured JSON as the result text
+                result = json.dumps(structured_output)
+            else:
+                raise ValueError(
+                    "Structured output validation failed. "
+                    "The agent could not produce valid JSON matching the output schema."
                 )
-
-            output_json = extract_json_from_response(result)
-            validation = validate_against_schema(output_json, output_schema)
-
-            if not validation.valid:
-                # First attempt failed - retry once by resuming the session
-                retry_prompt = build_validation_error_prompt(validation.errors, output_schema)
-                retry_options = ClaudeAgentOptions(
-                    cwd=str(project_dir.resolve()),
-                    permission_mode=claude_config[ClaudeConfigKey.PERMISSION_MODE],
-                    setting_sources=claude_config[ClaudeConfigKey.SETTING_SOURCES],
-                    resume=executor_session_id,
-                )
-                if claude_config[ClaudeConfigKey.MODEL]:
-                    retry_options.model = claude_config[ClaudeConfigKey.MODEL]
-                if mcp_servers:
-                    retry_options.mcp_servers = transform_mcp_servers_for_claude_code(mcp_servers)
-
-                result = await process_message_stream(
-                    sdk_query(prompt=retry_prompt, options=retry_options),
-                    retry_prompt,
-                    skip_assistant_message=True,
-                )
-
-                # Validate retry response
-                if not result:
-                    raise OutputSchemaValidationError(
-                        "Output validation failed after 1 retry",
-                        [{"path": "$", "message": "No result received from retry attempt"}]
-                    )
-
-                output_json = extract_json_from_response(result)
-                validation = validate_against_schema(output_json, output_schema)
-
-                if not validation.valid:
-                    # Retry exhausted - report failure
-                    raise OutputSchemaValidationError(
-                        "Output validation failed after 1 retry",
-                        validation.errors
-                    )
-
-            # Validation passed - send result event with structured data
-            try:
-                session_client.add_event(session_id, {
-                    "event_type": "result",
-                    "session_id": session_id,
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "result_text": None,
-                    "result_data": output_json,
-                })
-            except SessionClientError:
-                pass  # Silent failure
 
         elif result and session_id:
             # No output schema - send result event with text
@@ -583,9 +408,6 @@ async def run_claude_session(
         # NOTE: Session completion is signaled by the agent runner's supervisor
         # via POST /runner/runs/{run_id}/completed when this process exits.
 
-    except OutputSchemaValidationError:
-        # Re-raise validation errors directly (don't wrap them)
-        raise
     except Exception as e:
         # Propagate SDK errors with context
         raise Exception(f"Claude SDK error during session execution: {e}") from e
@@ -636,16 +458,15 @@ def run_session_sync(
         agent_name: Agent name (optional, for session metadata)
         executor_config: Executor-specific config (permission_mode, setting_sources, model)
         system_prompt: System prompt for Claude (only used for new sessions, not resume)
-        output_schema: JSON Schema for output validation. If provided, the agent's
-            output will be validated against this schema and retried once on failure.
+        output_schema: JSON Schema for structured output. If provided, uses SDK
+            native output_format for validated JSON responses.
 
     Returns:
         Tuple of (executor_session_id, result)
 
     Raises:
-        ValueError: If session_id or result not found in messages
+        ValueError: If session_id or result not found, or structured output fails
         ImportError: If claude-agent-sdk is not installed
-        OutputSchemaValidationError: If output validation fails after retry
         Exception: SDK errors are propagated
 
     Example:

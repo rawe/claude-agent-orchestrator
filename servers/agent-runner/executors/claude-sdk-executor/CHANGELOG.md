@@ -4,6 +4,20 @@ Concise log of refactoring changes. Each entry includes test status.
 
 ## [Unreleased]
 
+### 2026-02-05: Use SDK native structured outputs
+
+**Replace ~140 lines of custom output schema code with SDK built-in support**
+
+- Removed: `OutputSchemaValidationError`, `ValidationResult`, `validate_against_schema()`
+- Removed: `extract_json_from_response()`, `enrich_system_prompt_with_output_schema()`
+- Removed: `build_validation_error_prompt()`, manual retry loop
+- Removed: `jsonschema` dependency from script header
+- Added: `output_format={"type": "json_schema", "schema": ...}` in `ClaudeAgentOptions`
+- Added: `message.structured_output` capture from `ResultMessage`
+- SDK handles validation and retries internally
+
+**Tests**: All 49 tests pass (full suite)
+
 ### 2026-02-05: Switch from ClaudeSDKClient to query()
 
 **Fix resume regression with SDK 0.1.30 (CLI 2.1.32)**
