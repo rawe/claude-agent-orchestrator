@@ -4,6 +4,13 @@ Concise log of refactoring changes. Each entry includes test status.
 
 ## [Unreleased]
 
+### 2026-02-05: Refactor entry point and extract executor module
+
+**Extract `run_start`/`run_resume` from entry point into `lib/executor.py`**
+
+- Extracted: `executor.py` — `run_start()`, `run_resume()` (~200 lines)
+- Slimmed: `ao-claude-code-exec` now only handles CLI parsing and dispatch
+
 ### 2026-02-05: Extract modules and rename sdk_client
 
 **Split monolithic `claude_client.py` into focused modules**
