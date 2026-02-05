@@ -1,0 +1,9 @@
+{
+  "type": "autonomous",
+  "command": "executors/claude-agent-sdk/ao-claude-code-exec",
+  "config": {
+    "permission_mode": "bypassPermissions",
+    "setting_sources": [],
+    "model": "opus"
+  }
+}
