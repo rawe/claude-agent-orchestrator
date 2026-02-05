@@ -49,4 +49,33 @@ The SDK's `SubprocessCLITransport._find_cli()` checks for a bundled CLI first (`
 
 ## Status
 
-**Resolved** - Switched from `ClaudeSDKClient` (streaming mode) to `query()` (print mode) in the new executor. All 49 tests pass. The bug is `--resume` + `--input-format stream-json` in CLI 2.1.32. Using `query()` avoids this by using `--print` mode instead.
+**Partially resolved** - Switched from `ClaudeSDKClient` (streaming mode) to `query()` (print mode) in the new executor. Resume works again. However, this introduced a new regression:
+
+### New Issue: PostToolUse Hooks Do Not Fire in `query()` Mode
+
+The SDK's hook mechanism requires a **bidirectional control protocol** between Python and the CLI subprocess. In `query()` mode (`--print`), stdin is closed after sending the prompt, so there is no channel for the CLI to send hook callbacks back to Python.
+
+- `ClaudeSDKClient` (streaming): keeps stdin open, enables control protocol, hooks fire
+- `query()` (print): closes stdin after prompt, no control protocol, **hooks never fire**
+
+This means **post_tool events are no longer sent to the coordinator**. Tool calls still execute, but the executor cannot observe or report them.
+
+The integration test `test_post_tool_events_sent` masked this because it uses a soft check:
+```python
+if len(post_tool_events) > 0:  # silently passes with 0 events
+```
+
+**Impact**: No tool call visibility in the dashboard or session event history.
+
+**TODO**: Add a strict integration test that asserts post_tool events are actually sent (not a soft `if` check). This must fail when hooks are not firing so we catch regressions immediately.
+
+### Resolution Path
+
+The underlying problem is two SDK limitations that conflict:
+1. Resume is broken in streaming mode (CLI 2.1.32)
+2. Hooks only work in streaming mode
+
+Both need to be resolved in the SDK before we can have resume + hooks working together. Options:
+1. **Report hook limitation** to Claude Agent SDK team
+2. **Pin SDK to older version** where both resume and streaming work (if such a version exists)
+3. **Wait for SDK fix** for resume in streaming mode, then switch back to `ClaudeSDKClient`
