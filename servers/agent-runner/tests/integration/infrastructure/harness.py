@@ -81,6 +81,9 @@ class ExecutorTestHarness:
     # Default executor path (relative to agent-runner directory)
     DEFAULT_EXECUTOR_PATH = "executors/claude-code/ao-claude-code-exec"
 
+    # Delay between start and resume to allow CLI session files to flush
+    RESUME_DELAY = 2
+
     def __init__(self, executor_path: str | None = None):
         """
         Initialize test harness.
@@ -140,6 +143,10 @@ class ExecutorTestHarness:
         self._gateway.stop()
         self._mcp_server.stop()
         self._started = False
+
+    def wait_for_session(self):
+        """Wait for CLI session files to flush before resume."""
+        time.sleep(self.RESUME_DELAY)
 
     def clear(self):
         """Clear all recorded calls (between tests)."""
@@ -244,6 +251,8 @@ class ExecutorTestHarness:
                 exit_code=-1,
                 duration_seconds=0,
             )
+
+        self.wait_for_session()
 
         # Build resume payload
         session_id = start_payload["session_id"]

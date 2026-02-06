@@ -79,7 +79,7 @@ async def run_claude_session(
 
     # Import SDK here to give better error message if not installed
     try:
-        from claude_agent_sdk import query as sdk_query, ClaudeAgentOptions, ResultMessage, SystemMessage
+        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage, SystemMessage
     except ImportError as e:
         raise ImportError(
             "claude-agent-sdk is not installed. "
@@ -142,12 +142,12 @@ async def run_claude_session(
     # Helper function to process message stream and extract result
     # skip_assistant_message: When True, don't emit assistant message events.
     # Used for structured output agents where only the result event matters.
-    async def process_message_stream(messages, current_prompt: str, skip_assistant_message: bool = False):
+    async def process_message_stream(client, current_prompt: str, skip_assistant_message: bool = False):
         nonlocal executor_session_id, result, structured_output
 
         stream_result = None
 
-        async for message in messages:
+        async for message in client.receive_response():
             # Extract session_id from FIRST SystemMessage (arrives early!)
             # Only do binding on first query, not retries
             if isinstance(message, SystemMessage) and executor_session_id is None:
@@ -185,35 +185,37 @@ async def run_claude_session(
 
         return stream_result
 
-    # Run session using sdk query() function (uses --print mode, not streaming)
+    # Stream session using ClaudeSDKClient (interactive/streaming mode)
     try:
-        # Send the initial query and process response
-        skip_messages = output_schema is not None
-        result = await process_message_stream(
-            sdk_query(prompt=prompt, options=options),
-            prompt,
-            skip_assistant_message=skip_messages,
-        )
+        async with ClaudeSDKClient(options=options) as client:
+            # Send the initial query and process response
+            skip_messages = output_schema is not None
+            await client.query(prompt)
+            result = await process_message_stream(
+                client,
+                prompt,
+                skip_assistant_message=skip_messages,
+            )
 
-        # Send result event based on output type
-        if output_schema:
-            # Structured output: SDK handles validation and retries internally
-            if structured_output is not None:
-                emitter.emit_result(result_data=structured_output)
-                # Return structured JSON as the result text
-                result = json.dumps(structured_output)
-            else:
-                raise ValueError(
-                    "Structured output validation failed. "
-                    "The agent could not produce valid JSON matching the output schema."
-                )
+            # Send result event based on output type
+            if output_schema:
+                # Structured output: SDK handles validation and retries internally
+                if structured_output is not None:
+                    emitter.emit_result(result_data=structured_output)
+                    # Return structured JSON as the result text
+                    result = json.dumps(structured_output)
+                else:
+                    raise ValueError(
+                        "Structured output validation failed. "
+                        "The agent could not produce valid JSON matching the output schema."
+                    )
 
-        elif result:
-            # No output schema - send result event with text
-            emitter.emit_result(result_text=result)
+            elif result:
+                # No output schema - send result event with text
+                emitter.emit_result(result_text=result)
 
-        # NOTE: Session completion is signaled by the agent runner's supervisor
-        # via POST /runner/runs/{run_id}/completed when this process exits.
+            # NOTE: Session completion is signaled by the agent runner's supervisor
+            # via POST /runner/runs/{run_id}/completed when this process exits.
 
     except Exception as e:
         # Propagate SDK errors with context

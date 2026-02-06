@@ -4,6 +4,21 @@ Concise log of refactoring changes. Each entry includes test status.
 
 ## [Unreleased]
 
+### 2026-02-06: Switch back to ClaudeSDKClient from query()
+
+**Restore streaming mode for full hook support (PostToolUse events)**
+
+- Replaced `query()` (print mode) with `ClaudeSDKClient` (streaming mode)
+- PostToolUse hooks now fire correctly (fixes regression from query() switch)
+- SDK dependency left unpinned (pinning doesn't help — issue is in streaming mode)
+- Kept SDK native `output_format` for structured outputs (no manual jsonschema)
+- Kept modular architecture (session_events, mcp_transform, claude_config)
+- Added `wait_for_session()` to test harness with configurable `RESUME_DELAY`
+
+**Tests**: 42/49 pass. 7 resume tests fail intermittently due to CLI 2.1.33
+streaming mode issue (resume under repeated invocation). Start, MCP, output
+schema, and error handling tests all pass. See `BLOCKER.md` for details.
+
 ### 2026-02-05: Refactor entry point and extract executor module
 
 **Extract `run_start`/`run_resume` from entry point into `lib/executor.py`**

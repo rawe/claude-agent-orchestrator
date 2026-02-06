@@ -33,6 +33,8 @@ class TestBasicResume:
 
         assert start_result.success, f"Start failed: {start_result.stderr}"
 
+        harness.wait_for_session()
+
         # Now resume
         resume_result = harness.run_executor({
             "schema_version": "2.2",
@@ -61,6 +63,8 @@ class TestBasicResume:
 
         # Clear to isolate resume calls
         initial_calls = len(harness.get_gateway_calls())
+
+        harness.wait_for_session()
 
         # Resume
         resume_result = harness.run_executor({
@@ -93,6 +97,8 @@ class TestBasicResume:
         assert start_result.success
 
         events_after_start = len(harness.get_events_for_session(session_id))
+
+        harness.wait_for_session()
 
         # Resume
         resume_result = harness.run_executor({
@@ -127,6 +133,8 @@ class TestResumeContext:
 
         assert start_result.success, f"Start failed: {start_result.stderr}"
 
+        harness.wait_for_session()
+
         # Resume and ask about it
         resume_result = harness.run_executor({
             "schema_version": "2.2",
@@ -151,6 +159,8 @@ class TestResumeContext:
         })
         assert start_result.success
 
+        harness.wait_for_session()
+
         # First resume
         resume1_result = harness.run_executor({
             "schema_version": "2.2",
@@ -159,6 +169,8 @@ class TestResumeContext:
             "parameters": {"prompt": "Count: 2. Just confirm with the number."},
         })
         assert resume1_result.success
+
+        harness.wait_for_session()
 
         # Second resume - ask about the sequence
         resume2_result = harness.run_executor({
@@ -197,6 +209,8 @@ class TestResumeWithBlueprint:
 
         start_result = harness.run_executor(start_payload)
         assert start_result.success, f"Start failed: {start_result.stderr}"
+
+        harness.wait_for_session()
 
         # Resume with same blueprint (MCP servers)
         resume_result = harness.run_executor({
