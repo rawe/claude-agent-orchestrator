@@ -45,7 +45,13 @@ Concise log of refactoring changes. Each entry includes test status.
 - Root cause: `--resume` + `--input-format stream-json` broken in bundled CLI 2.1.32
 - Output schema retry now resumes the session via `query()` instead of sending a second message in the same streaming connection
 
-**Tests**: All 49 tests pass (full suite)
+**Known regression**: PostToolUse hooks do not fire in `query()` mode. The SDK hook
+mechanism requires a bidirectional control protocol (stdin kept open) which is only
+available in streaming mode. In `query()` mode, stdin is closed after sending the
+prompt, so hook callbacks never reach Python. Post_tool events are not sent to the
+coordinator. See `docs/design/claude-agent-sdk-refactor/BLOCKER.md` for details.
+
+**Tests**: All 49 tests pass (soft check on post_tool events masks the regression)
 
 ### 2026-02-05: Initial Setup
 
