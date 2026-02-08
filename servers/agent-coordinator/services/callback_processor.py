@@ -104,7 +104,7 @@ def on_child_completed(
             _pending_notifications.setdefault(parent_session_id, []).append(callback_data)
             return False
 
-        if parent_status == "finished":
+        if parent_status in ("finished", "idle"):
             # Parent is idle and no resume in-flight - deliver immediately
             # Mark as in-flight to prevent duplicate resume runs
             _resume_in_flight.add(parent_session_id)

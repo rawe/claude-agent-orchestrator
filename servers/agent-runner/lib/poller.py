@@ -114,9 +114,9 @@ class RunPoller:
                     return  # Exit poll loop
 
                 # Handle stop commands
-                if result.stop_runs:
-                    for run_id in result.stop_runs:
-                        self._handle_stop(run_id)
+                if result.stop_sessions:
+                    for session_id in result.stop_sessions:
+                        self._handle_stop(session_id)
                     continue  # Check for more commands
 
                 # Handle script sync commands
@@ -211,44 +211,55 @@ class RunPoller:
                 f"Executor process for session {run.session_id} is no longer running"
             )
 
-    def _handle_stop(self, run_id: str) -> None:
-        """Stop a running agent run by terminating its process."""
-        entry = self.registry.get_session_by_run(run_id)
+    def _handle_stop(self, session_id: str) -> None:
+        """Stop a session by terminating its executor process."""
+        entry = self.registry.get_session(session_id)
 
         if not entry:
-            # Agent run not running (already completed or never started)
-            logger.debug(f"Stop command for agent run {run_id} ignored - run not running")
+            logger.debug(f"Stop command for session {session_id} ignored - no live process")
             return
 
-        logger.info(f"Stopping agent run {run_id} (session={entry.session_id}, pid={entry.process.pid})")
+        run_id = entry.current_run_id  # May be None if between turns
+        logger.info(f"Stopping session {session_id} (run={run_id}, pid={entry.process.pid})")
 
         signal_used = "SIGTERM"
 
         try:
-            # Send SIGTERM first (graceful)
-            entry.process.terminate()
+            # For persistent processes: try graceful shutdown first
+            if entry.persistent:
+                try:
+                    self.executor.send_shutdown(entry.process)
+                    entry.process.wait(timeout=5)
+                    signal_used = "shutdown"
+                except Exception:
+                    pass  # Fall through to SIGTERM
 
-            # Wait briefly for graceful shutdown
-            try:
-                entry.process.wait(timeout=5)
-            except Exception:
-                # Force kill if not responding
-                entry.process.kill()
-                signal_used = "SIGKILL"
-                logger.warning(f"Agent run {run_id} did not respond to SIGTERM, sent SIGKILL")
+            # SIGTERM path (or first attempt for one-shot)
+            if entry.process.poll() is None:
+                entry.process.terminate()
+                try:
+                    entry.process.wait(timeout=5)
+                except Exception:
+                    entry.process.kill()
+                    signal_used = "SIGKILL"
+                    logger.warning(f"Session {session_id} did not respond to SIGTERM, sent SIGKILL")
 
             # Remove from registry
-            self.registry.remove_session(entry.session_id)
+            self.registry.remove_session(session_id)
 
-            # Report stopped
-            try:
-                self.api_client.report_stopped(self.runner_id, run_id, signal=signal_used)
-                logger.info(f"Agent run {run_id} stopped successfully (signal={signal_used})")
-            except Exception as e:
-                logger.error(f"Failed to report stopped for {run_id}: {e}")
+            # Report back using run_id if there was an active run
+            if run_id:
+                try:
+                    self.api_client.report_stopped(self.runner_id, run_id, signal=signal_used)
+                    logger.info(f"Session {session_id} stopped (run={run_id}, signal={signal_used})")
+                except Exception as e:
+                    logger.error(f"Failed to report stopped for run {run_id}: {e}")
+            else:
+                # Session was idle between turns — no active run to report on
+                logger.info(f"Idle session {session_id} stopped (no active run)")
 
         except Exception as e:
-            logger.error(f"Error stopping agent run {run_id}: {e}")
+            logger.error(f"Error stopping session {session_id}: {e}")
 
     def _handle_script_sync(self, script_name: str) -> None:
         """Download and extract a script from the coordinator."""

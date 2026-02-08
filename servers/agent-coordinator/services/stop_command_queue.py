@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 @dataclass
 class RunnerStopState:
     """Stop commands and event for a single runner."""
-    pending_stops: set[str] = field(default_factory=set)  # run_ids
+    pending_stops: set[str] = field(default_factory=set)  # session_ids
     event: asyncio.Event = field(default_factory=asyncio.Event)
 
 

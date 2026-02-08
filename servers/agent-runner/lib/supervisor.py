@@ -138,7 +138,7 @@ class RunSupervisor:
         if return_code == 0:
             logger.info(f"Agent run {run_id} completed successfully (session={session_id})")
             try:
-                self.api_client.report_completed(self.runner_id, run_id)
+                self.api_client.report_completed(self.runner_id, run_id, session_status="finished")
             except Exception as e:
                 logger.error(f"Failed to report completion for {run_id}: {e}")
         else:
@@ -191,7 +191,12 @@ class RunSupervisor:
                 logger.error(f"Failed to report crash for {run_id}: {e}")
         else:
             # Process was idle (between turns) and exited
-            logger.info(f"Idle persistent process exited for session {session_id} (exit_code={return_code})")
+            status = "finished" if return_code == 0 else "failed"
+            logger.info(f"Idle persistent process exited for session {session_id} (exit_code={return_code}, status={status})")
+            try:
+                self.api_client.report_session_status(self.runner_id, session_id, status)
+            except Exception as e:
+                logger.error(f"Failed to report session status for {session_id}: {e}")
 
     def _read_stderr(self, entry) -> str:
         """Read stderr from a process for error reporting."""
@@ -245,7 +250,7 @@ class RunSupervisor:
         self.registry.clear_run(session_id)
 
         try:
-            self.api_client.report_completed(self.runner_id, run_id)
+            self.api_client.report_completed(self.runner_id, run_id, session_status="idle")
             logger.info(f"Turn complete for run {run_id} (session={session_id})")
         except Exception as e:
             logger.error(f"Failed to report turn complete for {run_id}: {e}")

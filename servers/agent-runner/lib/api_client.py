@@ -86,13 +86,13 @@ class PollResult:
     """Result from polling for agent runs."""
     run: Optional[Run] = None
     deregistered: bool = False
-    stop_runs: list[str] = None  # Run IDs to stop
+    stop_sessions: list[str] = None  # Session IDs to stop
     sync_scripts: list[str] = None  # Script names to sync
     remove_scripts: list[str] = None  # Script names to remove
 
     def __post_init__(self):
-        if self.stop_runs is None:
-            self.stop_runs = []
+        if self.stop_sessions is None:
+            self.stop_sessions = []
         if self.sync_scripts is None:
             self.sync_scripts = []
         if self.remove_scripts is None:
@@ -232,7 +232,7 @@ class CoordinatorAPIClient:
         Returns PollResult with:
         - run: Run if available
         - deregistered: True if runner has been deregistered externally
-        - stop_runs: List of run IDs to stop
+        - stop_sessions: List of session IDs to stop
         """
         try:
             response = self._client.get(
@@ -253,8 +253,8 @@ class CoordinatorAPIClient:
                 return PollResult(deregistered=True)
 
             # Check for stop commands
-            if "stop_runs" in data:
-                return PollResult(stop_runs=data["stop_runs"])
+            if "stop_sessions" in data:
+                return PollResult(stop_sessions=data["stop_sessions"])
 
             # Check for script sync commands
             if "sync_scripts" in data or "remove_scripts" in data:
@@ -292,11 +292,17 @@ class CoordinatorAPIClient:
         )
         response.raise_for_status()
 
-    def report_completed(self, runner_id: str, run_id: str) -> None:
-        """Report that agent run completed successfully."""
+    def report_completed(self, runner_id: str, run_id: str, session_status: str = "finished") -> None:
+        """Report that agent run completed successfully.
+
+        Args:
+            runner_id: This runner's ID
+            run_id: The completed run ID
+            session_status: Session status to set ("idle" for persistent turn, "finished" for one-shot)
+        """
         response = self._client.post(
             f"{self.base_url}/runner/runs/{run_id}/completed",
-            json={"runner_id": runner_id, "status": "success"},
+            json={"runner_id": runner_id, "status": "success", "session_status": session_status},
             headers=self._get_auth_headers(),
         )
         response.raise_for_status()
@@ -315,6 +321,18 @@ class CoordinatorAPIClient:
         response = self._client.post(
             f"{self.base_url}/runner/runs/{run_id}/stopped",
             json={"runner_id": runner_id, "signal": signal},
+            headers=self._get_auth_headers(),
+        )
+        response.raise_for_status()
+
+    def report_session_status(self, runner_id: str, session_id: str, status: str) -> None:
+        """Report session status change (no active run).
+
+        Used when a persistent process exits while idle (between turns).
+        """
+        response = self._client.post(
+            f"{self.base_url}/runner/sessions/{session_id}/status",
+            json={"runner_id": runner_id, "status": status},
             headers=self._get_auth_headers(),
         )
         response.raise_for_status()
