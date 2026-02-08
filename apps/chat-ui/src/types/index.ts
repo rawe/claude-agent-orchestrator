@@ -40,9 +40,10 @@ export interface Session {
   /**
    * Session status:
    * - 'running': Agent is actively processing
-   * - 'finished': Agent is idle, ready for new input (can be resumed)
+   * - 'idle': Agent has finished a turn and is waiting for new input (can be resumed)
+   * - 'finished': Agent process has exited normally
    */
-  status: 'running' | 'finished';
+  status: 'running' | 'idle' | 'finished';
   created_at?: string;
   project_dir?: string;
   agent_name?: string;

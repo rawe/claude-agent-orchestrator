@@ -4,7 +4,7 @@
  * Note: Uses session_id (coordinator-generated) per ADR-010.
  */
 
-export type SessionStatus = 'pending' | 'running' | 'stopping' | 'finished' | 'stopped';
+export type SessionStatus = 'pending' | 'running' | 'idle' | 'stopping' | 'finished' | 'stopped' | 'failed';
 
 export interface Session {
   session_id: string;

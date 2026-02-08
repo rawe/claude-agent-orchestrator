@@ -23,12 +23,16 @@ function getStatusAccentColor(status: Session['status']): string {
       return 'bg-yellow-400';
     case 'running':
       return 'bg-emerald-500';
+    case 'idle':
+      return 'bg-blue-400';
     case 'stopping':
       return 'bg-amber-500';
     case 'finished':
       return 'bg-gray-300';
     case 'stopped':
       return 'bg-red-500';
+    case 'failed':
+      return 'bg-red-600';
     default:
       return 'bg-gray-300';
   }
@@ -120,7 +124,7 @@ export function SessionCard({
         <div className={`flex items-center gap-1 mt-2 pt-2 border-t border-gray-100 transition-opacity duration-200 ${
           isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}>
-          {session.status === 'running' && onStop && (
+          {(session.status === 'running' || session.status === 'idle') && onStop && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

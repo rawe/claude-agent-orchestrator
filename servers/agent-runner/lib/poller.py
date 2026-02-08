@@ -255,8 +255,12 @@ class RunPoller:
                 except Exception as e:
                     logger.error(f"Failed to report stopped for run {run_id}: {e}")
             else:
-                # Session was idle between turns — no active run to report on
-                logger.info(f"Idle session {session_id} stopped (no active run)")
+                # Session was idle between turns — report stopped directly
+                try:
+                    self.api_client.report_session_status(self.runner_id, session_id, "stopped")
+                    logger.info(f"Idle session {session_id} stopped (reported via session status)")
+                except Exception as e:
+                    logger.error(f"Failed to report stopped for idle session {session_id}: {e}")
 
         except Exception as e:
             logger.error(f"Error stopping session {session_id}: {e}")

@@ -320,6 +320,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const statusMap: Record<string, AgentStatus> = {
         starting: 'starting',
         running: 'running',
+        idle: 'idle',
         stopping: 'stopping',
         stopped: 'finished',
         finished: 'finished',

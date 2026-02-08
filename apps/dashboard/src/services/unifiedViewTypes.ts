@@ -22,9 +22,11 @@
 export const SessionStatusValues = {
   PENDING: 'pending',
   RUNNING: 'running',
+  IDLE: 'idle',
   STOPPING: 'stopping',
   FINISHED: 'finished',
   STOPPED: 'stopped',
+  FAILED: 'failed',
 } as const;
 
 export type SessionStatus = (typeof SessionStatusValues)[keyof typeof SessionStatusValues];
@@ -93,10 +95,10 @@ export type MessageRole = (typeof MessageRoleValues)[keyof typeof MessageRoleVal
 // ============================================================================
 
 /**
- * Check if a session is currently active (running or stopping)
+ * Check if a session is currently active (running, idle, or stopping)
  */
 export function isSessionActive(status: SessionStatus): boolean {
-  return status === SessionStatusValues.RUNNING || status === SessionStatusValues.STOPPING;
+  return status === SessionStatusValues.RUNNING || status === SessionStatusValues.IDLE || status === SessionStatusValues.STOPPING;
 }
 
 /**
