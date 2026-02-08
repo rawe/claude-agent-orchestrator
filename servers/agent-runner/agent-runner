@@ -54,7 +54,7 @@ import typer
 from config import RunnerConfig
 from api_client import CoordinatorAPIClient, DuplicateRunnerError, AgentNameCollisionError, AuthenticationError
 from auth0_client import Auth0M2MClient
-from registry import RunningRunsRegistry
+from registry import ProcessRegistry
 from executor import (
     RunExecutor,
     list_profiles,
@@ -185,7 +185,7 @@ class Runner:
                 port=config.mcp_port,  # Optional fixed port from CLI
             )
 
-        self.registry = RunningRunsRegistry()
+        self.registry = ProcessRegistry()
         # Note: mcp_server_url will be set after mcp_server.start() in start()
         self.executor = RunExecutor(
             default_project_dir=config.project_dir,

@@ -1,5 +1,6 @@
 {
   "type": "autonomous",
+  "lifecycle": "persistent",
   "command": "executors/claude-sdk-executor/ao-claude-code-exec",
   "config": {
     "permission_mode": "bypassPermissions",

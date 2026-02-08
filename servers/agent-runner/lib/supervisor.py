@@ -15,7 +15,7 @@ import time
 import logging
 
 from api_client import CoordinatorAPIClient
-from registry import RunningRunsRegistry
+from registry import ProcessRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class RunSupervisor:
     def __init__(
         self,
         api_client: CoordinatorAPIClient,
-        registry: RunningRunsRegistry,
+        registry: ProcessRegistry,
         runner_id: str,
         check_interval: float = 1.0,
     ):
@@ -77,24 +77,26 @@ class RunSupervisor:
 
     def _check_runs(self) -> None:
         """Check all running agent runs for completion."""
-        runs = self.registry.get_all_runs()
+        sessions = self.registry.get_all_sessions()
 
-        for run_id, running_run in runs.items():
+        for session_id, entry in sessions.items():
             # Check if process has finished
-            return_code = running_run.process.poll()
+            return_code = entry.process.poll()
 
             if return_code is not None:
                 # Process has finished
-                self._handle_completion(run_id, running_run, return_code)
+                self._handle_completion(session_id, entry, return_code)
 
-    def _handle_completion(self, run_id: str, running_run, return_code: int) -> None:
+    def _handle_completion(self, session_id: str, entry, return_code: int) -> None:
         """Handle agent run completion (success or failure).
 
         Reports completion status to agent-coordinator. Callback processing
         is handled by agent-coordinator when it receives the run_completed event.
         """
+        run_id = entry.current_run_id
+
         # Remove from registry first
-        self.registry.remove_run(run_id)
+        self.registry.remove_session(session_id)
 
         # Get any output from the process
         # Read directly from pipes instead of using communicate() to avoid
@@ -102,32 +104,32 @@ class RunSupervisor:
         stdout, stderr = "", ""
         try:
             # Check pipe status for diagnostics
-            stdout_status = "closed" if (not running_run.process.stdout or running_run.process.stdout.closed) else "open"
-            stderr_status = "closed" if (not running_run.process.stderr or running_run.process.stderr.closed) else "open"
+            stdout_status = "closed" if (not entry.process.stdout or entry.process.stdout.closed) else "open"
+            stderr_status = "closed" if (not entry.process.stderr or entry.process.stderr.closed) else "open"
 
             # Try reading directly from pipes
-            if running_run.process.stdout and not running_run.process.stdout.closed:
-                stdout = running_run.process.stdout.read() or ""
-            if running_run.process.stderr and not running_run.process.stderr.closed:
-                stderr = running_run.process.stderr.read() or ""
+            if entry.process.stdout and not entry.process.stdout.closed:
+                stdout = entry.process.stdout.read() or ""
+            if entry.process.stderr and not entry.process.stderr.closed:
+                stderr = entry.process.stderr.read() or ""
 
             # Log if pipes were already closed (helps diagnose fast-exit issues)
             if stdout_status == "closed" or stderr_status == "closed":
                 logger.debug(
-                    f"Process {run_id} pipes status: stdout={stdout_status}, stderr={stderr_status}"
+                    f"Process for session {session_id} pipes status: stdout={stdout_status}, stderr={stderr_status}"
                 )
         except Exception as e:
             # Fall back to communicate() if direct read fails
             try:
-                stdout, stderr = running_run.process.communicate(timeout=5.0)
+                stdout, stderr = entry.process.communicate(timeout=5.0)
             except Exception as e2:
                 logger.warning(
-                    f"Failed to get output from process {run_id}: "
+                    f"Failed to get output from process for session {session_id}: "
                     f"direct read: {e}, communicate: {e2}"
                 )
 
         if return_code == 0:
-            logger.info(f"Agent run {run_id} completed successfully (session={running_run.session_id})")
+            logger.info(f"Agent run {run_id} completed successfully (session={session_id})")
             try:
                 self.api_client.report_completed(self.runner_id, run_id)
             except Exception as e:
@@ -142,7 +144,7 @@ class RunSupervisor:
                 error_msg = f"Process exited with code {return_code}"
 
             # Log detailed failure info for debugging
-            logger.error(f"Agent run {run_id} failed (exit_code={return_code}, session={running_run.session_id})")
+            logger.error(f"Agent run {run_id} failed (exit_code={return_code}, session={session_id})")
             logger.error(f"  Error: {error_msg}")
             if stdout and stdout.strip():
                 # Truncate long output for logging

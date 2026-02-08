@@ -18,7 +18,7 @@ from typing import Callable, Optional
 
 from api_client import CoordinatorAPIClient, Run, PollResult
 from executor import RunExecutor
-from registry import RunningRunsRegistry
+from registry import ProcessRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class RunPoller:
         self,
         api_client: CoordinatorAPIClient,
         executor: RunExecutor,
-        registry: RunningRunsRegistry,
+        registry: ProcessRegistry,
         runner_id: str,
         on_deregistered: Optional[Callable[[], None]] = None,
     ):
@@ -150,7 +150,7 @@ class RunPoller:
             process = self.executor.execute_run(run)
 
             # Add to registry
-            self.registry.add_run(run.run_id, run.session_id, process)
+            self.registry.register_session(run.session_id, process, run.run_id)
 
             # Report started
             self.api_client.report_started(self.runner_id, run.run_id)
@@ -165,32 +165,32 @@ class RunPoller:
 
     def _handle_stop(self, run_id: str) -> None:
         """Stop a running agent run by terminating its process."""
-        running_run = self.registry.get_run(run_id)
+        entry = self.registry.get_session_by_run(run_id)
 
-        if not running_run:
+        if not entry:
             # Agent run not running (already completed or never started)
             logger.debug(f"Stop command for agent run {run_id} ignored - run not running")
             return
 
-        logger.info(f"Stopping agent run {run_id} (session={running_run.session_id}, pid={running_run.process.pid})")
+        logger.info(f"Stopping agent run {run_id} (session={entry.session_id}, pid={entry.process.pid})")
 
         signal_used = "SIGTERM"
 
         try:
             # Send SIGTERM first (graceful)
-            running_run.process.terminate()
+            entry.process.terminate()
 
             # Wait briefly for graceful shutdown
             try:
-                running_run.process.wait(timeout=5)
+                entry.process.wait(timeout=5)
             except Exception:
                 # Force kill if not responding
-                running_run.process.kill()
+                entry.process.kill()
                 signal_used = "SIGKILL"
                 logger.warning(f"Agent run {run_id} did not respond to SIGTERM, sent SIGKILL")
 
             # Remove from registry
-            self.registry.remove_run(run_id)
+            self.registry.remove_session(entry.session_id)
 
             # Report stopped
             try:

@@ -57,6 +57,7 @@ class ExecutorProfile:
     command: str
     config: dict[str, Any]
     agents_dir: Optional[str] = None  # Path to agents directory (relative to runner dir)
+    lifecycle: str = "one_shot"  # "one_shot" or "persistent"
 
 
 def get_profiles_dir() -> Path:
@@ -122,6 +123,7 @@ def load_profile(name: str) -> ExecutorProfile:
         command=profile["command"],
         config=profile.get("config", {}),
         agents_dir=profile.get("agents_dir"),
+        lifecycle=profile.get("lifecycle", "one_shot"),
     )
 
 
@@ -174,6 +176,7 @@ class RunExecutor:
         """
         self.default_project_dir = default_project_dir
         self.mcp_server_url = mcp_server_url
+        self.profile = profile
 
         # Resolve executor path and config from profile or defaults
         if profile:
@@ -186,6 +189,11 @@ class RunExecutor:
         logger.debug(f"Executor path: {self.executor_path}")
         if self.executor_config:
             logger.debug(f"Executor config: {self.executor_config}")
+
+    @property
+    def is_persistent(self) -> bool:
+        """Whether the executor uses persistent lifecycle (stays alive across turns)."""
+        return self.profile is not None and self.profile.lifecycle == "persistent"
 
     def execute_run(self, run: Run, parent_session_id: Optional[str] = None) -> subprocess.Popen:
         """Execute an agent run by spawning ao-*-exec with JSON payload via stdin.
@@ -348,8 +356,23 @@ class RunExecutor:
             errors='replace',
         )
 
-        # Write payload to stdin and close
-        process.stdin.write(payload_json)
-        process.stdin.close()
+        # Write payload to stdin
+        if self.is_persistent:
+            process.stdin.write(payload_json + "\n")
+            process.stdin.flush()
+        else:
+            process.stdin.write(payload_json)
+            process.stdin.close()
 
         return process
+
+    def send_turn(self, process: subprocess.Popen, run: Run) -> None:
+        """Write NDJSON turn message to an existing persistent process."""
+        msg = json.dumps({"type": "turn", "parameters": run.parameters})
+        process.stdin.write(msg + "\n")
+        process.stdin.flush()
+
+    def send_shutdown(self, process: subprocess.Popen) -> None:
+        """Send shutdown signal to a persistent process."""
+        process.stdin.write('{"type": "shutdown"}\n')
+        process.stdin.flush()
