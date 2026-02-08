@@ -38,7 +38,7 @@ class StopCommandQueue:
         with self._lock:
             self._runners.pop(runner_id, None)
 
-    def add_stop(self, runner_id: str, run_id: str) -> bool:
+    def add_stop(self, runner_id: str, session_id: str) -> bool:
         """Queue a stop command and wake up the runner's poll.
 
         Returns True if command was queued, False if runner not found.
@@ -48,14 +48,14 @@ class StopCommandQueue:
             if not state:
                 return False
 
-            state.pending_stops.add(run_id)
+            state.pending_stops.add(session_id)
             state.event.set()  # Wake up the poll!
             return True
 
     def get_and_clear(self, runner_id: str) -> list[str]:
         """Get pending stop commands and clear them.
 
-        Returns list of run_ids to stop.
+        Returns list of session_ids to stop.
         """
         with self._lock:
             state = self._runners.get(runner_id)

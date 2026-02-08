@@ -222,6 +222,9 @@ class RunPoller:
         run_id = entry.current_run_id  # May be None if between turns
         logger.info(f"Stopping session {session_id} (run={run_id}, pid={entry.process.pid})")
 
+        # Mark as stopping so supervisor skips reporting for this session
+        self.registry.mark_stopping(session_id)
+
         signal_used = "SIGTERM"
 
         try:
@@ -255,12 +258,13 @@ class RunPoller:
                 except Exception as e:
                     logger.error(f"Failed to report stopped for run {run_id}: {e}")
             else:
-                # Session was idle between turns — report stopped directly
+                # Session was idle between turns — report based on how it exited
+                end_status = "finished" if signal_used == "shutdown" else "stopped"
                 try:
-                    self.api_client.report_session_status(self.runner_id, session_id, "stopped")
-                    logger.info(f"Idle session {session_id} stopped (reported via session status)")
+                    self.api_client.report_session_status(self.runner_id, session_id, end_status)
+                    logger.info(f"Idle session {session_id} {end_status} (signal={signal_used})")
                 except Exception as e:
-                    logger.error(f"Failed to report stopped for idle session {session_id}: {e}")
+                    logger.error(f"Failed to report {end_status} for idle session {session_id}: {e}")
 
         except Exception as e:
             logger.error(f"Error stopping session {session_id}: {e}")

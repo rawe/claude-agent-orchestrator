@@ -33,6 +33,7 @@ class ProcessRegistry:
     def __init__(self):
         self._sessions: dict[str, SessionProcess] = {}
         self._run_index: dict[str, str] = {}
+        self._stopping: set[str] = set()  # sessions being stopped by poller
         self._lock = threading.Lock()
 
     def register_session(
@@ -99,6 +100,16 @@ class ProcessRegistry:
             entry.current_run_id = None
             return old_run_id
 
+    def mark_stopping(self, session_id: str) -> None:
+        """Mark a session as being stopped by the poller (dedup guard)."""
+        with self._lock:
+            self._stopping.add(session_id)
+
+    def is_stopping(self, session_id: str) -> bool:
+        """Check if a session is being stopped by the poller."""
+        with self._lock:
+            return session_id in self._stopping
+
     def remove_session(self, session_id: str) -> Optional[SessionProcess]:
         """Remove a session from both indexes.
 
@@ -108,6 +119,7 @@ class ProcessRegistry:
             entry = self._sessions.pop(session_id, None)
             if entry is not None and entry.current_run_id is not None:
                 self._run_index.pop(entry.current_run_id, None)
+            self._stopping.discard(session_id)
             return entry
 
     def get_all_sessions(self) -> dict[str, SessionProcess]:

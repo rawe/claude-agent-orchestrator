@@ -644,6 +644,14 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
 async def delete_session_endpoint(session_id: str):
     """Delete a session and all its events and runs."""
 
+    # Check session exists and is in a terminal state
+    session = get_session_by_id(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session["status"] in ("running", "idle"):
+        raise HTTPException(status_code=409, detail="Stop session first")
+
     # Delete from database (cascade deletes runs and events)
     result = delete_session(session_id)
 
@@ -1797,8 +1805,8 @@ async def report_session_status(session_id: str, request: SessionStatusRequest):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    if request.status not in ("finished", "failed"):
-        raise HTTPException(status_code=400, detail="Status must be 'finished' or 'failed'")
+    if request.status not in ("finished", "failed", "stopped"):
+        raise HTTPException(status_code=400, detail="Status must be 'finished', 'failed', or 'stopped'")
 
     await update_session_status_and_broadcast(session_id, request.status)
 

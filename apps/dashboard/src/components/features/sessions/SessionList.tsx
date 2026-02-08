@@ -17,9 +17,13 @@ type SortOption = 'modified_desc' | 'modified_asc' | 'created_desc' | 'created_a
 
 const statusOptions: { value: SessionStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All Status' },
+  { value: 'pending', label: 'Pending' },
   { value: 'running', label: 'Running' },
+  { value: 'idle', label: 'Idle' },
+  { value: 'stopping', label: 'Stopping' },
   { value: 'finished', label: 'Finished' },
   { value: 'stopped', label: 'Stopped' },
+  { value: 'failed', label: 'Failed' },
 ];
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -155,7 +159,7 @@ export function SessionList({
               session={session}
               isSelected={session.session_id === selectedSessionId}
               onSelect={() => onSelectSession(session.session_id)}
-              onStop={session.status === 'running' ? () => onStopSession(session.session_id) : undefined}
+              onStop={(session.status === 'running' || session.status === 'idle') ? () => onStopSession(session.session_id) : undefined}
               onDelete={() => onDeleteSession(session.session_id)}
             />
           ))

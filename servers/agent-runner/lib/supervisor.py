@@ -172,6 +172,11 @@ class RunSupervisor:
 
     def _handle_persistent_exit(self, session_id: str, entry, return_code: int) -> None:
         """Handle unexpected exit of a persistent process."""
+        # Dedup guard: if poller is handling the stop, skip reporting
+        if self.registry.is_stopping(session_id):
+            logger.debug(f"Skipping exit handling for session {session_id} — poller is stopping it")
+            return
+
         run_id = entry.current_run_id
         self.registry.remove_session(session_id)
 

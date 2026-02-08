@@ -8,8 +8,9 @@ interface SessionsContextValue {
   sessions: Session[];
   loading: boolean;
   stopSession: (sessionId: string) => Promise<{ success: boolean; message: string; run_id?: string }>;
+  stopAllSessions: () => Promise<{ stopped: number; failed: number }>;
   deleteSession: (sessionId: string) => Promise<void>;
-  deleteAllSessions: () => Promise<void>;
+  deleteAllSessions: () => Promise<{ deleted: number; skipped: number }>;
   refreshSessions: () => Promise<void>;
 }
 
@@ -104,12 +105,34 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
     setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
   }, []);
 
-  const deleteAllSessions = useCallback(async () => {
-    const sessionIds = sessions.map((s) => s.session_id);
-    for (const sessionId of sessionIds) {
-      await sessionService.deleteSession(sessionId);
-      setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+  const stopAllSessions = useCallback(async () => {
+    const stoppable = sessions.filter((s) => s.status === 'running' || s.status === 'idle');
+    let stopped = 0;
+    let failed = 0;
+    for (const session of stoppable) {
+      const result = await sessionService.stopSession(session.session_id);
+      if (result.success) stopped++;
+      else failed++;
     }
+    return { stopped, failed };
+  }, [sessions]);
+
+  const deleteAllSessions = useCallback(async () => {
+    const deletable = sessions.filter(
+      (s) => s.status !== 'running' && s.status !== 'idle' && s.status !== 'stopping'
+    );
+    let deleted = 0;
+    let skipped = sessions.length - deletable.length;
+    for (const session of deletable) {
+      try {
+        await sessionService.deleteSession(session.session_id);
+        setSessions((prev) => prev.filter((s) => s.session_id !== session.session_id));
+        deleted++;
+      } catch {
+        skipped++;
+      }
+    }
+    return { deleted, skipped };
   }, [sessions]);
 
   const refreshSessions = useCallback(async () => {
@@ -123,6 +146,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
         sessions,
         loading,
         stopSession,
+        stopAllSessions,
         deleteSession,
         deleteAllSessions,
         refreshSessions,

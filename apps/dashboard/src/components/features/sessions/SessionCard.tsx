@@ -120,10 +120,9 @@ export function SessionCard({
           {formatRelativeTime(session.modified_at || session.created_at)}
         </div>
 
-        {/* Actions - visible on hover or when selected */}
-        <div className={`flex items-center gap-1 mt-2 pt-2 border-t border-gray-100 transition-opacity duration-200 ${
-          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}>
+        {/* Actions */}
+        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
+          {/* Stop button: visible only for running/idle */}
           {(session.status === 'running' || session.status === 'idle') && onStop && (
             <button
               onClick={(e) => {
@@ -137,13 +136,28 @@ export function SessionCard({
               Stop
             </button>
           )}
+          {/* Delete button: disabled for running/idle/stopping, enabled for pending/finished/stopped/failed */}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onDelete();
+              const canDelete = session.status !== 'running' && session.status !== 'idle' && session.status !== 'stopping';
+              if (canDelete) {
+                onDelete();
+              }
             }}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
-            title="Delete session"
+            className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+              session.status === 'running' || session.status === 'idle' || session.status === 'stopping'
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-red-600 hover:bg-red-50'
+            }`}
+            title={
+              session.status === 'running' || session.status === 'idle'
+                ? 'Stop session first'
+                : session.status === 'stopping'
+                ? 'Session is stopping'
+                : 'Delete session'
+            }
+            disabled={session.status === 'running' || session.status === 'idle' || session.status === 'stopping'}
           >
             <Trash2 className="w-3 h-3" />
             Delete
