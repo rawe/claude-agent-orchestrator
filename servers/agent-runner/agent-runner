@@ -318,6 +318,15 @@ class Runner:
         """Stop all background threads and deregister from Agent Coordinator."""
         logger.info("Stopping runner...")
 
+        # Graceful shutdown cascade: stop all live executor processes first
+        # This ensures no orphan processes survive after runner exit
+        if self.poller:
+            live_sessions = self.registry.get_all_sessions()
+            if live_sessions:
+                logger.info(f"Stopping {len(live_sessions)} live session(s)...")
+                for session_id in live_sessions:
+                    self.poller._handle_stop(session_id)
+
         if self.poller:
             self.poller.stop()
         if self.supervisor:
