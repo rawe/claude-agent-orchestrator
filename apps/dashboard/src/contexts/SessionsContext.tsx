@@ -79,15 +79,10 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
               ...prev,
             ];
           });
-        } else if (event.event_type === 'run_completed') {
-          setSessions((prev) =>
-            prev.map((s) =>
-              s.session_id === event.session_id
-                ? { ...s, status: event.exit_code === 0 ? 'finished' : 'stopped' }
-                : s
-            )
-          );
         }
+        // Note: run_completed status is handled by session_updated SSE event
+        // from the coordinator, which has the authoritative session status
+        // (e.g. "idle" for persistent sessions, "finished" for one-shot).
       }
     };
 
