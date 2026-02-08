@@ -298,6 +298,9 @@ class Runner:
             self.config.heartbeat_interval,
         )
 
+        # Wire poller -> supervisor stdout reader callback for persistent processes
+        self.poller._start_stdout_reader = self.supervisor.start_stdout_reader
+
         # Start threads
         self.poller.start()
         self.supervisor.start()

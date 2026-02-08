@@ -1,0 +1,6 @@
+{
+  "type": "autonomous",
+  "lifecycle": "persistent",
+  "command": "executors/echo-executor/ao-echo-exec",
+  "config": {}
+}

@@ -1,0 +1,86 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx>=0.25.0",
+# ]
+# ///
+"""
+Echo Executor - minimal NDJSON protocol implementation for testing.
+
+Echoes prompts back as results without making Claude API calls.
+Implements the same stdin/stdout protocol as the Claude SDK executor.
+"""
+
+import json
+import os
+import sys
+import httpx
+
+
+def bind_session(session_id: str, gateway_url: str) -> None:
+    """Send bind request to runner gateway."""
+    try:
+        httpx.post(
+            f"{gateway_url}/sessions/{session_id}/bind",
+            json={"executor_session_id": f"echo-{session_id}"},
+            timeout=5.0,
+        )
+    except Exception as e:
+        print(f"[echo-exec] bind failed: {e}", file=sys.stderr)
+
+
+def main():
+    gateway_url = os.environ.get("AGENT_ORCHESTRATOR_API_URL", "http://localhost:8765")
+
+    # Read initial invocation (first line)
+    first_line = sys.stdin.readline()
+    if not first_line.strip():
+        print("[echo-exec] empty stdin, exiting", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        invocation = json.loads(first_line.strip())
+    except json.JSONDecodeError as e:
+        print(f"[echo-exec] invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    session_id = invocation.get("session_id", "unknown")
+    prompt = invocation.get("parameters", {}).get("prompt", "")
+
+    # Bind session
+    bind_session(session_id, gateway_url)
+
+    # Write turn_complete for turn 1
+    print(json.dumps({
+        "type": "turn_complete",
+        "result": f"echo: {prompt}",
+    }), flush=True)
+
+    # Subsequent turns loop
+    while True:
+        line = sys.stdin.readline()
+        if not line.strip():
+            # EOF
+            break
+
+        try:
+            msg = json.loads(line.strip())
+        except json.JSONDecodeError:
+            continue
+
+        msg_type = msg.get("type")
+
+        if msg_type == "shutdown":
+            break
+
+        if msg_type == "turn":
+            turn_prompt = msg.get("parameters", {}).get("prompt", "")
+            print(json.dumps({
+                "type": "turn_complete",
+                "result": f"echo: {turn_prompt}",
+            }), flush=True)
+
+
+if __name__ == "__main__":
+    main()

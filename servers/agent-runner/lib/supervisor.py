@@ -10,6 +10,8 @@ which allows proper queuing when the parent is busy. See:
 - servers/agent-coordinator/services/callback_processor.py
 """
 
+import json
+import subprocess
 import threading
 import time
 import logging
@@ -46,6 +48,11 @@ class RunSupervisor:
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
+        # Dedup set for reported runs (prevents double-reporting between stdout reader and poll loop)
+        self._reported_runs: set[str] = set()
+        self._reported_runs_lock = threading.Lock()
+        self._stdout_threads: list[threading.Thread] = []
+
     def start(self) -> None:
         """Start the supervisor thread."""
         if self._thread is not None and self._thread.is_alive():
@@ -76,19 +83,19 @@ class RunSupervisor:
             time.sleep(self.check_interval)
 
     def _check_runs(self) -> None:
-        """Check all running agent runs for completion."""
+        """Check all sessions for process exit."""
         sessions = self.registry.get_all_sessions()
 
         for session_id, entry in sessions.items():
-            # Check if process has finished
             return_code = entry.process.poll()
-
             if return_code is not None:
-                # Process has finished
-                self._handle_completion(session_id, entry, return_code)
+                if entry.persistent:
+                    self._handle_persistent_exit(session_id, entry, return_code)
+                else:
+                    self._handle_oneshot_exit(session_id, entry, return_code)
 
-    def _handle_completion(self, session_id: str, entry, return_code: int) -> None:
-        """Handle agent run completion (success or failure).
+    def _handle_oneshot_exit(self, session_id: str, entry, return_code: int) -> None:
+        """Handle one-shot agent run completion (success or failure).
 
         Reports completion status to agent-coordinator. Callback processing
         is handled by agent-coordinator when it receives the run_completed event.
@@ -162,3 +169,83 @@ class RunSupervisor:
                 self.api_client.report_failed(self.runner_id, run_id, error_msg)
             except Exception as e:
                 logger.error(f"Failed to report failure for {run_id}: {e}")
+
+    def _handle_persistent_exit(self, session_id: str, entry, return_code: int) -> None:
+        """Handle unexpected exit of a persistent process."""
+        run_id = entry.current_run_id
+        self.registry.remove_session(session_id)
+
+        if run_id:
+            # Process died with an active run — this is a crash
+            with self._reported_runs_lock:
+                if run_id in self._reported_runs:
+                    return
+                self._reported_runs.add(run_id)
+
+            stderr = self._read_stderr(entry)
+            error_msg = stderr or f"Persistent process exited with code {return_code}"
+            logger.error(f"Persistent process crashed for session {session_id} (run={run_id}, exit_code={return_code})")
+            try:
+                self.api_client.report_failed(self.runner_id, run_id, error_msg)
+            except Exception as e:
+                logger.error(f"Failed to report crash for {run_id}: {e}")
+        else:
+            # Process was idle (between turns) and exited
+            logger.info(f"Idle persistent process exited for session {session_id} (exit_code={return_code})")
+
+    def _read_stderr(self, entry) -> str:
+        """Read stderr from a process for error reporting."""
+        try:
+            if entry.process.stderr and not entry.process.stderr.closed:
+                return entry.process.stderr.read() or ""
+        except Exception:
+            pass
+        return ""
+
+    def start_stdout_reader(self, session_id: str, process: subprocess.Popen) -> None:
+        """Start a stdout reader thread for a persistent process."""
+        thread = threading.Thread(
+            target=self._stdout_reader_loop,
+            args=(session_id, process),
+            daemon=True,
+        )
+        thread.start()
+        self._stdout_threads.append(thread)
+        logger.debug(f"Started stdout reader for session {session_id}")
+
+    def _stdout_reader_loop(self, session_id: str, process: subprocess.Popen) -> None:
+        """Read NDJSON from persistent process stdout."""
+        try:
+            for line in iter(process.stdout.readline, ''):
+                if not line.strip():
+                    continue
+                try:
+                    msg = json.loads(line.strip())
+                except json.JSONDecodeError:
+                    continue  # skip non-JSON output
+                if msg.get("type") == "turn_complete":
+                    self._report_turn_complete(session_id)
+        except Exception as e:
+            logger.error(f"Stdout reader error for session {session_id}: {e}")
+        finally:
+            logger.debug(f"Stdout reader exiting for session {session_id}")
+
+    def _report_turn_complete(self, session_id: str) -> None:
+        """Handle turn_complete from stdout reader."""
+        entry = self.registry.get_session(session_id)
+        if not entry or not entry.current_run_id:
+            return
+        run_id = entry.current_run_id
+
+        with self._reported_runs_lock:
+            if run_id in self._reported_runs:
+                return  # already reported
+            self._reported_runs.add(run_id)
+
+        self.registry.clear_run(session_id)
+
+        try:
+            self.api_client.report_completed(self.runner_id, run_id)
+            logger.info(f"Turn complete for run {run_id} (session={session_id})")
+        except Exception as e:
+            logger.error(f"Failed to report turn complete for {run_id}: {e}")

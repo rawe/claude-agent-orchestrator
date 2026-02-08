@@ -313,10 +313,10 @@ async def run_multi_turn_session(
     Protocol:
         - Turn 1: Uses initial_invocation's prompt
         - Subsequent turns: Reads NDJSON from stdin
-          - {"type": "turn", "run_id": "...", "prompt": "..."} -> execute turn
+          - {"type": "turn", "parameters": {"prompt": "..."}} -> execute turn
           - {"type": "shutdown"} -> graceful exit
         - After each turn, writes to stdout:
-          {"type": "turn_complete", "run_id": "...", "result": "..."}
+          {"type": "turn_complete", "result": "..."}
 
     Args:
         initial_invocation: ExecutorInvocation for the first turn
@@ -392,7 +392,6 @@ async def run_multi_turn_session(
     from utils import format_autonomous_inputs
     has_custom_schema = blueprint.get("parameters_schema") is not None
     initial_prompt = format_autonomous_inputs(initial_invocation.parameters, has_custom_schema)
-    initial_run_id = initial_invocation.metadata.get("run_id", "")
 
     try:
         async with ClaudeSDKClient(options=options) as client:
@@ -447,7 +446,6 @@ async def run_multi_turn_session(
             # Write turn_complete for turn 1
             print(json.dumps({
                 "type": "turn_complete",
-                "run_id": initial_run_id,
                 "result": result or "",
             }), flush=True)
 
@@ -474,7 +472,6 @@ async def run_multi_turn_session(
                 if msg_type == "turn":
                     turn_params = msg.get("parameters", {})
                     turn_prompt = turn_params.get("prompt", "")
-                    turn_run_id = msg.get("run_id", "")
 
                     # Emit user message BEFORE querying
                     emitter.emit_user_message(turn_prompt)
@@ -504,7 +501,6 @@ async def run_multi_turn_session(
                     # Write turn_complete
                     print(json.dumps({
                         "type": "turn_complete",
-                        "run_id": turn_run_id,
                         "result": result or "",
                     }), flush=True)
                 else:

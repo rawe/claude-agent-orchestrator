@@ -68,6 +68,9 @@ class RunPoller:
         self._backoff_seconds = 1.0
         self._max_backoff = 30.0
 
+        # Callback for supervisor's stdout reader (set by agent-runner after creation)
+        self._start_stdout_reader: Optional[Callable] = None
+
         # Scripts directory for synced scripts
         self._scripts_dir = get_scripts_dir()
         self._scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -142,17 +145,38 @@ class RunPoller:
                 self._backoff_seconds = min(self._backoff_seconds * 2, self._max_backoff)
 
     def _handle_run(self, run: Run) -> None:
-        """Handle a received agent run by spawning subprocess."""
+        """Handle a received agent run by spawning subprocess or routing to existing process."""
         logger.debug(f"Received agent run {run.run_id}: type={run.type}, session={run.session_id}")
 
         try:
-            # Spawn subprocess
+            # Resume routing for persistent sessions
+            if run.type == "resume_session":
+                entry = self.registry.get_session(run.session_id)
+                if entry and entry.persistent:
+                    self._route_resume(run, entry)
+                    return
+                elif entry and not entry.persistent:
+                    # One-shot executor — fall through to spawn new process (existing behavior)
+                    pass
+                else:
+                    # No live process — fail explicitly (no fallback, no new process)
+                    self.api_client.report_failed(
+                        self.runner_id, run.run_id,
+                        f"No live executor process for session {run.session_id}"
+                    )
+                    return
+
+            # Start or one-shot resume — spawn new process
             process = self.executor.execute_run(run)
+            self.registry.register_session(
+                run.session_id, process, run.run_id,
+                persistent=self.executor.is_persistent
+            )
 
-            # Add to registry
-            self.registry.register_session(run.session_id, process, run.run_id)
+            # Start stdout reader for persistent processes
+            if self.executor.is_persistent and self._start_stdout_reader:
+                self._start_stdout_reader(run.session_id, process)
 
-            # Report started
             self.api_client.report_started(self.runner_id, run.run_id)
             logger.debug(f"Agent run {run.run_id} started (pid={process.pid})")
 
@@ -162,6 +186,30 @@ class RunPoller:
                 self.api_client.report_failed(self.runner_id, run.run_id, str(e))
             except Exception:
                 logger.error(f"Failed to report agent run failure for {run.run_id}")
+
+    def _route_resume(self, run: Run, entry) -> None:
+        """Route a resume turn to an existing persistent process."""
+        # Resume-while-busy guard
+        if entry.current_run_id is not None:
+            error_msg = (
+                f"Session {run.session_id} is busy with run {entry.current_run_id}, "
+                f"cannot accept resume run {run.run_id}"
+            )
+            logger.warning(error_msg)
+            self.api_client.report_failed(self.runner_id, run.run_id, error_msg)
+            return
+
+        try:
+            self.registry.swap_run(run.session_id, run.run_id)
+            self.executor.send_turn(entry.process, run)
+            self.api_client.report_started(self.runner_id, run.run_id)
+            logger.info(f"Resumed session {run.session_id} with run {run.run_id}")
+        except BrokenPipeError:
+            self.registry.remove_session(run.session_id)
+            self.api_client.report_failed(
+                self.runner_id, run.run_id,
+                f"Executor process for session {run.session_id} is no longer running"
+            )
 
     def _handle_stop(self, run_id: str) -> None:
         """Stop a running agent run by terminating its process."""
