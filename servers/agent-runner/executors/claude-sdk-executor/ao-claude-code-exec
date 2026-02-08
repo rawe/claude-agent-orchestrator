@@ -132,9 +132,12 @@ def main(
         "argv": sys.argv,
     })
 
-    # Parse stdin
+    # Parse first line from stdin (NDJSON protocol: first line is the invocation)
     try:
-        invocation = ExecutorInvocation.from_stdin()
+        first_line = sys.stdin.readline()
+        if not first_line.strip():
+            error_exit("No input received on stdin")
+        invocation = ExecutorInvocation.from_json(first_line.strip())
         invocation.log_summary()
     except ValueError as e:
         error_exit(str(e))
@@ -152,11 +155,11 @@ def main(
     })
 
     # Route to executor logic
-    from executor import run_start, run_resume
+    from executor import run_start, run_resume, run_multi_turn
 
     try:
         if invocation.mode == "start":
-            run_start(invocation)
+            run_multi_turn(invocation)
         else:
             run_resume(invocation)
     except ValueError as e:

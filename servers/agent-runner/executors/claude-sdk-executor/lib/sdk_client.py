@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Optional
 import asyncio
 import json
+import sys
 
 from mcp_transform import transform_mcp_servers_for_claude_code
 from claude_config import ClaudeConfigKey, get_claude_config
@@ -120,7 +121,6 @@ async def run_claude_session(
         }
     except ImportError as e:
         # If HookMatcher is not available, continue without hooks
-        import sys
         print(
             f"Warning: Could not import HookMatcher for hooks: {e}",
             file=sys.stderr
@@ -129,6 +129,7 @@ async def run_claude_session(
     # Add resume session ID if provided (use executor_session_id for SDK resume)
     if resume_executor_session_id:
         options.resume = resume_executor_session_id
+        print(f"[DIAG] resume mode: options.resume = {resume_executor_session_id}", file=sys.stderr)
 
     # Transform and add MCP servers (coordinator format → Claude Code format)
     if mcp_servers:
@@ -155,8 +156,10 @@ async def run_claude_session(
                     extracted_session_id = message.data.get('session_id')
                     if extracted_session_id:
                         executor_session_id = extracted_session_id
+                        print(f"[DIAG] executor_session_id extracted: {executor_session_id}", file=sys.stderr)
 
                         # Bind session and set up hook context (ADR-010)
+                        print(f"[DIAG] binding session {session_id} -> executor {executor_session_id}", file=sys.stderr)
                         emitter.bind(executor_session_id, str(project_dir))
                         set_hook_emitter(emitter)
 
@@ -169,6 +172,7 @@ async def run_claude_session(
 
             # Extract result from ResultMessage
             if isinstance(message, ResultMessage):
+                print(f"[DIAG] ResultMessage received, result length: {len(message.result) if message.result else 'None'}", file=sys.stderr)
                 if executor_session_id is None:
                     executor_session_id = message.session_id
 
@@ -197,31 +201,32 @@ async def run_claude_session(
                 skip_assistant_message=skip_messages,
             )
 
-            # Send result event based on output type
-            if output_schema:
-                # Structured output: SDK handles validation and retries internally
-                if structured_output is not None:
-                    emitter.emit_result(result_data=structured_output)
-                    # Return structured JSON as the result text
-                    result = json.dumps(structured_output)
-                else:
-                    raise ValueError(
-                        "Structured output validation failed. "
-                        "The agent could not produce valid JSON matching the output schema."
-                    )
+        # Send result event based on output type
+        if output_schema:
+            # Structured output: SDK handles validation and retries internally
+            if structured_output is not None:
+                emitter.emit_result(result_data=structured_output)
+                # Return structured JSON as the result text
+                result = json.dumps(structured_output)
+            else:
+                raise ValueError(
+                    "Structured output validation failed. "
+                    "The agent could not produce valid JSON matching the output schema."
+                )
 
-            elif result:
-                # No output schema - send result event with text
-                emitter.emit_result(result_text=result)
+        elif result:
+            # No output schema - send result event with text
+            emitter.emit_result(result_text=result)
 
-            # NOTE: Session completion is signaled by the agent runner's supervisor
-            # via POST /runner/runs/{run_id}/completed when this process exits.
+        # NOTE: Session completion is signaled by the agent runner's supervisor
+        # via POST /runner/runs/{run_id}/completed when this process exits.
 
     except Exception as e:
         # Propagate SDK errors with context
         raise Exception(f"Claude SDK error during session execution: {e}") from e
 
     # Validate we received required data
+    print(f"[DIAG] Final state: executor_session_id={executor_session_id}, result={'set' if result else 'None'}", file=sys.stderr)
     if not executor_session_id:
         raise ValueError(
             "No session_id received from Claude SDK. "
@@ -269,5 +274,267 @@ def run_session_sync(
             executor_config=executor_config,
             system_prompt=system_prompt,
             output_schema=output_schema,
+        )
+    )
+
+
+# =============================================================================
+# Multi-turn session support
+# =============================================================================
+
+
+async def _read_stdin_line() -> str:
+    """Read a single line from stdin without blocking the event loop.
+
+    Uses run_in_executor to offload the blocking readline call to a
+    thread pool, keeping the asyncio event loop responsive.
+
+    Returns:
+        The line read from stdin (may be empty string at EOF).
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, sys.stdin.readline)
+
+
+async def run_multi_turn_session(
+    initial_invocation,
+    project_dir: Path,
+    session_id: str,
+    api_url: str = "http://127.0.0.1:8765",
+    executor_config: Optional[dict] = None,
+) -> None:
+    """
+    Run a multi-turn Claude session within a single SDK client process.
+
+    Keeps the ClaudeSDKClient alive across multiple turns, receiving
+    subsequent turn requests via NDJSON on stdin and writing turn_complete
+    NDJSON messages to stdout.
+
+    Protocol:
+        - Turn 1: Uses initial_invocation's prompt
+        - Subsequent turns: Reads NDJSON from stdin
+          - {"type": "turn", "run_id": "...", "prompt": "..."} -> execute turn
+          - {"type": "shutdown"} -> graceful exit
+        - After each turn, writes to stdout:
+          {"type": "turn_complete", "run_id": "...", "result": "..."}
+
+    Args:
+        initial_invocation: ExecutorInvocation for the first turn
+        project_dir: Working directory for Claude
+        session_id: Coordinator-generated session ID (ADR-010)
+        api_url: Base URL of Runner Gateway
+        executor_config: Executor-specific config (permission_mode, etc.)
+    """
+    # Create event emitter for session lifecycle events
+    emitter = SessionEventEmitter(api_url, session_id)
+
+    # Import SDK
+    try:
+        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, ResultMessage, SystemMessage
+    except ImportError as e:
+        raise ImportError(
+            "claude-agent-sdk is not installed. "
+            "Commands using the SDK should have 'claude-agent-sdk' "
+            "in their uv script header dependencies."
+        ) from e
+
+    # Get executor config with defaults
+    claude_config = get_claude_config(executor_config)
+
+    # Build ClaudeAgentOptions
+    options = ClaudeAgentOptions(
+        cwd=str(project_dir.resolve()),
+        permission_mode=claude_config[ClaudeConfigKey.PERMISSION_MODE],
+        setting_sources=claude_config[ClaudeConfigKey.SETTING_SOURCES],
+    )
+
+    # Set model if specified (None = use SDK default)
+    if claude_config[ClaudeConfigKey.MODEL]:
+        options.model = claude_config[ClaudeConfigKey.MODEL]
+
+    # Set system prompt if provided (from agent blueprint)
+    blueprint = initial_invocation.agent_blueprint or {}
+    system_prompt = blueprint.get("system_prompt")
+    if system_prompt:
+        options.system_prompt = system_prompt
+
+    # Add programmatic hooks for post_tool events
+    try:
+        from claude_agent_sdk.types import HookMatcher
+
+        options.hooks = {
+            "PostToolUse": [
+                HookMatcher(hooks=[post_tool_hook]),
+            ],
+        }
+    except ImportError as e:
+        print(
+            f"Warning: Could not import HookMatcher for hooks: {e}",
+            file=sys.stderr
+        )
+
+    # Use SDK native structured outputs if output_schema provided
+    output_schema = blueprint.get("output_schema")
+    if output_schema:
+        options.output_format = {"type": "json_schema", "schema": output_schema}
+
+    # Transform and add MCP servers (coordinator format -> Claude Code format)
+    mcp_servers = blueprint.get("mcp_servers")
+    if mcp_servers:
+        options.mcp_servers = transform_mcp_servers_for_claude_code(mcp_servers)
+
+    # Initialize tracking variables
+    executor_session_id = None
+    structured_output = None
+    skip_assistant_message = output_schema is not None
+
+    # Extract initial prompt
+    from utils import format_autonomous_inputs
+    has_custom_schema = blueprint.get("parameters_schema") is not None
+    initial_prompt = format_autonomous_inputs(initial_invocation.parameters, has_custom_schema)
+    initial_run_id = initial_invocation.metadata.get("run_id", "")
+
+    try:
+        async with ClaudeSDKClient(options=options) as client:
+            # === Turn 1 ===
+            result = None
+
+            await client.query(initial_prompt)
+            async for message in client.receive_response():
+                # Extract session_id from first SystemMessage
+                if isinstance(message, SystemMessage) and executor_session_id is None:
+                    if message.subtype == 'init' and message.data:
+                        extracted_session_id = message.data.get('session_id')
+                        if extracted_session_id:
+                            executor_session_id = extracted_session_id
+                            print(f"[DIAG] multi-turn: executor_session_id extracted: {executor_session_id}", file=sys.stderr)
+
+                            # Bind session and set up hook context (ADR-010)
+                            emitter.bind(executor_session_id, str(project_dir))
+                            set_hook_emitter(emitter)
+
+                            # Send user message event for turn 1
+                            emitter.emit_user_message(initial_prompt)
+
+                # Extract result from ResultMessage
+                if isinstance(message, ResultMessage):
+                    print(f"[DIAG] multi-turn turn 1: ResultMessage received, result length: {len(message.result) if message.result else 'None'}", file=sys.stderr)
+                    if executor_session_id is None:
+                        executor_session_id = message.session_id
+                    result = message.result
+
+                    # Capture SDK structured output (when output_format is set)
+                    if getattr(message, 'structured_output', None) is not None:
+                        structured_output = message.structured_output
+
+                    # Send assistant message event (skip for structured output agents)
+                    if message.result and not skip_assistant_message:
+                        emitter.emit_assistant_message(message.result)
+
+            # Emit result event for turn 1
+            if output_schema:
+                if structured_output is not None:
+                    emitter.emit_result(result_data=structured_output)
+                    result = json.dumps(structured_output)
+                else:
+                    raise ValueError(
+                        "Structured output validation failed. "
+                        "The agent could not produce valid JSON matching the output schema."
+                    )
+            elif result:
+                emitter.emit_result(result_text=result)
+
+            # Write turn_complete for turn 1
+            print(json.dumps({
+                "type": "turn_complete",
+                "run_id": initial_run_id,
+                "result": result or "",
+            }), flush=True)
+
+            # === Subsequent turns loop ===
+            while True:
+                line = await _read_stdin_line()
+                if not line.strip():
+                    # EOF or empty line — treat as end of input
+                    print("[DIAG] multi-turn: stdin EOF, exiting turn loop", file=sys.stderr)
+                    break
+
+                try:
+                    msg = json.loads(line.strip())
+                except json.JSONDecodeError as e:
+                    print(f"[DIAG] multi-turn: invalid JSON on stdin: {e}", file=sys.stderr)
+                    continue
+
+                msg_type = msg.get("type")
+
+                if msg_type == "shutdown":
+                    print("[DIAG] multi-turn: received shutdown, exiting turn loop", file=sys.stderr)
+                    break
+
+                if msg_type == "turn":
+                    turn_params = msg.get("parameters", {})
+                    turn_prompt = turn_params.get("prompt", "")
+                    turn_run_id = msg.get("run_id", "")
+
+                    # Emit user message BEFORE querying
+                    emitter.emit_user_message(turn_prompt)
+
+                    # Execute turn
+                    result = None
+                    structured_output = None
+                    await client.query(turn_prompt)
+                    async for message in client.receive_response():
+                        if isinstance(message, ResultMessage):
+                            print(f"[DIAG] multi-turn turn N: ResultMessage received, result length: {len(message.result) if message.result else 'None'}", file=sys.stderr)
+                            result = message.result
+
+                            if getattr(message, 'structured_output', None) is not None:
+                                structured_output = message.structured_output
+
+                            if message.result and not skip_assistant_message:
+                                emitter.emit_assistant_message(message.result)
+
+                    # Emit result event
+                    if output_schema and structured_output is not None:
+                        emitter.emit_result(result_data=structured_output)
+                        result = json.dumps(structured_output)
+                    elif result:
+                        emitter.emit_result(result_text=result)
+
+                    # Write turn_complete
+                    print(json.dumps({
+                        "type": "turn_complete",
+                        "run_id": turn_run_id,
+                        "result": result or "",
+                    }), flush=True)
+                else:
+                    print(f"[DIAG] multi-turn: unknown message type '{msg_type}', ignoring", file=sys.stderr)
+
+    except Exception as e:
+        raise Exception(f"Claude SDK error during multi-turn session: {e}") from e
+
+    # Validate we received session binding
+    if not executor_session_id:
+        raise ValueError(
+            "No session_id received from Claude SDK during multi-turn session. "
+            "This may indicate an SDK version mismatch or API error."
+        )
+
+
+def run_multi_turn_session_sync(
+    initial_invocation,
+    project_dir: Path,
+    session_id: str,
+    api_url: str = "http://127.0.0.1:8765",
+    executor_config: Optional[dict] = None,
+) -> None:
+    """Synchronous wrapper for run_multi_turn_session."""
+    asyncio.run(
+        run_multi_turn_session(
+            initial_invocation=initial_invocation,
+            project_dir=project_dir,
+            session_id=session_id,
+            api_url=api_url,
+            executor_config=executor_config,
         )
     )

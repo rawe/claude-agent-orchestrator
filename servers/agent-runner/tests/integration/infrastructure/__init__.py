@@ -9,7 +9,7 @@ Components:
 
 from .fake_gateway import FakeRunnerGateway, GatewayCall
 from .mcp_server import MinimalMCPServer, ToolCall
-from .harness import ExecutorTestHarness, ExecutorResult
+from .harness import ExecutorTestHarness, ExecutorResult, MultiTurnExecutor
 
 __all__ = [
     "FakeRunnerGateway",
@@ -18,4 +18,5 @@ __all__ = [
     "ToolCall",
     "ExecutorTestHarness",
     "ExecutorResult",
+    "MultiTurnExecutor",
 ]

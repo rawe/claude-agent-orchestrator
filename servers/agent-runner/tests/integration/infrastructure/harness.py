@@ -23,6 +23,7 @@ Usage:
 import json
 import os
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +50,203 @@ class ExecutorResult:
     def output(self) -> str:
         """Alias for stdout."""
         return self.stdout
+
+
+class _StderrDrainer:
+    """Background thread that drains stderr to prevent pipe deadlocks.
+
+    The executor writes [DIAG] lines to stderr. If the pipe buffer fills
+    up, the executor blocks. This drainer reads stderr in a background
+    thread, storing lines for later inspection.
+    """
+
+    def __init__(self, pipe):
+        self._pipe = pipe
+        self._lines: list[str] = []
+        self._thread = threading.Thread(target=self._drain, daemon=True)
+        self._thread.start()
+
+    def _drain(self):
+        try:
+            for line in self._pipe:
+                self._lines.append(line)
+        except ValueError:
+            # Pipe closed
+            pass
+
+    @property
+    def output(self) -> str:
+        """Return all drained stderr text."""
+        return "".join(self._lines)
+
+    def join(self, timeout: float = 5.0):
+        self._thread.join(timeout=timeout)
+
+
+class MultiTurnExecutor:
+    """Manages a long-lived executor subprocess for multi-turn tests.
+
+    The executor reads NDJSON lines from stdin:
+      - Line 1: initial invocation (start payload)
+      - Subsequent lines: {"type": "turn", "run_id": "...", "parameters": {...}}
+      - {"type": "shutdown"} to exit gracefully
+
+    After each turn it writes to stdout:
+      {"type": "turn_complete", "run_id": "...", "result": "..."}
+    """
+
+    def __init__(self, cmd: list[str], env: dict, cwd: str):
+        self._cmd = cmd
+        self._env = env
+        self._cwd = cwd
+        self._proc: subprocess.Popen | None = None
+        self._drainer: _StderrDrainer | None = None
+
+    def start(self, initial_payload: dict, timeout: float = 120) -> dict:
+        """Spawn the executor and send the initial invocation.
+
+        Args:
+            initial_payload: JSON payload for the first turn (mode=start).
+            timeout: Seconds to wait for the first turn_complete.
+
+        Returns:
+            Parsed turn_complete dict from stdout.
+        """
+        self._proc = subprocess.Popen(
+            self._cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=self._cwd,
+            env=self._env,
+        )
+        self._drainer = _StderrDrainer(self._proc.stderr)
+
+        # Write initial payload as first NDJSON line
+        self._proc.stdin.write(json.dumps(initial_payload) + "\n")
+        self._proc.stdin.flush()
+
+        return self._read_turn_result(timeout)
+
+    def send_turn(self, run_id: str, parameters: dict, timeout: float = 120) -> dict:
+        """Send a subsequent turn and wait for the result.
+
+        Args:
+            run_id: Run ID for the turn.
+            parameters: Parameters dict (must contain "prompt").
+            timeout: Seconds to wait for turn_complete.
+
+        Returns:
+            Parsed turn_complete dict from stdout.
+        """
+        msg = {"type": "turn", "run_id": run_id, "parameters": parameters}
+        self._proc.stdin.write(json.dumps(msg) + "\n")
+        self._proc.stdin.flush()
+        return self._read_turn_result(timeout)
+
+    def shutdown(self, timeout: float = 10) -> int:
+        """Send shutdown message, close stdin, and wait for exit.
+
+        Returns:
+            Process exit code.
+        """
+        try:
+            self._proc.stdin.write(json.dumps({"type": "shutdown"}) + "\n")
+            self._proc.stdin.flush()
+        except (BrokenPipeError, OSError):
+            pass
+        try:
+            self._proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+        exit_code = self._proc.wait(timeout=timeout)
+        if self._drainer:
+            self._drainer.join(timeout=5.0)
+        return exit_code
+
+    def close_stdin(self, timeout: float = 10) -> int:
+        """Close stdin (EOF) without sending shutdown, and wait for exit.
+
+        Returns:
+            Process exit code.
+        """
+        try:
+            self._proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+        exit_code = self._proc.wait(timeout=timeout)
+        if self._drainer:
+            self._drainer.join(timeout=5.0)
+        return exit_code
+
+    def kill(self):
+        """Force kill the executor process."""
+        if self._proc and self._proc.poll() is None:
+            self._proc.kill()
+            self._proc.wait(timeout=5)
+        if self._drainer:
+            self._drainer.join(timeout=2.0)
+
+    @property
+    def stderr_output(self) -> str:
+        """Return all stderr output drained so far."""
+        if self._drainer:
+            return self._drainer.output
+        return ""
+
+    def _read_turn_result(self, timeout: float) -> dict:
+        """Read stdout lines until a JSON line with type=turn_complete.
+
+        Non-JSON lines are skipped (the executor may print debug output).
+
+        Args:
+            timeout: Seconds to wait before raising TimeoutError.
+
+        Returns:
+            Parsed turn_complete dict.
+        """
+        import select
+        import time
+
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"Timed out waiting for turn_complete after {timeout}s. "
+                    f"stderr: {self.stderr_output[-500:]}"
+                )
+
+            # Use select to wait for data with timeout (Unix only)
+            ready, _, _ = select.select([self._proc.stdout], [], [], min(remaining, 1.0))
+            if not ready:
+                # Check if process died
+                if self._proc.poll() is not None:
+                    raise RuntimeError(
+                        f"Executor exited with code {self._proc.returncode} "
+                        f"before sending turn_complete. stderr: {self.stderr_output[-500:]}"
+                    )
+                continue
+
+            line = self._proc.stdout.readline()
+            if not line:
+                raise RuntimeError(
+                    f"Executor stdout closed before turn_complete. "
+                    f"stderr: {self.stderr_output[-500:]}"
+                )
+
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                data = json.loads(line)
+                if isinstance(data, dict) and data.get("type") == "turn_complete":
+                    return data
+            except json.JSONDecodeError:
+                # Skip non-JSON output
+                continue
 
 
 class ExecutorTestHarness:
@@ -357,6 +555,38 @@ class ExecutorTestHarness:
         mcp_servers[server_name] = {"url": self._mcp_server.url}
 
         return payload
+
+    # Multi-turn executor factory
+
+    def create_multi_turn_executor(
+        self,
+        session_id: str | None = None,
+        env_override: dict[str, str] | None = None,
+    ) -> MultiTurnExecutor:
+        """Create a MultiTurnExecutor wired to this harness's services.
+
+        Args:
+            session_id: Optional session ID for AGENT_SESSION_ID env var.
+            env_override: Additional environment variables.
+
+        Returns:
+            A MultiTurnExecutor ready to call .start().
+        """
+        if not self._started:
+            raise RuntimeError("Harness not started. Call start() first.")
+
+        env = os.environ.copy()
+        env["AGENT_ORCHESTRATOR_API_URL"] = self._gateway.url
+
+        if session_id:
+            env["AGENT_SESSION_ID"] = session_id
+
+        if env_override:
+            env.update(env_override)
+
+        cmd = ["uv", "run", "--script", str(self._executor_path)]
+
+        return MultiTurnExecutor(cmd=cmd, env=env, cwd=str(self._runner_dir))
 
 
 # Context manager support
