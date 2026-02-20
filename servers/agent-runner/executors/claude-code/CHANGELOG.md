@@ -1,4 +1,4 @@
-# Claude SDK Executor - Changelog
+# Claude Code Executor - Changelog
 
 Concise log of refactoring changes. Each entry includes test status.
 
@@ -74,7 +74,7 @@ coordinator. See `docs/design/claude-agent-sdk-refactor/BLOCKER.md` for details.
 
 - Copied from `executors/claude-code/`
 - Files: `ao-claude-code-exec`, `lib/__init__.py`, `lib/claude_client.py`
-- Created profile: `profiles/claude-sdk-executor.json`
+- Created profile: `profiles/claude-code.json`
 
 ---
 
@@ -82,6 +82,6 @@ coordinator. See `docs/design/claude-agent-sdk-refactor/BLOCKER.md` for details.
 
 ```bash
 cd servers/agent-runner
-EXECUTOR_UNDER_TEST=executors/claude-sdk-executor/ao-claude-code-exec \
+EXECUTOR_UNDER_TEST=executors/claude-code/ao-claude-code-exec \
   uv run --with pytest pytest tests/integration/ -v
 ```

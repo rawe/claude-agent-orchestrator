@@ -1,5 +1,0 @@
-{
-  "type": "autonomous",
-  "command": "executors/test-executor/ao-test-exec",
-  "config": {}
-}

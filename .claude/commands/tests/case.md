@@ -21,7 +21,7 @@ Test case to run: `$ARGUMENTS`
    - If not found, list available test cases and ask which one to run
 
 2. **Read the test case** prerequisites and determine:
-   - Which executor is needed (look for `claude-code` or `test-executor` in prerequisites)
+   - Which executor is needed (look for `claude-code` or `echo-executor` in prerequisites)
    - Whether MCP server is needed (prerequisites mention "Agent Orchestrator MCP server")
    - Whether agent blueprints need to be copied (prerequisites mention blueprint)
 
@@ -35,7 +35,7 @@ Test case to run: `$ARGUMENTS`
 
 4. **Run `/tests:setup <executor>`** with the executor identified from the test case prerequisites:
    - If prerequisites mention `claude-code` executor: `/tests:setup claude-code`
-   - Otherwise: `/tests:setup` (defaults to `test-executor`)
+   - Otherwise: `/tests:setup` (defaults to `echo-executor`)
 
 ### Phase 4: Start MCP Server (if needed)
 

@@ -5,7 +5,7 @@ Manual integration tests for the Agent Orchestrator framework.
 ## Overview
 
 Tests verify the Agent Coordinator and Agent Runner work correctly together. Two profile options:
-- `test-executor` - Simple echo executor for fast, deterministic tests
+- `echo-executor` - Simple echo executor for fast, deterministic tests
 - `claude-code` - Real Claude AI executor for end-to-end validation
 
 ## Prerequisites
@@ -77,8 +77,8 @@ curl http://localhost:8765/health
 In another terminal (or background process). Use the helper script:
 
 ```bash
-# With test-executor profile (fast, deterministic)
-./tests/scripts/start-runner test-executor
+# With echo-executor profile (fast, deterministic)
+./tests/scripts/start-runner echo-executor
 
 # Or with claude-code profile (real AI)
 ./tests/scripts/start-runner claude-code
@@ -88,7 +88,7 @@ Or manually:
 
 ```bash
 set -a; source .env; set +a
-./servers/agent-runner/agent-runner -x test-executor
+./servers/agent-runner/agent-runner -x echo-executor
 ```
 
 ### 5. Start SSE Monitor
@@ -118,7 +118,7 @@ Commands are located in `.claude/commands/tests/` and provide automated test exe
 
 | Command | Description |
 |---------|-------------|
-| `/tests:setup [profile]` | Start core services (Coordinator, Runner, sse-monitor). Optional profile: `test-executor` (default) or `claude-code` |
+| `/tests:setup [profile]` | Start core services (Coordinator, Runner, sse-monitor). Optional profile: `echo-executor` (default) or `claude-code` |
 | `/tests:case <name>` | Run a specific test case. Reads prerequisites, calls setup with correct profile, handles test-specific setup |
 | `/tests:run` | Run all tests sequentially with automatic setup and teardown |
 | `/tests:teardown` | Stop all services and cleanup |
@@ -237,7 +237,7 @@ Outputs raw JSON lines - one event per line.
 
 ### reset-db
 
-Removes the SQLite database and test-executor session data:
+Removes the SQLite database:
 
 ```bash
 ./tests/scripts/reset-db
@@ -263,7 +263,7 @@ If you need to test authentication behavior, do so in a separate environment wit
 
 ### Runs not executing
 - Verify Agent Runner is registered (check runner logs)
-- Ensure using `-x test-executor` profile flag
+- Ensure using `-x echo-executor` profile flag
 
 ### No SSE events
 - Verify sse-monitor connected successfully

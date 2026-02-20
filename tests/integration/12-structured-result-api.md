@@ -6,7 +6,7 @@ Verify that the `GET /sessions/{id}/result` endpoint returns structured result f
 
 - Database reset: `./tests/scripts/reset-db`
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` profile
+- Agent Runner running with `-x echo-executor` profile
 
 ## Test Steps
 
@@ -97,7 +97,7 @@ Expected: `{"detail": "Session not finished"}` (if caught while running)
 - [ ] Response contains `result_text` field
 - [ ] Response contains `result_data` field
 - [ ] `result_text` contains the assistant's output
-- [ ] `result_data` is `null` for test-executor (AI agent pattern)
+- [ ] `result_data` is `null` for echo-executor (AI agent pattern)
 - [ ] 404 returned for non-existent session
 - [ ] 400 returned for non-finished session (if testable)
 

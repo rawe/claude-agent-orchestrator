@@ -26,7 +26,7 @@ and coordinates agents.
 ./scripts/start-dashboard.sh      # http://localhost:3000
 
 # 3. Runner (connects to coordinator)
-./scripts/start-runner-claude-sdk.sh
+./scripts/start-runner-claude-code.sh
 ```
 
 ### Dev Agent (`general-purpose`, `bypassPermissions`)
@@ -50,7 +50,7 @@ Verifies API behavior, TypeScript compilation, and runs integration tests.
 - Integration tests:
   ```bash
   cd servers/agent-runner
-  EXECUTOR_UNDER_TEST=executors/claude-sdk-executor/ao-claude-code-exec \
+  EXECUTOR_UNDER_TEST=executors/claude-code/ao-claude-code-exec \
     uv run --with pytest pytest tests/integration/tests/ -v \
     --ignore=tests/integration/tests/test_resume_mode.py
   ```

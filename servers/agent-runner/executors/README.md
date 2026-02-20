@@ -201,7 +201,7 @@ if __name__ == "__main__":
 | Name | Description |
 |------|-------------|
 | `claude-code` | Claude Agent SDK executor (default) |
-| `test-executor` | Simple echo executor for testing |
+| `echo-executor` | Simple echo executor for testing |
 
 ## Default Behavior
 

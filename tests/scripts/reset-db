@@ -11,8 +11,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Database paths
 COORDINATOR_DB="$PROJECT_ROOT/servers/agent-coordinator/.agent-orchestrator/observability.db"
-TEST_EXECUTOR_DATA="$PROJECT_ROOT/servers/agent-runner/executors/test-executor/.test-executor-data"
-
 echo "Resetting test environment..."
 
 # Remove Agent Coordinator database
@@ -21,14 +19,6 @@ if [ -f "$COORDINATOR_DB" ]; then
     echo "  Removed: $COORDINATOR_DB"
 else
     echo "  (no database to remove)"
-fi
-
-# Remove test executor session data
-if [ -d "$TEST_EXECUTOR_DATA" ]; then
-    rm -rf "$TEST_EXECUTOR_DATA"
-    echo "  Removed: $TEST_EXECUTOR_DATA"
-else
-    echo "  (no test executor data to remove)"
 fi
 
 echo "Done. Test environment is clean."

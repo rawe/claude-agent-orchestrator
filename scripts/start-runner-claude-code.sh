@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# Start Agent Runner for Claude Code - Development Mode
+# Start Agent Runner for Claude Code Executor - Development Mode
 # =============================================================================
-# - Executor: Claude Code (autonomous profile)
+# - Executor: Claude Code Executor (autonomous profile, uses Claude Agent SDK)
 # - Connects to Agent Coordinator at http://localhost:8765
 # - Project dir: .agent-orchestrator/runner-workdir/ (shared with other runners)
 # - No auth required (coordinator must also run without auth)
@@ -19,4 +19,4 @@ RUNNER_PROJECT_DIR="$PROJECT_ROOT/.agent-orchestrator/runner-workdir"
 mkdir -p "$RUNNER_PROJECT_DIR"
 
 PROJECT_DIR="$RUNNER_PROJECT_DIR" \
-"$PROJECT_ROOT/servers/agent-runner/agent-runner"
+"$PROJECT_ROOT/servers/agent-runner/agent-runner" --profile claude-code
