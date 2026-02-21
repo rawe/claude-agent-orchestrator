@@ -1,8 +1,9 @@
+import os
 import sqlite3
 from pathlib import Path
 import json
 
-DB_PATH = Path(".agent-orchestrator/observability.db")
+DB_PATH = Path(os.getenv("AGENT_ORCHESTRATOR_DB_PATH", ".agent-orchestrator/observability.db"))
 
 
 class SessionAlreadyExistsError(Exception):
