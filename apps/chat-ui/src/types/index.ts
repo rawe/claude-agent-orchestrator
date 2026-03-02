@@ -38,11 +38,16 @@ export interface SessionEvent {
 export interface Session {
   session_id: string;
   /**
-   * Session status:
-   * - 'running': Agent is actively processing
-   * - 'finished': Agent is idle, ready for new input (can be resumed)
+   * Session status (7 statuses):
+   * - 'pending': Session created, no executor bound yet
+   * - 'running': Agent is actively processing a turn
+   * - 'idle': Turn completed, process alive, waiting for next input (can be resumed)
+   * - 'stopping': Stop command issued, awaiting termination
+   * - 'finished': Session completed (clean exit or graceful shutdown) — terminal
+   * - 'stopped': Session force-terminated by stop command — terminal
+   * - 'failed': Process crashed (non-zero exit) — terminal
    */
-  status: 'running' | 'finished';
+  status: 'pending' | 'running' | 'idle' | 'stopping' | 'finished' | 'stopped' | 'failed';
   created_at?: string;
   project_dir?: string;
   agent_name?: string;

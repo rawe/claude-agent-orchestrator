@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, StopCircle, CircleDot, CircleOff, HelpCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, StopCircle, CircleDot, CircleOff, HelpCircle, Loader2, XCircle, Clock } from 'lucide-react';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray';
 type BadgeSize = 'sm' | 'md';
@@ -38,11 +38,20 @@ export function Badge({ children, variant = 'default', size = 'sm', className = 
 // Status icon component with optional animation
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
+    case 'pending':
+      return <Clock className="w-3 h-3 mr-1" />;
     case 'running':
       return (
         <span className="relative flex h-2 w-2 mr-1.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+      );
+    case 'idle':
+      return (
+        <span className="relative flex h-2 w-2 mr-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
         </span>
       );
     case 'stopping':
@@ -51,6 +60,8 @@ function StatusIcon({ status }: { status: string }) {
       return <CheckCircle2 className="w-3 h-3 mr-1" />;
     case 'stopped':
       return <StopCircle className="w-3 h-3 mr-1" />;
+    case 'failed':
+      return <XCircle className="w-3 h-3 mr-1" />;
     case 'active':
       return <CircleDot className="w-3 h-3 mr-1" />;
     case 'inactive':
@@ -63,10 +74,13 @@ function StatusIcon({ status }: { status: string }) {
 // Status-specific badges
 export function StatusBadge({ status }: { status: string }) {
   const statusConfig: Record<string, { variant: BadgeVariant; label: string }> = {
+    pending: { variant: 'warning', label: 'Pending' },
     running: { variant: 'success', label: 'Running' },
+    idle: { variant: 'info', label: 'Idle' },
     stopping: { variant: 'warning', label: 'Stopping' },
     finished: { variant: 'info', label: 'Finished' },
     stopped: { variant: 'danger', label: 'Stopped' },
+    failed: { variant: 'danger', label: 'Failed' },
     active: { variant: 'success', label: 'Active' },
     inactive: { variant: 'gray', label: 'Inactive' },
   };

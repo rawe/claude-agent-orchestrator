@@ -264,9 +264,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const statusMap: Record<string, string> = {
       pending: 'pending',
       running: 'running',
+      idle: 'idle',
       stopping: 'stopping',
       stopped: 'finished',
       finished: 'finished',
+      failed: 'finished',
     };
     setAgentStatus(statusMap[session.status] || 'finished');
     setIsLoading(false);
@@ -274,9 +276,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setCurrentToolCalls([]);
   }, []);
 
-  // Check if current session is active (running)
+  // Check if current session is active (cannot switch sessions or start new chat)
   const isSessionActive = useCallback(() => {
-    return isLoading || agentStatus === 'running' || agentStatus === 'starting';
+    return isLoading || agentStatus === 'running' || agentStatus === 'starting' || agentStatus === 'stopping';
   }, [isLoading, agentStatus]);
 
   const { subscribe } = useSSE();
@@ -341,7 +343,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setAgentStatus('running');
       } else if (backendStatus === 'stopping') {
         handleSessionStopping();
-      } else if (backendStatus === 'finished' || backendStatus === 'stopped') {
+      } else if (backendStatus === 'idle') {
+        handleSessionIdle();
+      } else if (backendStatus === 'finished' || backendStatus === 'stopped' || backendStatus === 'failed') {
         handleSessionFinished();
       }
       return;
@@ -412,17 +416,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }
 
   /**
-   * Handle session status changed to finished or stopped
-   *
-   * IMPORTANT: "finished" means agent's turn ended, NOT "session is done forever".
-   * All sessions are resumable. Only update status to enable user input.
-   * Let message events and run_completed handle pending message completion.
+   * Handle session entering idle state (turn completed, process alive, resumable)
+   */
+  function handleSessionIdle() {
+    setAgentStatus('idle');
+    setIsLoading(false);
+  }
+
+  /**
+   * Handle session reaching a terminal state (finished/stopped/failed)
+   * Terminal sessions cannot be resumed — user must start a new chat.
    */
   function handleSessionFinished() {
     setAgentStatus('finished');
-    // DON'T clear pending message here!
-    // - Message events will update it with actual content
-    // - run_completed event will complete it if still pending
+    setIsLoading(false);
   }
 
   /**
@@ -459,10 +466,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }
 
   /**
-   * Handle session stop event
+   * Handle run_completed event.
+   * Don't override agentStatus — session_updated SSE is authoritative
+   * (persistent sessions go idle, not finished).
    */
   function handleSessionStop(pendingMessageId: string | null) {
-    setAgentStatus('finished');
     setIsLoading(false);
 
     if (pendingMessageId) {

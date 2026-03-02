@@ -1,8 +1,9 @@
+import os
 import sqlite3
 from pathlib import Path
 import json
 
-DB_PATH = Path(".agent-orchestrator/observability.db")
+DB_PATH = Path(os.getenv("AGENT_ORCHESTRATOR_DB_PATH", ".agent-orchestrator/observability.db"))
 
 
 class SessionAlreadyExistsError(Exception):
@@ -851,6 +852,56 @@ def fail_runs_on_runner_disconnect(runner_id: str, current_time: str) -> list[di
     return failed_runs
 
 
+def finish_idle_sessions_for_runner(runner_id: str, current_time: str) -> list[str]:
+    """Mark idle sessions whose most recent run was from this runner as finished.
+
+    When a runner self-deregisters, sessions that are in 'idle' status and were
+    last served by this runner should be transitioned to 'finished' since the
+    executor process is gone.
+
+    Returns list of session_ids that were transitioned.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Find idle sessions where the most recent run was from this runner.
+    # A session is "owned" by a runner if its latest run (by created_at) was assigned to that runner.
+    cursor.execute(
+        """
+        SELECT s.session_id
+        FROM sessions s
+        WHERE s.status = 'idle'
+        AND s.session_id IN (
+            SELECT r1.session_id
+            FROM runs r1
+            WHERE r1.runner_id = ?
+            AND r1.created_at = (
+                SELECT MAX(r2.created_at)
+                FROM runs r2
+                WHERE r2.session_id = r1.session_id
+            )
+        )
+        """,
+        (runner_id,)
+    )
+    session_ids = [row[0] for row in cursor.fetchall()]
+
+    if session_ids:
+        placeholders = ",".join("?" for _ in session_ids)
+        cursor.execute(
+            f"""
+            UPDATE sessions
+            SET status = 'finished'
+            WHERE session_id IN ({placeholders})
+            """,
+            session_ids
+        )
+        conn.commit()
+
+    conn.close()
+    return session_ids
+
+
 # ============================================================================
 # Recovery Functions (Phase 5)
 # ============================================================================
@@ -993,4 +1044,87 @@ def recover_all_active_runs() -> dict:
     conn.commit()
     conn.close()
     return results
+
+
+# ============================================================================
+# Session Reaper Functions (Mechanism 5)
+# ============================================================================
+
+def get_orphaned_sessions(live_runner_ids: list[str]) -> list[dict]:
+    """Find non-terminal sessions whose runner is not in the live registry.
+
+    Joins sessions with runs to determine the runner_id for each session
+    (sessions table has no runner_id column; it lives on the runs table).
+
+    Args:
+        live_runner_ids: List of runner IDs currently registered in the coordinator.
+
+    Returns:
+        List of dicts with session_id, status, runner_id, and created_at.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    if live_runner_ids:
+        placeholders = ",".join("?" * len(live_runner_ids))
+        cursor = conn.execute(
+            f"""
+            SELECT s.session_id, s.status, r.runner_id, s.created_at
+            FROM sessions s
+            JOIN (
+                SELECT session_id, runner_id,
+                       ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
+                FROM runs
+                WHERE runner_id IS NOT NULL
+            ) r ON s.session_id = r.session_id AND r.rn = 1
+            WHERE s.status IN ('running', 'idle', 'stopping')
+            AND r.runner_id NOT IN ({placeholders})
+            """,
+            live_runner_ids,
+        )
+    else:
+        # No live runners -- all non-terminal sessions with a runner are orphaned
+        cursor = conn.execute(
+            """
+            SELECT s.session_id, s.status, r.runner_id, s.created_at
+            FROM sessions s
+            JOIN (
+                SELECT session_id, runner_id,
+                       ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at DESC) as rn
+                FROM runs
+                WHERE runner_id IS NOT NULL
+            ) r ON s.session_id = r.session_id AND r.rn = 1
+            WHERE s.status IN ('running', 'idle', 'stopping')
+            """
+        )
+
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def reap_session(session_id: str, new_status: str, current_time: str) -> dict | None:
+    """Transition an orphaned session to a terminal status.
+
+    Args:
+        session_id: The session to reap.
+        new_status: Terminal status to set ('failed', 'finished', 'stopped').
+        current_time: ISO timestamp for the update.
+
+    Returns:
+        Updated session dict, or None if session not found.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE sessions SET status = ? WHERE session_id = ?",
+        (new_status, session_id),
+    )
+    conn.commit()
+    conn.close()
+
+    if cursor.rowcount == 0:
+        return None
+
+    return get_session_by_id(session_id)
 

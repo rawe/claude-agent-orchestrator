@@ -25,8 +25,10 @@ type SortOption = 'modified_desc' | 'modified_asc';
 
 const statusOptions: { value: SessionStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
+  { value: 'idle', label: 'Idle' },
   { value: 'finished', label: 'Finished' },
   { value: 'stopped', label: 'Stopped' },
+  { value: 'failed', label: 'Failed' },
 ];
 
 export function SessionSelector({
@@ -56,9 +58,9 @@ export function SessionSelector({
     }
   }, [isOpen]);
 
-  // Filter out running sessions (can't switch to them) and apply filters
+  // Filter out active sessions (can't switch to running/stopping) and apply filters
   const filteredSessions = useMemo(() => {
-    let filtered = sessions.filter((s) => s.status !== 'running');
+    let filtered = sessions.filter((s) => s.status !== 'running' && s.status !== 'stopping' && s.status !== 'pending');
 
     // Filter by search
     if (search) {
@@ -229,7 +231,9 @@ function SessionItem({ session, isSelected, onSelect }: SessionItemProps) {
     >
       {/* Status indicator */}
       <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-        session.status === 'finished' ? 'bg-gray-400' : 'bg-amber-500'
+        session.status === 'idle' ? 'bg-blue-400'
+        : session.status === 'failed' ? 'bg-red-500'
+        : 'bg-gray-400'
       }`} />
 
       {/* Content */}

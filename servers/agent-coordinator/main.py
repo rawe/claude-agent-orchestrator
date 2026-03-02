@@ -21,7 +21,8 @@ from database import (
     create_session, get_session_by_id, get_session_result,
     update_session_parent, bind_session_executor, get_session_affinity,
     SessionAlreadyExistsError, fail_runs_on_runner_disconnect,
-    get_run_by_session_id,
+    finish_idle_sessions_for_runner, get_run_by_session_id,
+    get_orphaned_sessions, reap_session,
 )
 from auth import validate_startup_config, verify_api_key, AUTH_ENABLED, AuthConfigError
 from models import (
@@ -98,6 +99,12 @@ RUNNER_REMOVE_THRESHOLD = int(os.getenv("RUNNER_REMOVE_THRESHOLD", "600"))  # 10
 RUNNER_LIFECYCLE_INTERVAL = int(os.getenv("RUNNER_LIFECYCLE_INTERVAL", "30"))  # Check every 30s
 # Run demand timeout (ADR-011)
 RUN_NO_MATCH_TIMEOUT = int(os.getenv("RUN_NO_MATCH_TIMEOUT", "300"))  # 5 minutes
+
+# Session reaper configuration (Mechanism 5 - orphan prevention)
+REAPER_INTERVAL = int(os.environ.get("REAPER_INTERVAL", "60"))
+REAPER_GRACE_PERIOD = int(os.environ.get("REAPER_GRACE_PERIOD", "120"))
+REAPER_STALE_RUNNING = int(os.environ.get("REAPER_STALE_RUNNING", "900"))
+REAPER_STALE_STOPPING = int(os.environ.get("REAPER_STALE_STOPPING", "120"))
 
 # Run recovery mode (Phase 5)
 # - "none": Load as-is (may have stale claimed/running runs)
@@ -229,6 +236,98 @@ async def run_timeout_task():
             print(f"[ERROR] Run timeout task error: {e}", flush=True)
 
 
+async def session_reaper_task():
+    """Background task to detect and clean up orphaned sessions.
+
+    Periodically checks for sessions in non-terminal states ('running', 'idle',
+    'stopping') whose runner is no longer in the live runner registry. After a
+    staleness threshold, transitions them to terminal states:
+      - running -> failed
+      - idle -> finished
+      - stopping -> stopped
+
+    Includes a startup grace period to allow runners to reconnect after a
+    coordinator restart (when the in-memory registry is empty).
+    """
+    import time
+
+    _reaper_start_time = time.monotonic()
+
+    # Status -> (terminal_status, stale_threshold_seconds)
+    _reap_rules = {
+        "running": ("failed", REAPER_STALE_RUNNING),
+        "idle": ("finished", REAPER_STALE_RUNNING),
+        "stopping": ("stopped", REAPER_STALE_STOPPING),
+    }
+
+    while True:
+        await asyncio.sleep(REAPER_INTERVAL)
+        try:
+            # Skip during grace period after startup
+            elapsed = time.monotonic() - _reaper_start_time
+            if elapsed < REAPER_GRACE_PERIOD:
+                if DEBUG:
+                    remaining = REAPER_GRACE_PERIOD - elapsed
+                    print(f"[DEBUG] Session reaper: grace period ({remaining:.0f}s remaining)", flush=True)
+                continue
+
+            # Get live runner IDs
+            live_runners = runner_registry.get_all_runners()
+            live_runner_ids = [r.runner_id for r in live_runners]
+
+            # Find orphaned sessions
+            orphaned = get_orphaned_sessions(live_runner_ids)
+            if not orphaned:
+                continue
+
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
+
+            for session in orphaned:
+                session_id = session["session_id"]
+                status = session["status"]
+                created_at_str = session["created_at"]
+                runner_id = session["runner_id"]
+
+                rule = _reap_rules.get(status)
+                if not rule:
+                    continue
+
+                terminal_status, threshold_seconds = rule
+
+                # Calculate staleness from created_at
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                age_seconds = (now - created_at).total_seconds()
+
+                if age_seconds < threshold_seconds:
+                    if DEBUG:
+                        print(
+                            f"[DEBUG] Session reaper: {session_id} ({status}) orphaned but not stale "
+                            f"({age_seconds:.0f}s < {threshold_seconds}s threshold)",
+                            flush=True,
+                        )
+                    continue
+
+                # Reap the session
+                updated = reap_session(session_id, terminal_status, now_iso)
+                if updated:
+                    print(
+                        f"[REAPER] Session {session_id}: {status} -> {terminal_status} "
+                        f"(runner {runner_id} not in registry, age {age_seconds:.0f}s)",
+                        flush=True,
+                    )
+
+                    # Broadcast session update to SSE clients
+                    await sse_manager.broadcast(
+                        StreamEventType.SESSION_UPDATED,
+                        {"session": updated},
+                        session_id=session_id,
+                    )
+
+        except Exception as e:
+            print(f"[ERROR] Session reaper task error: {e}", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager"""
@@ -249,18 +348,25 @@ async def lifespan(app: FastAPI):
     lifecycle_task = asyncio.create_task(runner_lifecycle_task())
     # Start run timeout background task (ADR-011)
     timeout_task = asyncio.create_task(run_timeout_task())
+    # Start session reaper background task (Mechanism 5 - orphan prevention)
+    reaper_task = asyncio.create_task(session_reaper_task())
 
     yield
 
     # Cancel background tasks
     lifecycle_task.cancel()
     timeout_task.cancel()
+    reaper_task.cancel()
     try:
         await lifecycle_task
     except asyncio.CancelledError:
         pass
     try:
         await timeout_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await reaper_task
     except asyncio.CancelledError:
         pass
 
@@ -394,8 +500,8 @@ async def get_session_result_endpoint(session_id: str) -> SessionResult:
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    if session["status"] != "finished":
-        raise HTTPException(status_code=400, detail="Session not finished")
+    if session["status"] not in ("finished", "idle"):
+        raise HTTPException(status_code=400, detail="Session not finished or idle")
 
     result = get_session_result(session_id)
     if result is None:
@@ -464,7 +570,7 @@ async def _stop_run(run: Run) -> dict:
         raise HTTPException(status_code=400, detail="Run not claimed by any runner")
 
     # Queue the stop command (wakes up the runner's poll immediately)
-    if not stop_command_queue.add_stop(run.runner_id, run.run_id):
+    if not stop_command_queue.add_stop(run.runner_id, run.session_id):
         raise HTTPException(status_code=500, detail="Failed to queue stop command")
 
     # Update run status to STOPPING
@@ -510,7 +616,7 @@ async def stop_session(session_id: str):
             "message": "Session is already being stopped"
         }
 
-    if session_status in ("stopped", "finished"):
+    if session_status in ("stopped", "finished", "failed"):
         return {
             "ok": True,
             "session_id": session_id,
@@ -520,6 +626,29 @@ async def stop_session(session_id: str):
 
     # Find the run for this session (check by session_id)
     run = run_queue.get_run_by_session_id(session_id)
+
+    # Handle idle sessions (persistent process alive between turns)
+    if session_status == "idle":
+        if run and run.runner_id:
+            # Use last run's runner_id to route stop command
+            if not stop_command_queue.add_stop(run.runner_id, session_id):
+                raise HTTPException(status_code=500, detail="Failed to queue stop command")
+            await update_session_status_and_broadcast(session_id, "stopping")
+            return {
+                "ok": True,
+                "session_id": session_id,
+                "status": "stopping",
+                "message": "Stop command queued for idle session"
+            }
+        else:
+            # No runner info — just mark as stopped
+            await update_session_status_and_broadcast(session_id, "stopped")
+            return {
+                "ok": True,
+                "session_id": session_id,
+                "status": "stopped",
+                "message": "Idle session marked as stopped (no runner info)"
+            }
 
     if not run:
         # No active run - session might have finished or never started properly
@@ -620,6 +749,14 @@ async def update_metadata(session_id: str, metadata: SessionMetadataUpdate):
 @app.delete("/sessions/{session_id}", tags=["Sessions"])
 async def delete_session_endpoint(session_id: str):
     """Delete a session and all its events and runs."""
+
+    # Check session exists and is in a terminal state
+    session = get_session_by_id(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session["status"] in ("running", "idle"):
+        raise HTTPException(status_code=409, detail="Stop session first")
 
     # Delete from database (cascade deletes runs and events)
     result = delete_session(session_id)
@@ -1288,6 +1425,7 @@ class RunCompletedRequest(BaseModel):
     """Request body for run completion."""
     runner_id: str
     status: str = "success"
+    session_status: Optional[str] = None  # "idle" or "finished" (None defaults to "finished")
 
 
 class RunFailedRequest(BaseModel):
@@ -1403,7 +1541,7 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
 
     **Responses:**
     - `{"run": {...}}` - Run to execute
-    - `{"stop_runs": [...]}` - Session IDs to stop
+    - `{"stop_sessions": [...]}` - Session IDs to stop
     - `{"deregistered": true}` - Runner was deregistered
     - `204 No Content` - Nothing available after timeout
 
@@ -1436,11 +1574,11 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
 
     while elapsed < RUNNER_POLL_TIMEOUT:
         # Check for stop commands FIRST (highest priority)
-        stop_runs = stop_command_queue.get_and_clear(runner_id)
-        if stop_runs:
+        stop_sessions = stop_command_queue.get_and_clear(runner_id)
+        if stop_sessions:
             if DEBUG:
-                print(f"[DEBUG] Runner {runner_id} received stop commands for runs: {stop_runs}", flush=True)
-            return {"stop_runs": stop_runs}
+                print(f"[DEBUG] Runner {runner_id} received stop commands for sessions: {stop_sessions}", flush=True)
+            return {"stop_sessions": stop_sessions}
 
         # Check for script sync commands (second priority)
         sync_scripts, remove_scripts = script_sync_queue.get_and_clear(runner_id)
@@ -1502,7 +1640,7 @@ async def poll_for_runs(runner_id: str = Query(..., description="The registered 
         if event:
             try:
                 await asyncio.wait_for(event.wait(), timeout=poll_interval)
-                # Event was set - loop will check stop_runs
+                # Event was set - loop will check stop_sessions
             except asyncio.TimeoutError:
                 pass
         else:
@@ -1543,6 +1681,12 @@ async def report_run_started(run_id: str, request: RunnerIdRequest):
         update_session_parent(run.session_id, run.parent_session_id)
         if DEBUG:
             print(f"[DEBUG] Updated session {run.session_id} parent to {run.parent_session_id}", flush=True)
+
+    # Transition session idle -> running on resume turn start
+    if not session:
+        session = get_session_by_id(run.session_id)
+    if session and session["status"] == "idle":
+        await update_session_status_and_broadcast(run.session_id, "running")
 
     # === Run start event (moved from executor) ===
     # Insert run_start event for audit trail and SSE notification.
@@ -1598,8 +1742,10 @@ async def report_run_completed(run_id: str, request: RunCompletedRequest):
 
     session_id = run.session_id
     if session_id:
-        # Update session status to finished and broadcast to SSE clients
-        await update_session_status_and_broadcast(session_id, "finished")
+        # Use session_status from runner if provided (idle=persistent turn done, finished=one-shot done)
+        # Default to "finished" for backward compatibility with one-shot runners
+        new_session_status = request.session_status or "finished"
+        await update_session_status_and_broadcast(session_id, new_session_status)
 
         # Insert run_completed event for audit trail (moved from executor)
         stop_event = Event(
@@ -1695,6 +1841,10 @@ async def report_run_failed(run_id: str, request: RunFailedRequest):
             child_error=request.error,
         )
 
+    # Bug fix: update session status to "failed" (was left as "running" before)
+    if run.session_id:
+        await update_session_status_and_broadcast(run.session_id, "failed")
+
     return {"ok": True}
 
 
@@ -1737,6 +1887,37 @@ async def report_run_stopped(run_id: str, request: RunStoppedRequest):
     session = get_session_by_id(run.session_id)
     if session:
         await update_session_status_and_broadcast(run.session_id, "stopped")
+
+    return {"ok": True}
+
+
+class SessionStatusRequest(BaseModel):
+    """Request body for session status update from runner."""
+    runner_id: str
+    status: str  # "finished" or "failed"
+
+
+@app.post("/runner/sessions/{session_id}/status", tags=["Runners"], response_model=OkResponse)
+async def report_session_status(session_id: str, request: SessionStatusRequest):
+    """Report session status change from runner (no active run).
+
+    Used when a persistent process exits while idle (between turns).
+    The runner reports the session as finished (clean exit) or failed (crash).
+    """
+    if not runner_registry.get_runner(request.runner_id):
+        raise HTTPException(status_code=401, detail="Runner not registered")
+
+    session = get_session_by_id(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if request.status not in ("finished", "failed", "stopped"):
+        raise HTTPException(status_code=400, detail="Status must be 'finished', 'failed', or 'stopped'")
+
+    await update_session_status_and_broadcast(session_id, request.status)
+
+    if DEBUG:
+        print(f"[DEBUG] Session {session_id} status updated to '{request.status}' by runner {request.runner_id}", flush=True)
 
     return {"ok": True}
 
@@ -1820,8 +2001,48 @@ async def deregister_runner(
         script_sync_queue.unregister_runner(runner_id)
         # Delete runner-owned agents (Phase 4)
         runner_registry.delete_runner_agents(runner_id)
+
+        # Clean up orphaned runs and idle sessions for this runner
+        now = datetime.now(timezone.utc).isoformat()
+        orphaned_runs = fail_runs_on_runner_disconnect(runner_id, now)
+        for run in orphaned_runs:
+            run_id = run["run_id"]
+            session_id = run["session_id"]
+            error = run.get("error", "Runner disconnected during execution")
+            update_session_status(session_id, "failed")
+            await sse_manager.broadcast(
+                StreamEventType.RUN_FAILED,
+                {"run_id": run_id, "error": error, "session_id": session_id},
+                session_id=session_id,
+            )
+            # Trigger callback for async_callback mode
+            if run.get("execution_mode") == "async_callback":
+                parent_session_id = run.get("parent_session_id")
+                if parent_session_id:
+                    parent_session = get_session_by_id(parent_session_id)
+                    callback_processor.on_child_completed(
+                        child_session_id=session_id,
+                        parent_session=parent_session,
+                        child_result=None,
+                        child_failed=True,
+                        child_error=error,
+                    )
+
+        # Transition idle sessions that were served by this runner to finished
+        finished_sessions = finish_idle_sessions_for_runner(runner_id, now)
+        for session_id in finished_sessions:
+            await sse_manager.broadcast(
+                StreamEventType.SESSION_UPDATED,
+                {"session": {"session_id": session_id, "status": "finished"}},
+                session_id=session_id,
+            )
+
         if DEBUG:
             print(f"[DEBUG] Runner {runner_id} self-deregistered (graceful shutdown)", flush=True)
+            if orphaned_runs:
+                print(f"[DEBUG]   Failed {len(orphaned_runs)} orphaned run(s)", flush=True)
+            if finished_sessions:
+                print(f"[DEBUG]   Finished {len(finished_sessions)} idle session(s)", flush=True)
         return {"ok": True, "message": "Runner deregistered", "initiated_by": "self"}
     else:
         # External request (dashboard) - mark for deregistration, signal on next poll
@@ -2103,14 +2324,13 @@ async def get_run(run_id: str):
 async def stop_run(run_id: str):
     """Stop a running run by signaling its runner.
 
-    Queues a stop command for the runner that will terminate the run's process.
-    The runner will receive the stop command on its next poll and terminate the process.
+    Delegates to stop_session() for a single code path.
     """
     run = run_queue.get_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    return await _stop_run(run)
+    return await stop_session(run.session_id)
 
 
 # ==============================================================================

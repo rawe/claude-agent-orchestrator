@@ -115,9 +115,8 @@ Watch the sse-monitor output.
 
 ## Executor-Specific Behavior
 
-### test-executor
-- Currently ignores `agent_name` (echo behavior unchanged)
-- Future: Could validate agent exists or echo agent info
+### echo-executor
+- Ignores `agent_name` (echo behavior unchanged)
 
 ### claude-code
 - Requires agent blueprint to exist (404 error if not found)

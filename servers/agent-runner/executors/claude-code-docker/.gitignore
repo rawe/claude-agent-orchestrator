@@ -1,6 +1,0 @@
-# Ignore workspace contents (except .gitkeep)
-workspace/*
-!workspace/.gitkeep
-
-# Environment file with secrets
-.env

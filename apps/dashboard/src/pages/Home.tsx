@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MessageSquare, Activity, Settings, Server, ArrowDown, Database, Zap, GitBranch, Puzzle } from 'lucide-react';
+import { MessageSquare, Activity, Settings, Server, ArrowDown, Database, Zap, Puzzle, FileCode, Plug, Sliders } from 'lucide-react';
 
 export function Home() {
   return (
@@ -41,28 +41,28 @@ export function Home() {
                 <Settings className="w-6 h-6 text-indigo-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-1">Agent Management</h3>
-              <p className="text-sm text-gray-500">Define agent personalities and compose shared capabilities for reusable configurations</p>
+              <p className="text-sm text-gray-500">Define agent blueprints, compose capabilities, and configure MCP server connections</p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <GitBranch className="w-6 h-6 text-amber-600" />
+              <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <Server className="w-6 h-6 text-teal-600" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Callback Coordination</h3>
-              <p className="text-sm text-gray-500">Parent agents spawn workers and receive automatic completion notifications</p>
+              <h3 className="font-semibold text-gray-900 mb-1">Distributed Execution</h3>
+              <p className="text-sm text-gray-500">Agent Runners poll for work and execute sessions via framework-specific executors</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Database className="w-6 h-6 text-purple-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-1">Context Sharing</h3>
-              <p className="text-sm text-gray-500">Share documents between isolated agent sessions via the context store</p>
+              <p className="text-sm text-gray-500">Share documents between isolated agent sessions via the Context Store</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Activity className="w-6 h-6 text-green-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-1">Real-time Monitoring</h3>
-              <p className="text-sm text-gray-500">Live WebSocket updates for session events, status, and results</p>
+              <p className="text-sm text-gray-500">Live SSE updates for session events, run status, and execution results</p>
             </div>
           </div>
         </div>
@@ -75,20 +75,21 @@ export function Home() {
             Architecture Overview
           </h2>
           <p className="text-gray-500 text-center mb-8 max-w-2xl mx-auto">
-            The framework consists of a central coordinator, distributed runners, and a context store
-            working together to manage agent sessions.
+            A central Agent Coordinator dispatches work to distributed Agent Runners,
+            which execute sessions via framework-specific executors. A Context Store enables
+            document sharing across isolated sessions.
           </p>
 
           {/* Architecture Diagram */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 mb-12">
             <div className="flex flex-col items-center gap-4">
-              {/* User Layer */}
+              {/* Client Layer */}
               <div className="flex flex-wrap justify-center gap-3">
                 <div className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium border border-slate-200">
-                  Claude Code
+                  Claude Code + Plugins
                 </div>
                 <div className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium border border-slate-200">
-                  Claude Desktop
+                  MCP Clients
                 </div>
                 <div className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium border border-indigo-200">
                   Dashboard (You are here)
@@ -97,17 +98,17 @@ export function Home() {
 
               <ArrowDown className="w-5 h-5 text-gray-400" />
 
-              {/* API Layer */}
+              {/* Coordinator */}
               <div className="w-full max-w-2xl">
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl p-6 text-white">
                   <div className="text-center mb-4">
                     <h3 className="font-bold text-lg">Agent Coordinator</h3>
-                    <p className="text-indigo-100 text-sm">Central orchestration service</p>
+                    <p className="text-indigo-100 text-sm">Central orchestration service (port 8765)</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <div className="bg-white/20 rounded px-2 py-1.5 text-center">Sessions API</div>
-                    <div className="bg-white/20 rounded px-2 py-1.5 text-center">Runs Queue</div>
-                    <div className="bg-white/20 rounded px-2 py-1.5 text-center">Blueprints</div>
+                    <div className="bg-white/20 rounded px-2 py-1.5 text-center">Agent Runs Queue</div>
+                    <div className="bg-white/20 rounded px-2 py-1.5 text-center">Blueprints & Scripts</div>
                     <div className="bg-white/20 rounded px-2 py-1.5 text-center">Callbacks</div>
                   </div>
                 </div>
@@ -115,31 +116,39 @@ export function Home() {
 
               <div className="flex items-center gap-8 w-full max-w-2xl">
                 <div className="flex-1 h-px bg-gray-300"></div>
-                <span className="text-xs text-gray-400 whitespace-nowrap">long-poll / WebSocket</span>
+                <span className="text-xs text-gray-400 whitespace-nowrap">long-poll / SSE</span>
                 <div className="flex-1 h-px bg-gray-300"></div>
               </div>
 
               {/* Execution Layer */}
               <div className="flex flex-wrap justify-center gap-6 w-full">
                 {/* Runner */}
-                <div className="bg-teal-50 border-2 border-teal-200 rounded-xl p-5 min-w-[200px]">
+                <div className="bg-teal-50 border-2 border-teal-200 rounded-xl p-5 min-w-[220px]">
                   <div className="text-center">
                     <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center mx-auto mb-2">
                       <Server className="w-5 h-5 text-teal-600" />
                     </div>
                     <h4 className="font-semibold text-teal-800 text-sm">Agent Runner</h4>
-                    <p className="text-teal-600 text-xs mt-1">Executes Claude Code sessions</p>
+                    <p className="text-teal-600 text-xs mt-1">Polls for runs, spawns executors</p>
+                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                      <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px]">Claude Code Exec</span>
+                      <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px]">Procedural Exec</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Context Store */}
-                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-5 min-w-[200px]">
+                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-5 min-w-[220px]">
                   <div className="text-center">
                     <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
                       <Database className="w-5 h-5 text-purple-600" />
                     </div>
                     <h4 className="font-semibold text-purple-800 text-sm">Context Store</h4>
-                    <p className="text-purple-600 text-xs mt-1">Shared document storage</p>
+                    <p className="text-purple-600 text-xs mt-1">Document storage (port 8766)</p>
+                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">Tag-based queries</span>
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">Semantic search</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -160,7 +169,7 @@ export function Home() {
                 <div className="w-8 h-px bg-gray-300"></div>
               </div>
 
-              {/* Specialized Agents */}
+              {/* Worker Agents */}
               <div className="flex flex-wrap justify-center gap-3">
                 <div className="px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium border border-emerald-200">
                   Worker Agent
@@ -177,6 +186,9 @@ export function Home() {
 
               {/* MCP Servers */}
               <div className="flex flex-wrap justify-center gap-2">
+                <div className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded text-xs border border-orange-200">
+                  Context Store MCP
+                </div>
                 <div className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded text-xs border border-orange-200">
                   Atlassian MCP
                 </div>
@@ -217,7 +229,7 @@ export function Home() {
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Start new agent sessions with prompts. Select an agent blueprint,
-                  enter your task, and launch a new Claude Code session.
+                  enter your task, and launch a new session.
                 </p>
               </Link>
             </div>
@@ -227,7 +239,7 @@ export function Home() {
           <div className="mb-8">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1">Agent Management</h3>
             <p className="text-xs text-gray-400 mb-4">Define what agents know and how they connect to tools</p>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Link
                 to="/agents"
                 className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1 transition-all"
@@ -259,6 +271,22 @@ export function Home() {
                   Share domain knowledge across multiple agents.
                 </p>
               </Link>
+
+              <Link
+                to="/mcp-servers"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-orange-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-orange-100 rounded-xl group-hover:bg-orange-200 transition-colors">
+                    <Plug className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">MCP Servers</h3>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Manage MCP server configurations. Register STDIO and SSE servers
+                  that agents connect to via capabilities.
+                </p>
+              </Link>
             </div>
           </div>
 
@@ -284,13 +312,13 @@ export function Home() {
 
               <Link
                 to="/runs"
-                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-orange-300 hover:-translate-y-1 transition-all"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-amber-300 hover:-translate-y-1 transition-all"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2.5 bg-orange-100 rounded-xl group-hover:bg-orange-200 transition-colors">
-                    <Zap className="w-5 h-5 text-orange-600" />
+                  <div className="p-2.5 bg-amber-100 rounded-xl group-hover:bg-amber-200 transition-colors">
+                    <Zap className="w-5 h-5 text-amber-600" />
                   </div>
-                  <h3 className="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">Agent Runs</h3>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-amber-600 transition-colors">Agent Runs</h3>
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Track distributed task execution across runners. Monitor run
@@ -303,7 +331,7 @@ export function Home() {
           {/* Infrastructure Section */}
           <div className="mb-8">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Infrastructure</h3>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Link
                 to="/context-store"
                 className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-purple-300 hover:-translate-y-1 transition-all"
@@ -332,7 +360,45 @@ export function Home() {
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   View registered runners and their health status. Runners
-                  execute agent sessions as Claude Code subprocesses.
+                  execute agent sessions via framework-specific executors.
+                </p>
+              </Link>
+
+              <Link
+                to="/scripts"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-rose-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-rose-100 rounded-xl group-hover:bg-rose-200 transition-colors">
+                    <FileCode className="w-5 h-5 text-rose-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-rose-600 transition-colors">Scripts</h3>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Manage reusable scripts stored in the Coordinator. Used by
+                  procedural agents and capabilities for deterministic execution.
+                </p>
+              </Link>
+            </div>
+          </div>
+
+          {/* Configuration Section */}
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">Configuration</h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Link
+                to="/settings"
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-slate-300 hover:-translate-y-1 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-slate-100 rounded-xl group-hover:bg-slate-200 transition-colors">
+                    <Sliders className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-slate-600 transition-colors">Settings</h3>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Configure dashboard preferences, API connection settings,
+                  and authentication options.
                 </p>
               </Link>
             </div>

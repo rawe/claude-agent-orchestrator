@@ -13,10 +13,10 @@ See `tests/README.md` for full documentation.
 
 Profile: `$ARGUMENTS`
 
-If no profile specified, default to `test-executor`.
+If no profile specified, default to `echo-executor`.
 
 Valid profiles:
-- `test-executor` - Simple echo executor for fast, deterministic tests (default)
+- `echo-executor` - Simple echo executor for fast, deterministic tests (default)
 - `claude-code` - Real Claude AI executor for end-to-end validation
 
 ## Your Task
@@ -32,7 +32,7 @@ Valid profiles:
    ```bash
    ./servers/agent-runner/agent-runner -x <profile>
    ```
-   Use `test-executor` if no profile was specified, otherwise use the provided profile. Note: `-x` is short for `--profile`.
+   Use `echo-executor` if no profile was specified, otherwise use the provided profile. Note: `-x` is short for `--profile`.
 
 4. **Start SSE Monitor** in background:
    ```bash

@@ -90,7 +90,7 @@ Without `--profile`, the runner uses the default executor with no config.
 
 Profiles can specify an `agents_dir` to load agent definitions that are bundled with the runner. These agents are registered with the Agent Coordinator when the runner starts and removed when the runner stops.
 
-**Example** (`profiles/echo.json`):
+**Example** (`profiles/test-procedural.json`):
 ```json
 {
   "type": "procedural",
@@ -176,11 +176,11 @@ servers/agent-runner/
 ├── docs/                    # Documentation
 │   └── runner-gateway-api.md
 ├── executors/               # Executor implementations
-│   ├── claude-code/         # Claude SDK executor (autonomous)
+│   ├── claude-code/         # Claude Agent SDK executor (autonomous)
 │   │   ├── ao-claude-code-exec
-│   │   └── lib/claude_client.py
-│   ├── test-executor/       # Test/dummy executor (autonomous)
-│   │   └── ao-test-exec
+│   │   └── lib/
+│   ├── echo-executor/       # Echo executor for testing (autonomous)
+│   │   └── ao-echo-exec
 │   └── procedural-executor/ # CLI command executor (procedural)
 │       ├── ao-procedural-exec
 │       └── scripts/         # Bundled agent scripts
@@ -201,8 +201,8 @@ Autonomous executors run AI agents that interpret intent and can be resumed:
 
 | Executor | Type | Description |
 |----------|------|-------------|
-| `claude-code` | autonomous | Claude SDK with full coding capabilities |
-| `test-executor` | autonomous | Simple echo executor for testing |
+| `claude-code` | autonomous | Claude Agent SDK with full coding capabilities |
+| `echo-executor` | autonomous | Simple echo executor for testing |
 
 Autonomous agents:
 - Interpret natural language prompts

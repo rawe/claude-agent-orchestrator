@@ -320,6 +320,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const statusMap: Record<string, AgentStatus> = {
         starting: 'starting',
         running: 'running',
+        idle: 'idle',
         stopping: 'stopping',
         stopped: 'finished',
         finished: 'finished',
@@ -339,7 +340,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           break;
 
         case 'run_completed':
-          dispatch({ type: 'SET_AGENT_STATUS', status: 'finished' });
+          // Don't override status — session_updated SSE is authoritative
+          // (persistent sessions go idle, not finished)
           completeAssistantMessage();
           break;
 
@@ -451,12 +453,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_AGENT_STATUS', status: 'starting' });
 
     try {
-      if (!state.sessionId) {
-        // First message: start new session
+      if (!state.sessionId || state.agentStatus === 'finished' || state.agentStatus === 'error') {
+        // First message or terminal session: start new session
         const { sessionId } = await chatService.startSession(prompt);
         setSessionId(sessionId);
       } else {
-        // Session exists (status=finished means idle, ready to resume)
+        // Session is idle — resume it
         await chatService.resumeSession(state.sessionId, prompt);
       }
     } catch (error) {

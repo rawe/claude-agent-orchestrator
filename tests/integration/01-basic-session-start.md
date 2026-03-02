@@ -6,7 +6,7 @@ Verify that starting a new session produces the correct sequence of WebSocket ev
 
 - Database reset: `./tests/scripts/reset-db`
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` profile
+- Agent Runner running with `-x echo-executor` profile
 - sse-monitor running
 
 ## Test Steps
@@ -69,7 +69,7 @@ Watch the sse-monitor output.
    ```json
    {"type": "event", "data": {"event_type": "message", "session_id": "ses_...", "role": "assistant", "content": [{"type": "text", "text": "<response from executor>"}], ...}}
    ```
-   - With `test-executor`: `"[TEST-EXECUTOR] Received: Hello, this is a test message"`
+   - With `echo-executor`: `"[TEST-EXECUTOR] Received: Hello, this is a test message"`
    - With `claude-code`: Actual Claude response
 
 6. **session_updated** (status: finished)
@@ -99,6 +99,6 @@ Watch the sse-monitor output.
 
 The session data is stored in:
 - Database: `servers/agent-coordinator/.agent-orchestrator/observability.db`
-- Test executor: `servers/agent-runner/executors/test-executor/.test-executor-data/<session_id>.json`
+- Test executor: `servers/agent-runner/executors/echo-executor/.echo-executor-data/<session_id>.json`
 
 Run `./tests/scripts/reset-db` before the next test.

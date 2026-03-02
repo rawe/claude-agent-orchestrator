@@ -6,7 +6,7 @@ Verify that valid parameters are accepted by the coordinator.
 
 - Database reset: `./tests/scripts/reset-db`
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` profile (optional - only needed if testing execution)
+- Agent Runner running with `-x echo-executor` profile (optional - only needed if testing execution)
 
 ## Test Steps
 

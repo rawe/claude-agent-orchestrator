@@ -7,7 +7,7 @@ Verify that resuming an existing session produces the correct sequence of WebSoc
 - Complete test `01-basic-session-start` first (need existing session)
 - OR create a session using Step 0 below
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` profile
+- Agent Runner running with `-x echo-executor` profile
 - sse-monitor running
 
 ## Test Steps
@@ -110,7 +110,7 @@ Watch the sse-monitor output.
 Check the test executor's local data to verify message history:
 
 ```bash
-cat servers/agent-runner/executors/test-executor/.test-executor-data/<session_id>.json | python -m json.tool
+cat servers/agent-runner/executors/echo-executor/.echo-executor-data/<session_id>.json | python -m json.tool
 ```
 
 Expected: Should show all messages (from both start and resume).

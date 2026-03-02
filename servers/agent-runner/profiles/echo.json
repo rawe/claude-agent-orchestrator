@@ -1,6 +1,0 @@
-{
-  "type": "procedural",
-  "command": "executors/procedural-executor/ao-procedural-exec",
-  "agents_dir": "executors/procedural-executor/scripts/echo/agents",
-  "config": {}
-}

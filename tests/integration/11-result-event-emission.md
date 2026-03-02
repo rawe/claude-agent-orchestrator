@@ -6,7 +6,7 @@ Verify that executors emit a `result` event after session completion, containing
 
 - Database reset: `./tests/scripts/reset-db`
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` profile
+- Agent Runner running with `-x echo-executor` profile
 - sse-monitor running
 
 ## Test Steps
@@ -58,7 +58,7 @@ Watch the sse-monitor output for the `result` event.
      }
    }
    ```
-   Note: `result_data` is `null` for AI agents (test-executor, claude-code). It will contain structured JSON for deterministic agents.
+   Note: `result_data` is `null` for AI agents (echo-executor, claude-code). It will contain structured JSON for deterministic agents.
 
 7. **session_updated** (status: finished)
 8. **run_completed**
@@ -68,7 +68,7 @@ Watch the sse-monitor output for the `result` event.
 - [ ] `result` event is received after message events and before run_completed
 - [ ] `result` event has `event_type: "result"`
 - [ ] `result` event has `result_text` containing the assistant's output
-- [ ] `result` event has `result_data: null` (for test-executor/claude-code)
+- [ ] `result` event has `result_data: null` (for echo-executor/claude-code)
 - [ ] `session_id` in result event matches the session
 - [ ] `timestamp` is present and valid ISO format
 

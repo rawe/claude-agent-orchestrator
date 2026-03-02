@@ -45,7 +45,7 @@ Use scripts in `scripts/` to start services (see script comments for details):
 ```bash
 ./scripts/start-coordinator.sh            # Agent Coordinator
 ./scripts/start-dashboard.sh              # Dashboard
-./scripts/start-runner-claude-code.sh     # Runner with Claude Code executor
+./scripts/start-runner-claude-code.sh     # Runner with Claude Code executor (uses Claude Agent SDK)
 ./scripts/start-runner-procedural.sh      # Runner with procedural executor
 ./scripts/start-context-store.sh          # Context Store (port 8766)
 # With semantic search (requires Elasticsearch on :9200 and Ollama on :11434)

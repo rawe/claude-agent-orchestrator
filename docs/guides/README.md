@@ -8,6 +8,7 @@ Practical guides for creating, configuring, and deploying components of the Agen
 |-------|-------------|
 | [Script Authoring](./script-authoring-guide.md) | Create procedural scripts with parameter schemas |
 | [Auth0 Setup](./auth0-setup.md) | Configure Auth0 for OIDC authentication |
+| [Agent Team Guide](./agent-team-guide.md) | Structure agent teams for development tasks |
 
 ## See Also
 

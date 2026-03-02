@@ -5,7 +5,7 @@ Verify that a restarted runner gets the same deterministic ID (ADR-012).
 ## Prerequisites
 
 - Agent Coordinator running
-- Agent Runner running with `-x test-executor` profile
+- Agent Runner running with `-x echo-executor` profile
 
 ## Test Steps
 
@@ -22,7 +22,7 @@ Record the `runner_id` (format: `lnch_` + 12 hex chars).
 Stop the Agent Runner (Ctrl+C), then restart with same profile:
 
 ```bash
-./servers/agent-runner/agent-runner -x test-executor
+./servers/agent-runner/agent-runner -x echo-executor
 ```
 
 ### Step 3: Verify Same ID

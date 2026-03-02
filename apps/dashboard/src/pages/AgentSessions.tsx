@@ -3,10 +3,10 @@ import { useSessionEvents } from '@/hooks/useSessions';
 import { SessionList, SessionHeader, EventTimeline } from '@/components/features/sessions';
 import { ConfirmModal, EmptyState, Button } from '@/components/common';
 import { useNotification, useSessions } from '@/contexts';
-import { Activity, PanelLeftClose, PanelLeft, Trash2 } from 'lucide-react';
+import { Activity, PanelLeftClose, PanelLeft, Trash2, Square } from 'lucide-react';
 
 export function AgentSessions() {
-  const { sessions, loading, stopSession, deleteSession, deleteAllSessions } = useSessions();
+  const { sessions, loading, stopSession, stopAllSessions, deleteSession, deleteAllSessions } = useSessions();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const { events, loading: eventsLoading } = useSessionEvents(selectedSessionId);
   const { showSuccess, showError, showWarning } = useNotification();
@@ -14,8 +14,9 @@ export function AgentSessions() {
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'stop' | 'delete' | 'delete-all';
+    type: 'stop' | 'delete' | 'delete-all' | 'stop-all';
     sessionId?: string;
+    sessionStatus?: string;
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -58,14 +59,38 @@ export function AgentSessions() {
     }
   };
 
+  const handleStopAllSessions = async () => {
+    setActionLoading(true);
+    try {
+      const { stopped, failed } = await stopAllSessions();
+      if (stopped > 0 && failed === 0) {
+        showSuccess(`Stopped ${stopped} session${stopped > 1 ? 's' : ''}`);
+      } else if (stopped > 0 && failed > 0) {
+        showWarning(`Stopped ${stopped}, failed to stop ${failed}`);
+      } else if (failed > 0) {
+        showError(`Failed to stop ${failed} session${failed > 1 ? 's' : ''}`);
+      }
+    } catch (err) {
+      showError('Failed to stop sessions');
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+      setConfirmModal(null);
+    }
+  };
+
   const handleDeleteAllSessions = async () => {
     setActionLoading(true);
     try {
-      await deleteAllSessions();
+      const { deleted, skipped } = await deleteAllSessions();
       setSelectedSessionId(null);
-      showSuccess('All sessions deleted');
+      if (skipped > 0) {
+        showSuccess(`Deleted ${deleted} session${deleted !== 1 ? 's' : ''}, skipped ${skipped} active`);
+      } else {
+        showSuccess(`Deleted ${deleted} session${deleted !== 1 ? 's' : ''}`);
+      }
     } catch (err) {
-      showError('Failed to delete all sessions');
+      showError('Failed to delete sessions');
       console.error(err);
     } finally {
       setActionLoading(false);
@@ -81,14 +106,24 @@ export function AgentSessions() {
           <h1 className="text-lg font-semibold text-gray-900">Agent Sessions</h1>
           <p className="text-sm text-gray-500">Monitor running and completed agent sessions in real-time</p>
         </div>
-        <Button
-          variant="danger"
-          onClick={() => setConfirmModal({ isOpen: true, type: 'delete-all' })}
-          icon={<Trash2 className="w-4 h-4" />}
-          disabled={sessions.length === 0}
-        >
-          Delete All
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmModal({ isOpen: true, type: 'stop-all' })}
+            icon={<Square className="w-3.5 h-3.5" />}
+            disabled={!sessions.some((s) => s.status === 'running' || s.status === 'idle')}
+          >
+            Stop All
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => setConfirmModal({ isOpen: true, type: 'delete-all' })}
+            icon={<Trash2 className="w-4 h-4" />}
+            disabled={sessions.length === 0}
+          >
+            Delete All
+          </Button>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -100,7 +135,10 @@ export function AgentSessions() {
               sessions={sessions}
               selectedSessionId={selectedSessionId}
               onSelectSession={setSelectedSessionId}
-              onStopSession={(id) => setConfirmModal({ isOpen: true, type: 'stop', sessionId: id })}
+              onStopSession={(id) => {
+                const session = sessions.find((s) => s.session_id === id);
+                setConfirmModal({ isOpen: true, type: 'stop', sessionId: id, sessionStatus: session?.status });
+              }}
               onDeleteSession={(id) => setConfirmModal({ isOpen: true, type: 'delete', sessionId: id })}
               loading={loading}
             />
@@ -141,7 +179,7 @@ export function AgentSessions() {
             <EventTimeline
               events={events}
               loading={eventsLoading}
-              isRunning={selectedSession?.status === 'running'}
+              isRunning={selectedSession?.status === 'running' || selectedSession?.status === 'idle'}
             />
           ) : (
             <div className="h-full flex items-center justify-center bg-gray-50">
@@ -164,6 +202,8 @@ export function AgentSessions() {
           onConfirm={
             confirmModal.type === 'stop'
               ? handleStopSession
+              : confirmModal.type === 'stop-all'
+              ? handleStopAllSessions
               : confirmModal.type === 'delete-all'
               ? handleDeleteAllSessions
               : handleDeleteSession
@@ -171,19 +211,25 @@ export function AgentSessions() {
           title={
             confirmModal.type === 'stop'
               ? 'Stop Session'
+              : confirmModal.type === 'stop-all'
+              ? 'Stop All Sessions'
               : confirmModal.type === 'delete-all'
               ? 'Delete All Sessions'
               : 'Delete Session'
           }
           message={
             confirmModal.type === 'stop'
-              ? 'Stop this session? This will terminate it immediately.'
+              ? confirmModal.sessionStatus === 'idle'
+                ? 'End this session? The agent will shut down gracefully.'
+                : 'Stop this running session? The agent will be force-terminated.'
+              : confirmModal.type === 'stop-all'
+              ? `Stop all ${sessions.filter((s) => s.status === 'running' || s.status === 'idle').length} active sessions? Running sessions will be force-terminated, idle sessions will shut down gracefully.`
               : confirmModal.type === 'delete-all'
-              ? `Delete all ${sessions.length} sessions? This will permanently remove all session data and cannot be undone.`
+              ? `Delete all ${sessions.filter((s) => s.status !== 'running' && s.status !== 'idle' && s.status !== 'stopping').length} deletable sessions? Active sessions will be skipped. This cannot be undone.`
               : 'Delete this session? This cannot be undone.'
           }
-          confirmText={confirmModal.type === 'stop' ? 'Stop' : 'Delete'}
-          variant={confirmModal.type === 'stop' ? 'warning' : 'danger'}
+          confirmText={confirmModal.type === 'stop' || confirmModal.type === 'stop-all' ? 'Stop' : 'Delete'}
+          variant={confirmModal.type === 'stop' || confirmModal.type === 'stop-all' ? 'warning' : 'danger'}
           loading={actionLoading}
         />
       )}

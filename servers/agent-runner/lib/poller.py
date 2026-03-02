@@ -18,7 +18,7 @@ from typing import Callable, Optional
 
 from api_client import CoordinatorAPIClient, Run, PollResult
 from executor import RunExecutor
-from registry import RunningRunsRegistry
+from registry import ProcessRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class RunPoller:
         self,
         api_client: CoordinatorAPIClient,
         executor: RunExecutor,
-        registry: RunningRunsRegistry,
+        registry: ProcessRegistry,
         runner_id: str,
         on_deregistered: Optional[Callable[[], None]] = None,
     ):
@@ -67,6 +67,9 @@ class RunPoller:
         self._stop_event = threading.Event()
         self._backoff_seconds = 1.0
         self._max_backoff = 30.0
+
+        # Callback for supervisor's stdout reader (set by agent-runner after creation)
+        self._start_stdout_reader: Optional[Callable] = None
 
         # Scripts directory for synced scripts
         self._scripts_dir = get_scripts_dir()
@@ -111,9 +114,9 @@ class RunPoller:
                     return  # Exit poll loop
 
                 # Handle stop commands
-                if result.stop_runs:
-                    for run_id in result.stop_runs:
-                        self._handle_stop(run_id)
+                if result.stop_sessions:
+                    for session_id in result.stop_sessions:
+                        self._handle_stop(session_id)
                     continue  # Check for more commands
 
                 # Handle script sync commands
@@ -142,17 +145,38 @@ class RunPoller:
                 self._backoff_seconds = min(self._backoff_seconds * 2, self._max_backoff)
 
     def _handle_run(self, run: Run) -> None:
-        """Handle a received agent run by spawning subprocess."""
+        """Handle a received agent run by spawning subprocess or routing to existing process."""
         logger.debug(f"Received agent run {run.run_id}: type={run.type}, session={run.session_id}")
 
         try:
-            # Spawn subprocess
+            # Resume routing for persistent sessions
+            if run.type == "resume_session":
+                entry = self.registry.get_session(run.session_id)
+                if entry and entry.persistent:
+                    self._route_resume(run, entry)
+                    return
+                elif entry and not entry.persistent:
+                    # One-shot executor — fall through to spawn new process (existing behavior)
+                    pass
+                else:
+                    # No live process — fail explicitly (no fallback, no new process)
+                    self.api_client.report_failed(
+                        self.runner_id, run.run_id,
+                        f"No live executor process for session {run.session_id}"
+                    )
+                    return
+
+            # Start or one-shot resume — spawn new process
             process = self.executor.execute_run(run)
+            self.registry.register_session(
+                run.session_id, process, run.run_id,
+                persistent=self.executor.is_persistent
+            )
 
-            # Add to registry
-            self.registry.add_run(run.run_id, run.session_id, process)
+            # Start stdout reader for persistent processes
+            if self.executor.is_persistent and self._start_stdout_reader:
+                self._start_stdout_reader(run.session_id, process)
 
-            # Report started
             self.api_client.report_started(self.runner_id, run.run_id)
             logger.debug(f"Agent run {run.run_id} started (pid={process.pid})")
 
@@ -163,44 +187,87 @@ class RunPoller:
             except Exception:
                 logger.error(f"Failed to report agent run failure for {run.run_id}")
 
-    def _handle_stop(self, run_id: str) -> None:
-        """Stop a running agent run by terminating its process."""
-        running_run = self.registry.get_run(run_id)
-
-        if not running_run:
-            # Agent run not running (already completed or never started)
-            logger.debug(f"Stop command for agent run {run_id} ignored - run not running")
+    def _route_resume(self, run: Run, entry) -> None:
+        """Route a resume turn to an existing persistent process."""
+        # Resume-while-busy guard
+        if entry.current_run_id is not None:
+            error_msg = (
+                f"Session {run.session_id} is busy with run {entry.current_run_id}, "
+                f"cannot accept resume run {run.run_id}"
+            )
+            logger.warning(error_msg)
+            self.api_client.report_failed(self.runner_id, run.run_id, error_msg)
             return
 
-        logger.info(f"Stopping agent run {run_id} (session={running_run.session_id}, pid={running_run.process.pid})")
+        try:
+            self.registry.swap_run(run.session_id, run.run_id)
+            self.executor.send_turn(entry.process, run)
+            self.api_client.report_started(self.runner_id, run.run_id)
+            logger.info(f"Resumed session {run.session_id} with run {run.run_id}")
+        except BrokenPipeError:
+            self.registry.remove_session(run.session_id)
+            self.api_client.report_failed(
+                self.runner_id, run.run_id,
+                f"Executor process for session {run.session_id} is no longer running"
+            )
+
+    def _handle_stop(self, session_id: str) -> None:
+        """Stop a session by terminating its executor process."""
+        entry = self.registry.get_session(session_id)
+
+        if not entry:
+            logger.debug(f"Stop command for session {session_id} ignored - no live process")
+            return
+
+        run_id = entry.current_run_id  # May be None if between turns
+        logger.info(f"Stopping session {session_id} (run={run_id}, pid={entry.process.pid})")
+
+        # Mark as stopping so supervisor skips reporting for this session
+        self.registry.mark_stopping(session_id)
 
         signal_used = "SIGTERM"
 
         try:
-            # Send SIGTERM first (graceful)
-            running_run.process.terminate()
+            # For persistent processes: try graceful shutdown first
+            if entry.persistent:
+                try:
+                    self.executor.send_shutdown(entry.process)
+                    entry.process.wait(timeout=5)
+                    signal_used = "shutdown"
+                except Exception:
+                    pass  # Fall through to SIGTERM
 
-            # Wait briefly for graceful shutdown
-            try:
-                running_run.process.wait(timeout=5)
-            except Exception:
-                # Force kill if not responding
-                running_run.process.kill()
-                signal_used = "SIGKILL"
-                logger.warning(f"Agent run {run_id} did not respond to SIGTERM, sent SIGKILL")
+            # SIGTERM path (or first attempt for one-shot)
+            if entry.process.poll() is None:
+                entry.process.terminate()
+                try:
+                    entry.process.wait(timeout=5)
+                except Exception:
+                    entry.process.kill()
+                    signal_used = "SIGKILL"
+                    logger.warning(f"Session {session_id} did not respond to SIGTERM, sent SIGKILL")
 
             # Remove from registry
-            self.registry.remove_run(run_id)
+            self.registry.remove_session(session_id)
 
-            # Report stopped
-            try:
-                self.api_client.report_stopped(self.runner_id, run_id, signal=signal_used)
-                logger.info(f"Agent run {run_id} stopped successfully (signal={signal_used})")
-            except Exception as e:
-                logger.error(f"Failed to report stopped for {run_id}: {e}")
+            # Report back using run_id if there was an active run
+            if run_id:
+                try:
+                    self.api_client.report_stopped(self.runner_id, run_id, signal=signal_used)
+                    logger.info(f"Session {session_id} stopped (run={run_id}, signal={signal_used})")
+                except Exception as e:
+                    logger.error(f"Failed to report stopped for run {run_id}: {e}")
+            else:
+                # Session was idle between turns — report based on how it exited
+                end_status = "finished" if signal_used == "shutdown" else "stopped"
+                try:
+                    self.api_client.report_session_status(self.runner_id, session_id, end_status)
+                    logger.info(f"Idle session {session_id} {end_status} (signal={signal_used})")
+                except Exception as e:
+                    logger.error(f"Failed to report {end_status} for idle session {session_id}: {e}")
 
         except Exception as e:
-            logger.error(f"Error stopping agent run {run_id}: {e}")
+            logger.error(f"Error stopping session {session_id}: {e}")
 
     def _handle_script_sync(self, script_name: str) -> None:
         """Download and extract a script from the coordinator."""

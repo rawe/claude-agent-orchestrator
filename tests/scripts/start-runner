@@ -5,7 +5,7 @@
 #   ./tests/scripts/start-runner [profile]
 #
 # Arguments:
-#   profile  - Executor profile: test-executor (default) or claude-code
+#   profile  - Executor profile: echo-executor (default) or claude-code
 #
 # The script:
 #   - Sources .env and exports all variables
@@ -16,7 +16,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-PROFILE="${1:-test-executor}"
+PROFILE="${1:-echo-executor}"
 
 # Source and export all variables from .env
 if [ -f "$PROJECT_ROOT/.env" ]; then

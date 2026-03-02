@@ -107,6 +107,57 @@ Agents are stored as directories:
 └── .disabled               # Optional: presence = inactive
 ```
 
+## Testing
+
+No running services required — all tests use isolated fixtures with tmp_path SQLite and FastAPI TestClient.
+
+```bash
+# Run from servers/agent-coordinator/
+
+# All tests (unit + API)
+uv run --with pytest --with httpx pytest tests/ -v
+
+# Unit tests only
+uv run --with pytest --with httpx pytest tests/unit/ -v
+
+# API tests only
+uv run --with pytest --with httpx pytest tests/api/ -v
+
+# Single test file
+uv run --with pytest --with httpx pytest tests/unit/test_database_sessions.py -v
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py                     # Shared fixtures (db_path, coordinator_client, etc.)
+├── test_mcp_registry.py            # MCP registry tests
+├── test_placeholder_resolver.py    # Placeholder resolver tests
+├── unit/
+│   ├── test_smoke.py               # Fixture smoke test
+│   ├── test_database_sessions.py   # Session CRUD + state transitions
+│   ├── test_database_runs.py       # Run CRUD + atomic claiming
+│   ├── test_database_events.py     # Event CRUD + cascade delete
+│   ├── test_run_queue.py           # RunQueue add/claim/demand matching
+│   ├── test_runner_registry.py     # Runner register/heartbeat/lifecycle
+│   └── test_run_demands.py         # Demand matching logic
+└── api/
+    ├── test_runs_api.py            # POST /runs endpoints
+    ├── test_sessions_api.py        # GET/DELETE /sessions endpoints
+    └── test_runner_api.py          # Runner register/poll/report endpoints
+```
+
+### Fixtures
+
+| Fixture | Scope | Purpose |
+|---------|-------|---------|
+| `db_path` | function | Fresh SQLite in tmp_path, patches `database.DB_PATH` |
+| `file_storage` | function | Isolated file storage dirs via `AGENT_ORCHESTRATOR_AGENTS_DIR` |
+| `fresh_run_queue` | function | Reset RunQueue singleton with temp DB |
+| `coordinator_client` | function | FastAPI TestClient with full isolation (DB + file storage + services) |
+| `fast_timeouts` | function (autouse) | Short timeouts for all env-configurable intervals |
+
 ## Database
 
 Session, event, and run data is stored in SQLite:
