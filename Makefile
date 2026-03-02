@@ -31,6 +31,12 @@ SHELL := bash
 # Default registry (GitHub Container Registry)
 REGISTRY ?= ghcr.io/rawe
 
+# Comma variable for use inside $(if ...) expressions (Make treats literal commas as arg separators)
+comma := ,
+
+# Multi-arch platforms for CI builds (amd64 native + arm64 via QEMU emulation)
+PLATFORMS := linux/amd64,linux/arm64
+
 # Image names
 IMAGE_COORDINATOR := $(REGISTRY)/aof-coordinator
 IMAGE_RUNNER := $(REGISTRY)/aof-runner-claude-code
@@ -617,6 +623,17 @@ stop-chat-ui:
 # ==============================================================================
 # Build and optionally push versioned container images to GitHub Container Registry.
 #
+# Uses docker buildx for all builds. When PUSH=true (CI), images are built for
+# linux/amd64 + linux/arm64 (multi-arch) and pushed with registry-based BuildKit
+# cache. Without PUSH, images are built for the host architecture only and loaded
+# into the local Docker daemon (--load).
+#
+# Cache strategy: Each image has a :buildcache tag in GHCR. BuildKit pulls cached
+# layers before building and pushes updated layers after. mode=max caches ALL
+# layers including intermediate build stages (critical for multi-stage Dockerfiles
+# like dashboard and runners where the expensive dependency layers are in non-final
+# stages).
+#
 # Usage:
 #   make release VERSION=1.0.0                    # Build all images locally
 #   make release VERSION=1.0.0 PUSH=true          # Build and push to registry
@@ -626,6 +643,7 @@ stop-chat-ui:
 #   make release-coordinator VERSION=1.0.0
 #   make release-runner VERSION=1.0.0
 #   make release-dashboard VERSION=1.0.0
+#   make release-context-store VERSION=1.0.0
 #
 # The VERSION parameter is required and should match the git tag (without 'v' prefix).
 # Example: git tag v1.0.0 → make release VERSION=1.0.0
@@ -659,7 +677,7 @@ release-coordinator: _check-version
 	@echo "  Component version: $(COORDINATOR_VERSION)"
 	@echo "  Git commit: $(GIT_COMMIT)"
 	@echo ""
-	docker build \
+	docker buildx build \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMPONENT_VERSION=$(COORDINATOR_VERSION) \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
@@ -667,12 +685,11 @@ release-coordinator: _check-version
 		-t $(IMAGE_COORDINATOR):$(VERSION) \
 		-t $(IMAGE_COORDINATOR):latest \
 		-f servers/agent-coordinator/Dockerfile \
+		$(if $(PUSH),--platform $(PLATFORMS)) \
+		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_COORDINATOR):buildcache) \
+		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_COORDINATOR):buildcache$(comma)mode=max) \
+		$(if $(PUSH),--push,--load) \
 		servers/agent-coordinator
-ifdef PUSH
-	@echo "Pushing $(IMAGE_COORDINATOR):$(VERSION)..."
-	docker push $(IMAGE_COORDINATOR):$(VERSION)
-	docker push $(IMAGE_COORDINATOR):latest
-endif
 
 release-runner: _check-version
 	@echo ""
@@ -680,7 +697,7 @@ release-runner: _check-version
 	@echo "  Component version: $(RUNNER_VERSION)"
 	@echo "  Git commit: $(GIT_COMMIT)"
 	@echo ""
-	docker build \
+	docker buildx build \
 		--target claude-code \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMPONENT_VERSION=$(RUNNER_VERSION) \
@@ -689,12 +706,11 @@ release-runner: _check-version
 		-t $(IMAGE_RUNNER):$(VERSION) \
 		-t $(IMAGE_RUNNER):latest \
 		-f servers/agent-runner/docker/Dockerfile \
+		$(if $(PUSH),--platform $(PLATFORMS)) \
+		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_RUNNER):buildcache) \
+		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_RUNNER):buildcache$(comma)mode=max) \
+		$(if $(PUSH),--push,--load) \
 		.
-ifdef PUSH
-	@echo "Pushing $(IMAGE_RUNNER):$(VERSION)..."
-	docker push $(IMAGE_RUNNER):$(VERSION)
-	docker push $(IMAGE_RUNNER):latest
-endif
 
 release-runner-procedural: _check-version
 	@echo ""
@@ -702,7 +718,7 @@ release-runner-procedural: _check-version
 	@echo "  Component version: $(RUNNER_VERSION)"
 	@echo "  Git commit: $(GIT_COMMIT)"
 	@echo ""
-	docker build \
+	docker buildx build \
 		--target procedural \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMPONENT_VERSION=$(RUNNER_VERSION) \
@@ -711,12 +727,11 @@ release-runner-procedural: _check-version
 		-t $(IMAGE_RUNNER_PROCEDURAL):$(VERSION) \
 		-t $(IMAGE_RUNNER_PROCEDURAL):latest \
 		-f servers/agent-runner/docker/Dockerfile \
+		$(if $(PUSH),--platform $(PLATFORMS)) \
+		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_RUNNER_PROCEDURAL):buildcache) \
+		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_RUNNER_PROCEDURAL):buildcache$(comma)mode=max) \
+		$(if $(PUSH),--push,--load) \
 		.
-ifdef PUSH
-	@echo "Pushing $(IMAGE_RUNNER_PROCEDURAL):$(VERSION)..."
-	docker push $(IMAGE_RUNNER_PROCEDURAL):$(VERSION)
-	docker push $(IMAGE_RUNNER_PROCEDURAL):latest
-endif
 
 release-dashboard: _check-version
 	@echo ""
@@ -726,7 +741,7 @@ release-dashboard: _check-version
 	@echo ""
 	@# Build context is repo root (not apps/dashboard) because the dashboard
 	@# depends on workspace packages in packages/ that must be copied into the build
-	docker build \
+	docker buildx build \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMPONENT_VERSION=$(DASHBOARD_VERSION) \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
@@ -734,12 +749,11 @@ release-dashboard: _check-version
 		-t $(IMAGE_DASHBOARD):$(VERSION) \
 		-t $(IMAGE_DASHBOARD):latest \
 		-f apps/dashboard/Dockerfile \
+		$(if $(PUSH),--platform $(PLATFORMS)) \
+		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_DASHBOARD):buildcache) \
+		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_DASHBOARD):buildcache$(comma)mode=max) \
+		$(if $(PUSH),--push,--load) \
 		.
-ifdef PUSH
-	@echo "Pushing $(IMAGE_DASHBOARD):$(VERSION)..."
-	docker push $(IMAGE_DASHBOARD):$(VERSION)
-	docker push $(IMAGE_DASHBOARD):latest
-endif
 
 release-context-store: _check-version
 	@echo ""
@@ -747,7 +761,7 @@ release-context-store: _check-version
 	@echo "  Component version: $(CONTEXT_STORE_VERSION)"
 	@echo "  Git commit: $(GIT_COMMIT)"
 	@echo ""
-	docker build \
+	docker buildx build \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMPONENT_VERSION=$(CONTEXT_STORE_VERSION) \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
@@ -755,9 +769,8 @@ release-context-store: _check-version
 		-t $(IMAGE_CONTEXT_STORE):$(VERSION) \
 		-t $(IMAGE_CONTEXT_STORE):latest \
 		-f servers/context-store/Dockerfile \
+		$(if $(PUSH),--platform $(PLATFORMS)) \
+		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_CONTEXT_STORE):buildcache) \
+		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_CONTEXT_STORE):buildcache$(comma)mode=max) \
+		$(if $(PUSH),--push,--load) \
 		.
-ifdef PUSH
-	@echo "Pushing $(IMAGE_CONTEXT_STORE):$(VERSION)..."
-	docker push $(IMAGE_CONTEXT_STORE):$(VERSION)
-	docker push $(IMAGE_CONTEXT_STORE):latest
-endif
